@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Button, Heading, Screen, Text, TextField } from '../../components/ui';
 import { authErrorMessage, sendOtp, verifyOtp } from '../../lib/api/auth';
+import { useTheme } from '../../lib/theme';
 
 export default function LoginScreen() {
+  const t = useTheme();
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -46,63 +49,70 @@ export default function LoginScreen() {
     }
   }
 
+  function onChangeEmail() {
+    setStep('email');
+    setCode('');
+    setError(null);
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bem-vindo</Text>
+    <Screen scroll style={{ paddingTop: t.spacing.xxxl, gap: t.spacing.xl }}>
+      <View style={{ gap: t.spacing.md }}>
+        <Heading level={1}>{step === 'email' ? 'Só entra quem foi chamado.' : 'Olha o seu email.'}</Heading>
+        <Text tone="muted">
+          {step === 'email' ? (
+            'Põe seu email e a gente manda um código de 6 dígitos. Sem senha pra decorar.'
+          ) : (
+            <>
+              Mandamos um código de 6 dígitos para{' '}
+              <Text highlight bold>
+                {email}
+              </Text>
+              . Pode levar um minutinho.
+            </>
+          )}
+        </Text>
+      </View>
       {step === 'email' ? (
-        <>
-          <Text style={styles.text}>Digite seu email para receber um código de acesso.</Text>
-          <TextInput
-            style={styles.input}
+        <View style={{ gap: t.spacing.lg }}>
+          <TextField
+            label="Email"
             placeholder="seu@email.com"
             autoCapitalize="none"
             autoComplete="email"
+            autoCorrect={false}
+            textContentType="emailAddress"
             keyboardType="email-address"
+            returnKeyType="send"
+            editable={!busy}
             value={email}
             onChangeText={setEmail}
+            onSubmitEditing={onSendCode}
+            error={error ?? undefined}
+            help="Só funciona com o email que o grupo liberou."
           />
-          <Pressable accessibilityRole="button" style={styles.button} onPress={onSendCode} disabled={busy}>
-            <Text style={styles.buttonText}>Enviar código</Text>
-          </Pressable>
-        </>
+          <Button title="Enviar código" onPress={onSendCode} loading={busy} fullWidth />
+        </View>
       ) : (
-        <>
-          <Text style={styles.text}>Enviamos um código de 6 dígitos para {email}.</Text>
-          <TextInput
-            style={styles.input}
+        <View style={{ gap: t.spacing.lg }}>
+          <TextField
+            label="Código de 6 dígitos"
             placeholder="000000"
             keyboardType="number-pad"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
             maxLength={6}
+            editable={!busy}
             value={code}
-            onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
+            onChangeText={(c) => setCode(c.replace(/\D/g, ''))}
+            onSubmitEditing={onVerify}
+            error={error ?? undefined}
+            help="Não chegou? Olha o spam ou volta e manda de novo."
           />
-          <Pressable accessibilityRole="button" style={styles.button} onPress={onVerify} disabled={busy}>
-            <Text style={styles.buttonText}>Entrar</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setStep('email');
-              setCode('');
-              setError(null);
-            }}
-          >
-            <Text style={styles.link}>Usar outro email</Text>
-          </Pressable>
-        </>
+          <Button title="Entrar" onPress={onVerify} loading={busy} fullWidth />
+          <Button title="Voltar e usar outro email" variant="ghost" onPress={onChangeEmail} disabled={busy} fullWidth />
+        </View>
       )}
-      {busy ? <ActivityIndicator /> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 24, fontWeight: '700' },
-  text: { fontSize: 15, textAlign: 'center', color: '#555' },
-  input: { width: '100%', maxWidth: 360, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16 },
-  button: { backgroundColor: '#111', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  link: { color: '#0a58ca' },
-  error: { color: '#c00', textAlign: 'center' },
-});
