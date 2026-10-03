@@ -13,6 +13,7 @@ export type Colors = {
   onPrimary: string;
   accent: string;
   onAccent: string;
+  brand: string;
   danger: string;
   onDanger: string;
   success: string;
@@ -31,6 +32,7 @@ export const colors: Record<ColorScheme, Colors> = {
     onPrimary: '#F4F1EA',
     accent: '#FFE14D',
     onAccent: '#121212',
+    brand: '#5B3FD9',
     danger: '#B3261E',
     onDanger: '#FFFFFF',
     success: '#2E7D4F',
@@ -47,6 +49,7 @@ export const colors: Record<ColorScheme, Colors> = {
     onPrimary: '#121212',
     accent: '#FFE14D',
     onAccent: '#121212',
+    brand: '#B8A2FF',
     danger: '#FF8A80',
     onDanger: '#121212',
     success: '#7BD9A0',
@@ -57,6 +60,43 @@ export const colors: Record<ColorScheme, Colors> = {
 /** Fundos de avatar sem foto (iniciais); todos passam contraste com `avatarInk`. */
 export const avatarPalette = ['#E8DFC8', '#FFE14D', '#F4B6A6', '#BFD8C4', '#C5D0E8', '#E3C7E8'] as const;
 export const avatarInk = '#121212';
+
+/**
+ * Cores vibrantes de perfil. `bg` é preenchimento (banner, anel, chip) e `ink` o texto/ícone por cima;
+ * como o preenchimento é fixo, funciona igual no claro e no escuro (ink x bg >= 4.5:1).
+ */
+export const profilePalette = {
+  coral: { bg: '#FF6B5E', ink: '#121212' },
+  tangerine: { bg: '#FF9F1C', ink: '#121212' },
+  lime: { bg: '#C6F135', ink: '#121212' },
+  mint: { bg: '#6EE7B7', ink: '#121212' },
+  turquoise: { bg: '#22D3C5', ink: '#121212' },
+  blue: { bg: '#5AA9FF', ink: '#121212' },
+  violet: { bg: '#A78BFA', ink: '#121212' },
+  pink: { bg: '#FF7EB6', ink: '#121212' },
+} as const;
+
+export type ProfileColorKey = keyof typeof profilePalette;
+export type ProfileColor = { key: ProfileColorKey; bg: string; ink: string };
+
+export const profileColorKeys = Object.keys(profilePalette) as ProfileColorKey[];
+
+export function isProfileColorKey(key: unknown): key is ProfileColorKey {
+  return typeof key === 'string' && Object.prototype.hasOwnProperty.call(profilePalette, key);
+}
+
+/** Cor do perfil: a escolhida (`key`) se válida; senão derivada de forma estável do `userId`. */
+export function profileColor(userId: string, key?: string | null): ProfileColor {
+  let k: ProfileColorKey;
+  if (isProfileColorKey(key)) {
+    k = key;
+  } else {
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
+    k = profileColorKeys[hash % profileColorKeys.length];
+  }
+  return { key: k, ...profilePalette[k] };
+}
 
 export const fonts = {
   display: 'InstrumentSerif_400Regular',
