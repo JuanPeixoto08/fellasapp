@@ -1,0 +1,41 @@
+# Supabase – fellasapp
+
+Schema, RLS e storage do grupo fechado. Nenhuma chave é commitada: use `.env`
+(`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
+
+## Aplicar
+
+**Supabase CLI**
+```bash
+supabase link --project-ref <ref>
+supabase db push          # aplica supabase/migrations/*.sql
+```
+`supabase db reset` (local) também roda `seed.sql`.
+
+**SQL editor**: cole `migrations/0001_init.sql` e execute (é idempotente).
+
+Em Auth > Providers, habilite Email (OTP / magic link).
+
+## Modelo de acesso
+
+- `allowed_emails`: lista de convidados. Só membros leem; escrita só via SQL editor / service role.
+- Ao se cadastrar, o trigger cria o `profile` com `is_member = true` se o email estiver em `allowed_emails`; caso contrário `false` (o app deve mostrar "sem convite").
+- Se o convite for adicionado depois do cadastro, o profile existente é promovido automaticamente.
+- Só membros leem/escrevem posts, likes, comentários e profiles; cada um só edita/apaga o que é seu. Não-membros só enxergam o próprio profile.
+- `is_member` não é editável pelo cliente (grant por coluna).
+- Storage `post-images`: bucket **privado**; membros leem (use `createSignedUrl`), upload em `<user_id>/<arquivo>`, máx. 5 MB, só imagens. Guarde o path em `posts.image_url`.
+
+## Convidar um amigo
+
+No SQL editor (email em minúsculas):
+```sql
+insert into public.allowed_emails (email)
+values ('amigo@email.com')
+on conflict do nothing;
+```
+O amigo então entra no app com esse email.
+
+## Tipos
+
+`types/database.ts` é escrito à mão no formato do `supabase gen types typescript`.
+Se alterar o schema, atualize-o (ou regenere com a CLI).
