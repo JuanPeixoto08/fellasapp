@@ -36,6 +36,10 @@ export type Database = {
           display_name: string | null;
           avatar_url: string | null;
           bio: string | null;
+          accent_color: string | null;
+          status: string | null;
+          location: string | null;
+          birthday: string | null;
           is_member: boolean;
           created_at: string;
         };
@@ -45,6 +49,10 @@ export type Database = {
           display_name?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
+          accent_color?: string | null;
+          status?: string | null;
+          location?: string | null;
+          birthday?: string | null;
           is_member?: boolean;
           created_at?: string;
         };
@@ -54,6 +62,10 @@ export type Database = {
           display_name?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
+          accent_color?: string | null;
+          status?: string | null;
+          location?: string | null;
+          birthday?: string | null;
           is_member?: boolean;
           created_at?: string;
         };
