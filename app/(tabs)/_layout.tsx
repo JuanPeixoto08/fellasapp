@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getTabBarStyle } from '../../lib/tabBarStyle';
 import { useTheme } from '../../lib/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -25,15 +26,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: t.colors.brand,
         tabBarInactiveTintColor: t.colors.textMuted,
         tabBarLabelStyle: { fontFamily: t.fonts.bodyMedium, fontSize: t.typography.caption.fontSize },
-        tabBarStyle: {
-          backgroundColor: t.colors.bg,
-          borderTopColor: t.colors.border,
-          borderTopWidth: 1,
-          minHeight: t.layout.minTouch + t.spacing.sm + insets.bottom,
-          paddingTop: t.spacing.xs,
-          paddingBottom: Math.max(insets.bottom, t.spacing.xs),
-          paddingHorizontal: insets.left,
-        },
+        tabBarStyle: getTabBarStyle(t, insets),
       }}
     >
       <Tabs.Screen
