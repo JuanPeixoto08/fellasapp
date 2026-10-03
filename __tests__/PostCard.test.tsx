@@ -42,3 +42,37 @@ describe('PostCard like state', () => {
     expect(screen.getByText(/Curtiu/)).toBeTruthy();
   });
 });
+
+describe('PostCard reactions', () => {
+  it('renders the reaction bar', async () => {
+    await render(<PostCard post={{ ...post, reactions: [{ emoji: '❤️', count: 3 }], myReaction: null }} />);
+    expect(screen.getByLabelText('❤️ 3 reações')).toBeTruthy();
+  });
+
+  it('picks an emoji via the React button', async () => {
+    const onReact = jest.fn();
+    await render(<PostCard post={post} onReact={onReact} />);
+    await fireEvent.press(screen.getByLabelText('Reagir'));
+    await fireEvent.press(screen.getByLabelText('Reagir com 😂'));
+    expect(onReact).toHaveBeenCalledWith(post, '😂');
+  });
+
+  it('opens the picker on long press', async () => {
+    const onReact = jest.fn();
+    await render(<PostCard post={post} onReact={onReact} />);
+    await fireEvent(screen.getByLabelText('Abrir post de Ana'), 'longPress');
+    await fireEvent.press(screen.getByLabelText('Reagir com 👍'));
+    expect(onReact).toHaveBeenCalledWith(post, '👍');
+  });
+
+  it('removes my reaction when tapping my chip or the same emoji', async () => {
+    const onReact = jest.fn();
+    const mine = { ...post, reactions: [{ emoji: '❤️', count: 1 }], myReaction: '❤️' };
+    await render(<PostCard post={mine} onReact={onReact} />);
+    await fireEvent.press(screen.getByLabelText('❤️ 1 reação'));
+    expect(onReact).toHaveBeenLastCalledWith(mine, null);
+    await fireEvent.press(screen.getByLabelText('Reagir'));
+    await fireEvent.press(screen.getByLabelText('Reagir com ❤️'));
+    expect(onReact).toHaveBeenLastCalledWith(mine, null);
+  });
+});

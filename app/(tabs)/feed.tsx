@@ -5,6 +5,8 @@ import { ActivityIndicator, FlatList, View } from 'react-native';
 import { PostCard } from '../../components/PostCard';
 import { Button, EmptyState, Heading, Screen, Text } from '../../components/ui';
 import { listFeed, toggleLike, type FeedPost } from '../../lib/api/posts';
+import { setPostReaction } from '../../lib/api/reactions';
+import { withReaction } from '../../lib/reactionState';
 import { useTheme } from '../../lib/theme';
 
 export default function FeedScreen() {
@@ -61,6 +63,17 @@ export default function FeedScreen() {
     }
   };
 
+  const onReact = async (post: FeedPost, emoji: string | null) => {
+    const apply = (fn: (p: FeedPost) => FeedPost) =>
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? fn(p) : p)));
+    apply((p) => withReaction(p, emoji));
+    try {
+      await setPostReaction(post.id, emoji);
+    } catch {
+      apply((p) => ({ ...p, reactions: post.reactions, myReaction: post.myReaction }));
+    }
+  };
+
   return (
     <Screen flush>
       <FlatList
@@ -80,6 +93,7 @@ export default function FeedScreen() {
           <PostCard
             post={item}
             onToggleLike={onLike}
+            onReact={onReact}
             onPress={(p) => router.push(`/post/${p.id}`)}
           />
         )}
