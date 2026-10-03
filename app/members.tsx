@@ -76,7 +76,7 @@ export default function MembersScreen() {
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Membros')} />
-      <Screen>{body}</Screen>
+      <Screen header>{body}</Screen>
     </>
   );
 }

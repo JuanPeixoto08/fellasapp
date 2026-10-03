@@ -8,6 +8,7 @@ jest.mock('../lib/supabase', () => ({ supabase: {} }));
 const post: FeedPost = {
   id: 'p1',
   body: 'Olá galera',
+  images: [],
   imageUrl: null,
   createdAt: '2026-01-01T00:00:00Z',
   author: { id: 'u1', username: 'ana', display_name: 'Ana', avatar_url: null },
@@ -36,10 +37,36 @@ describe('PostCard', () => {
 });
 
 describe('PostCard like state', () => {
-  it('shows liked label and Descurtir when liked', async () => {
+  it('shows Descurtir (selected) when liked', async () => {
     await render(<PostCard post={{ ...post, likedByMe: true }} />);
-    expect(screen.getByLabelText('Descurtir')).toBeTruthy();
-    expect(screen.getByText(/Curtiu/)).toBeTruthy();
+    expect(screen.getByLabelText('Descurtir').props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it('hides zero counts, like on Twitter', async () => {
+    await render(<PostCard post={{ ...post, likeCount: 0, commentCount: 0 }} />);
+    expect(screen.queryByText('0')).toBeNull();
+    expect(screen.getByLabelText('Curtir')).toBeTruthy();
+  });
+});
+
+describe('PostCard layout', () => {
+  it('shows the date next to the name', async () => {
+    await render(<PostCard post={{ ...post, createdAt: '2025-02-07T12:00:00Z' }} />);
+    expect(screen.getByText('7 fev 2025')).toBeTruthy();
+  });
+
+  it('shows my reaction in place of the react face', async () => {
+    await render(<PostCard post={{ ...post, reactions: [{ emoji: '😂', count: 2 }], myReaction: '😂' }} />);
+    const button = screen.getByLabelText('Reagir');
+    expect(button.props.accessibilityHint).toMatch(/Sua reação: 😂/);
+  });
+
+  it('a photo opens the post when there is no image handler', async () => {
+    const onPress = jest.fn();
+    const withPhoto = { ...post, images: ['https://x/a.jpg'], imageUrl: 'https://x/a.jpg' };
+    await render(<PostCard post={withPhoto} onPress={onPress} />);
+    await fireEvent.press(screen.getByLabelText('Foto postada por Ana'));
+    expect(onPress).toHaveBeenCalledWith(withPhoto);
   });
 });
 

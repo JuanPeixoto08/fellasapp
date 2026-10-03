@@ -5,7 +5,8 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { stackHeader } from '../../components/profile/headerOptions';
-import { Avatar, Button, Screen, Text, TextField } from '../../components/ui';
+import { Avatar, Button, Divider, Screen, Text, TextField } from '../../components/ui';
+import { useSession } from '../../lib/auth/SessionProvider';
 import {
   getCurrentUserId,
   formatBirthday,
@@ -21,6 +22,7 @@ export default function EditProfileScreen() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { signOut } = useSession();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
@@ -95,9 +97,9 @@ export default function EditProfileScreen() {
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Editar perfil')} />
-      <Screen scroll style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
+      <Screen scroll header style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
         <View style={{ alignItems: 'center', gap: t.spacing.md }}>
-          <Avatar name={displayName || username || '?'} uri={avatarUri} size={t.layout.minTouch * 2} />
+          <Avatar name={displayName || username || '?'} uri={avatarUri} size={t.avatarSizes.xl} />
           <Button
             title={avatarUri ? 'Trocar foto' : 'Escolher foto'}
             variant="secondary"
@@ -190,6 +192,8 @@ export default function EditProfileScreen() {
           </Text>
         ) : null}
         <Button title="Salvar" fullWidth loading={saving} onPress={save} />
+        <Divider />
+        <Button title="Sair da conta" variant="ghost" fullWidth onPress={() => void signOut()} disabled={saving} />
       </Screen>
     </>
   );

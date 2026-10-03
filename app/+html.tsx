@@ -24,4 +24,5 @@ const css = `
 html, body, #root { height: 100%; }
 body { overflow: hidden; }
 #root { height: 100dvh; }
+input:focus, input:focus-visible, textarea:focus, textarea:focus-visible { outline: none; }
 `;

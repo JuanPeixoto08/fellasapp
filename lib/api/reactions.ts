@@ -1,6 +1,16 @@
 import { supabase } from '../supabase';
 
-export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
+export { QUICK_REACTIONS as REACTION_EMOJIS } from '../emoji';
+
+/** Mesmo limite do banco (0004): 1 a 16 code points e sem espaço, para não virar texto livre. */
+export function isValidReactionEmoji(emoji: string): boolean {
+  const points = [...emoji].length;
+  return points >= 1 && points <= 16 && !/\s/.test(emoji);
+}
+
+function assertEmoji(emoji: string): void {
+  if (!isValidReactionEmoji(emoji)) throw new Error('Reação inválida');
+}
 
 export type ReactionSummary = { emoji: string; count: number };
 
@@ -41,6 +51,7 @@ export async function setPostReaction(
   postId: string,
   emoji: string | null,
 ): Promise<void> {
+  if (emoji !== null) assertEmoji(emoji);
   const userId = await currentUserId();
   if (emoji === null) {
     const { error } = await supabase
@@ -65,6 +76,7 @@ export async function setCommentReaction(
   commentId: string,
   emoji: string | null,
 ): Promise<void> {
+  if (emoji !== null) assertEmoji(emoji);
   const userId = await currentUserId();
   if (emoji === null) {
     const { error } = await supabase

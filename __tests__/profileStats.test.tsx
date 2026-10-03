@@ -60,7 +60,6 @@ describe('ProfileStats', () => {
     await render(
       <ProfileStats
         stats={{ posts: 3, likesReceived: 12, commentsReceived: 5 }}
-        color={{ bg: '#FFE14D', ink: '#121212' }}
       />,
     );
     expect(screen.getByText('3')).toBeTruthy();

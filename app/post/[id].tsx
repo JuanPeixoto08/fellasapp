@@ -1,10 +1,13 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentItem } from '../../components/feed/CommentItem';
+import { PhotoViewer } from '../../components/feed/PhotoViewer';
 import { PostCard } from '../../components/PostCard';
-import { Button, EmptyState, Screen, Text, TextField } from '../../components/ui';
+import { stackHeader } from '../../components/profile/headerOptions';
+import { Avatar, EmptyState, IconButton, Screen, Text, TextField } from '../../components/ui';
 import {
   addComment,
   getPost,
@@ -14,13 +17,20 @@ import {
   type FeedPost,
 } from '../../lib/api/posts';
 import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
+import { useSession } from '../../lib/auth/SessionProvider';
 import { friendlyError } from '../../lib/errors';
 import { withLike, withReaction } from '../../lib/reactionState';
 import { useTheme } from '../../lib/theme';
+import { useMyAvatar } from '../../lib/useMyAvatar';
+import { removePost } from '../../lib/usePostList';
 
 export default function PostDetailScreen() {
   const t = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const myId = useSession().session?.user.id;
+  const me = useMyAvatar();
+  const insets = useSafeAreaInsets();
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
@@ -50,6 +60,13 @@ export default function PostDetailScreen() {
     } catch {
       setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
     }
+  };
+
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  const onDelete = async (p: FeedPost) => {
+    await removePost(p.id);
+    router.back();
   };
 
   const onReactPost = async (p: FeedPost, emoji: string | null) => {
@@ -91,8 +108,8 @@ export default function PostDetailScreen() {
 
   if (loadError && !post) {
     return (
-      <Screen>
-        <Stack.Screen options={{ headerShown: true, title: 'Post' }} />
+      <Screen header>
+        <Stack.Screen options={stackHeader(t, 'Post')} />
         <EmptyState
           title="Não deu pra abrir esse post"
           message={loadError}
@@ -104,20 +121,26 @@ export default function PostDetailScreen() {
   }
 
   return (
-    <Screen flush>
+    <Screen flush header>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Stack.Screen options={{ headerShown: true, title: 'Post' }} />
+        <Stack.Screen options={stackHeader(t, 'Post')} />
         <FlatList
           data={comments}
           keyExtractor={(c) => c.id}
-          contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingVertical: t.spacing.lg, gap: t.spacing.sm }}
+          contentContainerStyle={{ paddingBottom: t.spacing.lg, gap: t.spacing.sm }}
           ListHeaderComponent={
             post ? (
-              <View style={{ marginBottom: t.spacing.md }}>
-                <PostCard post={post} onToggleLike={onLike} onReact={onReactPost} />
+              <View style={{ borderBottomWidth: t.borders.hairline, borderColor: t.colors.border }}>
+                <PostCard
+                  post={post}
+                  onToggleLike={onLike}
+                  onReact={onReactPost}
+                  onPressImage={(_, i) => setViewerIndex(i)}
+                  onDelete={post.author.id === myId ? onDelete : undefined}
+                />
               </View>
             ) : null
           }
@@ -129,7 +152,7 @@ export default function PostDetailScreen() {
                 accessibilityLabel="Carregando post"
               />
             ) : (
-              <Text tone="muted" align="center">
+              <Text tone="muted" align="center" style={{ padding: t.spacing.xl }}>
                 Sem comentários ainda. Puxa o assunto.
               </Text>
             )
@@ -139,7 +162,9 @@ export default function PostDetailScreen() {
         <View
           style={{
             gap: t.spacing.sm,
-            padding: t.spacing.md,
+            paddingHorizontal: t.layout.gutter,
+            paddingTop: t.spacing.sm,
+            paddingBottom: t.spacing.sm + insets.bottom,
             borderTopWidth: t.borders.hairline,
             borderTopColor: t.colors.border,
             backgroundColor: t.colors.bg,
@@ -151,19 +176,42 @@ export default function PostDetailScreen() {
             </Text>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: t.spacing.sm }}>
+            {/* avatar centrado na altura de uma linha do campo (44) */}
+            <View style={{ height: t.layout.minTouch, justifyContent: 'center' }}>
+              <Avatar name={me.name} uri={me.uri} size={t.avatarSizes.sm} />
+            </View>
             <View style={{ flex: 1 }}>
               <TextField
                 label="Comentar"
-                placeholder="Fala aí…"
+                hideLabel
+                shape="pill"
+                multiline
+                numberOfLines={1}
+                placeholder={`Comentar como ${me.name.split(' ')[0]}…`}
                 value={text}
                 onChangeText={setText}
                 editable={!sending}
+                maxLength={1000}
               />
             </View>
-            <Button title="Enviar" onPress={send} loading={sending} disabled={!text.trim()} />
+            <IconButton
+              icon="arrow-up"
+              variant="solid"
+              accessibilityLabel="Enviar"
+              onPress={send}
+              disabled={!text.trim() || sending}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
+      {post && viewerIndex !== null ? (
+        <PhotoViewer
+          uris={post.images}
+          index={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          alt={`Foto postada por ${post.author.display_name || post.author.username}`}
+        />
+      ) : null}
     </Screen>
   );
 }

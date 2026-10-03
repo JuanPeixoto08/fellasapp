@@ -1,6 +1,47 @@
 import { resolveUrl } from '../lib/api/storage';
 import { friendlyError, isUniqueViolation } from '../lib/errors';
+import { memberSince, shortDate } from '../lib/format';
+import { emitPostCreated, emitPostDeleted, onPostCreated, onPostDeleted } from '../lib/postEvents';
 import { withLike } from '../lib/reactionState';
+
+describe('shortDate', () => {
+  const now = new Date('2026-06-01T12:00:00');
+  it('omite o ano quando é o ano atual', () => {
+    expect(shortDate('2026-02-07T12:00:00', now)).toBe('7 fev');
+  });
+  it('mostra o ano quando é outro', () => {
+    expect(shortDate('2025-12-25T12:00:00', now)).toBe('25 dez 2025');
+  });
+  it('data inválida vira vazio', () => {
+    expect(shortDate('nada', now)).toBe('');
+  });
+});
+
+describe('memberSince', () => {
+  it('formata mês e ano', () => {
+    expect(memberSince('2026-01-15T12:00:00Z')).toBe('membro desde jan 2026');
+    expect(memberSince(null)).toBeNull();
+  });
+});
+
+describe('postEvents', () => {
+  it('avisa quem está ouvindo e para depois de desinscrever', () => {
+    const deleted = jest.fn();
+    const created = jest.fn();
+    const offDeleted = onPostDeleted(deleted);
+    const offCreated = onPostCreated(created);
+    emitPostDeleted('p1');
+    emitPostCreated();
+    expect(deleted).toHaveBeenCalledWith('p1');
+    expect(created).toHaveBeenCalledTimes(1);
+    offDeleted();
+    offCreated();
+    emitPostDeleted('p2');
+    emitPostCreated();
+    expect(deleted).toHaveBeenCalledTimes(1);
+    expect(created).toHaveBeenCalledTimes(1);
+  });
+});
 
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
 

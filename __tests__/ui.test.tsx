@@ -94,3 +94,16 @@ describe('components/ui', () => {
     expect(onAction).toHaveBeenCalled();
   });
 });
+
+describe('marca e fontes', () => {
+  it('Logo FELLAS é uma imagem acessível com o nome do app', async () => {
+    const { Logo } = require('../components/ui');
+    await render(<Logo height={24} />);
+    expect(screen.getByLabelText('fellas')).toBeTruthy();
+  });
+
+  it('todas as fontes do tema são Golos Text (Inter e Instrument Serif saíram)', () => {
+    const { fonts } = require('../lib/theme');
+    for (const family of Object.values(fonts) as string[]) expect(family).toMatch(/^GolosText_/);
+  });
+});
