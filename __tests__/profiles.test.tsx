@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import ProfileView from '../components/ProfileView';
 import { updateMyProfile, validateUsername } from '../lib/api/profiles';
 
@@ -97,7 +99,13 @@ describe('updateMyProfile', () => {
 
 describe('ProfileView', () => {
   it('renderiza nome, @username, bio e posts', async () => {
-    await render(<ProfileView userId="u1" />);
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 34 } }}
+      >
+        <ProfileView userId="u1" />
+      </SafeAreaProvider>,
+    );
     expect(await screen.findByText('Ana')).toBeTruthy();
     expect(screen.getByText('@ana_01')).toBeTruthy();
     expect(screen.getByText('Oi, sou a Ana')).toBeTruthy();

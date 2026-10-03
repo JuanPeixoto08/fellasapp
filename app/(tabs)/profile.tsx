@@ -1,12 +1,15 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Button, View } from 'react-native';
+import { View } from 'react-native';
 
 import ProfileView from '../../components/ProfileView';
+import { Button } from '../../components/ui';
 import { getCurrentUserId } from '../../lib/api/profiles';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../lib/theme';
 
 export default function ProfileScreen() {
+  const t = useTheme();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -20,17 +23,17 @@ export default function ProfileScreen() {
     }, []),
   );
 
-  if (!userId) return <View style={{ flex: 1 }} />;
+  if (!userId) return <View style={{ flex: 1, backgroundColor: t.colors.bg }} />;
 
   return (
     <ProfileView
       key={version}
       userId={userId}
       actions={
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button title="Editar" onPress={() => router.push('/profile/edit')} />
-          <Button title="Membros" onPress={() => router.push('/members')} />
-          <Button title="Sair" onPress={() => supabase.auth.signOut()} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: t.spacing.sm }}>
+          <Button title="Editar perfil" variant="secondary" onPress={() => router.push('/profile/edit')} />
+          <Button title="Membros" variant="secondary" onPress={() => router.push('/members')} />
+          <Button title="Sair" variant="ghost" onPress={() => supabase.auth.signOut()} />
         </View>
       }
     />
