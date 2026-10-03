@@ -30,6 +30,10 @@ export const fakeProfile: Profile = {
   display_name: 'Teste Fella',
   avatar_url: null,
   bio: 'Usuário falso do modo dev (EXPO_PUBLIC_DEV_FAKE_LOGIN).',
+  accent_color: null,
+  status: null,
+  location: null,
+  birthday: null,
   is_member: true,
   created_at: new Date(0).toISOString(),
 };
