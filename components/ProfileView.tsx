@@ -9,9 +9,11 @@ import {
   type Post,
   type Profile,
 } from '../lib/api/profiles';
-import { useTheme } from '../lib/theme';
+import { getProfileStats, type ProfileStats as Stats } from '../lib/api/profileStats';
+import { profileColor, useTheme } from '../lib/theme';
 import { PostTile } from './profile/PostTile';
 import { ProfileHeader } from './profile/ProfileHeader';
+import { ProfileStats } from './profile/ProfileStats';
 import { Divider, EmptyState, Heading, Text } from './ui';
 
 type Props = {
@@ -29,6 +31,7 @@ export default function ProfileView({ userId, actions }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +41,8 @@ export default function ProfileView({ userId, actions }: Props) {
       setProfile(p);
       setPosts(ps);
       setAvatar(await getSignedUrl(p.avatar_url));
+      // estatísticas são um extra: se falharem, o resto do perfil continua
+      setStats(await getProfileStats(userId).catch(() => null));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar perfil');
@@ -77,6 +82,7 @@ export default function ProfileView({ userId, actions }: Props) {
     );
   }
 
+  const color = profileColor(profile.id, profile.accent_color);
   const content = Math.min(width, t.layout.maxContentWidth) - t.layout.gutter * 2;
   const tile = Math.floor((content - t.spacing.sm * (COLUMNS - 1)) / COLUMNS);
 
@@ -93,6 +99,7 @@ export default function ProfileView({ userId, actions }: Props) {
         }}
       >
         <ProfileHeader profile={profile} avatarUri={avatar} actions={actions} />
+        {stats ? <ProfileStats stats={stats} color={color} /> : null}
         <Divider />
         <View style={{ gap: t.spacing.md }}>
           <Heading level={2}>
@@ -108,8 +115,8 @@ export default function ProfileView({ userId, actions }: Props) {
             />
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm }}>
-              {posts.map((post) => (
-                <PostTile key={post.id} post={post} size={tile} />
+              {posts.map((post, i) => (
+                <PostTile key={post.id} post={post} size={tile} tone={i} />
               ))}
             </View>
           )}
