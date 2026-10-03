@@ -1,5 +1,9 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 
+import { CommentButton } from './feed/CommentButton';
+import { LikeButton } from './feed/LikeButton';
+import { Avatar, Card, Text } from './ui';
+import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
 
 type Props = {
@@ -9,67 +13,43 @@ type Props = {
 };
 
 export function PostCard({ post, onToggleLike, onPress }: Props) {
+  const t = useTheme();
   const name = post.author.display_name || post.author.username;
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        {post.author.avatar_url ? (
-          <Image source={{ uri: post.author.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        <Text style={styles.name}>{name}</Text>
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
+        <Avatar name={name} uri={post.author.avatar_url} size={40} />
+        <Text bold style={{ flex: 1 }} numberOfLines={1}>
+          {name}
+        </Text>
       </View>
-      <Pressable onPress={() => onPress?.(post)}>
-        {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
-        {post.imageUrl ? (
-          <Image
-            source={{ uri: post.imageUrl }}
-            style={styles.image}
-            resizeMode="cover"
-            accessibilityLabel="Imagem do post"
-          />
-        ) : null}
-      </Pressable>
-      <View style={styles.actions}>
+      {post.body || post.imageUrl ? (
         <Pressable
-          onPress={() => onToggleLike?.(post)}
+          onPress={onPress ? () => onPress(post) : undefined}
           accessibilityRole="button"
-          accessibilityLabel={post.likedByMe ? 'Descurtir' : 'Curtir'}
+          accessibilityLabel={`Abrir post de ${name}`}
+          style={{ gap: t.spacing.md }}
         >
-          <Text style={[styles.action, post.likedByMe && styles.liked]}>
-            {post.likedByMe ? '♥' : '♡'} {post.likeCount}
-          </Text>
+          {post.body ? <Text variant="lead">{post.body}</Text> : null}
+          {post.imageUrl ? (
+            <Image
+              source={{ uri: post.imageUrl }}
+              resizeMode="cover"
+              accessibilityLabel={`Foto postada por ${name}`}
+              style={{
+                width: '100%',
+                aspectRatio: 1,
+                borderRadius: t.radii.md,
+                backgroundColor: t.colors.surfaceSunken,
+              }}
+            />
+          ) : null}
         </Pressable>
-        <Pressable
-          onPress={() => onPress?.(post)}
-          accessibilityRole="button"
-          accessibilityLabel="Comentários"
-        >
-          <Text style={styles.action}>💬 {post.commentCount}</Text>
-        </Pressable>
+      ) : null}
+      <View style={{ flexDirection: 'row', gap: t.spacing.sm }}>
+        <LikeButton liked={post.likedByMe} count={post.likeCount} onPress={() => onToggleLike?.(post)} />
+        <CommentButton count={post.commentCount} onPress={() => onPress?.(post)} />
       </View>
-    </View>
+    </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ccc',
-    backgroundColor: '#fff',
-  },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
-  avatarFallback: { backgroundColor: '#ddd', alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontWeight: '700' },
-  name: { fontWeight: '600', fontSize: 15 },
-  body: { fontSize: 16, marginBottom: 8 },
-  image: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: '#eee' },
-  actions: { flexDirection: 'row', gap: 20, marginTop: 8 },
-  action: { fontSize: 15, color: '#444' },
-  liked: { color: '#e0245e' },
-});
