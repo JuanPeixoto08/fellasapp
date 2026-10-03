@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import * as authApi from '../api/auth';
 import type { Profile } from '../api/auth';
+import { DEV_FAKE_LOGIN, fakeProfile, fakeSession } from './devFakeLogin';
 
 type SessionContextValue = {
   session: Session | null;
@@ -15,6 +16,19 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  if (DEV_FAKE_LOGIN) return <FakeSessionProvider>{children}</FakeSessionProvider>;
+  return <RealSessionProvider>{children}</RealSessionProvider>;
+}
+
+function FakeSessionProvider({ children }: { children: ReactNode }) {
+  const value = useMemo(
+    () => ({ session: fakeSession, profile: fakeProfile, loading: false, signOut: async () => {} }),
+    [],
+  );
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+function RealSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
