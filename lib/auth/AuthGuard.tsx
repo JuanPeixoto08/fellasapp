@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import type { ReactNode } from 'react';
 
+import { Text } from '../../components/ui';
+import { useTheme } from '../theme';
 import { useSession } from './SessionProvider';
 
 export type GuardTarget = '/login' | '/not-invited' | '/feed' | null;
@@ -21,6 +23,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const { session, profile, loading } = useSession();
   const segments = useSegments();
   const router = useRouter();
+  const t = useTheme();
   const first = segments[0] as string | undefined;
 
   const target = loading ? null : resolveGuardTarget(!!session, !!profile?.is_member, first);
@@ -33,19 +36,23 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     <>
       {children}
       {loading ? (
-        <View style={styles.overlay}>
-          <ActivityIndicator />
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel="Carregando"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: t.spacing.lg,
+              backgroundColor: t.colors.bg,
+            },
+          ]}
+        >
+          <Text variant="headline">fellas</Text>
+          <ActivityIndicator color={t.colors.primary} />
         </View>
       ) : null}
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-});
