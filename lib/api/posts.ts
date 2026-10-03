@@ -1,5 +1,12 @@
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
+import {
+  NO_REACTIONS,
+  commentReactionsMap,
+  postReactionsMap,
+  type ReactionGroup,
+  type ReactionSummary,
+} from './reactions';
 
 export const PAGE_SIZE = 10;
 const BUCKET = 'post-images';
@@ -20,6 +27,8 @@ export type FeedPost = {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  reactions: ReactionSummary[];
+  myReaction: string | null;
 };
 
 export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
@@ -29,6 +38,8 @@ export type Comment = {
   body: string;
   createdAt: string;
   author: Author;
+  reactions: ReactionSummary[];
+  myReaction: string | null;
 };
 
 type PostRow = Tables<'posts'> & {
@@ -62,7 +73,12 @@ async function signImage(path: string | null): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
-async function mapPost(row: PostRow, liked: Set<string>): Promise<FeedPost> {
+async function mapPost(
+  row: PostRow,
+  liked: Set<string>,
+  reactions: Map<string, ReactionGroup>,
+): Promise<FeedPost> {
+  const r = reactions.get(row.id) ?? NO_REACTIONS;
   return {
     id: row.id,
     body: row.body,
@@ -72,6 +88,8 @@ async function mapPost(row: PostRow, liked: Set<string>): Promise<FeedPost> {
     likeCount: row.likes?.[0]?.count ?? 0,
     commentCount: row.comments?.[0]?.count ?? 0,
     likedByMe: liked.has(row.id),
+    reactions: r.reactions,
+    myReaction: r.myReaction,
   };
 }
 
@@ -101,8 +119,12 @@ export async function listFeed(
   const { data, error } = await query;
   if (error) throw error;
   const rows = (data ?? []) as unknown as PostRow[];
-  const liked = await likedSet(userId, rows.map((r) => r.id));
-  const posts = await Promise.all(rows.map((r) => mapPost(r, liked)));
+  const ids = rows.map((r) => r.id);
+  const [liked, reactions] = await Promise.all([
+    likedSet(userId, ids),
+    postReactionsMap(userId, ids),
+  ]);
+  const posts = await Promise.all(rows.map((r) => mapPost(r, liked, reactions)));
   return {
     posts,
     nextCursor:
@@ -118,8 +140,11 @@ export async function getPost(postId: string): Promise<FeedPost> {
     .eq('id', postId)
     .single();
   if (error) throw error;
-  const liked = await likedSet(userId, [postId]);
-  return mapPost(data as unknown as PostRow, liked);
+  const [liked, reactions] = await Promise.all([
+    likedSet(userId, [postId]),
+    postReactionsMap(userId, [postId]),
+  ]);
+  return mapPost(data as unknown as PostRow, liked, reactions);
 }
 
 async function uploadImage(userId: string, uri: string): Promise<string> {
@@ -181,6 +206,7 @@ export async function toggleLike(postId: string): Promise<boolean> {
 }
 
 export async function listComments(postId: string): Promise<Comment[]> {
+  const userId = await currentUserId();
   const { data, error } = await supabase
     .from('comments')
     .select(
@@ -196,12 +222,19 @@ export async function listComments(postId: string): Promise<Comment[]> {
     author_id: string;
     author: Author | null;
   };
-  return ((data ?? []) as unknown as Row[]).map((c) => ({
-    id: c.id,
-    body: c.body,
-    createdAt: c.created_at,
-    author: c.author ?? unknownAuthor(c.author_id),
-  }));
+  const rows = (data ?? []) as unknown as Row[];
+  const reactions = await commentReactionsMap(userId, rows.map((c) => c.id));
+  return rows.map((c) => {
+    const r = reactions.get(c.id) ?? NO_REACTIONS;
+    return {
+      id: c.id,
+      body: c.body,
+      createdAt: c.created_at,
+      author: c.author ?? unknownAuthor(c.author_id),
+      reactions: r.reactions,
+      myReaction: r.myReaction,
+    };
+  });
 }
 
 export async function addComment(
