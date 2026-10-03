@@ -22,6 +22,21 @@ describe('ReactionPicker', () => {
     await fireEvent.press(screen.getByLabelText('Fechar reações'));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('does not nest button-role elements (invalid <button> in <button> on web)', async () => {
+    await render(<ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} />);
+    const isButton = (props: Record<string, unknown>) =>
+      props.accessibilityRole === 'button' || props.role === 'button';
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBeGreaterThan(1);
+    for (const button of buttons) {
+      let ancestor = button.parent;
+      while (ancestor) {
+        expect(isButton(ancestor.props)).toBe(false);
+        ancestor = ancestor.parent;
+      }
+    }
+  });
 });
 
 describe('ReactionBar', () => {
