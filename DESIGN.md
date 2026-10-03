@@ -22,6 +22,12 @@ Neutros quentes de papel/tinta, nunca cinza puro. A "cor" do app é o amarelo ma
 
 Accent só como marca-texto (`<Text highlight>`), badge "novo" ou destaque pontual; sempre com `onAccent` por cima. Avatares sem foto usam tons de papel/pastel com tinta.
 
+### Paleta vibrante (perfil)
+Para o app não ficar monocromático, cada membro tem uma **cor de perfil** (`profilePalette` em `lib/theme.ts`): coral `#FF6B5E` · tangerine `#FF9F1C` · lime `#C6F135` · mint `#6EE7B7` · turquoise `#22D3C5` · blue `#5AA9FF` · violet `#A78BFA` · pink `#FF7EB6`. Cada uma tem `bg` e `ink` (`#121212`, contraste ≥ 4.5:1), iguais no claro e no escuro porque é preenchimento fixo.
+- `profileColor(userId, key?)` devolve a cor escolhida (`accent_color`) ou, se ausente/inválida, uma derivada do id (estável).
+- Usar em: banner e anel do avatar do perfil, chips e stats do membro, seletor de cor. Texto/ícone sobre a cor sempre usa `ink`. Não usar como cor de texto sobre `bg`/`surface` (baixo contraste).
+- `brand` (violeta `#5B3FD9` claro / `#B8A2FF` escuro) é o tint ativo da tab bar e destaques de UI sobre papel, com contraste ≥ 4.5:1 no `bg`.
+
 ## Tipografia
 - **Display: Instrument Serif** (regular + itálico) — títulos grandes, editoriais. Só existe em peso 400: hierarquia vem do tamanho, não de negrito.
 - **Corpo/UI: Inter** (Regular/Medium/Bold).
