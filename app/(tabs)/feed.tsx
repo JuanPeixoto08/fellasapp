@@ -1,11 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { PostCard } from '../../components/PostCard';
+import { Button, EmptyState, Heading, Screen, Text } from '../../components/ui';
 import { listFeed, toggleLike, type FeedPost } from '../../lib/api/posts';
+import { useTheme } from '../../lib/theme';
 
 export default function FeedScreen() {
+  const t = useTheme();
   const router = useRouter();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -59,34 +62,65 @@ export default function FeedScreen() {
   };
 
   return (
-    <FlatList
-      data={posts}
-      keyExtractor={(p) => p.id}
-      renderItem={({ item }) => (
-        <PostCard
-          post={item}
-          onToggleLike={onLike}
-          onPress={(p) => router.push(`/post/${p.id}`)}
-        />
-      )}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-      onEndReached={() => cursor && load(false, cursor)}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={
-        loading ? null : (
-          <View style={styles.center}>
-            <Text>{error ?? 'Nenhum post ainda. Seja o primeiro!'}</Text>
+    <Screen flush>
+      <FlatList
+        data={posts}
+        keyExtractor={(p) => p.id}
+        contentContainerStyle={{
+          paddingHorizontal: t.layout.gutter,
+          paddingBottom: t.spacing.xl,
+          gap: t.spacing.lg,
+        }}
+        ListHeaderComponent={
+          <View style={{ paddingTop: t.spacing.lg, paddingBottom: t.spacing.xs }}>
+            <Heading level={1}>Os fellas</Heading>
           </View>
-        )
-      }
-      ListFooterComponent={
-        loading && !refreshing ? <ActivityIndicator style={styles.center} /> : null
-      }
-    />
+        }
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            onToggleLike={onLike}
+            onPress={(p) => router.push(`/post/${p.id}`)}
+          />
+        )}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onEndReached={() => cursor && load(false, cursor)}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={
+          loading ? null : error ? (
+            <EmptyState
+              title="O feed não carregou"
+              message="Deu ruim na conexão. Confere a internet e tenta de novo."
+              actionLabel="Tentar de novo"
+              onAction={() => load(true, null)}
+            />
+          ) : (
+            <EmptyState
+              title="Ninguém postou ainda."
+              message="Quebra o gelo: manda a primeira foto ou frase pro grupo."
+              actionLabel="Bora postar"
+              onAction={() => router.navigate('/new')}
+            />
+          )
+        }
+        ListFooterComponent={
+          error && posts.length > 0 ? (
+            <View style={{ alignItems: 'center', padding: t.spacing.lg, gap: t.spacing.sm }}>
+              <Text tone="muted" align="center" accessibilityRole="alert">
+                Não deu pra carregar mais posts.
+              </Text>
+              <Button variant="secondary" title="Tentar de novo" onPress={() => load(false, cursor)} />
+            </View>
+          ) : loading && !refreshing ? (
+            <ActivityIndicator
+              style={{ padding: t.spacing.xl }}
+              color={t.colors.primary}
+              accessibilityLabel="Carregando posts"
+            />
+          ) : null
+        }
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { padding: 24, alignItems: 'center' },
-});
