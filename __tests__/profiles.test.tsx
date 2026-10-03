@@ -58,7 +58,11 @@ jest.mock('../lib/supabase', () => {
             mockUpload(...a);
             return Promise.resolve({ error: null });
           },
-          createSignedUrl: () => Promise.resolve({ data: { signedUrl: 'https://x/y.jpg' }, error: null }),
+          createSignedUrls: (paths: string[]) =>
+            Promise.resolve({
+              data: paths.map((p) => ({ path: p, signedUrl: `https://x/${p}`, error: null })),
+              error: null,
+            }),
         }),
       },
     },
@@ -66,10 +70,10 @@ jest.mock('../lib/supabase', () => {
 });
 
 describe('validateUsername', () => {
-  it.each(['abc', 'a_b_c_1', 'a'.repeat(20)])('aceita %s', (u) => {
+  it.each(['abc', 'a_b_c_1', 'a'.repeat(30)])('aceita %s', (u) => {
     expect(validateUsername(u)).toBeNull();
   });
-  it.each(['ab', 'a'.repeat(21), 'Ana', 'a b c', 'ana-1', 'aná'])('rejeita %s', (u) => {
+  it.each(['ab', 'a'.repeat(31), 'Ana', 'a b c', 'ana-1', 'aná'])('rejeita %s', (u) => {
     expect(validateUsername(u)).not.toBeNull();
   });
 });
@@ -131,7 +135,7 @@ describe('updateMyProfile', () => {
   it('rejeita username inválido sem chamar o banco', async () => {
     await expect(
       updateMyProfile({ display_name: 'A', username: 'x', bio: '' }),
-    ).rejects.toThrow(/Username/);
+    ).rejects.toThrow(/3 a 30/);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
@@ -161,8 +165,8 @@ describe('ProfileView', () => {
     );
     expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();
     expect(screen.getByTestId('profile-banner').props.style.backgroundColor).toBe('#FF6B5E');
-    expect(screen.getByText('📍 Recife')).toBeTruthy();
-    expect(screen.getByText('🎂 20/05')).toBeTruthy();
+    expect(screen.getByLabelText('Cidade: Recife')).toBeTruthy();
+    expect(screen.getByLabelText('Aniversário: 20/05')).toBeTruthy();
     expect(screen.getByText('membro desde jan 2026')).toBeTruthy();
     expect(await screen.findByText('curtidas')).toBeTruthy();
   });

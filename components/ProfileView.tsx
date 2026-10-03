@@ -2,14 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  getProfile,
-  getSignedUrl,
-  listPostsByUser,
-  type Post,
-  type Profile,
-} from '../lib/api/profiles';
+import { getProfile, listPostsByUser, type Post, type Profile } from '../lib/api/profiles';
 import { getProfileStats, type ProfileStats as Stats } from '../lib/api/profileStats';
+import { resolveUrl, signPaths } from '../lib/api/storage';
+import { friendlyError } from '../lib/errors';
 import { profileColor, useTheme } from '../lib/theme';
 import { PostTile } from './profile/PostTile';
 import { ProfileHeader } from './profile/ProfileHeader';
@@ -30,7 +26,7 @@ export default function ProfileView({ userId, actions }: Props) {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [signed, setSigned] = useState<Map<string, string>>(new Map());
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,14 +34,18 @@ export default function ProfileView({ userId, actions }: Props) {
   const load = useCallback(async () => {
     try {
       const [p, ps] = await Promise.all([getProfile(userId), listPostsByUser(userId)]);
+      // avatar + fotos do grid numa assinatura só; estatísticas são um extra e podem falhar sozinhas
+      const [urls, st] = await Promise.all([
+        signPaths([p.avatar_url, ...ps.map((post) => post.image_url)]).catch(() => new Map<string, string>()),
+        getProfileStats(userId).catch(() => null),
+      ]);
       setProfile(p);
       setPosts(ps);
-      setAvatar(await getSignedUrl(p.avatar_url));
-      // estatísticas são um extra: se falharem, o resto do perfil continua
-      setStats(await getProfileStats(userId).catch(() => null));
+      setSigned(urls);
+      setStats(st);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar perfil');
+      setError(friendlyError(e, 'Pode ter sido a conexão. Tenta de novo daqui a pouco.'));
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export default function ProfileView({ userId, actions }: Props) {
           gap: t.spacing.xl,
         }}
       >
-        <ProfileHeader profile={profile} avatarUri={avatar} actions={actions} />
+        <ProfileHeader profile={profile} avatarUri={resolveUrl(profile.avatar_url, signed)} actions={actions} />
         {stats ? <ProfileStats stats={stats} color={color} /> : null}
         <Divider />
         <View style={{ gap: t.spacing.md }}>
@@ -116,7 +116,13 @@ export default function ProfileView({ userId, actions }: Props) {
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm }}>
               {posts.map((post, i) => (
-                <PostTile key={post.id} post={post} size={tile} tone={i} />
+                <PostTile
+                  key={post.id}
+                  post={post}
+                  imageUri={resolveUrl(post.image_url, signed)}
+                  size={tile}
+                  tone={i}
+                />
               ))}
             </View>
           )}

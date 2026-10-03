@@ -1,15 +1,17 @@
 import { supabase } from '../supabase';
 import type { Database } from '../../types/database';
+import { BUCKET } from './storage';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Post = Database['public']['Tables']['posts']['Row'];
 
-const BUCKET = 'post-images';
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+// Mesmo limite do check em profiles.username (0001_init.sql). O trigger de cadastro gera nomes
+// de até 29 caracteres, então um limite menor aqui travava o "Salvar" de quem nunca mexeu no usuário.
+const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
 export function validateUsername(username: string): string | null {
   if (!USERNAME_RE.test(username)) {
-    return 'Username deve ter 3-20 caracteres: letras minúsculas, números e _';
+    return 'O usuário precisa ter de 3 a 30 caracteres: letras minúsculas, números e _';
   }
   return null;
 }
@@ -45,15 +47,6 @@ export async function listPostsByUser(id: string): Promise<Post[]> {
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
-}
-
-/** Bucket privado: converte o caminho salvo (avatar_url / image_url) em URL assinada. */
-export async function getSignedUrl(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  if (/^https?:\/\//.test(path)) return path;
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-  if (error) return null;
-  return data.signedUrl;
 }
 
 export type UpdateProfileInput = {

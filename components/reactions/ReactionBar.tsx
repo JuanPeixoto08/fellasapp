@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 
-import { Text } from '../ui';
+import { Icon, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 
 export type ReactionGroup = { emoji: string; count: number };
@@ -62,7 +62,7 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
 
 type ButtonProps = { onPress?: () => void };
 
-/** Botão pequeno "☺+" que abre o seletor de reações. */
+/** Botão pequeno (carinha) que abre o seletor de reações. */
 export function ReactButton({ onPress }: ButtonProps) {
   const t = useTheme();
   return (
@@ -73,15 +73,13 @@ export function ReactButton({ onPress }: ButtonProps) {
           minWidth: t.layout.minTouch,
           paddingHorizontal: t.spacing.md,
           borderRadius: t.radii.pill,
-          borderWidth: 1,
+          borderWidth: t.borders.hairline,
           borderColor: t.colors.border,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text variant="small" bold tone="muted">
-          ☺+
-        </Text>
+        <Icon name="happy-outline" size="md" tone="muted" />
       </View>
     </Pressable>
   );

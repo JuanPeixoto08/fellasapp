@@ -7,11 +7,11 @@ import {
   type ReactionGroup,
   type ReactionSummary,
 } from './reactions';
+import { BUCKET, resolveUrl, signPaths } from './storage';
 
 export const PAGE_SIZE = 10;
-const BUCKET = 'post-images';
-const SIGNED_URL_TTL = 60 * 60;
 
+/** `avatar_url` já vem como URL assinada (pronta para exibir) ou null. */
 export type Author = Pick<
   Tables<'profiles'>,
   'id' | 'username' | 'display_name' | 'avatar_url'
@@ -64,33 +64,33 @@ async function currentUserId(): Promise<string> {
   return data.user.id;
 }
 
-async function signImage(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  if (/^https?:\/\//.test(path)) return path;
-  const { data } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL);
-  return data?.signedUrl ?? null;
+function mapAuthor(author: Author | null, id: string, signed: Map<string, string>): Author {
+  if (!author) return unknownAuthor(id);
+  return { ...author, avatar_url: resolveUrl(author.avatar_url, signed) };
 }
 
-async function mapPost(
-  row: PostRow,
+/** Assina fotos e avatares de todos os posts em uma chamada só. */
+async function mapPosts(
+  rows: PostRow[],
   liked: Set<string>,
   reactions: Map<string, ReactionGroup>,
-): Promise<FeedPost> {
-  const r = reactions.get(row.id) ?? NO_REACTIONS;
-  return {
-    id: row.id,
-    body: row.body,
-    imageUrl: await signImage(row.image_url),
-    createdAt: row.created_at,
-    author: row.author ?? unknownAuthor(row.author_id),
-    likeCount: row.likes?.[0]?.count ?? 0,
-    commentCount: row.comments?.[0]?.count ?? 0,
-    likedByMe: liked.has(row.id),
-    reactions: r.reactions,
-    myReaction: r.myReaction,
-  };
+): Promise<FeedPost[]> {
+  const signed = await signPaths(rows.flatMap((r) => [r.image_url, r.author?.avatar_url]));
+  return rows.map((row) => {
+    const r = reactions.get(row.id) ?? NO_REACTIONS;
+    return {
+      id: row.id,
+      body: row.body,
+      imageUrl: resolveUrl(row.image_url, signed),
+      createdAt: row.created_at,
+      author: mapAuthor(row.author, row.author_id, signed),
+      likeCount: row.likes?.[0]?.count ?? 0,
+      commentCount: row.comments?.[0]?.count ?? 0,
+      likedByMe: liked.has(row.id),
+      reactions: r.reactions,
+      myReaction: r.myReaction,
+    };
+  });
 }
 
 async function likedSet(userId: string, postIds: string[]): Promise<Set<string>> {
@@ -124,7 +124,7 @@ export async function listFeed(
     likedSet(userId, ids),
     postReactionsMap(userId, ids),
   ]);
-  const posts = await Promise.all(rows.map((r) => mapPost(r, liked, reactions)));
+  const posts = await mapPosts(rows, liked, reactions);
   return {
     posts,
     nextCursor:
@@ -144,7 +144,8 @@ export async function getPost(postId: string): Promise<FeedPost> {
     likedSet(userId, [postId]),
     postReactionsMap(userId, [postId]),
   ]);
-  return mapPost(data as unknown as PostRow, liked, reactions);
+  const [post] = await mapPosts([data as unknown as PostRow], liked, reactions);
+  return post;
 }
 
 async function uploadImage(userId: string, uri: string): Promise<string> {
@@ -223,14 +224,17 @@ export async function listComments(postId: string): Promise<Comment[]> {
     author: Author | null;
   };
   const rows = (data ?? []) as unknown as Row[];
-  const reactions = await commentReactionsMap(userId, rows.map((c) => c.id));
+  const [reactions, signed] = await Promise.all([
+    commentReactionsMap(userId, rows.map((c) => c.id)),
+    signPaths(rows.map((c) => c.author?.avatar_url)),
+  ]);
   return rows.map((c) => {
     const r = reactions.get(c.id) ?? NO_REACTIONS;
     return {
       id: c.id,
       body: c.body,
       createdAt: c.created_at,
-      author: c.author ?? unknownAuthor(c.author_id),
+      author: mapAuthor(c.author, c.author_id, signed),
       reactions: r.reactions,
       myReaction: r.myReaction,
     };

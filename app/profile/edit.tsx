@@ -14,6 +14,7 @@ import {
   updateMyProfile,
   validateUsername,
 } from '../../lib/api/profiles';
+import { friendlyError, isUniqueViolation } from '../../lib/errors';
 import { isProfileColorKey, profileColor, profileColorKeys, profilePalette, useTheme } from '../../lib/theme';
 
 export default function EditProfileScreen() {
@@ -49,7 +50,7 @@ export default function EditProfileScreen() {
         setUsername(p.username);
         setBio(p.bio ?? '');
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar perfil'));
+      .catch((e) => setError(friendlyError(e, 'Não deu pra carregar seu perfil. Volta e tenta de novo.')));
   }, []);
 
   async function pickAvatar() {
@@ -84,7 +85,8 @@ export default function EditProfileScreen() {
       });
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao salvar');
+      if (isUniqueViolation(e)) setUsernameError('Esse usuário já é de outro fella. Escolhe outro.');
+      else setError(friendlyError(e, 'Não rolou salvar. Tenta de novo.'));
     } finally {
       setSaving(false);
     }
@@ -112,7 +114,7 @@ export default function EditProfileScreen() {
           label="Usuário"
           placeholder="seu_usuario"
           error={usernameError}
-          help="3 a 20 caracteres: letras minúsculas, números e _"
+          help="3 a 30 caracteres: letras minúsculas, números e _"
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
@@ -174,7 +176,7 @@ export default function EditProfileScreen() {
                     height: t.layout.minTouch,
                     borderRadius: t.radii.pill,
                     backgroundColor: profilePalette[key].bg,
-                    borderWidth: selected ? 3 : 0,
+                    borderWidth: selected ? t.borders.selected : 0,
                     borderColor: t.colors.text,
                   }}
                 />

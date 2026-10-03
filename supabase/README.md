@@ -14,7 +14,13 @@ supabase db push          # aplica supabase/migrations/*.sql
 
 **SQL editor**: cole `migrations/0001_init.sql` e execute (é idempotente).
 
-**Atenção:** `migrations/0002_profile_extras.sql` (cor do perfil, status, cidade, aniversário) também precisa ser aplicada (`db push` ou colar no SQL editor; é idempotente). Sem ela, salvar o perfil com esses campos falha.
+**Atenção:** as migrations seguintes também precisam ser aplicadas, em ordem (`db push` ou colar
+cada uma no SQL editor; todas são idempotentes):
+
+| Migration | O que traz | Sem ela… |
+| --- | --- | --- |
+| `0002_profile_extras.sql` | cor do perfil, status, cidade, aniversário | salvar o perfil com esses campos falha |
+| `0003_reactions.sql` | tabelas `post_reactions` e `comment_reactions` + RLS | o feed e os posts não carregam (o app busca as reações junto) |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 

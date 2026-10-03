@@ -131,6 +131,13 @@ export type Spacing = keyof typeof spacing;
 export const radii = { sm: 4, md: 8, lg: 12, pill: 999 } as const;
 export type Radius = keyof typeof radii;
 
+/** Espessuras de borda: `hairline` para contornos, `selected` para marcar a opção escolhida. */
+export const borders = { hairline: 1, selected: 3 } as const;
+
+/** Tamanhos de ícone (Ionicons): sm acompanha texto small, md o body, lg ações soltas. */
+export const iconSizes = { sm: 16, md: 20, lg: 24 } as const;
+export type IconSize = keyof typeof iconSizes;
+
 export const layout = {
   /** Largura máxima do conteúdo na web/tablet. */
   maxContentWidth: 640,
@@ -162,13 +169,27 @@ export type Theme = {
   typography: typeof typography;
   spacing: typeof spacing;
   radii: typeof radii;
+  borders: typeof borders;
+  iconSizes: typeof iconSizes;
   layout: typeof layout;
   motion: typeof motion;
   shadows: typeof shadows;
 };
 
 export function getTheme(scheme: ColorScheme): Theme {
-  return { scheme, colors: colors[scheme], fonts, typography, spacing, radii, layout, motion, shadows };
+  return {
+    scheme,
+    colors: colors[scheme],
+    fonts,
+    typography,
+    spacing,
+    radii,
+    borders,
+    iconSizes,
+    layout,
+    motion,
+    shadows,
+  };
 }
 
 /** Tema atual conforme o esquema do sistema (claro por padrão). */

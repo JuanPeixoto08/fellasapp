@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } fro
 
 import { CommentItem } from '../../components/feed/CommentItem';
 import { PostCard } from '../../components/PostCard';
-import { Button, Screen, Text, TextField } from '../../components/ui';
+import { Button, EmptyState, Screen, Text, TextField } from '../../components/ui';
 import {
   addComment,
   getPost,
@@ -14,7 +14,8 @@ import {
   type FeedPost,
 } from '../../lib/api/posts';
 import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
-import { withReaction } from '../../lib/reactionState';
+import { friendlyError } from '../../lib/errors';
+import { withLike, withReaction } from '../../lib/reactionState';
 import { useTheme } from '../../lib/theme';
 
 export default function PostDetailScreen() {
@@ -23,15 +24,18 @@ export default function PostDetailScreen() {
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
       const [p, c] = await Promise.all([getPost(id), listComments(id)]);
       setPost(p);
       setComments(c);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar o post');
+      setLoadError(friendlyError(e, 'Pode ter sido apagado ou a conexão caiu. Tenta de novo.'));
     }
   }, [id]);
 
@@ -40,11 +44,11 @@ export default function PostDetailScreen() {
   }, [load]);
 
   const onLike = async (p: FeedPost) => {
+    setPost((cur) => (cur ? withLike(cur, !p.likedByMe) : cur));
     try {
       await toggleLike(p.id);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao curtir');
+    } catch {
+      setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
     }
   };
 
@@ -69,14 +73,35 @@ export default function PostDetailScreen() {
   };
 
   const send = async () => {
+    if (sending || !text.trim()) return;
+    setSending(true);
+    setSendError(null);
     try {
       await addComment(id, text);
       setText('');
-      await load();
+      setPost((cur) => (cur ? { ...cur, commentCount: cur.commentCount + 1 } : cur));
+      // só os comentários: o post já está na tela e não precisa ser buscado (nem assinado) de novo
+      setComments(await listComments(id).catch(() => comments));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao comentar');
+      setSendError(friendlyError(e, 'Não rolou mandar o comentário. Tenta de novo.'));
+    } finally {
+      setSending(false);
     }
   };
+
+  if (loadError && !post) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: true, title: 'Post' }} />
+        <EmptyState
+          title="Não deu pra abrir esse post"
+          message={loadError}
+          actionLabel="Tentar de novo"
+          onAction={load}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen flush>
@@ -97,11 +122,7 @@ export default function PostDetailScreen() {
             ) : null
           }
           ListEmptyComponent={
-            error ? (
-              <Text tone="danger" align="center" accessibilityRole="alert">
-                {error}
-              </Text>
-            ) : !post ? (
+            !post ? (
               <ActivityIndicator
                 style={{ padding: t.spacing.xl }}
                 color={t.colors.primary}
@@ -117,19 +138,30 @@ export default function PostDetailScreen() {
         />
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'flex-end',
             gap: t.spacing.sm,
             padding: t.spacing.md,
-            borderTopWidth: 1,
+            borderTopWidth: t.borders.hairline,
             borderTopColor: t.colors.border,
             backgroundColor: t.colors.bg,
           }}
         >
-          <View style={{ flex: 1 }}>
-            <TextField label="Comentar" placeholder="Fala aí…" value={text} onChangeText={setText} />
+          {sendError ? (
+            <Text variant="small" tone="danger" accessibilityRole="alert">
+              {sendError}
+            </Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: t.spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label="Comentar"
+                placeholder="Fala aí…"
+                value={text}
+                onChangeText={setText}
+                editable={!sending}
+              />
+            </View>
+            <Button title="Enviar" onPress={send} loading={sending} disabled={!text.trim()} />
           </View>
-          <Button title="Enviar" onPress={send} disabled={!text.trim()} />
         </View>
       </KeyboardAvoidingView>
     </Screen>

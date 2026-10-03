@@ -5,6 +5,7 @@ import { Image, View } from 'react-native';
 
 import { Button, Heading, Screen, Text, TextField } from '../../components/ui';
 import { createPost } from '../../lib/api/posts';
+import { friendlyError } from '../../lib/errors';
 import { useTheme } from '../../lib/theme';
 
 export default function NewPostScreen() {
@@ -37,9 +38,7 @@ export default function NewPostScreen() {
       setImageUri(null);
       router.navigate('/feed');
     } catch (e) {
-      setError(
-        `Não rolou postar${e instanceof Error && e.message ? ` (${e.message})` : ''}. Tenta de novo.`,
-      );
+      setError(friendlyError(e, 'Não rolou postar. Tenta de novo.'));
     } finally {
       setSaving(false);
     }
