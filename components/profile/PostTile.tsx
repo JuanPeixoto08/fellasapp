@@ -1,45 +1,47 @@
-import { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
 
-import { getSignedUrl, type Post } from '../../lib/api/profiles';
+import type { Post } from '../../lib/api/profiles';
 import { profileColorKeys, profilePalette, useTheme } from '../../lib/theme';
-import { Text } from '../ui';
+import { Icon, Text } from '../ui';
 
 type Props = {
   post: Post;
+  /** URL assinada da foto (o ProfileView assina o grid inteiro de uma vez). */
+  imageUri: string | null;
   size: number;
   /** Índice na paleta de perfil, para tiles sem imagem. */
   tone?: number;
 };
 
 /** Quadradinho do grid de posts: foto, ou o texto do post quando não há imagem. */
-export function PostTile({ post, size, tone = 0 }: Props) {
+export function PostTile({ post, imageUri, size, tone = 0 }: Props) {
   const t = useTheme();
   const tint = profilePalette[profileColorKeys[tone % profileColorKeys.length]];
-  const plain = !!post.image_url;
-  const [uri, setUri] = useState<string | null>(null);
-
-  useEffect(() => {
-    getSignedUrl(post.image_url).then(setUri);
-  }, [post.image_url]);
+  const photo = !!post.image_url;
 
   return (
     <View
       testID="post-tile"
-      accessibilityLabel={post.image_url ? 'Post com foto' : `Post: ${post.body}`}
+      accessibilityLabel={photo ? 'Post com foto' : `Post: ${post.body}`}
       style={{
         width: size,
         height: size,
         borderRadius: t.radii.md,
-        backgroundColor: plain ? t.colors.surfaceSunken : tint.bg,
-        borderWidth: plain ? 1 : 0,
+        backgroundColor: photo ? t.colors.surfaceSunken : tint.bg,
+        borderWidth: photo ? t.borders.hairline : 0,
         borderColor: t.colors.border,
-        padding: uri ? 0 : t.spacing.sm,
+        padding: photo ? 0 : t.spacing.sm,
+        alignItems: photo && !imageUri ? 'center' : undefined,
+        justifyContent: photo && !imageUri ? 'center' : undefined,
         overflow: 'hidden',
       }}
     >
-      {uri ? (
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+      {photo ? (
+        imageUri ? (
+          <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} />
+        ) : (
+          <Icon name="image-outline" size="lg" tone="muted" />
+        )
       ) : (
         <Text variant="caption" numberOfLines={5} style={{ color: tint.ink }}>
           {post.body}

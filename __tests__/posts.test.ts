@@ -2,6 +2,7 @@ import { listComments, listFeed, toggleLike } from '../lib/api/posts';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
 let mockResults: Record<string, unknown> = {};
+const mockSignCalls: string[][] = [];
 
 jest.mock('../lib/supabase', () => {
   const makeBuilder = (table: string) => {
@@ -27,7 +28,13 @@ jest.mock('../lib/supabase', () => {
       from: (table: string) => makeBuilder(table),
       storage: {
         from: () => ({
-          createSignedUrl: async (p: string) => ({ data: { signedUrl: `https://signed/${p}` } }),
+          createSignedUrls: async (paths: string[]) => {
+            mockSignCalls.push(paths);
+            return {
+              data: paths.map((p) => ({ path: p, signedUrl: `https://signed/${p}`, error: null })),
+              error: null,
+            };
+          },
         }),
       },
     },
@@ -36,6 +43,7 @@ jest.mock('../lib/supabase', () => {
 
 beforeEach(() => {
   mockCalls.length = 0;
+  mockSignCalls.length = 0;
   mockResults = {};
 });
 
@@ -49,7 +57,7 @@ describe('listFeed', () => {
           body: 'oi',
           image_url: 'u1/a.jpg',
           created_at: '2026-01-02T00:00:00Z',
-          author: { id: 'u1', username: 'ana', display_name: 'Ana', avatar_url: null },
+          author: { id: 'u1', username: 'ana', display_name: 'Ana', avatar_url: 'u1/avatar.jpg' },
           likes: [{ count: 3 }],
           comments: [{ count: 2 }],
         },
@@ -101,6 +109,9 @@ describe('listFeed', () => {
       myReaction: null,
     });
     expect(page.nextCursor).toBeNull();
+    expect(page.posts[0].author.avatar_url).toBe('https://signed/u1/avatar.jpg');
+    // fotos e avatares numa assinatura só (bucket privado)
+    expect(mockSignCalls).toEqual([['u1/a.jpg', 'u1/avatar.jpg']]);
     expect(mockCalls).toContainEqual({
       table: 'posts',
       op: 'lt',

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
+import { Text } from '../ui';
 
 export const DEFAULT_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -90,7 +91,7 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
                     backgroundColor: isSelected ? t.colors.accent : 'transparent',
                   }}
                 >
-                  <RNText style={{ fontSize: 26 }}>{emoji}</RNText>
+                  <Text variant="title">{emoji}</Text>
                 </View>
               </Pressable>
             );

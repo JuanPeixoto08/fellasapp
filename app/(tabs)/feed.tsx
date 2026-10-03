@@ -6,7 +6,7 @@ import { PostCard } from '../../components/PostCard';
 import { Button, EmptyState, Heading, Screen, Text } from '../../components/ui';
 import { listFeed, toggleLike, type FeedPost } from '../../lib/api/posts';
 import { setPostReaction } from '../../lib/api/reactions';
-import { withReaction } from '../../lib/reactionState';
+import { withLike, withReaction } from '../../lib/reactionState';
 import { useTheme } from '../../lib/theme';
 
 export default function FeedScreen() {
@@ -48,13 +48,7 @@ export default function FeedScreen() {
 
   const onLike = async (post: FeedPost) => {
     const apply = (liked: boolean) =>
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, likedByMe: liked, likeCount: p.likeCount + (liked ? 1 : -1) }
-            : p,
-        ),
-      );
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? withLike(p, liked) : p)));
     apply(!post.likedByMe);
     try {
       await toggleLike(post.id);

@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { profileColor, useTheme } from '../../lib/theme';
-import { Avatar, Heading, Text } from '../ui';
+import { Avatar, Heading, Icon, Text, type IconName } from '../ui';
 
 type Props = { profile: Profile; avatarUri: string | null; actions?: ReactNode };
 
@@ -28,11 +28,12 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
   const name = profile.display_name || profile.username;
   const avatarSize = t.layout.minTouch * 2;
   const ring = t.spacing.xs;
-  const info = [
-    profile.location ? `📍 ${profile.location}` : null,
-    birthdayDayMonth(profile.birthday) ? `🎂 ${birthdayDayMonth(profile.birthday)}` : null,
-    memberSince(profile.created_at),
-  ].filter((x): x is string => !!x);
+  const birthday = birthdayDayMonth(profile.birthday);
+  const since = memberSince(profile.created_at);
+  const info: { icon: IconName; label: string; text: string }[] = [];
+  if (profile.location) info.push({ icon: 'location-outline', label: 'Cidade', text: profile.location });
+  if (birthday) info.push({ icon: 'gift-outline', label: 'Aniversário', text: birthday });
+  if (since) info.push({ icon: 'calendar-clear-outline', label: 'Membro', text: since });
 
   return (
     <View style={{ gap: t.spacing.sm }}>
@@ -49,7 +50,7 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
           testID="profile-avatar-ring"
           style={{
             padding: ring,
-            borderRadius: 999,
+            borderRadius: t.radii.pill,
             backgroundColor: color.bg,
             borderWidth: ring,
             borderColor: t.colors.bg,
@@ -83,12 +84,26 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
         ) : null}
         {info.length > 0 ? (
           <View
-            style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: t.spacing.md }}
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              columnGap: t.spacing.lg,
+              rowGap: t.spacing.xs,
+            }}
           >
-            {info.map((line) => (
-              <Text key={line} variant="small" tone="muted">
-                {line}
-              </Text>
+            {info.map((item) => (
+              <View
+                key={item.label}
+                accessible
+                accessibilityLabel={`${item.label}: ${item.text}`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}
+              >
+                <Icon name={item.icon} size="sm" tone="muted" />
+                <Text variant="small" tone="muted">
+                  {item.text}
+                </Text>
+              </View>
             ))}
           </View>
         ) : null}

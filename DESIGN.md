@@ -47,10 +47,13 @@ Pouca sombra: cartão usa borda 1px + sombra suave com offset (0,2) e blur 8, op
 Um momento autoral: o botão "afunda" (escala 0.97) ao toque, com retorno rápido ease-out (≈120ms). Entradas de lista 180ms ease-out exponencial. Respeita reduzir movimento. Nada de bounce decorativo.
 
 ## Componentes (components/ui)
-Screen · Text/Heading · Button (primary, secondary, ghost, danger; loading/disabled) · TextField (label, erro, ajuda) · Avatar (foto ou iniciais em cor determinística) · Card · EmptyState · Divider. Todos com estados disabled/erro/loading onde fizer sentido, `accessibilityRole` e labels.
+Screen · Text/Heading · Button (primary, secondary, ghost, danger; loading/disabled) · TextField (label, erro, ajuda) · Avatar (foto ou iniciais em cor determinística) · Card · EmptyState · Divider · Icon. Todos com estados disabled/erro/loading onde fizer sentido, `accessibilityRole` e labels.
 
 ## Ícones
-Biblioteca de ícones desenhados (adicionar em task de telas, ex. @expo/vector-icons); sem emoji/glifos como ícone.
+Ionicons (`@expo/vector-icons`) via `<Icon>` de `components/ui`, sempre na variante `-outline` fora da tab bar. Tamanhos por token `iconSizes`: sm 16 (junto de texto small) · md 20 · lg 24. Cor por `tone` (default/muted) ou `color` explícita (ex. `ink` sobre a cor de perfil). Ícone é decorativo: o rótulo acessível fica no controle. Sem emoji/glifos como ícone.
+
+## Bordas
+Token `borders`: `hairline` 1 (contornos de chip, cartão, divisória) · `selected` 3 (opção escolhida, ex. seletor de cor do perfil).
 
 ## Não fazer
 Negrito sintético na serifa display; cartão dentro de cartão; eyebrow acima de título; texto em gradiente; borda lateral colorida; cinza puro; fonte de sistema como display.
