@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "fellasapp",
+    "slug": "fellasapp",
+    "version": "1.0.0",
+    "scheme": "fellasapp",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.fellasinc.fellasapp" },
+    "android": { "package": "com.fellasinc.fellasapp" },
+    "web": { "bundler": "metro", "output": "single", "name": "fellasapp", "shortName": "fellasapp", "display": "standalone" },
+    "plugins": ["expo-router"]
+  }
+}
