@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   getProfile,
@@ -8,6 +9,10 @@ import {
   type Post,
   type Profile,
 } from '../lib/api/profiles';
+import { useTheme } from '../lib/theme';
+import { PostTile } from './profile/PostTile';
+import { ProfileHeader } from './profile/ProfileHeader';
+import { Divider, EmptyState, Heading, Text } from './ui';
 
 type Props = {
   userId: string;
@@ -15,7 +20,12 @@ type Props = {
   actions?: React.ReactNode;
 };
 
+const COLUMNS = 3;
+
 export default function ProfileView({ userId, actions }: Props) {
+  const t = useTheme();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -40,74 +50,71 @@ export default function ProfileView({ userId, actions }: Props) {
     load();
   }, [load]);
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
-  if (error || !profile) {
-    return <Text style={styles.error}>{error ?? 'Perfil não encontrado'}</Text>;
+  const frame = { flex: 1, backgroundColor: t.colors.bg } as const;
+
+  if (loading) {
+    return (
+      <View style={[frame, { alignItems: 'center', justifyContent: 'center', gap: t.spacing.md }]}>
+        <ActivityIndicator color={t.colors.primary} />
+        <Text tone="muted">Carregando o perfil…</Text>
+      </View>
+    );
   }
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        {avatar ? (
-          <Image source={{ uri: avatar }} style={styles.avatar} accessibilityLabel="Avatar" />
-        ) : (
-          <View style={[styles.avatar, styles.avatarEmpty]} />
-        )}
-        <Text style={styles.name}>{profile.display_name || profile.username}</Text>
-        <Text style={styles.username}>@{profile.username}</Text>
-        {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-        {actions}
-      </View>
-      <Text style={styles.section}>Posts ({posts.length})</Text>
-      <View style={styles.grid}>
-        {posts.map((post) => (
-          <PostTile key={post.id} post={post} />
-        ))}
-      </View>
-      {posts.length === 0 ? <Text style={styles.empty}>Nenhum post ainda</Text> : null}
-    </ScrollView>
-  );
-}
+  if (error || !profile) {
+    return (
+      <SafeAreaView edges={['top']} style={[frame, { justifyContent: 'center' }]}>
+        <EmptyState
+          title="Não achamos esse perfil"
+          message={error ?? 'Perfil não encontrado'}
+          actionLabel="Tentar de novo"
+          onAction={() => {
+            setLoading(true);
+            load();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
-function PostTile({ post }: { post: Post }) {
-  const [uri, setUri] = useState<string | null>(null);
-  useEffect(() => {
-    getSignedUrl(post.image_url).then(setUri);
-  }, [post.image_url]);
+  const content = Math.min(width, t.layout.maxContentWidth) - t.layout.gutter * 2;
+  const tile = Math.floor((content - t.spacing.sm * (COLUMNS - 1)) / COLUMNS);
 
   return (
-    <View style={styles.tile} testID="post-tile">
-      {uri ? (
-        <Image source={{ uri }} style={styles.tileImage} />
-      ) : (
-        <Text style={styles.tileText} numberOfLines={4}>
-          {post.body}
-        </Text>
-      )}
-    </View>
+    <SafeAreaView edges={['top', 'left', 'right']} style={frame}>
+      <ScrollView
+        contentContainerStyle={{
+          width: '100%',
+          maxWidth: t.layout.maxContentWidth,
+          alignSelf: 'center',
+          paddingHorizontal: t.layout.gutter,
+          paddingBottom: t.spacing.xxl + insets.bottom,
+          gap: t.spacing.xl,
+        }}
+      >
+        <ProfileHeader profile={profile} avatarUri={avatar} actions={actions} />
+        <Divider />
+        <View style={{ gap: t.spacing.md }}>
+          <Heading level={2}>
+            Posts{' '}
+            <Text variant="title" tone="muted">
+              {posts.length}
+            </Text>
+          </Heading>
+          {posts.length === 0 ? (
+            <EmptyState
+              title="Nada por aqui ainda"
+              message="Quando rolar o primeiro post, ele aparece aqui."
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm }}>
+              {posts.map((post) => (
+                <PostTile key={post.id} post={post} size={tile} />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 16 },
-  center: { flex: 1 },
-  header: { alignItems: 'center', gap: 6, marginBottom: 16 },
-  avatar: { width: 96, height: 96, borderRadius: 48 },
-  avatarEmpty: { backgroundColor: '#ddd' },
-  name: { fontSize: 20, fontWeight: '600' },
-  username: { color: '#666' },
-  bio: { textAlign: 'center' },
-  section: { fontWeight: '600', marginBottom: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  tile: {
-    width: '32%',
-    aspectRatio: 1,
-    backgroundColor: '#f2f2f2',
-    padding: 4,
-    overflow: 'hidden',
-  },
-  tileImage: { width: '100%', height: '100%' },
-  tileText: { fontSize: 12 },
-  empty: { color: '#888', textAlign: 'center', marginTop: 16 },
-  error: { color: 'crimson', padding: 16 },
-});
