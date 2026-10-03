@@ -4,9 +4,9 @@ import type { Profile } from '../../lib/api/profiles';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Text } from '../ui';
 
-type Props = { member: Profile; onPress: () => void };
+type Props = { member: Profile; avatarUri?: string | null; onPress: () => void };
 
-export function MemberRow({ member, onPress }: Props) {
+export function MemberRow({ member, avatarUri, onPress }: Props) {
   const t = useTheme();
   const name = member.display_name || member.username;
   return (
@@ -23,7 +23,7 @@ export function MemberRow({ member, onPress }: Props) {
         backgroundColor: pressed ? t.colors.surfaceSunken : 'transparent',
       })}
     >
-      <Avatar name={name} size={t.layout.minTouch} />
+      <Avatar name={name} uri={avatarUri} size={t.layout.minTouch} />
       <View style={{ flex: 1 }}>
         <Text bold numberOfLines={1}>
           {name}

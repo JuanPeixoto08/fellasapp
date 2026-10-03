@@ -7,11 +7,13 @@ import {
   type ReactionGroup,
   type ReactionSummary,
 } from './reactions';
+import { BUCKET, resolveUrl, signPaths } from './storage';
 
 export const PAGE_SIZE = 10;
-const BUCKET = 'post-images';
-const SIGNED_URL_TTL = 60 * 60;
+/** Fotos por post (mesmo limite do check posts_images_max). */
+export const MAX_IMAGES = 4;
 
+/** `avatar_url` já vem como URL assinada (pronta para exibir) ou null. */
 export type Author = Pick<
   Tables<'profiles'>,
   'id' | 'username' | 'display_name' | 'avatar_url'
@@ -20,7 +22,9 @@ export type Author = Pick<
 export type FeedPost = {
   id: string;
   body: string;
-  /** URL assinada (bucket privado) pronta para exibir, ou null. */
+  /** URLs assinadas (bucket privado) das fotos, na ordem; até 4. */
+  images: string[];
+  /** Atalho para a primeira foto (capa na aba Fotos), ou null. */
   imageUrl: string | null;
   createdAt: string;
   author: Author;
@@ -64,33 +68,43 @@ async function currentUserId(): Promise<string> {
   return data.user.id;
 }
 
-async function signImage(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  if (/^https?:\/\//.test(path)) return path;
-  const { data } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL);
-  return data?.signedUrl ?? null;
+/** Fotos do post: a lista `images` (0005) ou, em posts antigos/banco sem a migration, a `image_url`. */
+export function imagePaths(row: { images?: string[] | null; image_url: string | null }): string[] {
+  if (row.images && row.images.length > 0) return row.images.slice(0, MAX_IMAGES);
+  return row.image_url ? [row.image_url] : [];
 }
 
-async function mapPost(
-  row: PostRow,
+function mapAuthor(author: Author | null, id: string, signed: Map<string, string>): Author {
+  if (!author) return unknownAuthor(id);
+  return { ...author, avatar_url: resolveUrl(author.avatar_url, signed) };
+}
+
+/** Assina fotos e avatares de todos os posts em uma chamada só. */
+async function mapPosts(
+  rows: PostRow[],
   liked: Set<string>,
   reactions: Map<string, ReactionGroup>,
-): Promise<FeedPost> {
-  const r = reactions.get(row.id) ?? NO_REACTIONS;
-  return {
-    id: row.id,
-    body: row.body,
-    imageUrl: await signImage(row.image_url),
-    createdAt: row.created_at,
-    author: row.author ?? unknownAuthor(row.author_id),
-    likeCount: row.likes?.[0]?.count ?? 0,
-    commentCount: row.comments?.[0]?.count ?? 0,
-    likedByMe: liked.has(row.id),
-    reactions: r.reactions,
-    myReaction: r.myReaction,
-  };
+): Promise<FeedPost[]> {
+  const signed = await signPaths(rows.flatMap((r) => [...imagePaths(r), r.author?.avatar_url]));
+  return rows.map((row) => {
+    const r = reactions.get(row.id) ?? NO_REACTIONS;
+    const images = imagePaths(row)
+      .map((p) => resolveUrl(p, signed))
+      .filter((u): u is string => !!u);
+    return {
+      id: row.id,
+      body: row.body,
+      images,
+      imageUrl: images[0] ?? null,
+      createdAt: row.created_at,
+      author: mapAuthor(row.author, row.author_id, signed),
+      likeCount: row.likes?.[0]?.count ?? 0,
+      commentCount: row.comments?.[0]?.count ?? 0,
+      likedByMe: liked.has(row.id),
+      reactions: r.reactions,
+      myReaction: r.myReaction,
+    };
+  });
 }
 
 async function likedSet(userId: string, postIds: string[]): Promise<Set<string>> {
@@ -105,8 +119,15 @@ async function likedSet(userId: string, postIds: string[]): Promise<Set<string>>
 }
 
 /** Feed paginado por created_at (mais novos primeiro). `cursor` = created_at do último item. */
+export type FeedFilter = {
+  /** Só posts deste autor (perfil). */
+  authorId?: string;
+  /** Só posts com foto (aba Fotos do perfil). */
+  photosOnly?: boolean;
+};
+
 export async function listFeed(
-  { cursor }: { cursor?: string | null } = {},
+  { cursor, authorId, photosOnly }: { cursor?: string | null } & FeedFilter = {},
 ): Promise<FeedPage> {
   const userId = await currentUserId();
   let query = supabase
@@ -115,6 +136,8 @@ export async function listFeed(
     .order('created_at', { ascending: false })
     .limit(PAGE_SIZE);
   if (cursor) query = query.lt('created_at', cursor);
+  if (authorId) query = query.eq('author_id', authorId);
+  if (photosOnly) query = query.not('image_url', 'is', null);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -124,7 +147,7 @@ export async function listFeed(
     likedSet(userId, ids),
     postReactionsMap(userId, ids),
   ]);
-  const posts = await Promise.all(rows.map((r) => mapPost(r, liked, reactions)));
+  const posts = await mapPosts(rows, liked, reactions);
   return {
     posts,
     nextCursor:
@@ -144,13 +167,15 @@ export async function getPost(postId: string): Promise<FeedPost> {
     likedSet(userId, [postId]),
     postReactionsMap(userId, [postId]),
   ]);
-  return mapPost(data as unknown as PostRow, liked, reactions);
+  const [post] = await mapPosts([data as unknown as PostRow], liked, reactions);
+  return post;
 }
 
-async function uploadImage(userId: string, uri: string): Promise<string> {
+async function uploadImage(userId: string, uri: string, index: number): Promise<string> {
   const blob = await (await fetch(uri)).blob();
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-  const path = `${userId}/${Date.now()}.${ext}`;
+  // o índice evita colisão de nome quando várias sobem no mesmo milissegundo
+  const path = `${userId}/${Date.now()}-${index}.${ext}`;
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, blob, { contentType: blob.type || 'image/jpeg' });
@@ -158,23 +183,47 @@ async function uploadImage(userId: string, uri: string): Promise<string> {
   return path;
 }
 
+async function removeImages(paths: string[]): Promise<void> {
+  const own = paths.filter((p) => !/^https?:\/\//.test(p));
+  if (own.length === 0) return;
+  await supabase.storage.from(BUCKET).remove(own).catch(() => {});
+}
+
 export async function createPost({
   body,
-  imageUri,
+  imageUris = [],
 }: {
   body: string;
-  imageUri?: string | null;
+  /** Fotos locais (até 4), na ordem de exibição. */
+  imageUris?: string[];
 }): Promise<Tables<'posts'>> {
   const text = body.trim();
-  if (!text && !imageUri) throw new Error('Escreva algo ou escolha uma imagem');
+  if (!text && imageUris.length === 0) throw new Error('Escreva algo ou escolha uma imagem');
+  if (imageUris.length > MAX_IMAGES) throw new Error(`No máximo ${MAX_IMAGES} fotos por post`);
   const userId = await currentUserId();
-  const image_url = imageUri ? await uploadImage(userId, imageUri) : null;
-  const { data, error } = await supabase
-    .from('posts')
-    .insert({ author_id: userId, body: text, image_url })
-    .select()
-    .single();
-  if (error) throw error;
+
+  const results = await Promise.allSettled(imageUris.map((uri, i) => uploadImage(userId, uri, i)));
+  const paths = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) {
+    // não deixa foto órfã no bucket se o post não for criado
+    await removeImages(paths);
+    throw failed.reason;
+  }
+
+  // 1 foto vai só em image_url (funciona mesmo sem a migration 0005); 2+ precisam de `images`.
+  // image_url sempre recebe a primeira, para apps antigos ainda abertos mostrarem ao menos ela.
+  const row = {
+    author_id: userId,
+    body: text,
+    image_url: paths[0] ?? null,
+    ...(paths.length > 1 ? { images: paths } : {}),
+  };
+  const { data, error } = await supabase.from('posts').insert(row).select().single();
+  if (error) {
+    await removeImages(paths);
+    throw error;
+  }
   return data;
 }
 
@@ -223,18 +272,41 @@ export async function listComments(postId: string): Promise<Comment[]> {
     author: Author | null;
   };
   const rows = (data ?? []) as unknown as Row[];
-  const reactions = await commentReactionsMap(userId, rows.map((c) => c.id));
+  const [reactions, signed] = await Promise.all([
+    commentReactionsMap(userId, rows.map((c) => c.id)),
+    signPaths(rows.map((c) => c.author?.avatar_url)),
+  ]);
   return rows.map((c) => {
     const r = reactions.get(c.id) ?? NO_REACTIONS;
     return {
       id: c.id,
       body: c.body,
       createdAt: c.created_at,
-      author: c.author ?? unknownAuthor(c.author_id),
+      author: mapAuthor(c.author, c.author_id, signed),
       reactions: r.reactions,
       myReaction: r.myReaction,
     };
   });
+}
+
+/**
+ * Apaga um post meu (RLS só deixa o autor). Curtidas, comentários e reações vão junto por cascade;
+ * a foto no bucket é removida em seguida, sem falhar a operação se a limpeza der errado.
+ */
+export async function deletePost(postId: string): Promise<void> {
+  const userId = await currentUserId();
+  const { data, error } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', postId)
+    .eq('author_id', userId)
+    // `*` em vez de listar colunas: funciona com ou sem a coluna `images` (0005)
+    .select('*');
+  if (error) throw error;
+  const rows = (data ?? []) as Pick<Tables<'posts'>, 'image_url' | 'images'>[];
+  if (rows.length === 0) throw new Error('Post não encontrado ou não é seu');
+  const { image_url, images } = rows[0];
+  await removeImages([...new Set([...(images ?? []), ...(image_url ? [image_url] : [])])]);
 }
 
 export async function addComment(

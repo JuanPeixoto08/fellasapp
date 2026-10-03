@@ -1,13 +1,20 @@
-import { listComments, listFeed, toggleLike } from '../lib/api/posts';
+import { createPost, deletePost, listComments, listFeed, toggleLike } from '../lib/api/posts';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
 let mockResults: Record<string, unknown> = {};
+const mockSignCalls: string[][] = [];
+const mockRemoved: string[] = [];
+const mockUploaded: string[] = [];
+/** Índices (como string) das fotos cujo upload deve falhar. */
+let mockUploadFail: string[] = [];
+
+globalThis.fetch = jest.fn(async () => ({ blob: async () => ({ type: 'image/jpeg' }) })) as unknown as typeof fetch;
 
 jest.mock('../lib/supabase', () => {
   const makeBuilder = (table: string) => {
     let op = 'select';
     const b: any = {};
-    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'in', 'lt', 'order', 'limit']) {
+    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'in', 'lt', 'not', 'order', 'limit']) {
       b[m] = (...args: unknown[]) => {
         if (['insert', 'upsert', 'delete'].includes(m)) op = m;
         mockCalls.push({ table, op: m, args });
@@ -27,7 +34,24 @@ jest.mock('../lib/supabase', () => {
       from: (table: string) => makeBuilder(table),
       storage: {
         from: () => ({
-          createSignedUrl: async (p: string) => ({ data: { signedUrl: `https://signed/${p}` } }),
+          upload: async (path: string) => {
+            if (mockUploadFail.includes(path.split('-').pop()!.split('.')[0])) {
+              return { data: null, error: new Error('upload falhou') };
+            }
+            mockUploaded.push(path);
+            return { data: { path }, error: null };
+          },
+          remove: async (paths: string[]) => {
+            mockRemoved.push(...paths);
+            return { data: null, error: null };
+          },
+          createSignedUrls: async (paths: string[]) => {
+            mockSignCalls.push(paths);
+            return {
+              data: paths.map((p) => ({ path: p, signedUrl: `https://signed/${p}`, error: null })),
+              error: null,
+            };
+          },
         }),
       },
     },
@@ -36,7 +60,95 @@ jest.mock('../lib/supabase', () => {
 
 beforeEach(() => {
   mockCalls.length = 0;
+  mockSignCalls.length = 0;
+  mockRemoved.length = 0;
   mockResults = {};
+});
+
+describe('listFeed filters (perfil)', () => {
+  it('filtra por autor e só fotos', async () => {
+    mockResults['posts.select'] = { data: [], error: null };
+    await listFeed({ authorId: 'u1', photosOnly: true });
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'eq', args: ['author_id', 'u1'] });
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'not', args: ['image_url', 'is', null] });
+  });
+
+  it('sem filtro não restringe autor nem foto', async () => {
+    mockResults['posts.select'] = { data: [], error: null };
+    await listFeed();
+    expect(mockCalls.some((c) => c.table === 'posts' && (c.op === 'eq' || c.op === 'not'))).toBe(false);
+  });
+});
+
+describe('fotos (até 4)', () => {
+  beforeEach(() => {
+    mockUploaded.length = 0;
+    mockUploadFail = [];
+  });
+
+  it('lê a lista images e assina todas; post antigo cai na image_url', async () => {
+    mockResults['posts.select'] = {
+      data: [
+        { id: 'a', author_id: 'u1', body: '', image_url: 'u1/1.jpg', images: ['u1/1.jpg', 'u1/2.jpg', 'u1/3.jpg'], created_at: 't', author: null, likes: [], comments: [] },
+        { id: 'b', author_id: 'u1', body: '', image_url: 'u1/old.jpg', images: [], created_at: 't', author: null, likes: [], comments: [] },
+      ],
+      error: null,
+    };
+    const { posts } = await listFeed();
+    expect(posts[0].images).toEqual(['https://signed/u1/1.jpg', 'https://signed/u1/2.jpg', 'https://signed/u1/3.jpg']);
+    expect(posts[0].imageUrl).toBe('https://signed/u1/1.jpg');
+    expect(posts[1].images).toEqual(['https://signed/u1/old.jpg']);
+  });
+
+  it('1 foto grava só image_url (funciona sem a migration 0005)', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: 'oi', imageUris: ['file://a.jpg'] });
+    const insert = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert');
+    expect(insert?.args[0]).toEqual({ author_id: 'me', body: 'oi', image_url: mockUploaded[0] });
+  });
+
+  it('3 fotos gravam images na ordem e image_url = primeira', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: '', imageUris: ['file://a', 'file://b', 'file://c'] });
+    const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+    expect(row.images).toEqual(mockUploaded);
+    expect(row.image_url).toBe(mockUploaded[0]);
+    expect((row.images as string[]).map((p) => p.split('-').pop())).toEqual(['0.jpg', '1.jpg', '2.jpg']);
+  });
+
+  it('falha de upload apaga as que subiram e não cria o post', async () => {
+    mockUploadFail = ['1'];
+    await expect(createPost({ body: '', imageUris: ['file://a', 'file://b'] })).rejects.toThrow('upload falhou');
+    expect(mockRemoved).toEqual(mockUploaded);
+    expect(mockCalls.some((c) => c.table === 'posts' && c.op === 'insert')).toBe(false);
+  });
+
+  it('mais de 4 fotos é recusado antes de subir', async () => {
+    await expect(createPost({ body: '', imageUris: ['1', '2', '3', '4', '5'] })).rejects.toThrow(/4 fotos/);
+    expect(mockUploaded).toEqual([]);
+  });
+
+  it('apagar o post remove todas as fotos do bucket', async () => {
+    mockResults['posts.delete'] = { data: [{ image_url: 'me/1.jpg', images: ['me/1.jpg', 'me/2.jpg'] }], error: null };
+    await deletePost('p1');
+    expect(mockRemoved.sort()).toEqual(['me/1.jpg', 'me/2.jpg']);
+  });
+});
+
+describe('deletePost', () => {
+  it('apaga só o meu post e remove a foto do bucket', async () => {
+    mockResults['posts.delete'] = { data: [{ image_url: 'me/a.jpg' }], error: null };
+    await deletePost('p1');
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'eq', args: ['id', 'p1'] });
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'eq', args: ['author_id', 'me'] });
+    expect(mockRemoved).toEqual(['me/a.jpg']);
+  });
+
+  it('falha quando nada foi apagado (post de outro ou inexistente)', async () => {
+    mockResults['posts.delete'] = { data: [], error: null };
+    await expect(deletePost('p1')).rejects.toThrow();
+    expect(mockRemoved).toEqual([]);
+  });
 });
 
 describe('listFeed', () => {
@@ -49,7 +161,7 @@ describe('listFeed', () => {
           body: 'oi',
           image_url: 'u1/a.jpg',
           created_at: '2026-01-02T00:00:00Z',
-          author: { id: 'u1', username: 'ana', display_name: 'Ana', avatar_url: null },
+          author: { id: 'u1', username: 'ana', display_name: 'Ana', avatar_url: 'u1/avatar.jpg' },
           likes: [{ count: 3 }],
           comments: [{ count: 2 }],
         },
@@ -101,6 +213,9 @@ describe('listFeed', () => {
       myReaction: null,
     });
     expect(page.nextCursor).toBeNull();
+    expect(page.posts[0].author.avatar_url).toBe('https://signed/u1/avatar.jpg');
+    // fotos e avatares numa assinatura só (bucket privado)
+    expect(mockSignCalls).toEqual([['u1/a.jpg', 'u1/avatar.jpg']]);
     expect(mockCalls).toContainEqual({
       table: 'posts',
       op: 'lt',

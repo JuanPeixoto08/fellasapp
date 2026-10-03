@@ -1,50 +1,57 @@
-import { useEffect, useState } from 'react';
-import { Image, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 
-import { getSignedUrl, type Post } from '../../lib/api/profiles';
-import { profileColorKeys, profilePalette, useTheme } from '../../lib/theme';
-import { Text } from '../ui';
+import type { FeedPost } from '../../lib/api/posts';
+import { useTheme } from '../../lib/theme';
+import { Icon } from '../ui';
 
 type Props = {
-  post: Post;
+  post: FeedPost;
   size: number;
-  /** Índice na paleta de perfil, para tiles sem imagem. */
-  tone?: number;
+  onPress?: (post: FeedPost) => void;
 };
 
-/** Quadradinho do grid de posts: foto, ou o texto do post quando não há imagem. */
-export function PostTile({ post, size, tone = 0 }: Props) {
+/** Quadradinho da aba Fotos: a primeira foto do post (+ ícone quando tem várias); tocar abre o post. */
+export function PostTile({ post, size, onPress }: Props) {
   const t = useTheme();
-  const tint = profilePalette[profileColorKeys[tone % profileColorKeys.length]];
-  const plain = !!post.image_url;
-  const [uri, setUri] = useState<string | null>(null);
-
-  useEffect(() => {
-    getSignedUrl(post.image_url).then(setUri);
-  }, [post.image_url]);
-
+  const count = post.images.length;
+  const label = count > 1 ? `Abrir post com ${count} fotos` : 'Abrir foto';
   return (
-    <View
+    <Pressable
       testID="post-tile"
-      accessibilityLabel={post.image_url ? 'Post com foto' : `Post: ${post.body}`}
-      style={{
+      accessibilityRole="button"
+      accessibilityLabel={post.body ? `${label}: ${post.body}` : label}
+      onPress={() => onPress?.(post)}
+      style={({ pressed }) => ({
         width: size,
         height: size,
-        borderRadius: t.radii.md,
-        backgroundColor: plain ? t.colors.surfaceSunken : tint.bg,
-        borderWidth: plain ? 1 : 0,
-        borderColor: t.colors.border,
-        padding: uri ? 0 : t.spacing.sm,
+        borderRadius: t.radii.sm,
+        backgroundColor: t.colors.surfaceSunken,
+        alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
-      }}
+        opacity: pressed ? 0.8 : 1,
+      })}
     >
-      {uri ? (
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+      {post.imageUrl ? (
+        <Image source={{ uri: post.imageUrl }} style={{ width: '100%', height: '100%' }} />
       ) : (
-        <Text variant="caption" numberOfLines={5} style={{ color: tint.ink }}>
-          {post.body}
-        </Text>
+        <Icon name="image-outline" size="lg" tone="muted" />
       )}
-    </View>
+      {count > 1 ? (
+        <View
+          testID="post-tile-multi"
+          style={{
+            position: 'absolute',
+            top: t.spacing.xs,
+            right: t.spacing.xs,
+            padding: t.spacing.xs,
+            borderRadius: t.radii.sm,
+            backgroundColor: t.colors.overlay,
+          }}
+        >
+          <Icon name="copy-outline" size="sm" color={t.colors.onOverlay} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

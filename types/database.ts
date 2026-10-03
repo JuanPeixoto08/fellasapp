@@ -77,6 +77,8 @@ export type Database = {
           author_id: string;
           body: string;
           image_url: string | null;
+          /** Caminhos das fotos (até 4), na ordem; vazio em posts sem foto ou anteriores à 0005. */
+          images: string[];
           created_at: string;
         };
         Insert: {
@@ -84,6 +86,7 @@ export type Database = {
           author_id: string;
           body?: string;
           image_url?: string | null;
+          images?: string[];
           created_at?: string;
         };
         Update: {
@@ -91,6 +94,7 @@ export type Database = {
           author_id?: string;
           body?: string;
           image_url?: string | null;
+          images?: string[];
           created_at?: string;
         };
         Relationships: [
