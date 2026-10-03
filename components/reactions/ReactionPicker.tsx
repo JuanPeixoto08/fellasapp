@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing, Modal, Pressable, Text as RNText, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
 
@@ -44,12 +44,13 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Fechar reações"
-        style={{ flex: 1, backgroundColor: t.colors.overlay, alignItems: 'center', justifyContent: 'center' }}
-      >
+      <View style={{ flex: 1, backgroundColor: t.colors.overlay, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar reações"
+          style={StyleSheet.absoluteFill}
+        />
         <Animated.View
           accessibilityRole="toolbar"
           accessibilityLabel="Escolher reação"
@@ -95,7 +96,7 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
             );
           })}
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
