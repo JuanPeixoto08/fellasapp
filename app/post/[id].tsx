@@ -1,17 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Button,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 
+import { CommentItem } from '../../components/feed/CommentItem';
 import { PostCard } from '../../components/PostCard';
+import { Button, Screen, Text, TextField } from '../../components/ui';
 import {
   addComment,
   getPost,
@@ -20,8 +13,10 @@ import {
   type Comment,
   type FeedPost,
 } from '../../lib/api/posts';
+import { useTheme } from '../../lib/theme';
 
 export default function PostDetailScreen() {
+  const t = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -62,43 +57,59 @@ export default function PostDetailScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Stack.Screen options={{ headerShown: true, title: 'Post' }} />
-      <FlatList
-        data={comments}
-        keyExtractor={(c) => c.id}
-        ListHeaderComponent={post ? <PostCard post={post} onToggleLike={onLike} /> : null}
-        ListEmptyComponent={<Text style={styles.msg}>{error ?? 'Sem comentários ainda.'}</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.comment}>
-            <Text style={styles.author}>
-              {item.author.display_name || item.author.username}
-            </Text>
-            <Text>{item.body}</Text>
-          </View>
-        )}
-      />
-      <View style={styles.composer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Comentar..."
-          value={text}
-          onChangeText={setText}
+    <Screen flush>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Stack.Screen options={{ headerShown: true, title: 'Post' }} />
+        <FlatList
+          data={comments}
+          keyExtractor={(c) => c.id}
+          contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingVertical: t.spacing.lg, gap: t.spacing.sm }}
+          ListHeaderComponent={
+            post ? (
+              <View style={{ marginBottom: t.spacing.md }}>
+                <PostCard post={post} onToggleLike={onLike} />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            error ? (
+              <Text tone="danger" align="center" accessibilityRole="alert">
+                {error}
+              </Text>
+            ) : !post ? (
+              <ActivityIndicator
+                style={{ padding: t.spacing.xl }}
+                color={t.colors.primary}
+                accessibilityLabel="Carregando post"
+              />
+            ) : (
+              <Text tone="muted" align="center">
+                Sem comentários ainda. Puxa o assunto.
+              </Text>
+            )
+          }
+          renderItem={({ item }) => <CommentItem comment={item} />}
         />
-        <Button title="Enviar" onPress={send} disabled={!text.trim()} />
-      </View>
-    </KeyboardAvoidingView>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: t.spacing.sm,
+            padding: t.spacing.md,
+            borderTopWidth: 1,
+            borderTopColor: t.colors.border,
+            backgroundColor: t.colors.bg,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <TextField label="Comentar" placeholder="Fala aí…" value={text} onChangeText={setText} />
+          </View>
+          <Button title="Enviar" onPress={send} disabled={!text.trim()} />
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  msg: { padding: 16, textAlign: 'center' },
-  comment: { paddingHorizontal: 12, paddingVertical: 8 },
-  author: { fontWeight: '600' },
-  composer: { flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8 },
-});

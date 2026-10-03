@@ -32,3 +32,11 @@ describe('PostCard', () => {
     expect(onToggleLike).toHaveBeenCalledWith(post);
   });
 });
+
+describe('PostCard like state', () => {
+  it('shows liked label and Descurtir when liked', async () => {
+    await render(<PostCard post={{ ...post, likedByMe: true }} />);
+    expect(screen.getByLabelText('Descurtir')).toBeTruthy();
+    expect(screen.getByText(/Curtiu/)).toBeTruthy();
+  });
+});
