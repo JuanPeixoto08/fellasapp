@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
-import { updateMyProfile, validateUsername } from '../lib/api/profiles';
+import { formatBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
 
 const mockUpdate = jest.fn();
 const mockUpload = jest.fn();
@@ -15,6 +15,10 @@ const profileRow = {
   display_name: 'Ana',
   avatar_url: null,
   bio: 'Oi, sou a Ana',
+  accent_color: null,
+  status: null,
+  location: null,
+  birthday: null,
   is_member: true,
   created_at: '2026-01-01',
 };
@@ -70,6 +74,20 @@ describe('validateUsername', () => {
   });
 });
 
+describe('birthday', () => {
+  it('converte DD/MM/AAAA em ISO', () => {
+    expect(parseBirthday('20/05/1999')).toBe('1999-05-20');
+    expect(parseBirthday('')).toBeNull();
+  });
+  it.each(['31/02/2000', '2000-01-01', '1/1/2000', '01/01/2999'])('rejeita %s', (v) => {
+    expect(parseBirthday(v)).toBeUndefined();
+  });
+  it('formata ISO', () => {
+    expect(formatBirthday('1999-05-20')).toBe('20/05/1999');
+    expect(formatBirthday(null)).toBe('');
+  });
+});
+
 describe('updateMyProfile', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -78,6 +96,27 @@ describe('updateMyProfile', () => {
     expect(mockUpdate).toHaveBeenCalledWith({ display_name: 'Ana', username: 'ana_01', bio: 'oi' });
     expect(mockEqUpdate).toHaveBeenCalledWith('id', 'u1');
     expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('envia campos novos; vazio vira null', async () => {
+    await updateMyProfile({
+      display_name: 'Ana',
+      username: 'ana_01',
+      bio: '',
+      status: ' 🎧 pagode ',
+      location: '  ',
+      birthday: '1999-05-20',
+      accent_color: 'coral',
+    });
+    expect(mockUpdate).toHaveBeenCalledWith({
+      display_name: 'Ana',
+      username: 'ana_01',
+      bio: '',
+      status: '🎧 pagode',
+      location: null,
+      birthday: '1999-05-20',
+      accent_color: 'coral',
+    });
   });
 
   it('faz upload do avatar e salva o caminho', async () => {
