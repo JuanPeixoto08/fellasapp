@@ -14,6 +14,8 @@ const post: FeedPost = {
   likeCount: 4,
   commentCount: 7,
   likedByMe: false,
+  reactions: [],
+  myReaction: null,
 };
 
 describe('PostCard', () => {
