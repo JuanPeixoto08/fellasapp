@@ -1,22 +1,29 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Button, Image, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { stackHeader } from '../../components/profile/headerOptions';
+import { Avatar, Button, Screen, Text, TextField } from '../../components/ui';
 import {
   getCurrentUserId,
   getProfile,
   updateMyProfile,
   validateUsername,
 } from '../../lib/api/profiles';
+import { useTheme } from '../../lib/theme';
 
 export default function EditProfileScreen() {
+  const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -42,9 +49,10 @@ export default function EditProfileScreen() {
 
   async function save() {
     const invalid = validateUsername(username.trim().toLowerCase());
-    if (invalid) return setError(invalid);
+    if (invalid) return setUsernameError(invalid);
     setSaving(true);
     setError(null);
+    setUsernameError(undefined);
     try {
       await updateMyProfile({ display_name: displayName, username, bio, avatarUri });
       router.back();
@@ -56,39 +64,50 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatar} /> : null}
-      <Button title="Escolher foto" onPress={pickAvatar} />
-      <TextInput
-        style={styles.input}
-        placeholder="Nome"
-        value={displayName}
-        onChangeText={setDisplayName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="username"
-        autoCapitalize="none"
-        autoCorrect={false}
-        value={username}
-        onChangeText={setUsername}
-      />
-      <TextInput
-        style={[styles.input, { height: 80 }]}
-        placeholder="Bio"
-        multiline
-        value={bio}
-        onChangeText={setBio}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button title={saving ? 'Salvando...' : 'Salvar'} onPress={save} disabled={saving} />
-    </ScrollView>
+    <>
+      <Stack.Screen options={stackHeader(t, 'Editar perfil')} />
+      <Screen scroll style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
+        <View style={{ alignItems: 'center', gap: t.spacing.md }}>
+          <Avatar name={displayName || username || '?'} uri={avatarUri} size={t.layout.minTouch * 2} />
+          <Button
+            title={avatarUri ? 'Trocar foto' : 'Escolher foto'}
+            variant="secondary"
+            onPress={pickAvatar}
+          />
+        </View>
+        <TextField
+          label="Nome"
+          placeholder="Como a galera te chama"
+          value={displayName}
+          onChangeText={setDisplayName}
+        />
+        <TextField
+          label="Usuário"
+          placeholder="seu_usuario"
+          error={usernameError}
+          help="3 a 20 caracteres: letras minúsculas, números e _"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={username}
+          onChangeText={(v) => {
+            setUsername(v);
+            setUsernameError(undefined);
+          }}
+        />
+        <TextField
+          label="Bio"
+          placeholder="Conta uma coisa sobre você"
+          multiline
+          value={bio}
+          onChangeText={setBio}
+        />
+        {error ? (
+          <Text tone="danger" accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
+        <Button title="Salvar" fullWidth loading={saving} onPress={save} />
+      </Screen>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12 },
-  avatar: { width: 96, height: 96, borderRadius: 48, alignSelf: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10 },
-  error: { color: 'crimson' },
-});
