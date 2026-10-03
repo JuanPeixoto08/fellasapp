@@ -8,6 +8,9 @@ import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+import { AuthGuard } from '../lib/auth/AuthGuard';
+import { SessionProvider } from '../lib/auth/SessionProvider';
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     InstrumentSerif_400Regular,
@@ -25,12 +28,18 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <>
+    <SessionProvider>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(auth)/login" />
-      </Stack>
-    </>
+      <AuthGuard>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(auth)/login" />
+          <Stack.Screen name="not-invited" />
+          <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
+          <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
+          <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
+        </Stack>
+      </AuthGuard>
+    </SessionProvider>
   );
 }
