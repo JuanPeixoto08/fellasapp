@@ -13,6 +13,8 @@ import {
   type Comment,
   type FeedPost,
 } from '../../lib/api/posts';
+import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
+import { withReaction } from '../../lib/reactionState';
 import { useTheme } from '../../lib/theme';
 
 export default function PostDetailScreen() {
@@ -46,6 +48,26 @@ export default function PostDetailScreen() {
     }
   };
 
+  const onReactPost = async (p: FeedPost, emoji: string | null) => {
+    setPost((cur) => (cur ? withReaction(cur, emoji) : cur));
+    try {
+      await setPostReaction(p.id, emoji);
+    } catch {
+      setPost((cur) => (cur ? { ...cur, reactions: p.reactions, myReaction: p.myReaction } : cur));
+    }
+  };
+
+  const onReactComment = async (c: Comment, emoji: string | null) => {
+    const apply = (fn: (x: Comment) => Comment) =>
+      setComments((prev) => prev.map((x) => (x.id === c.id ? fn(x) : x)));
+    apply((x) => withReaction(x, emoji));
+    try {
+      await setCommentReaction(c.id, emoji);
+    } catch {
+      apply((x) => ({ ...x, reactions: c.reactions, myReaction: c.myReaction }));
+    }
+  };
+
   const send = async () => {
     try {
       await addComment(id, text);
@@ -70,7 +92,7 @@ export default function PostDetailScreen() {
           ListHeaderComponent={
             post ? (
               <View style={{ marginBottom: t.spacing.md }}>
-                <PostCard post={post} onToggleLike={onLike} />
+                <PostCard post={post} onToggleLike={onLike} onReact={onReactPost} />
               </View>
             ) : null
           }
@@ -91,7 +113,7 @@ export default function PostDetailScreen() {
               </Text>
             )
           }
-          renderItem={({ item }) => <CommentItem comment={item} />}
+          renderItem={({ item }) => <CommentItem comment={item} onReact={onReactComment} />}
         />
         <View
           style={{
