@@ -1,7 +1,7 @@
 # PRODUCT
 
 ## Platform
-adaptive — Expo (React Native) iOS/Android + web PWA (Cloudflare). Uma base de código, toques primeiro, web como PWA instalável.
+adaptive
 
 ## Produto
 **fellasapp** é a rede social fechada da FellasInc: um grupo de amigos, só convidados. Postar, ver o feed, curtir, comentar, ter perfil. Sem público, sem algoritmo, sem estranhos.

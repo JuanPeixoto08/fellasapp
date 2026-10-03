@@ -1,26 +1,32 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Button, Heading, Screen, Text } from '../components/ui';
 import { useSession } from '../lib/auth/SessionProvider';
+import { useTheme } from '../lib/theme';
 
 export default function NotInvitedScreen() {
-  const { signOut } = useSession();
+  const { session, signOut } = useSession();
+  const t = useTheme();
+  const email = session?.user?.email;
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Você ainda não foi convidado</Text>
-      <Text style={styles.text}>
-        Este app é só para um grupo fechado de amigos. Peça para alguém do grupo liberar o seu email.
-      </Text>
-      <Pressable accessibilityRole="button" style={styles.button} onPress={() => void signOut()}>
-        <Text style={styles.buttonText}>Sair</Text>
-      </Pressable>
-    </View>
+    <Screen scroll style={{ paddingTop: t.spacing.xxxl, gap: t.spacing.xl }}>
+      <View style={{ gap: t.spacing.md }}>
+        <Heading level={1}>Você ainda não foi convidado</Heading>
+        <Text tone="muted">
+          Este app é só para um grupo fechado de amigos. Pede pra alguém do grupo liberar o seu email e
+          volta aqui, bora.
+        </Text>
+        {email ? (
+          <Text tone="muted">
+            Você entrou como{' '}
+            <Text highlight bold>
+              {email}
+            </Text>
+            . Se não é esse, sai e tenta com o certo.
+          </Text>
+        ) : null}
+      </View>
+      <Button title="Sair" variant="secondary" onPress={() => void signOut()} fullWidth />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  text: { fontSize: 15, textAlign: 'center', color: '#555' },
-  button: { backgroundColor: '#111', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-});
