@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Heading, Screen, Text, TextField } from '../../components/ui';
+import { Button, Heading, Logo, Screen, Text, TextField } from '../../components/ui';
 import { authErrorMessage, sendOtp, verifyOtp } from '../../lib/api/auth';
 import { useTheme } from '../../lib/theme';
 
@@ -57,6 +57,7 @@ export default function LoginScreen() {
 
   return (
     <Screen scroll style={{ paddingTop: t.spacing.xxxl, gap: t.spacing.xl }}>
+      <Logo height={t.layout.logoHeight.lg} />
       <View style={{ gap: t.spacing.md }}>
         <Heading level={1}>{step === 'email' ? 'Só entra quem foi chamado.' : 'Olha o seu email.'}</Heading>
         <Text tone="muted">

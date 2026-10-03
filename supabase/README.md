@@ -14,7 +14,15 @@ supabase db push          # aplica supabase/migrations/*.sql
 
 **SQL editor**: cole `migrations/0001_init.sql` e execute (é idempotente).
 
-**Atenção:** `migrations/0002_profile_extras.sql` (cor do perfil, status, cidade, aniversário) também precisa ser aplicada (`db push` ou colar no SQL editor; é idempotente). Sem ela, salvar o perfil com esses campos falha.
+**Atenção:** as migrations seguintes também precisam ser aplicadas, em ordem (`db push` ou colar
+cada uma no SQL editor; todas são idempotentes):
+
+| Migration | O que traz | Sem ela… |
+| --- | --- | --- |
+| `0002_profile_extras.sql` | cor do perfil, status, cidade, aniversário | salvar o perfil com esses campos falha |
+| `0003_reactions.sql` | tabelas `post_reactions` e `comment_reactions` + RLS | o feed e os posts não carregam (o app busca as reações junto) |
+| `0004_reactions_any_emoji.sql` | reação com qualquer emoji (troca a lista fixa de 6 por limite de tamanho) | reagir com emoji fora dos 6 da barra rápida falha |
+| `0005_post_images.sql` | até 4 fotos por post (coluna `images`, migra a foto atual de cada post) | postar com 2+ fotos falha (1 foto continua funcionando) |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 

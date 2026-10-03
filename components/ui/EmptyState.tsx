@@ -23,7 +23,12 @@ export function EmptyState({ title, message, actionLabel, onAction }: EmptyState
           {message}
         </Text>
       ) : null}
-      {actionLabel && onAction ? <Button title={actionLabel} onPress={onAction} /> : null}
+      {actionLabel && onAction ? (
+        // o Button se alinha à esquerda por padrão; a View o deixa centralizado aqui
+        <View>
+          <Button title={actionLabel} onPress={onAction} />
+        </View>
+      ) : null}
     </View>
   );
 }

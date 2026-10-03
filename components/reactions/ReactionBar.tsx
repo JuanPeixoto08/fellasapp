@@ -1,7 +1,8 @@
 import { Pressable, View } from 'react-native';
 
-import { Text } from '../ui';
 import { useTheme } from '../../lib/theme';
+import { ActionButton } from '../feed/ActionButton';
+import { Icon, Text } from '../ui';
 
 export type ReactionGroup = { emoji: string; count: number };
 
@@ -11,7 +12,7 @@ type BarProps = {
   onPressChip?: (emoji: string) => void;
 };
 
-/** Chips agrupados "❤️ 3"; o da minha reação fica com borda/fundo accent. */
+/** Chips mínimos "😂 3", um por emoji; o da minha reação fica invertido (acento neutro). */
 export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
   const t = useTheme();
   if (!reactions || reactions.length === 0) return null;
@@ -28,28 +29,23 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
             accessibilityLabel={`${emoji} ${count} ${count === 1 ? 'reação' : 'reações'}`}
             accessibilityHint={mine ? 'Toque para remover sua reação' : 'Toque para reagir com este emoji'}
             accessibilityState={{ selected: mine }}
-            hitSlop={t.spacing.xs}
+            hitSlop={{ top: t.spacing.sm, bottom: t.spacing.sm, left: t.spacing.xs, right: t.spacing.xs }}
           >
             <View
               style={{
-                minHeight: t.layout.minTouch,
+                height: t.layout.chipHeight,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: t.spacing.xs,
-                paddingHorizontal: t.spacing.md,
+                paddingHorizontal: t.spacing.sm,
                 borderRadius: t.radii.pill,
-                borderWidth: 1,
+                borderWidth: t.borders.hairline,
                 borderColor: mine ? t.colors.accent : t.colors.border,
-                backgroundColor: mine ? t.colors.accent : t.colors.surface,
+                backgroundColor: mine ? t.colors.accent : 'transparent',
               }}
             >
               <Text variant="small">{emoji}</Text>
-              <Text
-                variant="small"
-                bold
-                tone={mine ? undefined : 'muted'}
-                style={mine ? { color: t.colors.onAccent } : undefined}
-              >
+              <Text variant="caption" tone="muted" style={mine ? { color: t.colors.onAccent } : undefined}>
                 {count}
               </Text>
             </View>
@@ -60,29 +56,21 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
   );
 }
 
-type ButtonProps = { onPress?: () => void };
+type ButtonProps = {
+  onPress?: () => void;
+  /** Minha reação atual: aparece no lugar da carinha. */
+  myReaction?: string | null;
+};
 
-/** Botão pequeno "☺+" que abre o seletor de reações. */
-export function ReactButton({ onPress }: ButtonProps) {
-  const t = useTheme();
+/** Abre o seletor de reações; quando já reagi, mostra o meu emoji (tocar troca ou remove). */
+export function ReactButton({ onPress, myReaction }: ButtonProps) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Reagir" hitSlop={t.spacing.xs}>
-      <View
-        style={{
-          minHeight: t.layout.minTouch,
-          minWidth: t.layout.minTouch,
-          paddingHorizontal: t.spacing.md,
-          borderRadius: t.radii.pill,
-          borderWidth: 1,
-          borderColor: t.colors.border,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Text variant="small" bold tone="muted">
-          ☺+
-        </Text>
-      </View>
-    </Pressable>
+    <ActionButton
+      onPress={onPress}
+      accessibilityLabel="Reagir"
+      accessibilityHint={myReaction ? `Sua reação: ${myReaction}. Toque para trocar ou remover` : undefined}
+    >
+      {myReaction ? <Text>{myReaction}</Text> : <Icon name="happy-outline" tone="muted" />}
+    </ActionButton>
   );
 }

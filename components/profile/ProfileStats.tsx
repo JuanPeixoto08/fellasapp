@@ -6,11 +6,10 @@ import { Text } from '../ui';
 
 export type ProfileStatsProps = {
   stats: Pick<Stats, 'posts' | 'likesReceived' | 'commentsReceived'>;
-  /** Cor do perfil: fundo e tinta (texto) com contraste garantido. */
-  color?: { bg: string; ink: string };
 };
 
-export function ProfileStats({ stats, color }: ProfileStatsProps) {
+/** Números do perfil entre fios, como cabeçalho de jornal: discretos, sem bloco de cor. */
+export function ProfileStats({ stats }: ProfileStatsProps) {
   const t = useTheme();
   const items = [
     { value: stats.posts, label: 'posts' },
@@ -22,25 +21,26 @@ export function ProfileStats({ stats, color }: ProfileStatsProps) {
       accessibilityRole="summary"
       style={{
         flexDirection: 'row',
-        backgroundColor: color?.bg ?? t.colors.surface,
-        borderRadius: t.radii.lg,
-        borderWidth: color ? 0 : 1,
+        paddingVertical: t.spacing.md,
+        borderTopWidth: t.borders.hairline,
+        borderBottomWidth: t.borders.hairline,
         borderColor: t.colors.border,
-        paddingVertical: t.spacing.lg,
-        paddingHorizontal: t.spacing.md,
       }}
     >
-      {items.map((item) => (
+      {items.map((item, i) => (
         <View
           key={item.label}
           accessible
           accessibilityLabel={`${item.value} ${item.label}`}
-          style={{ flex: 1, alignItems: 'center' }}
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            borderLeftWidth: i === 0 ? 0 : t.borders.hairline,
+            borderColor: t.colors.border,
+          }}
         >
-          <Text variant="headline" style={color ? { color: color.ink } : undefined}>
-            {String(item.value)}
-          </Text>
-          <Text variant="caption" tone="muted" style={color ? { color: color.ink } : undefined}>
+          <Text variant="title">{String(item.value)}</Text>
+          <Text variant="caption" tone="muted">
             {item.label}
           </Text>
         </View>

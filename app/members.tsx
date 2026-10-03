@@ -7,6 +7,8 @@ import { MemberRow } from '../components/profile/MemberRow';
 import { stackHeader } from '../components/profile/headerOptions';
 import { Divider, EmptyState, Screen, Text } from '../components/ui';
 import { listMembers, type Profile } from '../lib/api/profiles';
+import { resolveUrl, signPaths } from '../lib/api/storage';
+import { friendlyError } from '../lib/errors';
 import { useTheme } from '../lib/theme';
 
 export default function MembersScreen() {
@@ -14,6 +16,7 @@ export default function MembersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [members, setMembers] = useState<Profile[]>([]);
+  const [avatars, setAvatars] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,8 +24,12 @@ export default function MembersScreen() {
     setLoading(true);
     setError(null);
     listMembers()
-      .then(setMembers)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar membros'))
+      .then(async (list) => {
+        // sem as fotos a lista ainda serve (iniciais), então falha na assinatura não derruba a tela
+        setAvatars(await signPaths(list.map((m) => m.avatar_url)).catch(() => new Map()));
+        setMembers(list);
+      })
+      .catch((e) => setError(friendlyError(e, 'Pode ter sido a conexão. Tenta de novo daqui a pouco.')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -56,7 +63,11 @@ export default function MembersScreen() {
           <EmptyState title="Ninguém por aqui ainda" message="Os membros do grupo aparecem nesta lista." />
         }
         renderItem={({ item }) => (
-          <MemberRow member={item} onPress={() => router.push(`/user/${item.id}`)} />
+          <MemberRow
+            member={item}
+            avatarUri={resolveUrl(item.avatar_url, avatars)}
+            onPress={() => router.push(`/user/${item.id}`)}
+          />
         )}
       />
     );
@@ -65,7 +76,7 @@ export default function MembersScreen() {
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Membros')} />
-      <Screen>{body}</Screen>
+      <Screen header>{body}</Screen>
     </>
   );
 }
