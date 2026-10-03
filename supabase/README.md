@@ -14,6 +14,8 @@ supabase db push          # aplica supabase/migrations/*.sql
 
 **SQL editor**: cole `migrations/0001_init.sql` e execute (é idempotente).
 
+**Atenção:** `migrations/0002_profile_extras.sql` (cor do perfil, status, cidade, aniversário) também precisa ser aplicada (`db push` ou colar no SQL editor; é idempotente). Sem ela, salvar o perfil com esses campos falha.
+
 Em Auth > Providers, habilite Email (OTP / magic link).
 
 ## Modelo de acesso

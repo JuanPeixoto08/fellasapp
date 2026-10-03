@@ -61,7 +61,36 @@ export type UpdateProfileInput = {
   username: string;
   bio: string;
   avatarUri?: string;
+  /** Campos extras: string vazia vira null; undefined não altera. */
+  accent_color?: string | null;
+  status?: string | null;
+  location?: string | null;
+  /** ISO `AAAA-MM-DD`. */
+  birthday?: string | null;
 };
+
+/** Converte "DD/MM/AAAA" em "AAAA-MM-DD"; vazio -> null; inválido -> undefined. */
+export function parseBirthday(text: string): string | null | undefined {
+  const v = text.trim();
+  if (!v) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (!m) return undefined;
+  const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) {
+    return undefined;
+  }
+  if (date.getTime() > Date.now()) return undefined;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** "AAAA-MM-DD" -> "DD/MM/AAAA". */
+export function formatBirthday(iso: string | null | undefined): string {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+const emptyToNull = (v: string | null): string | null => (v?.trim() ? v.trim() : null);
 
 export async function updateMyProfile(input: UpdateProfileInput): Promise<Profile> {
   const username = input.username.trim().toLowerCase();
@@ -69,11 +98,16 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (invalid) throw new Error(invalid);
 
   const userId = await getCurrentUserId();
-  const fields: Pick<Profile, 'display_name' | 'username' | 'bio'> & { avatar_url?: string } = {
+  const fields: Database['public']['Tables']['profiles']['Update'] = {
     display_name: input.display_name.trim(),
     username,
     bio: input.bio.trim(),
   };
+
+  if (input.accent_color !== undefined) fields.accent_color = emptyToNull(input.accent_color);
+  if (input.status !== undefined) fields.status = emptyToNull(input.status);
+  if (input.location !== undefined) fields.location = emptyToNull(input.location);
+  if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
 
   if (input.avatarUri) {
     const blob = await (await fetch(input.avatarUri)).blob();
