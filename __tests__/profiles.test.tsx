@@ -15,12 +15,12 @@ const profileRow = {
   display_name: 'Ana',
   avatar_url: null,
   bio: 'Oi, sou a Ana',
-  accent_color: null,
-  status: null,
-  location: null,
-  birthday: null,
+  accent_color: 'coral',
+  status: '🎧 ouvindo pagode',
+  location: 'Recife',
+  birthday: '1999-05-20',
   is_member: true,
-  created_at: '2026-01-01',
+  created_at: '2026-01-15T12:00:00Z',
 };
 const postRows = [
   { id: 'p1', author_id: 'u1', body: 'primeiro post', image_url: null, created_at: '2026-01-02' },
@@ -149,5 +149,21 @@ describe('ProfileView', () => {
     expect(screen.getByText('@ana_01')).toBeTruthy();
     expect(screen.getByText('Oi, sou a Ana')).toBeTruthy();
     expect(screen.getByText('primeiro post')).toBeTruthy();
+  });
+
+  it('mostra banner, status, info e estatísticas', async () => {
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 34 } }}
+      >
+        <ProfileView userId="u1" />
+      </SafeAreaProvider>,
+    );
+    expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();
+    expect(screen.getByTestId('profile-banner').props.style.backgroundColor).toBe('#FF6B5E');
+    expect(screen.getByText('📍 Recife')).toBeTruthy();
+    expect(screen.getByText('🎂 20/05')).toBeTruthy();
+    expect(screen.getByText('membro desde jan 2026')).toBeTruthy();
+    expect(await screen.findByText('curtidas')).toBeTruthy();
   });
 });
