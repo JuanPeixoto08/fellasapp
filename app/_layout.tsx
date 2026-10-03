@@ -1,5 +1,9 @@
-import { Inter_400Regular, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
-import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import {
+  GolosText_400Regular,
+  GolosText_500Medium,
+  GolosText_600SemiBold,
+  GolosText_700Bold,
+} from '@expo-google-fonts/golos-text';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,17 +11,18 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+injectWebStyles();
 
 import { AuthGuard } from '../lib/auth/AuthGuard';
 import { SessionProvider } from '../lib/auth/SessionProvider';
+import { injectWebStyles } from '../lib/webStyles';
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    InstrumentSerif_400Regular,
-    InstrumentSerif_400Regular_Italic,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_700Bold,
+    GolosText_400Regular,
+    GolosText_500Medium,
+    GolosText_600SemiBold,
+    GolosText_700Bold,
   });
   const ready = loaded || !!error; // sem fonte custom o app ainda abre, com a fonte do sistema
 

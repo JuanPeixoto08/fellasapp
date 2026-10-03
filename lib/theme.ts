@@ -14,10 +14,16 @@ export type Colors = {
   accent: string;
   onAccent: string;
   brand: string;
+  /** Coração curtido: vermelho próprio, diferente do `danger`. */
+  like: string;
   danger: string;
   onDanger: string;
   success: string;
   overlay: string;
+  /** Ícone/texto sobre `overlay` ou foto (✕ da miniatura, visualizador): claro nos dois temas. */
+  onOverlay: string;
+  /** Fundo do visualizador de fotos em tela cheia (escuro nos dois temas). */
+  viewerBg: string;
 };
 
 export const colors: Record<ColorScheme, Colors> = {
@@ -30,13 +36,16 @@ export const colors: Record<ColorScheme, Colors> = {
     border: '#DAD5C8',
     primary: '#121212',
     onPrimary: '#F4F1EA',
-    accent: '#FFE14D',
-    onAccent: '#121212',
+    accent: '#2E2B26',
+    onAccent: '#F4F1EA',
     brand: '#5B3FD9',
+    like: '#C81E3A',
     danger: '#B3261E',
     onDanger: '#FFFFFF',
     success: '#2E7D4F',
     overlay: 'rgba(18, 18, 18, 0.45)',
+    onOverlay: '#F4F1EA',
+    viewerBg: '#0B0B0B',
   },
   dark: {
     bg: '#121212',
@@ -47,18 +56,21 @@ export const colors: Record<ColorScheme, Colors> = {
     border: '#333333',
     primary: '#F4F1EA',
     onPrimary: '#121212',
-    accent: '#FFE14D',
+    accent: '#E0DCD3',
     onAccent: '#121212',
     brand: '#B8A2FF',
+    like: '#FF5A6E',
     danger: '#FF8A80',
     onDanger: '#121212',
     success: '#7BD9A0',
     overlay: 'rgba(0, 0, 0, 0.6)',
+    onOverlay: '#F4F1EA',
+    viewerBg: '#0B0B0B',
   },
 };
 
 /** Fundos de avatar sem foto (iniciais); todos passam contraste com `avatarInk`. */
-export const avatarPalette = ['#E8DFC8', '#FFE14D', '#F4B6A6', '#BFD8C4', '#C5D0E8', '#E3C7E8'] as const;
+export const avatarPalette = ['#E8DFC8', '#D9D3C4', '#F4B6A6', '#BFD8C4', '#C5D0E8', '#E3C7E8'] as const;
 export const avatarInk = '#121212';
 
 /**
@@ -99,11 +111,12 @@ export function profileColor(userId: string, key?: string | null): ProfileColor 
 }
 
 export const fonts = {
-  display: 'InstrumentSerif_400Regular',
-  displayItalic: 'InstrumentSerif_400Regular_Italic',
-  body: 'Inter_400Regular',
-  bodyMedium: 'Inter_500Medium',
-  bodyBold: 'Inter_700Bold',
+  /** Títulos: Golos Text em peso alto; hierarquia por tamanho + peso (sem serifa desde out/2026). */
+  display: 'GolosText_700Bold',
+  displaySemiBold: 'GolosText_600SemiBold',
+  body: 'GolosText_400Regular',
+  bodyMedium: 'GolosText_500Medium',
+  bodyBold: 'GolosText_700Bold',
 } as const;
 
 export type TextVariant = 'display' | 'headline' | 'title' | 'lead' | 'body' | 'small' | 'caption';
@@ -116,9 +129,9 @@ export type TextStyleToken = {
 };
 
 export const typography: Record<TextVariant, TextStyleToken> = {
-  display: { fontFamily: fonts.display, fontSize: 48, lineHeight: 50, letterSpacing: -0.5 },
-  headline: { fontFamily: fonts.display, fontSize: 36, lineHeight: 40, letterSpacing: -0.3 },
-  title: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, letterSpacing: -0.1 },
+  display: { fontFamily: fonts.display, fontSize: 48, lineHeight: 52, letterSpacing: -1.2 },
+  headline: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6 },
+  title: { fontFamily: fonts.displaySemiBold, fontSize: 24, lineHeight: 30, letterSpacing: -0.4 },
   lead: { fontFamily: fonts.body, fontSize: 18, lineHeight: 26, letterSpacing: 0 },
   body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, letterSpacing: 0 },
   small: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, letterSpacing: 0 },
@@ -138,9 +151,24 @@ export const borders = { hairline: 1, selected: 3 } as const;
 export const iconSizes = { sm: 16, md: 20, lg: 24 } as const;
 export type IconSize = keyof typeof iconSizes;
 
+/** Avatares: sm comentário · md card do feed · lg cabeçalho do perfil · xl edição de perfil. */
+export const avatarSizes = { sm: 32, md: 40, lg: 56, xl: 88 } as const;
+
 export const layout = {
   /** Largura máxima do conteúdo na web/tablet. */
   maxContentWidth: 640,
+  /** Largura máxima de diálogos (confirmação). */
+  maxDialogWidth: 400,
+  /** Altura visual do chip de reação; o toque completa os 44 com hitSlop. */
+  chipHeight: 28,
+  /** Fresta entre fotos de um mesmo post. */
+  mediaGap: 2,
+  /** Altura da marca FELLAS: topo do feed (sm) e tela de carregamento (lg). */
+  logoHeight: { sm: 24, lg: 44 },
+  /** Altura das folhas que sobem de baixo (seletor de emoji), como fração da tela. */
+  sheetHeightRatio: 0.75,
+  /** Proporções (largura/altura) das fotos no post: 1 foto fica entre min e max; 2+ usam grid. */
+  mediaAspect: { min: 3 / 4, max: 1.91, grid: 16 / 9 },
   gutter: spacing.lg,
   minTouch: 44,
 } as const;
@@ -171,6 +199,7 @@ export type Theme = {
   radii: typeof radii;
   borders: typeof borders;
   iconSizes: typeof iconSizes;
+  avatarSizes: typeof avatarSizes;
   layout: typeof layout;
   motion: typeof motion;
   shadows: typeof shadows;
@@ -186,6 +215,7 @@ export function getTheme(scheme: ColorScheme): Theme {
     radii,
     borders,
     iconSizes,
+    avatarSizes,
     layout,
     motion,
     shadows,

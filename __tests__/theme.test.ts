@@ -17,6 +17,21 @@ describe('profilePalette', () => {
     expect(contrast(profilePalette[key].bg, profilePalette[key].ink)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('acento neutro (sem amarelo) e onAccent têm contraste AA nos dois temas', () => {
+    for (const scheme of [colors.light, colors.dark]) {
+      expect(scheme.accent).not.toBe('#FFE14D');
+      expect(contrast(scheme.accent, scheme.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(scheme.onAccent, scheme.accent)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('vermelho da curtida tem contraste AA sobre bg e é diferente do danger', () => {
+    for (const scheme of [colors.light, colors.dark]) {
+      expect(contrast(scheme.like, scheme.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(scheme.like).not.toBe(scheme.danger);
+    }
+  });
+
   it('brand tem contraste AA sobre bg em claro e escuro', () => {
     expect(contrast(colors.light.brand, colors.light.bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.dark.brand, colors.dark.bg)).toBeGreaterThanOrEqual(4.5);

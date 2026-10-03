@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import type { ReactNode } from 'react';
 
-import { Text } from '../../components/ui';
+import { Logo } from '../../components/ui';
 import { useTheme } from '../theme';
 import { useSession } from './SessionProvider';
 
@@ -49,7 +49,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
             },
           ]}
         >
-          <Text variant="headline">fellas</Text>
+          <Logo height={t.layout.logoHeight.lg} />
           <ActivityIndicator color={t.colors.primary} />
         </View>
       ) : null}

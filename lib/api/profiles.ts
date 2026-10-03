@@ -39,16 +39,6 @@ export async function listMembers(): Promise<Profile[]> {
   return data ?? [];
 }
 
-export async function listPostsByUser(id: string): Promise<Post[]> {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*')
-    .eq('author_id', id)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-
 export type UpdateProfileInput = {
   display_name: string;
   username: string;

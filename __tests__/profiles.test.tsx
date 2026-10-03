@@ -1,9 +1,28 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
 import { formatBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
+
+const mockPush = jest.fn();
+const mockUsePostList = jest.fn();
+let mockMe = 'u1';
+
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    useRouter: () => ({ push: mockPush, navigate: jest.fn() }),
+    useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
+  };
+});
+jest.mock('../lib/auth/SessionProvider', () => ({
+  useSession: () => ({ session: { user: { id: mockMe } } }),
+}));
+jest.mock('../lib/usePostList', () => ({
+  usePostList: (opts: unknown) => mockUsePostList(opts),
+  removePost: jest.fn(),
+}));
 
 const mockUpdate = jest.fn();
 const mockUpload = jest.fn();
@@ -140,34 +159,96 @@ describe('updateMyProfile', () => {
   });
 });
 
+const feedPost = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  body: 'primeiro post',
+  images: [] as string[],
+  imageUrl: null as string | null,
+  createdAt: '2026-01-02T00:00:00Z',
+  author: { id: 'u1', username: 'ana_01', display_name: 'Ana', avatar_url: null },
+  likeCount: 0,
+  commentCount: 0,
+  likedByMe: false,
+  reactions: [],
+  myReaction: null,
+  ...extra,
+});
+const textPost = feedPost('p1');
+const photoPost = feedPost('p2', { body: 'olha isso', images: ['https://x/p2.jpg', 'https://x/p2b.jpg'], imageUrl: 'https://x/p2.jpg' });
+const fakeList = (posts: unknown[]) => ({
+  posts,
+  loaded: true,
+  loading: false,
+  refreshing: false,
+  error: null,
+  refresh: jest.fn(),
+  reload: jest.fn(),
+  loadMore: jest.fn(),
+  like: jest.fn(),
+  react: jest.fn(),
+});
+
+function renderProfile() {
+  return render(
+    <SafeAreaProvider
+      initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 34 } }}
+    >
+      <ProfileView userId="u1" />
+    </SafeAreaProvider>,
+  );
+}
+
 describe('ProfileView', () => {
-  it('renderiza nome, @username, bio e posts', async () => {
-    await render(
-      <SafeAreaProvider
-        initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 34 } }}
-      >
-        <ProfileView userId="u1" />
-      </SafeAreaProvider>,
+  beforeEach(() => {
+    mockMe = 'u1';
+    mockPush.mockClear();
+    mockUsePostList.mockReset();
+    mockUsePostList.mockImplementation((opts: { photosOnly?: boolean }) =>
+      fakeList(opts?.photosOnly ? [photoPost] : [textPost, photoPost]),
     );
-    expect(await screen.findByText('Ana')).toBeTruthy();
-    expect(screen.getByText('@ana_01')).toBeTruthy();
-    expect(screen.getByText('Oi, sou a Ana')).toBeTruthy();
-    expect(screen.getByText('primeiro post')).toBeTruthy();
   });
 
-  it('mostra banner, status, info e estatísticas', async () => {
-    await render(
-      <SafeAreaProvider
-        initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 34 } }}
-      >
-        <ProfileView userId="u1" />
-      </SafeAreaProvider>,
-    );
+  it('renderiza nome, @username, bio e os posts um embaixo do outro', async () => {
+    await renderProfile();
+    expect(await screen.findByText('@ana_01')).toBeTruthy();
+    expect(screen.getByText('Oi, sou a Ana')).toBeTruthy();
+    expect(screen.getByText('primeiro post')).toBeTruthy();
+    expect(screen.getByText('olha isso')).toBeTruthy();
+    expect(mockUsePostList).toHaveBeenCalledWith({ authorId: 'u1' });
+  });
+
+  it('mostra anel na cor do perfil, status, info e estatísticas', async () => {
+    await renderProfile();
     expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();
-    expect(screen.getByTestId('profile-banner').props.style.backgroundColor).toBe('#FF6B5E');
+    expect(screen.getByTestId('profile-avatar-ring').props.style.borderColor).toBe('#FF6B5E');
     expect(screen.getByLabelText('Cidade: Recife')).toBeTruthy();
     expect(screen.getByLabelText('Aniversário: 20/05')).toBeTruthy();
     expect(screen.getByText('membro desde jan 2026')).toBeTruthy();
     expect(await screen.findByText('curtidas')).toBeTruthy();
+  });
+
+  it('aba Fotos mostra só as fotos e tocar abre o post', async () => {
+    await renderProfile();
+    await fireEvent.press(await screen.findByText('Fotos'));
+    expect(mockUsePostList).toHaveBeenLastCalledWith({ authorId: 'u1', photosOnly: true, enabled: true });
+    const tiles = screen.getAllByTestId('post-tile');
+    expect(tiles).toHaveLength(1);
+    // post com 2 fotos: um quadradinho só, com o ícone de "várias"
+    expect(screen.getByTestId('post-tile-multi')).toBeTruthy();
+    expect(screen.getByLabelText('Abrir post com 2 fotos: olha isso')).toBeTruthy();
+    await fireEvent.press(tiles[0]);
+    expect(mockPush).toHaveBeenCalledWith('/post/p2');
+  });
+
+  it('só no meu perfil os posts têm lixeira', async () => {
+    await renderProfile();
+    expect(await screen.findAllByLabelText('Apagar post')).toHaveLength(2);
+  });
+
+  it('no perfil de outro fella não tem lixeira', async () => {
+    mockMe = 'u9';
+    await renderProfile();
+    await screen.findByText('@ana_01');
+    expect(screen.queryByLabelText('Apagar post')).toBeNull();
   });
 });

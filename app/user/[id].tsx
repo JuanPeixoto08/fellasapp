@@ -10,7 +10,7 @@ export default function UserProfileScreen() {
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Perfil')} />
-      <ProfileView userId={id} />
+      <ProfileView userId={id} header />
     </>
   );
 }

@@ -11,9 +11,11 @@ export type ScreenProps = {
   /** Sem padding lateral (ex.: listas full-bleed). */
   flush?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** A tela tem cabeçalho de navegação: ele já cuida da área segura do topo. */
+  header?: boolean;
 };
 
-export function Screen({ children, scroll, flush, style }: ScreenProps) {
+export function Screen({ children, scroll, flush, style, header }: ScreenProps) {
   const t = useTheme();
   const inner: ViewStyle = {
     width: '100%',
@@ -22,7 +24,7 @@ export function Screen({ children, scroll, flush, style }: ScreenProps) {
     paddingHorizontal: flush ? 0 : t.layout.gutter,
   };
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: t.colors.bg }}>
+    <SafeAreaView edges={header ? ['left', 'right'] : ['top', 'left', 'right']} style={{ flex: 1, backgroundColor: t.colors.bg }}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={[inner, { paddingVertical: t.spacing.lg, gap: t.spacing.lg }, style]}
