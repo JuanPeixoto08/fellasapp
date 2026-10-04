@@ -14,6 +14,18 @@ type Props = {
   alt: string;
 };
 
+/** Tecla → ação no visualizador (web): ← → trocam de foto, Esc fecha. */
+export function viewerKeyAction(
+  key: string,
+  current: number,
+  count: number,
+): { type: 'go'; to: number } | { type: 'close' } | null {
+  if (key === 'Escape') return { type: 'close' };
+  if (key === 'ArrowRight' && current < count - 1) return { type: 'go', to: current + 1 };
+  if (key === 'ArrowLeft' && current > 0) return { type: 'go', to: current - 1 };
+  return null;
+}
+
 /** Fotos do post em tela cheia: desliza para os lados, "1/3" no topo, ✕ fecha. Sem zoom por enquanto. */
 export function PhotoViewer({ uris, index, onClose, alt }: Props) {
   const t = useTheme();
@@ -32,6 +44,20 @@ export function PhotoViewer({ uris, index, onClose, alt }: Props) {
     setCurrent(next);
     list.current?.scrollToIndex({ index: next, animated: true });
   };
+
+  // teclado só na web e só com o visualizador aberto
+  useEffect(() => {
+    if (!open || Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      const action = viewerKeyAction(e.key, current, uris.length);
+      if (!action) return;
+      e.preventDefault();
+      if (action.type === 'close') onClose();
+      else go(action.to);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
 
   // botão sobre o fundo escuro: cor fixa clara, nos dois temas
   const control = (icon: IconName, label: string, onPress: () => void) => (
