@@ -30,7 +30,8 @@ import NotInvitedScreen from '../app/not-invited';
 import { AuthGuard } from '../lib/auth/AuthGuard';
 import { SessionProvider } from '../lib/auth/SessionProvider';
 
-const session = { user: { id: 'u1' } };
+// já criou senha: o guard não segura em /set-password
+const session = { user: { id: 'u1', user_metadata: { has_password: true } } };
 
 function setup(sess: unknown, profile: unknown) {
   mockAuth.getSession.mockResolvedValue({ data: { session: sess } });
@@ -57,6 +58,7 @@ describe('LoginScreen', () => {
   it('envia o OTP e vai para o passo do código', async () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     await render(<LoginScreen />);
+    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'Ana@Email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await waitFor(() =>
@@ -71,6 +73,7 @@ describe('LoginScreen', () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     mockAuth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
     await render(<LoginScreen />);
+    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'ana@email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await await fireEvent.changeText(await screen.findByPlaceholderText('000000'), '123456');
@@ -88,6 +91,7 @@ describe('LoginScreen', () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     mockAuth.verifyOtp.mockResolvedValue({ data: {}, error: new Error('Token has expired or is invalid') });
     await render(<LoginScreen />);
+    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'ana@email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await await fireEvent.changeText(await screen.findByPlaceholderText('000000'), '123456');
