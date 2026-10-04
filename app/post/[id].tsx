@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { friendlyError } from '../../lib/errors';
 import { withLike, withReaction } from '../../lib/reactionState';
+import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveEvent } from '../../lib/realtime';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { removePost } from '../../lib/usePostList';
@@ -52,6 +53,27 @@ export default function PostDetailScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // ao vivo: o que outras pessoas fazem neste post (ou nos comentários dele) aparece sozinho
+  const commentsRef = useRef(comments);
+  commentsRef.current = comments;
+  useEffect(() => {
+    const live = debounce(() => void load(), LIVE_DEBOUNCE_MS);
+    const concernsThisPost = (event: LiveEvent) => {
+      if (event.kind === 'resync') return true;
+      if (event.mine) return false; // o que eu fiz a tela já mostrou
+      if (postIdOf(event) === id) return true;
+      const commentId = event.table === 'comment_reactions' ? event.row.comment_id : event.table === 'comments' ? event.row.id : null;
+      return !!commentId && commentsRef.current.some((c) => c.id === commentId);
+    };
+    const off = onLive((event) => {
+      if (concernsThisPost(event)) live();
+    });
+    return () => {
+      live.cancel();
+      off();
+    };
+  }, [id, load]);
 
   const onLike = async (p: FeedPost) => {
     setPost((cur) => (cur ? withLike(cur, !p.likedByMe) : cur));
