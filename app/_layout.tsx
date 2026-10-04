@@ -48,6 +48,7 @@ export default function RootLayout() {
             <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
             <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
             <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
+            <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Notificações' }} />
           </Stack>
         </AppShell>
       </AuthGuard>
