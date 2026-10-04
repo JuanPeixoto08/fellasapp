@@ -25,6 +25,7 @@ jest.mock('../lib/supabase', () => ({
 }));
 
 import { fetchNotifications, fetchUnreadCount, markNotificationsSeen } from '../lib/api/notifications';
+import { clearSignedUrlCache } from '../lib/api/storage';
 
 const row = (over: Record<string, unknown>) => ({
   kind: 'like',
@@ -40,6 +41,7 @@ const row = (over: Record<string, unknown>) => ({
 });
 
 beforeEach(() => {
+  clearSignedUrlCache();
   jest.clearAllMocks();
   mockTables = {
     profiles: [

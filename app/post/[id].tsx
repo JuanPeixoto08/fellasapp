@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { friendlyError } from '../../lib/errors';
 import { withLike, withReaction } from '../../lib/reactionState';
+import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveEvent } from '../../lib/realtime';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { removePost } from '../../lib/usePostList';
@@ -53,13 +54,72 @@ export default function PostDetailScreen() {
     load();
   }, [load]);
 
+  // ao vivo: o que outras pessoas fazem neste post (ou nos comentários dele) aparece sozinho.
+  // Com curtida/reação minha ainda indo para o servidor, espera ela chegar: a resposta antiga desfaria na
+  // tela o que acabei de fazer.
+  const commentsRef = useRef(comments);
+  commentsRef.current = comments;
+  const inFlight = useRef(0);
+  const version = useRef(0);
+  const deferred = useRef(false);
+  const liveLoad = useCallback(async () => {
+    if (inFlight.current > 0) {
+      deferred.current = true;
+      return;
+    }
+    const asked = version.current;
+    try {
+      const [p, c] = await Promise.all([getPost(id), listComments(id)]);
+      if (inFlight.current > 0 || version.current !== asked) {
+        deferred.current = true;
+        return;
+      }
+      setPost(p);
+      setComments(c);
+    } catch {
+      // a próxima mudança (ou a volta para a aba) tenta de novo
+    }
+  }, [id]);
+  const mutating = async (run: () => Promise<void>) => {
+    inFlight.current += 1;
+    version.current += 1;
+    try {
+      await run();
+    } finally {
+      inFlight.current -= 1;
+      if (inFlight.current === 0 && deferred.current) {
+        deferred.current = false;
+        void liveLoad();
+      }
+    }
+  };
+  useEffect(() => {
+    const live = debounce(() => void liveLoad(), LIVE_DEBOUNCE_MS);
+    const concernsThisPost = (event: LiveEvent) => {
+      if (event.kind === 'resync') return true;
+      if (event.mine) return false; // o que eu fiz a tela já mostrou
+      if (postIdOf(event) === id) return true;
+      const commentId = event.table === 'comment_reactions' ? event.row.comment_id : event.table === 'comments' ? event.row.id : null;
+      return !!commentId && commentsRef.current.some((c) => c.id === commentId);
+    };
+    const off = onLive((event) => {
+      if (concernsThisPost(event)) live();
+    });
+    return () => {
+      live.cancel();
+      off();
+    };
+  }, [id, liveLoad]);
+
   const onLike = async (p: FeedPost) => {
     setPost((cur) => (cur ? withLike(cur, !p.likedByMe) : cur));
-    try {
-      await toggleLike(p.id);
-    } catch {
-      setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
-    }
+    await mutating(async () => {
+      try {
+        await toggleLike(p.id);
+      } catch {
+        setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
+      }
+    });
   };
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -71,22 +131,26 @@ export default function PostDetailScreen() {
 
   const onReactPost = async (p: FeedPost, emoji: string | null) => {
     setPost((cur) => (cur ? withReaction(cur, emoji) : cur));
-    try {
-      await setPostReaction(p.id, emoji);
-    } catch {
-      setPost((cur) => (cur ? { ...cur, reactions: p.reactions, myReaction: p.myReaction } : cur));
-    }
+    await mutating(async () => {
+      try {
+        await setPostReaction(p.id, emoji);
+      } catch {
+        setPost((cur) => (cur ? { ...cur, reactions: p.reactions, myReaction: p.myReaction } : cur));
+      }
+    });
   };
 
   const onReactComment = async (c: Comment, emoji: string | null) => {
     const apply = (fn: (x: Comment) => Comment) =>
       setComments((prev) => prev.map((x) => (x.id === c.id ? fn(x) : x)));
     apply((x) => withReaction(x, emoji));
-    try {
-      await setCommentReaction(c.id, emoji);
-    } catch {
-      apply((x) => ({ ...x, reactions: c.reactions, myReaction: c.myReaction }));
-    }
+    await mutating(async () => {
+      try {
+        await setCommentReaction(c.id, emoji);
+      } catch {
+        apply((x) => ({ ...x, reactions: c.reactions, myReaction: c.myReaction }));
+      }
+    });
   };
 
   const send = async () => {

@@ -11,6 +11,7 @@ jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => mockSession 
 
 import { NotificationsSync } from '../components/notifications/NotificationsSync';
 import { getUnreadNotifications, setUnreadNotifications, UNREAD_POLL_MS } from '../lib/notificationsStore';
+import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
 const member = (id: string) => ({ session: { user: { id } }, profile: { is_member: true } });
 let appStateHandler: ((s: string) => void) | null = null;
@@ -80,6 +81,34 @@ describe('NotificationsSync', () => {
     expect(mockFetchUnread).toHaveBeenCalledTimes(2);
     await act(async () => {
       jest.advanceTimersByTime(UNREAD_POLL_MS);
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(3);
+  });
+
+  it('tempo real: curtida/comentário/reação de outra pessoa busca o número (rajada vira uma busca)', async () => {
+    mockSession = member('u1');
+    await render(<NotificationsSync />);
+    await flush();
+    expect(mockFetchUnread).toHaveBeenCalledTimes(1);
+    const change = (table: string, mine = false, type = 'INSERT') =>
+      emitLive({ kind: 'change', table, type, row: {}, mine } as never);
+    await act(async () => {
+      change('likes');
+      change('comments');
+      change('post_reactions');
+      jest.advanceTimersByTime(LIVE_DEBOUNCE_MS);
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      change('likes', true); // eu mesmo
+      change('posts'); // post novo não é notificação
+      change('profiles', false, 'UPDATE'); // alguém mexeu no perfil
+      jest.advanceTimersByTime(LIVE_DEBOUNCE_MS);
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      change('profiles', false, 'INSERT'); // fella novo
+      jest.advanceTimersByTime(LIVE_DEBOUNCE_MS);
     });
     expect(mockFetchUnread).toHaveBeenCalledTimes(3);
   });
