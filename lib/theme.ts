@@ -73,42 +73,6 @@ export const colors: Record<ColorScheme, Colors> = {
 export const avatarPalette = ['#E8DFC8', '#D9D3C4', '#F4B6A6', '#BFD8C4', '#C5D0E8', '#E3C7E8'] as const;
 export const avatarInk = '#121212';
 
-/**
- * Cores vibrantes de perfil. `bg` é preenchimento (banner, anel, chip) e `ink` o texto/ícone por cima;
- * como o preenchimento é fixo, funciona igual no claro e no escuro (ink x bg >= 4.5:1).
- */
-export const profilePalette = {
-  coral: { bg: '#FF6B5E', ink: '#121212' },
-  tangerine: { bg: '#FF9F1C', ink: '#121212' },
-  lime: { bg: '#C6F135', ink: '#121212' },
-  mint: { bg: '#6EE7B7', ink: '#121212' },
-  turquoise: { bg: '#22D3C5', ink: '#121212' },
-  blue: { bg: '#5AA9FF', ink: '#121212' },
-  violet: { bg: '#A78BFA', ink: '#121212' },
-  pink: { bg: '#FF7EB6', ink: '#121212' },
-} as const;
-
-export type ProfileColorKey = keyof typeof profilePalette;
-export type ProfileColor = { key: ProfileColorKey; bg: string; ink: string };
-
-export const profileColorKeys = Object.keys(profilePalette) as ProfileColorKey[];
-
-export function isProfileColorKey(key: unknown): key is ProfileColorKey {
-  return typeof key === 'string' && Object.prototype.hasOwnProperty.call(profilePalette, key);
-}
-
-/** Cor do perfil: a escolhida (`key`) se válida; senão derivada de forma estável do `userId`. */
-export function profileColor(userId: string, key?: string | null): ProfileColor {
-  let k: ProfileColorKey;
-  if (isProfileColorKey(key)) {
-    k = key;
-  } else {
-    let hash = 0;
-    for (let i = 0; i < userId.length; i++) hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
-    k = profileColorKeys[hash % profileColorKeys.length];
-  }
-  return { key: k, ...profilePalette[k] };
-}
 
 export const fonts = {
   /** Títulos: Golos Text em peso alto; hierarquia por tamanho + peso (sem serifa desde out/2026). */

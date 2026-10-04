@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { stackHeader } from '../../components/profile/headerOptions';
@@ -18,7 +18,7 @@ import {
   validateUsername,
 } from '../../lib/api/profiles';
 import { friendlyError, isUniqueViolation } from '../../lib/errors';
-import { isProfileColorKey, profileColor, profileColorKeys, profilePalette, useTheme } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 
 const BIRTHDAY_ERROR = 'Essa data não rola. Usa DD/MM/AAAA, tipo 20/05/1999.';
 
@@ -34,8 +34,6 @@ export default function EditProfileScreen() {
   const [location, setLocation] = useState('');
   const [birthday, setBirthday] = useState('');
   const [birthdayError, setBirthdayError] = useState<string | undefined>();
-  const [accent, setAccent] = useState<string | null>(null);
-  const [userId, setUserId] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | undefined>();
@@ -43,15 +41,11 @@ export default function EditProfileScreen() {
 
   useEffect(() => {
     getCurrentUserId()
-      .then((id) => {
-        setUserId(id);
-        return getProfile(id);
-      })
+      .then(getProfile)
       .then((p) => {
         setStatus(p.status ?? '');
         setLocation(p.location ?? '');
         setBirthday(formatBirthday(p.birthday));
-        setAccent(isProfileColorKey(p.accent_color) ? p.accent_color : null);
         setDisplayName(p.display_name ?? '');
         setUsername(p.username);
         setBio(p.bio ?? '');
@@ -87,7 +81,6 @@ export default function EditProfileScreen() {
         status,
         location,
         birthday: parsedBirthday,
-        accent_color: accent,
       });
       router.back();
     } catch (e) {
@@ -169,33 +162,6 @@ export default function EditProfileScreen() {
             if (parseBirthday(birthday) === undefined) setBirthdayError(BIRTHDAY_ERROR);
           }}
         />
-        <View style={{ gap: t.spacing.sm }}>
-          <Text variant="small" bold>
-            Cor do perfil
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.md }}>
-            {profileColorKeys.map((key) => {
-              const selected = (accent ?? profileColor(userId).key) === key;
-              return (
-                <Pressable
-                  key={key}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`Cor ${key}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => setAccent(key)}
-                  style={{
-                    width: t.layout.minTouch,
-                    height: t.layout.minTouch,
-                    borderRadius: t.radii.pill,
-                    backgroundColor: profilePalette[key].bg,
-                    borderWidth: selected ? t.borders.selected : 0,
-                    borderColor: t.colors.text,
-                  }}
-                />
-              );
-            })}
-          </View>
-        </View>
         {error ? (
           <Text tone="danger" accessibilityRole="alert">
             {error}

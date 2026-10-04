@@ -54,4 +54,9 @@ describe('Editar perfil: limites', () => {
     await fireEvent.changeText(screen.getByLabelText('Bio'), 'oi fellas');
     expect(screen.getByText('9/160')).toBeTruthy();
   });
+
+  it('não tem mais seletor de cor do perfil', async () => {
+    await renderScreen();
+    expect(screen.queryByText('Cor do perfil')).toBeNull();
+  });
 });

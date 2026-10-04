@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
+import { colors } from '../lib/theme';
 import { PROFILE_LIMITS, formatBirthday, maskBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
 
 const mockPush = jest.fn();
@@ -35,7 +36,7 @@ const profileRow = {
   display_name: 'Ana',
   avatar_url: null,
   bio: 'Oi, sou a Ana',
-  accent_color: 'coral',
+  accent_color: 'coral', // coluna antiga, o app ignora
   status: '🎧 ouvindo pagode',
   location: 'Recife',
   birthday: '1999-05-20',
@@ -142,7 +143,6 @@ describe('updateMyProfile', () => {
       status: ' 🎧 pagode ',
       location: '  ',
       birthday: '1999-05-20',
-      accent_color: 'coral',
     });
     expect(mockUpdate).toHaveBeenCalledWith({
       display_name: 'Ana',
@@ -151,7 +151,6 @@ describe('updateMyProfile', () => {
       status: '🎧 pagode',
       location: null,
       birthday: '1999-05-20',
-      accent_color: 'coral',
     });
   });
 
@@ -244,10 +243,13 @@ describe('ProfileView', () => {
     expect(mockUsePostList).toHaveBeenCalledWith({ authorId: 'u1' });
   });
 
-  it('mostra anel na cor do perfil, status, info e estatísticas', async () => {
+  it('mostra status, info e estatísticas, sem cor de perfil', async () => {
     await renderProfile();
     expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();
-    expect(screen.getByTestId('profile-avatar-ring').props.style.borderColor).toBe('#FF6B5E');
+    expect(screen.queryByTestId('profile-avatar-ring')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('profile-status').props.style).backgroundColor).toBe(
+      colors.light.surfaceSunken,
+    );
     expect(screen.getByLabelText('Cidade: Recife')).toBeTruthy();
     expect(screen.getByLabelText('Aniversário: 20/05')).toBeTruthy();
     expect(screen.getByText('membro desde jan 2026')).toBeTruthy();

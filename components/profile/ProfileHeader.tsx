@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
-import { profileColor, useTheme } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import { Avatar, Heading, Icon, Text, type IconName } from '../ui';
 
 type Props = {
@@ -20,12 +20,10 @@ function birthdayDayMonth(iso: string | null | undefined): string | null {
 }
 
 /**
- * Cabeçalho compacto: avatar com anel na cor do fella, nome e ações numa linha; status como chip
- * na mesma cor (o único gesto de cor da página), bio e info logo abaixo.
+ * Cabeçalho compacto: avatar, nome e ações numa linha; status como chip neutro, bio e info logo abaixo.
  */
 export function ProfileHeader({ profile, avatarUri, actions }: Props) {
   const t = useTheme();
-  const color = profileColor(profile.id, profile.accent_color);
   const name = profile.display_name || profile.username;
   const birthday = birthdayDayMonth(profile.birthday);
   const since = memberSince(profile.created_at);
@@ -37,17 +35,7 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
   return (
     <View style={{ gap: t.spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-        <View
-          testID="profile-avatar-ring"
-          style={{
-            padding: t.borders.selected,
-            borderRadius: t.radii.pill,
-            borderWidth: t.borders.selected,
-            borderColor: color.bg,
-          }}
-        >
-          <Avatar name={name} uri={avatarUri} size={t.avatarSizes.lg} />
-        </View>
+        <Avatar name={name} uri={avatarUri} size={t.avatarSizes.lg} />
         <View style={{ flex: 1 }}>
           <Heading level={2} numberOfLines={2}>
             {name}
@@ -63,13 +51,13 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
           testID="profile-status"
           style={{
             alignSelf: 'flex-start',
-            backgroundColor: color.bg,
+            backgroundColor: t.colors.surfaceSunken,
             borderRadius: t.radii.pill,
             paddingHorizontal: t.spacing.md,
             paddingVertical: t.spacing.xs,
           }}
         >
-          <Text variant="small" bold style={{ color: color.ink }}>
+          <Text variant="small" bold>
             {profile.status}
           </Text>
         </View>
