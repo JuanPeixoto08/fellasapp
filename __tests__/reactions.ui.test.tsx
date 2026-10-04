@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { ReactButton, ReactionBar, ReactionPicker } from '../components/reactions';
 
@@ -67,5 +68,38 @@ describe('ReactButton', () => {
     await render(<ReactButton onPress={onPress} />);
     await fireEvent.press(screen.getByLabelText('Reagir'));
     expect(onPress).toHaveBeenCalled();
+  });
+});
+
+describe('ReactionPicker preso ao botão', () => {
+  const anchorAt = (x: number, y: number) =>
+    ({ current: { measureInWindow: (cb: (...a: number[]) => void) => cb(x, y, 44, 44) } }) as never;
+
+  it('abre logo acima do botão de reagir, não no meio da tela', async () => {
+    await render(<ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} anchorRef={anchorAt(600, 500)} />);
+    const bar = StyleSheet.flatten(screen.getByLabelText('Escolher reação').props.style);
+    expect(bar.position).toBe('absolute');
+    expect(bar.top).toBeLessThan(500);
+    expect(bar.left + bar.width).toBe(644); // alinhada pela direita do botão
+  });
+
+  it('botão no topo da tela: abre embaixo dele', async () => {
+    await render(<ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} anchorRef={anchorAt(600, 10)} />);
+    const bar = StyleSheet.flatten(screen.getByLabelText('Escolher reação').props.style);
+    expect(bar.top).toBeGreaterThan(54);
+  });
+
+  it('os emojis da barra são os desenhados do app', async () => {
+    await render(<ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} />);
+    expect(screen.getByTestId('emoji-😂')).toBeTruthy();
+  });
+});
+
+describe('emojis desenhados nas reações', () => {
+  it('chip e botão de reagir usam o desenho do app', async () => {
+    await render(<ReactionBar reactions={[{ emoji: '🔥', count: 2 }]} myReaction={null} />);
+    expect(screen.getByTestId('emoji-🔥')).toBeTruthy();
+    await render(<ReactButton myReaction="🙏" />);
+    expect(screen.getByTestId('emoji-🙏')).toBeTruthy();
   });
 });

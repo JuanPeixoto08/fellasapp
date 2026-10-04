@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ReactButton, ReactionBar, ReactionPicker } from '../reactions';
@@ -18,6 +18,8 @@ type Props = {
 export function CommentItem({ comment, onReact }: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
+  // a barra de reações abre presa a este botão
+  const reactAnchor = useRef<View>(null);
   const react = (emoji: string) => onReact?.(comment, nextReaction(comment.myReaction, emoji));
   const name = comment.author.display_name || comment.author.username;
   const date = postTime(comment.createdAt);
@@ -46,11 +48,12 @@ export function CommentItem({ comment, onReact }: Props) {
             <MentionText text={comment.body} />
           </Pressable>
           <View style={{ marginVertical: -t.spacing.sm, marginRight: -t.spacing.sm }}>
-            <ReactButton myReaction={comment.myReaction} onPress={() => setPicking(true)} />
+            <ReactButton myReaction={comment.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
           </View>
         </View>
         <ReactionBar reactions={comment.reactions} myReaction={comment.myReaction} onPressChip={react} />
         <ReactionPicker
+          anchorRef={reactAnchor}
           visible={picking}
           selected={comment.myReaction}
           onSelect={(emoji) => {
