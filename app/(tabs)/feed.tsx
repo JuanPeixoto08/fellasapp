@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 
+import { Composer } from '../../components/feed/Composer';
 import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
+import { useLayoutTier } from '../../lib/layout';
 import { useTheme } from '../../lib/theme';
 import { removePost, usePostList } from '../../lib/usePostList';
 
@@ -12,6 +14,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const { session } = useSession();
   const me = session?.user.id;
+  const tier = useLayoutTier();
   const { posts, loading, refreshing, error, refresh, reload, loadMore, like, react } = usePostList();
 
   return (
@@ -22,19 +25,26 @@ export default function FeedScreen() {
         contentContainerStyle={{ paddingBottom: t.spacing.xl }}
         ItemSeparatorComponent={Divider}
         ListHeaderComponent={
-          <View
-            style={{
-              paddingHorizontal: t.layout.gutter,
-              paddingTop: t.spacing.lg,
-              paddingBottom: t.spacing.sm,
-              borderBottomWidth: t.borders.hairline,
-              borderColor: t.colors.border,
-            }}
-          >
-            <View accessibilityRole="header">
-              <Logo height={t.layout.logoHeight.sm} />
+          tier === 'compact' ? (
+            <View
+              style={{
+                paddingHorizontal: t.layout.gutter,
+                paddingTop: t.spacing.lg,
+                paddingBottom: t.spacing.sm,
+                borderBottomWidth: t.borders.hairline,
+                borderColor: t.colors.border,
+              }}
+            >
+              <View accessibilityRole="header">
+                <Logo height={t.layout.logoHeight.sm} />
+              </View>
             </View>
-          </View>
+          ) : (
+            // desktop: o logo está na lateral; a coluna começa pelo compositor
+            <View style={{ borderBottomWidth: t.borders.hairline, borderColor: t.colors.border }}>
+              <Composer variant="inline" />
+            </View>
+          )
         }
         renderItem={({ item }) => (
           <PostCard
