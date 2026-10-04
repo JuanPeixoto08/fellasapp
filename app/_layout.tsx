@@ -14,6 +14,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 injectWebStyles();
 
 import { NotificationsSync } from '../components/notifications/NotificationsSync';
+import { EmojiPickerHost } from '../components/reactions/EmojiPickerHost';
 import { MemberDirectorySync } from '../components/realtime/MemberDirectorySync';
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
 import { AppShell } from '../components/shell/AppShell';
@@ -55,6 +56,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Notificações' }} />
           </Stack>
         </AppShell>
+        <EmojiPickerHost />
       </AuthGuard>
     </SessionProvider>
   );

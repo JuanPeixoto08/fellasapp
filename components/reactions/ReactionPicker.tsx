@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { pushRecentEmoji, QUICK_REACTIONS } from '../../lib/emoji';
+import { closeEmojiPicker, openEmojiPicker } from '../../lib/emojiPickerStore';
 import { placePopover, type Rect } from '../../lib/popover';
 import { useTheme } from '../../lib/theme';
 import { Emoji, IconButton } from '../ui';
-import { EmojiPicker } from './EmojiPicker';
 
 export const DEFAULT_REACTION_EMOJIS: readonly string[] = QUICK_REACTIONS;
 
@@ -51,7 +51,15 @@ export function ReactionPicker({
     }
     const node = anchorRef?.current as Measurable | null | undefined;
     node?.measureInWindow?.((x, y, width, height) => setAnchor({ x, y, width, height }));
+    // o post sumiu (ou fechou por fora): o painel completo também fecha
+    return closeEmojiPicker;
   }, [visible, anchorRef]);
+
+  // o painel completo é desenhado na raiz (EmojiPickerHost), fora da lista do feed, para rolar de verdade
+  const openFull = () => {
+    setFull(true);
+    openEmojiPicker({ selected, anchor, onSelect, onClose });
+  };
 
   const pick = (emoji: string) => {
     pushRecentEmoji(emoji);
@@ -91,10 +99,6 @@ export function ReactionPicker({
 
   return (
     <>
-      {/* só monta quando o "+" é tocado: cada post tem um ReactionPicker */}
-      {visible && full ? (
-        <EmojiPicker visible selected={selected} onSelect={onSelect} onClose={onClose} anchor={anchor} />
-      ) : null}
       <Modal visible={visible && !full} transparent animationType="none" onRequestClose={onClose}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Pressable
@@ -149,7 +153,7 @@ export function ReactionPicker({
                 </Pressable>
               );
             })}
-            <IconButton icon="add" accessibilityLabel="Mais emojis" variant="ghost" tone="muted" onPress={() => setFull(true)} />
+            <IconButton icon="add" accessibilityLabel="Mais emojis" variant="ghost" tone="muted" onPress={openFull} />
           </Animated.View>
         </View>
       </Modal>

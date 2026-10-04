@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { FlatList } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ReactionPicker } from '../components/reactions';
+import { EmojiPickerHost } from '../components/reactions/EmojiPickerHost';
 import { isValidReactionEmoji } from '../lib/api/reactions';
 import { getRecentEmojis, loadEmojiGroups, normalize, pushRecentEmoji, searchEmojis } from '../lib/emoji';
 
@@ -68,7 +70,13 @@ function renderPicker(props: Partial<Parameters<typeof ReactionPicker>[0]> = {})
     <SafeAreaProvider
       initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
     >
-      <ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} {...props} />
+      {/* como no app: a barra mora num post dentro da lista do feed; o painel completo, na raiz */}
+      <FlatList
+        data={[1]}
+        keyExtractor={String}
+        renderItem={() => <ReactionPicker visible selected={null} onSelect={() => {}} onClose={() => {}} {...props} />}
+      />
+      <EmojiPickerHost />
     </SafeAreaProvider>,
   );
 }
@@ -82,6 +90,14 @@ describe('ReactionPicker + seletor completo', () => {
     await fireEvent.press(await screen.findByLabelText('rosto chorando de rir'));
     expect(onSelect).toHaveBeenCalledWith('😂');
     expect(await getRecentEmojis()).toEqual(['😂']);
+    expect(screen.queryByLabelText('Buscar emoji')).toBeNull(); // o painel fecha
+  });
+
+  it('o painel rola de verdade mesmo aberto de um post do feed', async () => {
+    await renderPicker();
+    await fireEvent.press(screen.getByLabelText('Mais emojis'));
+    await screen.findByText('Sorrisos e emoção');
+    expect(screen.getByTestId('emoji-list').type).toBe('RCTScrollView');
   });
 
   it('busca sem resultado avisa', async () => {
