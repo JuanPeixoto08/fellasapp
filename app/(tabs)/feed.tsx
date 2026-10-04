@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { Composer } from '../../components/feed/Composer';
+import { NotificationsBell } from '../../components/notifications/NotificationsBell';
 import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -29,14 +30,18 @@ export default function FeedScreen() {
             <View
               style={{
                 paddingHorizontal: t.layout.gutter,
-                paddingTop: t.spacing.lg,
+                // o sino (alvo de 44) já dá o respiro de cima
+                paddingTop: t.spacing.sm,
                 paddingBottom: t.spacing.sm,
                 borderBottomWidth: t.borders.hairline,
                 borderColor: t.colors.border,
               }}
             >
-              <View accessibilityRole="header">
-                <Logo height={t.layout.logoHeight.sm} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View accessibilityRole="header">
+                  <Logo height={t.layout.logoHeight.sm} />
+                </View>
+                <NotificationsBell />
               </View>
             </View>
           ) : (
