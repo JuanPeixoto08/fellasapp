@@ -32,7 +32,7 @@ let mockSession: { session: { user: { id: string } } | null; profile: { is_membe
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => mockSession }));
 
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
-import { debounce, LIVE_TABLES, onLive, postIdOf, type LiveEvent } from '../lib/realtime';
+import { affectsNotifications, debounce, LIVE_TABLES, onLive, postIdOf, type LiveEvent } from '../lib/realtime';
 
 const member = (id: string) => ({ session: { user: { id } }, profile: { is_member: true } });
 let appStateHandler: ((s: string) => void) | null = null;
@@ -135,5 +135,14 @@ describe('debounce', () => {
     jest.advanceTimersByTime(800);
     expect(fn).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+});
+
+describe('affectsNotifications', () => {
+  it('post novo de outra pessoa pode ter me marcado; o meu não', () => {
+    const post = (mine: boolean) => ({ kind: 'change', table: 'posts', type: 'INSERT', row: {}, mine }) as never;
+    expect(affectsNotifications(post(false))).toBe(true);
+    expect(affectsNotifications(post(true))).toBe(false);
+    expect(affectsNotifications({ kind: 'change', table: 'posts', type: 'DELETE', row: {}, mine: false })).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { Image, Pressable, View } from 'react-native';
 
-import { shortDate } from '../../lib/format';
+import { postTime } from '../../lib/format';
 import { describeNotification, notificationText, type AppNotification, type NotificationKind } from '../../lib/notifications';
 import { useTheme, type Theme } from '../../lib/theme';
 import { Avatar, Icon, interactiveStyle, Text, type IconName } from '../ui';
@@ -19,6 +19,8 @@ function kindIcon(t: Theme, kind: NotificationKind): { name: IconName; color?: s
       return { name: 'gift-outline' };
     case 'new_member':
       return { name: 'person-add-outline' };
+    case 'mention':
+      return { name: 'at-outline' };
   }
 }
 
@@ -29,11 +31,12 @@ export function NotificationRow({ item, onPress }: Props) {
   const t = useTheme();
   const who = item.actors[0];
   const icon = kindIcon(t, item.kind);
-  const date = shortDate(item.latestAt);
+  // aniversário: o texto já diz "hoje" (o horário seria a meia-noite, "há 15 h")
+  const date = item.kind === 'birthday' ? null : postTime(item.latestAt);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${notificationText(item)}. ${date}`}
+      accessibilityLabel={date ? `${notificationText(item)}. ${date}` : notificationText(item)}
       onPress={() => onPress(item)}
       style={(state) => ({
         flexDirection: 'row',
@@ -81,9 +84,11 @@ export function NotificationRow({ item, onPress }: Props) {
             </Text>
           ))}
         </Text>
-        <Text variant="small" tone="muted">
-          {date}
-        </Text>
+        {date ? (
+          <Text variant="small" tone="muted">
+            {date}
+          </Text>
+        ) : null}
       </View>
       {item.thumbUrl ? (
         <Image

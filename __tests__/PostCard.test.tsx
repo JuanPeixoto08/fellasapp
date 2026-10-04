@@ -59,9 +59,10 @@ describe('PostCard hover', () => {
 });
 
 describe('PostCard layout', () => {
-  it('shows the date next to the name', async () => {
+  it('shows the date and time next to the name', async () => {
     await render(<PostCard post={{ ...post, createdAt: '2025-02-07T12:00:00Z' }} />);
-    expect(screen.getByText('7 fev 2025')).toBeTruthy();
+    // a hora depende do fuso de quem roda o teste
+    expect(screen.getByText(/^7 fev 2025 \d{2}:\d{2}$/)).toBeTruthy();
   });
 
   it('shows my reaction in place of the react face', async () => {
