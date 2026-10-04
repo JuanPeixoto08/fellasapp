@@ -76,7 +76,7 @@ Depois, pelo `wrangler` (já logado):
   `createStory(...)`, `listActiveStories()` (stories das últimas 24 h + autor + se eu vi + minha reação),
   `markStoryViewed(id)`, `listStoryViewers(id)` (só do dono), `reactToStory(id, emoji | null)`,
   `deleteStory(id)`.
-- Foto: reduzida como no feed (`lib/imageUpload`), lado maior 1920 (tela cheia em pé), antes de enviar.
+- Foto: reduzida exatamente como no feed (`shrinkForUpload` de `lib/imageUpload`: lado maior 2048, JPEG 0.8), antes de enviar.
 - Vídeo: tocado com `expo-video` (web e nativo). Duração: no nativo vem da galeria
   (`videoMaxDuration: 15`); na web, lida dos metadados do arquivo antes de enviar — acima de 15 s mostra
   "Esse vídeo passa de 15 s. Escolhe um menor.".
