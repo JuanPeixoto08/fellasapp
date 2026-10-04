@@ -5,12 +5,33 @@ import type { Tables } from '../../types/database';
 
 export type Profile = Tables<'profiles'>;
 
-export async function sendOtp(email: string): Promise<void> {
+/**
+ * Manda o código de 6 dígitos. `createUser`: primeiro acesso pode criar a conta (o convite é checado no
+ * banco); "esqueci a senha" não, para email desconhecido não virar conta nova.
+ */
+export async function sendOtp(email: string, { createUser = true }: { createUser?: boolean } = {}): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: createUser },
   });
   if (error) throw error;
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<Session | null> {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session;
+}
+
+/** Define (ou troca) a senha e marca na conta que ela já tem senha. */
+export async function setPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password, data: { has_password: true } });
+  if (error) throw error;
+}
+
+/** A conta já criou senha? (marca em user_metadata, gravada por `setPassword`). */
+export function hasPassword(session: Session | null): boolean {
+  return session?.user.user_metadata?.has_password === true;
 }
 
 export async function verifyOtp(email: string, token: string): Promise<Session | null> {
@@ -48,6 +69,14 @@ export async function signOut(): Promise<void> {
 export function authErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? '');
   const msg = raw.toLowerCase();
+  if (msg.includes('invalid login credentials'))
+    return 'Email ou senha errados. Tenta de novo ou usa "Esqueci a senha".';
+  if (msg.includes('should be different from the old password'))
+    return 'Essa já é a sua senha. Escolhe uma diferente.';
+  if (msg.includes('password should be at least') || msg.includes('weak password'))
+    return 'Senha fraca. Usa pelo menos 8 caracteres.';
+  if (msg.includes('signups not allowed'))
+    return 'Não achamos uma conta com esse email. Se é seu primeiro acesso, usa "Primeiro acesso".';
   if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('seconds'))
     return 'Muitas tentativas. Aguarde um pouco e tente novamente.';
   if (msg.includes('expired') || msg.includes('invalid'))

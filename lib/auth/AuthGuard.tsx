@@ -5,17 +5,25 @@ import type { ReactNode } from 'react';
 
 import { Logo } from '../../components/ui';
 import { useTheme } from '../theme';
+import { hasPassword } from '../api/auth';
+import { usePasswordResetPending } from './passwordReset';
 import { useSession } from './SessionProvider';
 
-export type GuardTarget = '/login' | '/not-invited' | '/feed' | null;
+export type GuardTarget = '/login' | '/not-invited' | '/feed' | '/set-password' | null;
 
+/**
+ * Para onde mandar a pessoa. `needsPassword`: membro que ainda não criou senha (ou que está redefinindo
+ * pelo "esqueci a senha") fica preso em /set-password até salvar uma.
+ */
 export function resolveGuardTarget(
   hasSession: boolean,
   isMember: boolean,
   first: string | undefined,
+  needsPassword = false,
 ): GuardTarget {
   if (!hasSession) return first === '(auth)' ? null : '/login';
   if (!isMember) return first === 'not-invited' ? null : '/not-invited';
+  if (needsPassword) return first === 'set-password' ? null : '/set-password';
   return first === '(auth)' || first === 'not-invited' ? '/feed' : null;
 }
 
@@ -26,7 +34,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const t = useTheme();
   const first = segments[0] as string | undefined;
 
-  const target = loading ? null : resolveGuardTarget(!!session, !!profile?.is_member, first);
+  const resetting = usePasswordResetPending();
+  const needsPassword = !hasPassword(session) || resetting;
+  const target = loading ? null : resolveGuardTarget(!!session, !!profile?.is_member, first, needsPassword);
 
   useEffect(() => {
     if (target) router.replace(target as never);
