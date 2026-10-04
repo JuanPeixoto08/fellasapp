@@ -12,6 +12,7 @@ import {
   formatBirthday,
   getProfile,
   maskBirthday,
+  PROFILE_LIMITS,
   parseBirthday,
   updateMyProfile,
   validateUsername,
@@ -112,6 +113,7 @@ export default function EditProfileScreen() {
         <TextField
           label="Nome"
           placeholder="Como a galera te chama"
+          maxLength={PROFILE_LIMITS.displayName}
           value={displayName}
           onChangeText={setDisplayName}
         />
@@ -132,6 +134,8 @@ export default function EditProfileScreen() {
           label="Bio"
           placeholder="Conta uma coisa sobre você"
           multiline
+          maxLength={PROFILE_LIMITS.bio}
+          help={`${bio.length}/${PROFILE_LIMITS.bio}`}
           value={bio}
           onChangeText={setBio}
         />
