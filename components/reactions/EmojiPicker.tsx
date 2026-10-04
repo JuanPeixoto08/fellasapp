@@ -10,6 +10,7 @@ import {
   type EmojiGroup,
   type EmojiItem,
 } from '../../lib/emoji';
+import { useLayoutTier } from '../../lib/layout';
 import { useTheme } from '../../lib/theme';
 import { EmptyState, Icon, IconButton, Text, TextField, type IconName } from '../ui';
 
@@ -49,11 +50,12 @@ function toRows(groups: EmojiGroup[], columns: number, withHeaders: boolean): Ro
   return rows;
 }
 
-/** Seletor com todos os emojis: busca em português, recentes e categorias. Sobe de baixo. */
+/** Seletor com todos os emojis: busca em português, recentes e categorias. Sobe de baixo no celular; no desktop abre como painel centralizado. */
 export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const panel = useLayoutTier() !== 'compact';
   const list = useRef<FlatList<Row>>(null);
   const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -75,7 +77,10 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
     if (!groups) load();
   }, [visible, groups, load]);
 
-  const sheetWidth = Math.min(width, t.layout.maxContentWidth);
+  // celular: folha de baixo na largura da tela; desktop: painel centralizado de 400
+  const sheetWidth = panel
+    ? Math.min(width - t.layout.gutter * 2, t.layout.maxDialogWidth)
+    : Math.min(width, t.layout.maxContentWidth);
   const columns = Math.max(1, Math.floor((sheetWidth - t.layout.gutter * 2) / t.layout.minTouch));
   const cell = Math.floor((sheetWidth - t.layout.gutter * 2) / columns);
   const headerHeight = t.spacing.xxl;
@@ -132,21 +137,23 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: t.colors.overlay, justifyContent: 'flex-end' }}>
+      <View style={{ flex: 1, backgroundColor: t.colors.overlay, justifyContent: panel ? 'center' : 'flex-end' }}>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Fechar emojis" style={StyleSheet.absoluteFill} />
         <View
+          testID="emoji-sheet"
           accessibilityViewIsModal
           style={{
-            width: '100%',
+            width: panel ? sheetWidth : '100%',
             maxWidth: t.layout.maxContentWidth,
             alignSelf: 'center',
             height: height * t.layout.sheetHeightRatio,
             backgroundColor: t.colors.surface,
-            borderTopLeftRadius: t.radii.lg,
-            borderTopRightRadius: t.radii.lg,
+            ...(panel
+              ? { borderRadius: t.radii.lg }
+              : { borderTopLeftRadius: t.radii.lg, borderTopRightRadius: t.radii.lg }),
             borderWidth: t.borders.hairline,
             borderColor: t.colors.border,
-            paddingBottom: insets.bottom,
+            paddingBottom: panel ? 0 : insets.bottom,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, padding: t.layout.gutter, paddingBottom: t.spacing.sm }}>
