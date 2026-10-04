@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 export type Draft = { body: string; imageUris: string[] };
 
@@ -28,4 +28,15 @@ export function setDraft(next: Draft | ((d: Draft) => Draft)): void {
 
 export function clearDraft(): void {
   setDraft(EMPTY);
+}
+
+/**
+ * O rascunho vive em memória, fora da conta: sem isto, depois de um logout (ou troca de conta) num
+ * aparelho/navegador compartilhado a próxima pessoa veria — e poderia postar — o rascunho da anterior.
+ * Limpa sempre que o usuário logado muda; o mesmo usuário (token renovado, re-render) mantém.
+ */
+export function useClearDraftOnUserChange(userId: string | undefined): void {
+  useEffect(() => {
+    clearDraft();
+  }, [userId]);
 }
