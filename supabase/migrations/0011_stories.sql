@@ -36,7 +36,12 @@ create policy "stories_select_members" on public.stories
   for select to authenticated using (public.is_member() and created_at > now() - interval '24 hours');
 drop policy if exists "stories_insert_own" on public.stories;
 create policy "stories_insert_own" on public.stories
-  for insert to authenticated with check (public.is_member() and author_id = auth.uid());
+  for insert to authenticated with check (
+    public.is_member()
+    and author_id = auth.uid()
+    -- story nasce agora: data forjada no futuro faria um story que nunca vence
+    and created_at between now() - interval '1 minute' and now() + interval '1 minute'
+  );
 drop policy if exists "stories_delete_own" on public.stories;
 create policy "stories_delete_own" on public.stories
   for delete to authenticated using (author_id = auth.uid());

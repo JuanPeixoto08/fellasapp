@@ -116,11 +116,14 @@ export async function markStoryViewed(storyId: string): Promise<void> {
 
 /** Quem viu o meu story (a política só deixa o dono ver), com o emoji de quem reagiu. */
 export async function listStoryViewers(storyId: string): Promise<StoryViewer[]> {
+  const me = await getCurrentUserId();
   const [views, reactions] = await Promise.all([
     supabase
       .from('story_views')
       .select('viewed_at, viewer:profiles(id, username, display_name, avatar_url)')
       .eq('story_id', storyId)
+      // eu também marco que vi o meu story (o anel); a lista é de quem mais viu
+      .neq('viewer_id', me)
       .order('viewed_at', { ascending: false }),
     supabase.from('story_reactions').select('user_id, emoji').eq('story_id', storyId),
   ]);

@@ -46,12 +46,15 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
   const [viewersOpen, setViewersOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [picking, setPicking] = useState(false);
+  // o relógio só anda com a foto/vídeo carregado (internet lenta não come o começo do story)
+  const [readyId, setReadyId] = useState<string | null>(null);
   const reactAnchor = useRef<View>(null);
 
   const group = cursor ? groups[cursor.group] : null;
   const story = group && cursor ? group.stories[cursor.story] : null;
   const mine = !!group && group.author.id === myId;
-  const stopped = paused || viewersOpen || confirming || picking;
+  const ready = !!story && readyId === story.id;
+  const stopped = paused || viewersOpen || confirming || picking || !ready;
   const elapsed = story && clock.id === story.id ? clock.ms : 0;
 
   const goNext = useCallback(() => {
@@ -152,9 +155,23 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
           {story.kind === 'video' ? (
-            <StoryVideo key={story.id} uri={story.mediaUrl} paused={stopped} muted={muted} />
+            <StoryVideo
+              key={story.id}
+              uri={story.mediaUrl}
+              paused={paused || viewersOpen || confirming || picking}
+              muted={muted}
+              onReady={() => setReadyId(story.id)}
+              onBlocked={() => setMuted(true)}
+            />
           ) : (
-            <Image source={{ uri: story.mediaUrl }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
+            <Image
+              testID="story-photo"
+              source={{ uri: story.mediaUrl }}
+              resizeMode="contain"
+              onLoad={() => setReadyId(story.id)}
+              onError={() => setReadyId(story.id)}
+              style={{ width: '100%', height: '100%' }}
+            />
           )}
         </View>
 
@@ -291,6 +308,7 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
           onSelect={react}
           onClose={() => setPicking(false)}
           anchorRef={reactAnchor}
+          allowMore={false}
         />
 
         {viewersOpen ? (

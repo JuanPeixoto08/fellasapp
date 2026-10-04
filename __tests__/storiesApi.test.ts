@@ -5,7 +5,7 @@ jest.mock('../lib/supabase', () => {
   const builder = (table: string) => {
     let op = 'select';
     const b: any = {};
-    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'in', 'gt', 'order']) {
+    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'neq', 'in', 'gt', 'order']) {
       b[m] = (...args: unknown[]) => {
         if (['insert', 'upsert', 'delete'].includes(m)) op = m;
         mockCalls.push({ table, op: m, args });
@@ -34,7 +34,7 @@ jest.mock('../lib/api/storage', () => ({
 }));
 jest.mock('../lib/storiesConfig', () => ({ STORIES_URL: 'https://w.test' }));
 
-import { createStory, listActiveStories, reactToStory, StoryUploadError, uploadStoryMedia } from '../lib/api/stories';
+import { createStory, listActiveStories, listStoryViewers, reactToStory, StoryUploadError, uploadStoryMedia } from '../lib/api/stories';
 
 beforeEach(() => {
   mockCalls.length = 0;
@@ -120,5 +120,12 @@ describe('createStory e reactToStory', () => {
     expect(mockCalls.find((c) => c.op === 'upsert')?.args[0]).toEqual({ story_id: 's1', user_id: 'me', emoji: '🔥' });
     await reactToStory('s1', null);
     expect(mockCalls.some((c) => c.table === 'story_reactions' && c.op === 'delete')).toBe(true);
+  });
+});
+
+describe('listStoryViewers', () => {
+  it('não conta o dono (eu também marco que vi o meu)', async () => {
+    await listStoryViewers('s1');
+    expect(mockCalls.find((c) => c.table === 'story_views' && c.op === 'neq')?.args).toEqual(['viewer_id', 'me']);
   });
 });
