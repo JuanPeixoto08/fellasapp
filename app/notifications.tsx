@@ -7,8 +7,10 @@ import { NotificationRow } from '../components/notifications/NotificationRow';
 import { stackHeader } from '../components/profile/headerOptions';
 import { Divider, EmptyState, Screen } from '../components/ui';
 import { fetchNotifications, markNotificationsSeen } from '../lib/api/notifications';
+import { listActiveStories } from '../lib/api/stories';
 import type { AppNotification } from '../lib/notifications';
 import { setUnreadNotifications } from '../lib/notificationsStore';
+import { openStories } from '../lib/storyViewerStore';
 import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../lib/realtime';
 import { useTheme } from '../lib/theme';
 
@@ -67,6 +69,17 @@ export default function NotificationsScreen() {
   );
 
   const open = (n: AppNotification) => {
+    if (n.kind === 'story_reaction' && n.storyId) {
+      // abre o meu story que recebeu a reação (se já sumiu, não faz nada)
+      const storyId = n.storyId;
+      listActiveStories()
+        .then((groups) => {
+          const group = groups.find((g) => g.stories.some((s) => s.id === storyId));
+          if (group) openStories(groups, group.author.id, storyId);
+        })
+        .catch(() => {});
+      return;
+    }
     if (n.postId) router.push(`/post/${n.postId}`);
     else if (n.actors[0]) router.push(`/user/${n.actors[0].id}`);
   };

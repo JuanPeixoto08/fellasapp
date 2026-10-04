@@ -48,10 +48,11 @@ export async function fetchNotifications(): Promise<AppNotification[]> {
   return rows.map((r) => {
     const actorIds = r.actor_ids ?? [];
     return {
-      key: [r.kind, r.post_id ?? '', r.comment_id ?? '', actorIds[0] ?? ''].join(':'),
+      key: [r.kind, r.post_id ?? '', r.comment_id ?? '', r.story_id ?? '', actorIds[0] ?? ''].join(':'),
       kind: r.kind as NotificationKind,
       postId: r.post_id,
       commentId: r.comment_id,
+      storyId: r.story_id ?? null,
       actors: actorIds.map((id) => byId.get(id)).filter((p): p is NotificationPerson => !!p),
       actorCount: r.actor_count,
       emojis: r.emojis ?? [],

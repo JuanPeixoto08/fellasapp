@@ -145,4 +145,9 @@ describe('affectsNotifications', () => {
     expect(affectsNotifications(post(true))).toBe(false);
     expect(affectsNotifications({ kind: 'change', table: 'posts', type: 'DELETE', row: {}, mine: false })).toBe(false);
   });
+
+  it('story novo não é notificação; reação de outra pessoa no story é', () => {
+    expect(affectsNotifications({ kind: 'change', table: 'stories', type: 'INSERT', row: {}, mine: false })).toBe(false);
+    expect(affectsNotifications({ kind: 'change', table: 'story_reactions', type: 'INSERT', row: {}, mine: false })).toBe(true);
+  });
 });

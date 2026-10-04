@@ -12,6 +12,7 @@ const base: AppNotification = {
   kind: 'like',
   postId: 'p1',
   commentId: null,
+  storyId: null,
   actors: [p('Ana')],
   actorCount: 1,
   emojis: [],
@@ -60,6 +61,13 @@ describe('describeNotification', () => {
     expect(notificationText(n({ kind: 'thread_reply', commentId: 'c2', body: 'kkk' }))).toBe(
       'Ana também comentou num post que você comentou: “kkk”',
     );
+  });
+
+  it('reação no meu story', () => {
+    expect(notificationText(n({ kind: 'story_reaction', postId: null, emojis: ['😂'] }))).toBe('Ana reagiu 😂 ao seu story');
+    expect(
+      notificationText(n({ kind: 'story_reaction', postId: null, actors: [p('Ana'), p('Pedro')], actorCount: 2, emojis: ['😂', '🔥'] })),
+    ).toBe('Ana e Pedro reagiram 😂 🔥 ao seu story');
   });
 
   it('marcação em post e em comentário', () => {

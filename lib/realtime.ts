@@ -3,7 +3,16 @@
  * estiver na tela (feed, post, notificações, coluna da direita). Quem escuta decide o que buscar de novo.
  * `resync` = a conexão voltou ou o app voltou para a frente: eventos podem ter passado, atualize tudo.
  */
-export const LIVE_TABLES = ['posts', 'likes', 'comments', 'post_reactions', 'comment_reactions', 'profiles'] as const;
+export const LIVE_TABLES = [
+  'posts',
+  'likes',
+  'comments',
+  'post_reactions',
+  'comment_reactions',
+  'profiles',
+  'stories',
+  'story_reactions',
+] as const;
 export type LiveTable = (typeof LIVE_TABLES)[number];
 
 export type LiveChange = {
@@ -40,6 +49,7 @@ export function actorOf(table: LiveTable, row: Record<string, unknown>): string 
   switch (table) {
     case 'posts':
     case 'comments':
+    case 'stories':
       return str(row.author_id);
     case 'profiles':
       return str(row.id);
@@ -61,6 +71,7 @@ export function postIdOf(change: LiveChange): string | null {
 export function affectsNotifications(event: LiveEvent): boolean {
   if (event.kind === 'resync') return true;
   if (event.mine) return false;
+  if (event.table === 'stories') return false; // story novo aparece na faixa, não vira notificação
   if (event.table === 'profiles' || event.table === 'posts') return event.type === 'INSERT';
   return true;
 }

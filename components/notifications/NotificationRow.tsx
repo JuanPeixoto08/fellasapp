@@ -14,6 +14,7 @@ function kindIcon(t: Theme, kind: NotificationKind): { name: IconName; color?: s
       return { name: 'chatbubble-outline' };
     case 'post_reaction':
     case 'comment_reaction':
+    case 'story_reaction':
       return { name: 'happy-outline' };
     case 'birthday':
       return { name: 'gift-outline' };
