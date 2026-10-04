@@ -8,7 +8,11 @@ const mockUploaded: string[] = [];
 /** Índices (como string) das fotos cujo upload deve falhar. */
 let mockUploadFail: string[] = [];
 
-globalThis.fetch = jest.fn(async () => ({ blob: async () => ({ type: 'image/jpeg' }) })) as unknown as typeof fetch;
+globalThis.fetch = jest.fn(async (uri: string) => ({
+  blob: async () => ({ type: String(uri).endsWith('.gif') ? 'image/gif' : 'image/jpeg' }),
+})) as unknown as typeof fetch;
+
+jest.mock('../lib/imageUpload', () => ({ shrinkForUpload: async (uri: string) => uri + '#reduzida' }));
 
 jest.mock('../lib/supabase', () => {
   const makeBuilder = (table: string) => {
@@ -121,6 +125,15 @@ describe('fotos (até 4)', () => {
     await expect(createPost({ body: '', imageUris: ['file://a', 'file://b'] })).rejects.toThrow('upload falhou');
     expect(mockRemoved).toEqual(mockUploaded);
     expect(mockCalls.some((c) => c.table === 'posts' && c.op === 'insert')).toBe(false);
+  });
+
+  it('foto sobe reduzida; GIF sobe como está (senão perde a animação)', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: '', imageUris: ['file://a.jpg', 'file://b.gif'] });
+    const fetched = (globalThis.fetch as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(fetched).toContain('file://a.jpg#reduzida');
+    expect(fetched).not.toContain('file://b.gif#reduzida');
+    expect(mockUploaded.map((p) => p.split('.').pop()).sort()).toEqual(['gif', 'jpg']);
   });
 
   it('mais de 4 fotos é recusado antes de subir', async () => {
