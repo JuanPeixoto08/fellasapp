@@ -64,6 +64,26 @@ describe('NotificationsSync', () => {
     expect(mockFetchUnread).toHaveBeenCalledTimes(3);
   });
 
+  it('em segundo plano não busca; volta a buscar quando o app volta', async () => {
+    mockSession = member('u1');
+    await render(<NotificationsSync />);
+    await flush();
+    expect(mockFetchUnread).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(UNREAD_POLL_MS * 3);
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      appStateHandler?.('active');
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      jest.advanceTimersByTime(UNREAD_POLL_MS);
+    });
+    expect(mockFetchUnread).toHaveBeenCalledTimes(3);
+  });
+
   it('trocar de conta zera o número antes de chegar o da conta nova', async () => {
     mockSession = member('u1');
     const view = await render(<NotificationsSync />);
