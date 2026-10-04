@@ -31,4 +31,19 @@ describe('EmojiPicker por faixa', () => {
     const style = StyleSheet.flatten(screen.getByTestId('emoji-sheet').props.style);
     expect(style).toMatchObject({ width: 400, borderRadius: 12 });
   });
+
+  it('desktop preso ao botão: painel de altura fixa perto dele, sem vazar o conteúdo', async () => {
+    mockTier = 'expanded';
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 750, height: 1334 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
+      >
+        <EmojiPicker visible selected={null} onSelect={() => {}} onClose={() => {}} anchor={{ x: 600, y: 900, width: 44, height: 44 }} />
+      </SafeAreaProvider>,
+    );
+    const style = StyleSheet.flatten(screen.getByTestId('emoji-sheet').props.style);
+    expect(style).toMatchObject({ position: 'absolute', width: 400, height: 420, overflow: 'hidden' });
+    expect(style.top + 420).toBeLessThanOrEqual(900);
+    expect(style.left + 400).toBe(644);
+  });
 });

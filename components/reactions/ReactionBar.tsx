@@ -1,8 +1,9 @@
+import type { Ref } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
 import { ActionButton } from '../feed/ActionButton';
-import { Icon, Text } from '../ui';
+import { Emoji, Icon, Text } from '../ui';
 
 export type ReactionGroup = { emoji: string; count: number };
 
@@ -44,7 +45,7 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
                 backgroundColor: mine ? t.colors.accent : 'transparent',
               }}
             >
-              <Text variant="small">{emoji}</Text>
+              <Emoji emoji={emoji} size="sm" />
               <Text variant="caption" tone="muted" style={mine ? { color: t.colors.onAccent } : undefined}>
                 {count}
               </Text>
@@ -60,17 +61,21 @@ type ButtonProps = {
   onPress?: () => void;
   /** Minha reação atual: aparece no lugar da carinha. */
   myReaction?: string | null;
+  /** Para a barra de reações abrir presa a este botão (ReactionPicker anchorRef). */
+  anchorRef?: Ref<View>;
 };
 
 /** Abre o seletor de reações; quando já reagi, mostra o meu emoji (tocar troca ou remove). */
-export function ReactButton({ onPress, myReaction }: ButtonProps) {
+export function ReactButton({ onPress, myReaction, anchorRef }: ButtonProps) {
   return (
-    <ActionButton
-      onPress={onPress}
-      accessibilityLabel="Reagir"
-      accessibilityHint={myReaction ? `Sua reação: ${myReaction}. Toque para trocar ou remover` : undefined}
-    >
-      {myReaction ? <Text>{myReaction}</Text> : <Icon name="happy-outline" tone="muted" />}
-    </ActionButton>
+    <View ref={anchorRef} collapsable={false}>
+      <ActionButton
+        onPress={onPress}
+        accessibilityLabel="Reagir"
+        accessibilityHint={myReaction ? `Sua reação: ${myReaction}. Toque para trocar ou remover` : undefined}
+      >
+        {myReaction ? <Emoji emoji={myReaction} size="md" /> : <Icon name="happy-outline" tone="muted" />}
+      </ActionButton>
+    </View>
   );
 }

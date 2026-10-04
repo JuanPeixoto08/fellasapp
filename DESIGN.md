@@ -52,7 +52,8 @@ Screen · Text/Heading · Button (primary, secondary, ghost, danger; loading/dis
 Sem caixa: nada de cartão com borda/sombra. O post fica direto no papel e as listas separam com `Divider` de ponta a ponta. Avatar `md` numa coluna; na outra, nome (bold) + data à direita, texto, fotos (`PostImages`: 1 na proporção original limitada por `mediaAspect`, 2–4 em grade como no Twitter, raio `lg`), chips de reação e a fila de ações: ♡ e 💬 como ícone + número (zero não aparece), carinha de reagir isolada à direita — vira o meu emoji quando já reagi. Chips de reação mínimos (altura `chipHeight`, contorno fino; o meu invertido). Comentários seguem o mesmo desenho, com a carinha ao lado do texto.
 
 ### Reações e fotos
-- Barra rápida (pílula com os 6 de `QUICK_REACTIONS` + "+"): se a minha reação não é um dos 6, ela entra primeiro, invertida, para dar pra remover. O "+" abre o `EmojiPicker`: folha que sobe de baixo (`sheetHeightRatio`), busca em pt (dados `emojibase-data` carregados só ao abrir), Recentes (no aparelho) e categorias com ícones desenhados (nunca emoji como ícone).
+- Emojis de reação são desenhados pelo app (`<Emoji>`, Twemoji; tamanhos `emojiSizes` sm 16 chip · md 20 botão · lg 28 barra/seletor), iguais em qualquer aparelho; sem imagem, cai no emoji do aparelho. Emoji dentro do texto escrito continua o do aparelho.
+- Barra rápida (pílula com os 6 de `QUICK_REACTIONS` + "+"), presa ao botão de reagir (acima; sem espaço, embaixo; `placePopover`), sem escurecer a tela: se a minha reação não é um dos 6, ela entra primeiro, invertida, para dar pra remover. O "+" abre o `EmojiPicker`: no celular, folha que sobe de baixo (`sheetHeightRatio`); no computador, painel de 400 × `emojiPanelHeight` preso ao botão, conteúdo rolando por dentro; busca em pt (dados `emojibase-data` carregados só ao abrir), Recentes (no aparelho) e categorias com ícones desenhados (nunca emoji como ícone).
 - Até 4 fotos por post. No post, toque abre o `PhotoViewer` (fundo `viewerBg`, "1/3", ✕; setas só na web). Controles sobre foto usam `overlay` + `onOverlay`. Na aba Fotos, um quadradinho por post, com ícone de "várias" quando tem mais de uma.
 
 ### Perfil
@@ -70,7 +71,7 @@ Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celula
 - Sidebar: logo (→ feed), Feed/Notificações/Perfil/Membros (Notificações com `Badge`; ativo = ícone cheio + `brand` + negrito), botão Postar (abre a janela do compositor), eu no pé.
 - RightRail: "Os fellas" (até 8 + Ver todos) e "Aniversários" (próximos 3; Hoje/Amanhã/12 out; ícone `gift-outline`).
 - Compositor (`components/feed/Composer`): página no celular, topo do feed e janela no desktop, um rascunho só (limpo quando o usuário logado muda).
-- Tamanhos que dependem da largura usam `useContentWidth()` (coluna), nunca a janela. Seletor de emojis vira painel de 400 no desktop.
+- Tamanhos que dependem da largura usam `useContentWidth()` (coluna), nunca a janela. Seletor de emojis vira painel de 400 preso ao botão de reagir no desktop.
 - Web/desktop: hover `surfaceSunken` + cursor de mão em clicáveis (`interactiveStyle`); ← → Esc no visualizador.
 
 ## Notificações
