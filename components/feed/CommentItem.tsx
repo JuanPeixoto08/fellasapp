@@ -6,6 +6,7 @@ import { Avatar, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
 import { postTime } from '../../lib/format';
+import { MentionText } from '../MentionText';
 import { nextReaction } from '../../lib/reactionState';
 
 type Props = {
@@ -42,7 +43,7 @@ export function CommentItem({ comment, onReact }: Props) {
             accessibilityLabel={`Comentário de ${name}`}
             style={{ flex: 1 }}
           >
-            <Text>{comment.body}</Text>
+            <MentionText text={comment.body} />
           </Pressable>
           <View style={{ marginVertical: -t.spacing.sm, marginRight: -t.spacing.sm }}>
             <ReactButton myReaction={comment.myReaction} onPress={() => setPicking(true)} />

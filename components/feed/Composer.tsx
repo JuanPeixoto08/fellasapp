@@ -5,10 +5,12 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput
 import { createPost, MAX_IMAGES } from '../../lib/api/posts';
 import { clearDraft, setDraft, useDraft } from '../../lib/composerDraft';
 import { friendlyError } from '../../lib/errors';
+import { activeMention, insertMention } from '../../lib/mentions';
 import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { emitPostCreated } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
+import { MentionSuggestions } from '../MentionSuggestions';
 import { useContentWidth } from '../shell/ShellContext';
 import { Avatar, Button, ConfirmDialog, Icon, IconButton, Text, useAutoGrow } from '../ui';
 
@@ -47,6 +49,10 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     extra: t.spacing.sm,
     min: t.typography.lead.lineHeight + t.spacing.sm,
   });
+
+  // @: posição do cursor (null = fim do texto, logo depois de digitar) e a menção sendo escrita
+  const [cursor, setCursor] = useState<number | null>(null);
+  const mention = activeMention(body, Math.min(cursor ?? body.length, body.length));
 
   const room = MAX_IMAGES - imageUris.length;
   const hasDraft = body.trim().length > 0 || imageUris.length > 0;
@@ -132,12 +138,26 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             multiline
             maxLength={MAX_BODY}
             value={body}
-            onChangeText={(text) => setDraft((d) => ({ ...d, body: text }))}
+            onChangeText={(text) => {
+              setDraft((d) => ({ ...d, body: text }));
+              setCursor(null);
+            }}
+            onSelectionChange={(e) => setCursor(e.nativeEvent.selection.end)}
             editable={!saving}
             textAlignVertical="top"
             style={[t.typography.lead, { color: t.colors.text, paddingTop: t.spacing.sm, height: grow.height }]}
           />
         </View>
+        {mention ? (
+          <MentionSuggestions
+            query={mention.query}
+            onPick={(username) => {
+              setDraft((d) => ({ ...d, body: insertMention(d.body, mention, username) }));
+              setCursor(null);
+              input.current?.focus();
+            }}
+          />
+        ) : null}
         {!hasDraft && variant !== 'inline' ? (
           <Text variant="small" tone="muted">
             Uma frase, até {MAX_IMAGES} fotos, ou os dois. Só os fellas veem.

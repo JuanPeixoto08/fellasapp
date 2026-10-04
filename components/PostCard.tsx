@@ -9,6 +9,7 @@ import { Avatar, ConfirmDialog, IconButton, Text } from './ui';
 import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
+import { MentionText } from './MentionText';
 import { nextReaction } from '../lib/reactionState';
 
 type Props = {
@@ -89,7 +90,7 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
             accessibilityRole="button"
             accessibilityLabel={`Abrir post de ${name}`}
           >
-            <Text>{post.body}</Text>
+            <MentionText text={post.body} />
           </Pressable>
         ) : null}
         <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={pressImage} />
