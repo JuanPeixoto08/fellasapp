@@ -59,6 +59,32 @@ describe('usePostList ao vivo', () => {
     expect(result.current.newPosts).toBe(0);
   });
 
+  it('puxar para atualizar (ou qualquer recarga do topo) já mostra os novos e some com o botão', async () => {
+    const { result } = await feed();
+    await act(async () => {
+      change('posts', 'INSERT', { id: 'p9', author_id: 'bia' });
+    });
+    expect(result.current.newPosts).toBe(1);
+    mockListFeed.mockResolvedValue({ posts: [post('p9'), post('p1'), post('p2')], nextCursor: null });
+    await act(async () => result.current.refresh());
+    await waitFor(() => expect(result.current.posts).toHaveLength(3));
+    expect(result.current.newPosts).toBe(0);
+  });
+
+  it('post contado que foi apagado sai da conta; o mesmo post não conta duas vezes', async () => {
+    const { result } = await feed();
+    await act(async () => {
+      change('posts', 'INSERT', { id: 'p9', author_id: 'bia' });
+      change('posts', 'INSERT', { id: 'p9', author_id: 'bia' });
+      change('posts', 'INSERT', { id: 'p8', author_id: 'bia' });
+    });
+    expect(result.current.newPosts).toBe(2);
+    await act(async () => {
+      change('posts', 'DELETE', { id: 'p9' });
+    });
+    expect(result.current.newPosts).toBe(1);
+  });
+
   it('no perfil de alguém só conta post daquela pessoa', async () => {
     const { result } = await feed({ authorId: 'ana' });
     await act(async () => {
