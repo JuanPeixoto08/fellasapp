@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AvatarCropper } from '../../components/profile/AvatarCropper';
 import { stackHeader } from '../../components/profile/headerOptions';
 import { Avatar, Button, Divider, Screen, Text, TextField } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -35,6 +36,8 @@ export default function EditProfileScreen() {
   const [birthday, setBirthday] = useState('');
   const [birthdayError, setBirthdayError] = useState<string | undefined>();
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
+  /** Foto escolhida esperando o "Ajustar foto". */
+  const [cropUri, setCropUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
@@ -56,11 +59,10 @@ export default function EditProfileScreen() {
   async function pickAvatar() {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
+      // sem recorte do sistema e sem compressão: o AvatarCropper enquadra e salva 512 em JPEG
+      quality: 1,
     });
-    if (!res.canceled) setAvatarUri(res.assets[0].uri);
+    if (!res.canceled) setCropUri(res.assets[0].uri);
   }
 
   async function save() {
@@ -94,6 +96,14 @@ export default function EditProfileScreen() {
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Editar perfil')} />
+      <AvatarCropper
+        uri={cropUri}
+        onCancel={() => setCropUri(null)}
+        onConfirm={(uri) => {
+          setAvatarUri(uri);
+          setCropUri(null);
+        }}
+      />
       <Screen scroll header style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
         <View style={{ alignItems: 'center', gap: t.spacing.md }}>
           <Avatar name={displayName || username || '?'} uri={avatarUri} size={t.avatarSizes.xl} />
