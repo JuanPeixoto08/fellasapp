@@ -51,7 +51,7 @@ describe('EmojiPicker por faixa', () => {
     mockTier = 'expanded';
     await renderPicker();
     const title = await screen.findByText('Sorrisos e emoção');
-    type Node = { props: { style?: object }; parent: Node | null };
+    type Node = { props: { style?: { paddingHorizontal?: number } }; parent: Node | null };
     let node = title.parent as unknown as Node | null;
     let padded = false;
     for (let i = 0; i < 4 && node; i++, node = node.parent) {
