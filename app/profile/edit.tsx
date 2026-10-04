@@ -11,12 +11,15 @@ import {
   getCurrentUserId,
   formatBirthday,
   getProfile,
+  maskBirthday,
   parseBirthday,
   updateMyProfile,
   validateUsername,
 } from '../../lib/api/profiles';
 import { friendlyError, isUniqueViolation } from '../../lib/errors';
 import { isProfileColorKey, profileColor, profileColorKeys, profilePalette, useTheme } from '../../lib/theme';
+
+const BIRTHDAY_ERROR = 'Essa data não rola. Usa DD/MM/AAAA, tipo 20/05/1999.';
 
 export default function EditProfileScreen() {
   const t = useTheme();
@@ -69,7 +72,7 @@ export default function EditProfileScreen() {
     const invalid = validateUsername(username.trim().toLowerCase());
     if (invalid) return setUsernameError(invalid);
     const parsedBirthday = parseBirthday(birthday);
-    if (parsedBirthday === undefined) return setBirthdayError('Use o formato DD/MM/AAAA com uma data válida');
+    if (parsedBirthday === undefined) return setBirthdayError(BIRTHDAY_ERROR);
     setSaving(true);
     setError(null);
     setBirthdayError(undefined);
@@ -150,13 +153,16 @@ export default function EditProfileScreen() {
         <TextField
           label="Aniversário"
           placeholder="DD/MM/AAAA"
-          keyboardType="numbers-and-punctuation"
+          keyboardType="number-pad"
           error={birthdayError}
           maxLength={10}
           value={birthday}
           onChangeText={(v) => {
-            setBirthday(v);
+            setBirthday(maskBirthday(v));
             setBirthdayError(undefined);
+          }}
+          onBlur={() => {
+            if (parseBirthday(birthday) === undefined) setBirthdayError(BIRTHDAY_ERROR);
           }}
         />
         <View style={{ gap: t.spacing.sm }}>
