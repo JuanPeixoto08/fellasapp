@@ -4,14 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../../lib/auth/SessionProvider';
 import type { LayoutTier } from '../../lib/layout';
+import { notificationsLabel } from '../../lib/notifications';
+import { useUnreadNotifications } from '../../lib/notificationsStore';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
-import { Avatar, Button, Icon, IconButton, interactiveStyle, Logo, Text, type IconName } from '../ui';
+import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, Text, type IconName } from '../ui';
 
-export type NavKey = 'feed' | 'profile' | 'members';
+export type NavKey = 'feed' | 'notifications' | 'profile' | 'members';
 
-const ITEMS: { key: NavKey; label: string; href: '/feed' | '/profile' | '/members'; icon: IconName; iconActive: IconName }[] = [
+const ITEMS: { key: NavKey; label: string; href: '/feed' | '/notifications' | '/profile' | '/members'; icon: IconName; iconActive: IconName }[] = [
   { key: 'feed', label: 'Feed', href: '/feed', icon: 'newspaper-outline', iconActive: 'newspaper' },
+  { key: 'notifications', label: 'Notificações', href: '/notifications', icon: 'notifications-outline', iconActive: 'notifications' },
   { key: 'profile', label: 'Perfil', href: '/profile', icon: 'person-outline', iconActive: 'person' },
   { key: 'members', label: 'Membros', href: '/members', icon: 'people-outline', iconActive: 'people' },
 ];
@@ -21,16 +24,18 @@ export function activeNavItem(pathname: string): NavKey | null {
   if (pathname === '/' || pathname === '/feed') return 'feed';
   if (pathname === '/profile') return 'profile';
   if (pathname === '/members') return 'members';
+  if (pathname === '/notifications') return 'notifications';
   return null;
 }
 
 type Props = { tier: Exclude<LayoutTier, 'compact'>; onCompose: () => void };
 
-/** Barra lateral do desktop: logo, Feed/Perfil/Membros, Postar e eu no pé. */
+/** Barra lateral do desktop: logo, Feed/Notificações/Perfil/Membros, Postar e eu no pé. */
 export function Sidebar({ tier, onCompose }: Props) {
   const t = useTheme();
   const router = useRouter();
   const active = activeNavItem(usePathname());
+  const unread = useUnreadNotifications();
   const me = useMyAvatar();
   const { profile } = useSession();
   const expanded = tier === 'expanded';
@@ -72,7 +77,7 @@ export function Sidebar({ tier, onCompose }: Props) {
           <Pressable
             key={item.key}
             accessibilityRole="link"
-            accessibilityLabel={item.label}
+            accessibilityLabel={item.key === 'notifications' ? notificationsLabel(unread) : item.label}
             accessibilityState={{ selected: on }}
             onPress={() => router.navigate(item.href)}
             style={(state) => ({
@@ -87,7 +92,14 @@ export function Sidebar({ tier, onCompose }: Props) {
               ...interactiveStyle(t, state),
             })}
           >
-            <Icon name={on ? item.iconActive : item.icon} size="lg" color={on ? t.colors.brand : undefined} />
+            <View>
+              <Icon name={on ? item.iconActive : item.icon} size="lg" color={on ? t.colors.brand : undefined} />
+              {item.key === 'notifications' ? (
+                <View pointerEvents="none" style={{ position: 'absolute', top: -t.spacing.xs, right: -t.spacing.sm }}>
+                  <Badge count={unread} />
+                </View>
+              ) : null}
+            </View>
             {expanded ? (
               <Text variant="lead" bold={on} style={on ? { color: t.colors.brand } : undefined}>
                 {item.label}
