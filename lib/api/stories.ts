@@ -14,6 +14,9 @@ export const STORY_PHOTO_MS = 5000;
 export const MAX_VIDEO_MS = 15000;
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Erro de envio com mensagem pt-BR pronta para a tela (o resto passa por friendlyError). */
+export class StoryUploadError extends Error {}
+
 const UPLOAD_ERRORS: Record<number, string> = {
   401: 'Sua sessão expirou. Entra de novo.',
   403: 'Só fellas podem postar story.',
@@ -27,13 +30,19 @@ export async function uploadStoryMedia(uri: string): Promise<{ url: string; cont
   const contentType = blob.type || 'application/octet-stream';
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) throw new Error(UPLOAD_ERRORS[401]);
-  const res = await fetch(`${STORIES_URL}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
-    body: blob,
-  });
-  if (!res.ok) throw new Error(UPLOAD_ERRORS[res.status] ?? 'Não rolou enviar. Tenta de novo.');
+  if (!token) throw new StoryUploadError(UPLOAD_ERRORS[401]);
+  let res: Response;
+  try {
+    res = await fetch(`${STORIES_URL}/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+      body: blob,
+    });
+  } catch {
+    // sem rede (ou o Worker caiu sem responder): o navegador só diz "Failed to fetch"
+    throw new StoryUploadError('Sem conexão. Confere a internet e tenta de novo.');
+  }
+  if (!res.ok) throw new StoryUploadError(UPLOAD_ERRORS[res.status] ?? 'Não rolou enviar. Tenta de novo.');
   const { url } = (await res.json()) as { url: string };
   return { url, contentType };
 }

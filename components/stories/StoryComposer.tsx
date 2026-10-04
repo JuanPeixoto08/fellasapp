@@ -4,7 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { createStory, MAX_VIDEO_MS, STORY_PHOTO_MS, uploadStoryMedia, type StoryKind } from '../../lib/api/stories';
+import {
+  createStory,
+  MAX_VIDEO_MS,
+  STORY_PHOTO_MS,
+  StoryUploadError,
+  uploadStoryMedia,
+  type StoryKind,
+} from '../../lib/api/stories';
+import { friendlyError } from '../../lib/errors';
 import { shrinkForUpload } from '../../lib/imageUpload';
 import { imagesFromPaste } from '../../lib/pasteImages';
 import { emitStoriesChanged } from '../../lib/storyViewerStore';
@@ -17,6 +25,13 @@ const DURATION_SLACK_MS = 500;
 
 type Picked = { kind: StoryKind; uri: string; durationMs: number };
 type Asset = { uri: string; type?: string | null; duration?: number | null };
+/** Vídeo que não dá para postar: longo demais ou duração ilegível. */
+type Problem = 'tooLong' | 'unreadable' | null;
+
+const PROBLEM_TEXT: Record<Exclude<Problem, null>, string> = {
+  tooLong: 'Esse vídeo passa de 15 s. Escolhe um menor.',
+  unreadable: 'Não consegui ler esse vídeo. Tenta outro.',
+};
 
 function PreviewVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => {
@@ -24,20 +39,35 @@ function PreviewVideo({ uri }: { uri: string }) {
     p.loop = true;
     p.play();
   });
-  return <VideoView player={player} nativeControls={false} contentFit="contain" style={{ width: '100%', height: '100%' }} />;
+  // playsInline: sem isso o Safari do iPhone abre o player do sistema em tela cheia
+  return (
+    <VideoView player={player} nativeControls={false} playsInline contentFit="contain" style={{ width: '100%', height: '100%' }} />
+  );
+}
+
+/**
+ * Duração em ms. Na web a galeria entrega `duration` em segundos (e 0 quando falha), então vale a lida
+ * do arquivo; no celular vem em ms. null = ilegível.
+ */
+async function durationOf(asset: Asset): Promise<number | null> {
+  const fromPicker = Platform.OS === 'web' ? null : asset.duration;
+  const ms = fromPicker && fromPicker > 0 ? fromPicker : await videoDurationMs(asset.uri);
+  return ms && Number.isFinite(ms) && ms > 0 ? ms : null;
 }
 
 type Props = { visible: boolean; onClose: () => void };
 
 /**
- * Postar story: abre a galeria (foto ou vídeo até 15 s), mostra a prévia em tela cheia e envia. No
- * computador, Ctrl+V com uma imagem também vira o story.
+ * Postar story: foto ou vídeo até 15 s, prévia em tela cheia e envio. No celular a galeria abre na hora;
+ * no computador abre com um botão de escolher e dá para colar uma imagem (Ctrl+V).
  */
 export function StoryComposer({ visible, onClose }: Props) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const web = Platform.OS === 'web';
   const [picked, setPicked] = useState<Picked | null>(null);
-  const [tooLong, setTooLong] = useState(false);
+  const [problem, setProblem] = useState<Problem>(null);
+  const [opening, setOpening] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // a tela de fora costuma passar () => ... novo a cada render: sem ref, a galeria reabriria
@@ -46,64 +76,70 @@ export function StoryComposer({ visible, onClose }: Props) {
 
   const use = useCallback(async (asset: Asset) => {
     setError(null);
-    setTooLong(false);
+    setProblem(null);
     if (asset.type !== 'video') {
       setPicked({ kind: 'photo', uri: asset.uri, durationMs: STORY_PHOTO_MS });
       return;
     }
-    const duration = asset.duration ?? (await videoDurationMs(asset.uri)) ?? MAX_VIDEO_MS;
-    if (duration > MAX_VIDEO_MS + DURATION_SLACK_MS) {
+    const duration = await durationOf(asset);
+    if (duration === null || duration > MAX_VIDEO_MS + DURATION_SLACK_MS) {
       setPicked(null);
-      setTooLong(true);
+      setProblem(duration === null ? 'unreadable' : 'tooLong');
       return;
     }
-    setPicked({ kind: 'video', uri: asset.uri, durationMs: Math.min(Math.max(1, Math.round(duration)), MAX_VIDEO_MS) });
+    setPicked({ kind: 'video', uri: asset.uri, durationMs: Math.min(Math.round(duration), MAX_VIDEO_MS) });
   }, []);
 
+  /** Abre a galeria; false se a pessoa desistiu. */
   const pick = useCallback(async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
-      videoMaxDuration: MAX_VIDEO_MS / 1000,
-      quality: 1,
-      allowsMultipleSelection: false,
-    });
-    if (res.canceled || !res.assets?.[0]) return false;
-    await use(res.assets[0]);
-    return true;
+    setOpening(true);
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        videoMaxDuration: MAX_VIDEO_MS / 1000,
+        quality: 1,
+        allowsMultipleSelection: false,
+      });
+      if (res.canceled || !res.assets?.[0]) return false;
+      await use(res.assets[0]);
+      return true;
+    } catch {
+      setError('Não consegui abrir suas fotos. Confere a permissão do app e tenta de novo.');
+      return true;
+    } finally {
+      setOpening(false);
+    }
   }, [use]);
 
-  // abriu: vai direto para a galeria; desistiu sem nada escolhido, fecha
+  // celular: abriu, vai direto para a galeria (desistiu sem nada, fecha). Computador: espera o botão ou Ctrl+V
   useEffect(() => {
     if (!visible) {
       setPicked(null);
-      setTooLong(false);
+      setProblem(null);
       setSending(false);
       setError(null);
       return;
     }
+    if (web) return;
     let alive = true;
-    pick()
-      .then((ok) => {
-        if (alive && !ok) close.current();
-      })
-      .catch(() => {
-        if (alive) setError('Não consegui abrir suas fotos. Confere a permissão do app e tenta de novo.');
-      });
+    pick().then((ok) => {
+      if (alive && !ok) close.current();
+    });
     return () => {
       alive = false;
     };
-  }, [visible, pick]);
+  }, [visible, pick, web]);
 
   // web: Ctrl+V com imagem vira o story
   useEffect(() => {
-    if (!visible || Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (!visible || !web || typeof document === 'undefined') return;
     const onPaste = (e: ClipboardEvent) => {
       const [file] = imagesFromPaste(e as never);
       if (file) void use({ uri: URL.createObjectURL(file), type: 'image' });
     };
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [visible, use]);
+  }, [visible, web, use]);
 
   const post = async () => {
     if (!picked || sending) return;
@@ -116,13 +152,45 @@ export function StoryComposer({ visible, onClose }: Props) {
       emitStoriesChanged();
       onClose();
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : 'Não rolou postar. Tenta de novo.');
+      // só o erro de envio já vem em português; o resto (banco, rede) passa pelo tradutor
+      setError(e instanceof StoryUploadError ? e.message : friendlyError(e, 'Não rolou postar. Tenta de novo.'));
     } finally {
       setSending(false);
     }
   };
 
   const onOverlay = { color: t.colors.onOverlay };
+  const choose = <Button title="Escolher foto ou vídeo" variant="secondary" onPress={() => void pick()} loading={opening} />;
+
+  let middle;
+  if (problem) {
+    middle = (
+      <>
+        <Text align="center" style={onOverlay}>
+          {PROBLEM_TEXT[problem]}
+        </Text>
+        {choose}
+      </>
+    );
+  } else if (picked) {
+    middle =
+      picked.kind === 'video' ? (
+        <PreviewVideo uri={picked.uri} />
+      ) : (
+        <Image source={{ uri: picked.uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
+      );
+  } else if (web) {
+    middle = (
+      <>
+        <Text align="center" style={onOverlay}>
+          Escolhe uma foto ou um vídeo de até 15 s, ou cola uma imagem (Ctrl+V).
+        </Text>
+        {choose}
+      </>
+    );
+  } else if (!error) {
+    middle = <ActivityIndicator color={t.colors.onOverlay} accessibilityLabel="Abrindo suas fotos" />;
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -132,22 +200,7 @@ export function StoryComposer({ visible, onClose }: Props) {
         </View>
 
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: t.layout.gutter, gap: t.spacing.lg }}>
-          {tooLong ? (
-            <>
-              <Text align="center" style={onOverlay}>
-                Esse vídeo passa de 15 s. Escolhe um menor.
-              </Text>
-              <Button title="Escolher outro" variant="secondary" onPress={() => void pick()} />
-            </>
-          ) : picked ? (
-            picked.kind === 'video' ? (
-              <PreviewVideo uri={picked.uri} />
-            ) : (
-              <Image source={{ uri: picked.uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
-            )
-          ) : error ? null : (
-            <ActivityIndicator color={t.colors.onOverlay} accessibilityLabel="Abrindo suas fotos" />
-          )}
+          {middle}
         </View>
 
         {error ? (
@@ -155,7 +208,7 @@ export function StoryComposer({ visible, onClose }: Props) {
             {error}
           </Text>
         ) : null}
-        {picked && !tooLong ? (
+        {picked && !problem ? (
           <View style={{ paddingHorizontal: t.layout.gutter }}>
             <Button
               title="Postar story"

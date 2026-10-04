@@ -34,7 +34,7 @@ jest.mock('../lib/api/storage', () => ({
 }));
 jest.mock('../lib/storiesConfig', () => ({ STORIES_URL: 'https://w.test' }));
 
-import { createStory, listActiveStories, reactToStory, uploadStoryMedia } from '../lib/api/stories';
+import { createStory, listActiveStories, reactToStory, StoryUploadError, uploadStoryMedia } from '../lib/api/stories';
 
 beforeEach(() => {
   mockCalls.length = 0;
@@ -66,6 +66,18 @@ describe('uploadStoryMedia', () => {
       .mockResolvedValueOnce({ blob: async () => ({ type: 'image/jpeg', size: 1 }) })
       .mockResolvedValueOnce({ ok: false, status, json: async () => ({}) }) as never;
     await expect(uploadStoryMedia('file://a.jpg')).rejects.toThrow(message);
+  });
+});
+
+describe('uploadStoryMedia sem rede', () => {
+  it('falha de rede vira mensagem pt-BR (e é um StoryUploadError)', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ blob: async () => ({ type: 'image/jpeg', size: 1 }) })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch')) as never;
+    const err = await uploadStoryMedia('file://a.jpg').catch((e) => e);
+    expect(err).toBeInstanceOf(StoryUploadError);
+    expect(err.message).toBe('Sem conexão. Confere a internet e tenta de novo.');
   });
 });
 
