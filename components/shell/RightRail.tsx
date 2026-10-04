@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,7 +22,10 @@ export function RightRail() {
   const { members, avatars, loading, error, reload } = useMembers();
   const insets = useSafeAreaInsets();
   const today = useToday();
-  const birthdays = useMemo(() => nextBirthdays(members, today, MAX_BIRTHDAYS), [members, today]);
+  // todos os próximos, em ordem; a coluna mostra os 3 primeiros e "Ver todos" abre o resto ali mesmo
+  const allBirthdays = useMemo(() => nextBirthdays(members, today, Infinity), [members, today]);
+  const [allShown, setAllShown] = useState(false);
+  const birthdays = allShown ? allBirthdays : allBirthdays.slice(0, MAX_BIRTHDAYS);
   const open = (id: string) => router.push(id === myId ? '/profile' : `/user/${id}`);
 
   const row = (state: Parameters<typeof interactiveStyle>[1]) => ({
@@ -125,6 +128,19 @@ export function RightRail() {
               );
             })
           )}
+          {allBirthdays.length > MAX_BIRTHDAYS ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={allShown ? 'Ver menos aniversários' : 'Ver todos os aniversários'}
+              accessibilityState={{ expanded: allShown }}
+              onPress={() => setAllShown((v) => !v)}
+              style={row}
+            >
+              <Text variant="small" style={{ color: t.colors.brand }}>
+                {allShown ? 'Ver menos' : 'Ver todos'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </ScrollView>
