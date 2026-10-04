@@ -1,4 +1,5 @@
 import { createPost, deletePost, listComments, listFeed, toggleLike } from '../lib/api/posts';
+import { clearSignedUrlCache } from '../lib/api/storage';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
 let mockResults: Record<string, unknown> = {};
@@ -63,6 +64,7 @@ jest.mock('../lib/supabase', () => {
 });
 
 beforeEach(() => {
+  clearSignedUrlCache();
   mockCalls.length = 0;
   mockSignCalls.length = 0;
   mockRemoved.length = 0;
