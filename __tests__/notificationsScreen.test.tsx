@@ -27,6 +27,7 @@ const mockSetUnread = jest.fn();
 jest.mock('../lib/notificationsStore', () => ({ setUnreadNotifications: (n: number) => mockSetUnread(n) }));
 
 import NotificationsScreen from '../app/notifications';
+import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
 const ana = { id: 'u2', name: 'Ana', avatarUrl: null };
 const item = (over: Partial<AppNotification>): AppNotification => ({
@@ -88,6 +89,18 @@ describe('Tela de notificações', () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(mockMarkSeen).toHaveBeenCalledTimes(2));
     expect(screen.getAllByTestId('unread-dot')).toHaveLength(2);
+  });
+
+  it('tempo real: com a tela aberta, notificação nova entra sozinha', async () => {
+    mockFetch.mockResolvedValueOnce([item({})]);
+    mockFetch.mockResolvedValueOnce([item({ kind: 'comment', commentId: 'c9', body: 'chegou', unread: true }), item({})]);
+    await open();
+    await screen.findByLabelText(/Ana curtiu seu post/);
+    await act(async () => {
+      emitLive({ kind: 'change', table: 'comments', type: 'INSERT', row: {}, mine: false });
+      await new Promise((r) => setTimeout(r, LIVE_DEBOUNCE_MS + 50));
+    });
+    expect(await screen.findByLabelText(/Ana comentou: “chegou”/)).toBeTruthy();
   });
 
   it('toque leva ao post ou ao perfil', async () => {
