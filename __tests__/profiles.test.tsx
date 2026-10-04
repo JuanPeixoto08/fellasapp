@@ -36,7 +36,6 @@ const profileRow = {
   display_name: 'Ana',
   avatar_url: null,
   bio: 'Oi, sou a Ana',
-  accent_color: 'coral', // coluna antiga, o app ignora
   status: '🎧 ouvindo pagode',
   location: 'Recife',
   birthday: '1999-05-20',
