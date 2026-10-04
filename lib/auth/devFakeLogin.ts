@@ -19,7 +19,7 @@ export const fakeSession = {
     email: FAKE_EMAIL,
     aud: 'authenticated',
     app_metadata: {},
-    user_metadata: {},
+    user_metadata: { has_password: true },
     created_at: new Date(0).toISOString(),
   },
 } as Session;
