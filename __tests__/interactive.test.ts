@@ -20,4 +20,14 @@ describe('CSS global da web', () => {
     const { WEB_CSS } = require('../lib/webStyles');
     expect(WEB_CSS).toContain('#root { height: 100dvh; }');
   });
+
+  it('barra de rolagem fina nas cores do tema, clara e escura', () => {
+    const { WEB_CSS } = require('../lib/webStyles');
+    const { colors } = require('../lib/theme');
+    expect(WEB_CSS).toContain('scrollbar-width: thin');
+    expect(WEB_CSS).toContain(`scrollbar-color: ${colors.light.border} transparent`);
+    expect(WEB_CSS).toMatch(/prefers-color-scheme: dark/);
+    expect(WEB_CSS).toContain(`scrollbar-color: ${colors.dark.border} transparent`);
+    expect(WEB_CSS).toContain('color-scheme: dark');
+  });
 });
