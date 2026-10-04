@@ -6,10 +6,12 @@ import type { AppNotification } from '../lib/notifications';
 const mockPush = jest.fn();
 /** Último callback de foco: chamar de novo simula voltar para a tela. */
 let mockRefocus: () => void = () => {};
+let mockFocused = true;
 jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     useRouter: () => ({ push: mockPush }),
+    useIsFocused: () => mockFocused,
     useFocusEffect: (cb: () => void) => {
       mockRefocus = cb;
       useEffect(cb, [cb]);
@@ -56,6 +58,7 @@ async function open() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockFocused = true;
   mockMarkSeen.mockResolvedValue(undefined);
 });
 
@@ -101,6 +104,43 @@ describe('Tela de notificações', () => {
       await new Promise((r) => setTimeout(r, LIVE_DEBOUNCE_MS + 50));
     });
     expect(await screen.findByLabelText(/Ana comentou: “chegou”/)).toBeTruthy();
+  });
+
+  it('escondida atrás de um post aberto, não recarrega nem marca como visto', async () => {
+    mockFetch.mockResolvedValue([item({})]);
+    const view = await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <NotificationsScreen />
+      </SafeAreaProvider>,
+    );
+    await screen.findByLabelText(/Ana curtiu seu post/);
+    await waitFor(() => expect(mockMarkSeen).toHaveBeenCalledTimes(1));
+    mockFocused = false;
+    await view.rerender(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <NotificationsScreen />
+      </SafeAreaProvider>,
+    );
+    await act(async () => {
+      emitLive({ kind: 'change', table: 'likes', type: 'INSERT', row: {}, mine: false });
+      await new Promise((r) => setTimeout(r, LIVE_DEBOUNCE_MS + 50));
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockMarkSeen).toHaveBeenCalledTimes(1);
+  });
+
+  it('lista vazia: o que chega ao vivo não pisca o carregando', async () => {
+    mockFetch.mockResolvedValueOnce([]);
+    await open();
+    await screen.findByText('Nada por aqui ainda.');
+    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    await act(async () => {
+      emitLive({ kind: 'change', table: 'likes', type: 'INSERT', row: {}, mine: false });
+      await new Promise((r) => setTimeout(r, LIVE_DEBOUNCE_MS + 50));
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByLabelText('Carregando notificações')).toBeNull();
+    expect(screen.getByText('Nada por aqui ainda.')).toBeTruthy();
   });
 
   it('toque leva ao post ou ao perfil', async () => {
