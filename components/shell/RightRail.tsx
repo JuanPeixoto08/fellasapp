@@ -8,6 +8,7 @@ import { useSession } from '../../lib/auth/SessionProvider';
 import { nextBirthdays } from '../../lib/birthdays';
 import { useTheme } from '../../lib/theme';
 import { useMembers } from '../../lib/useMembers';
+import { useToday } from '../../lib/useToday';
 import { Avatar, Button, Heading, Icon, interactiveStyle, Text } from '../ui';
 
 const MAX_MEMBERS = 8;
@@ -20,7 +21,8 @@ export function RightRail() {
   const myId = useSession().session?.user.id;
   const { members, avatars, loading, error, reload } = useMembers();
   const insets = useSafeAreaInsets();
-  const birthdays = useMemo(() => nextBirthdays(members, new Date(), MAX_BIRTHDAYS), [members]);
+  const today = useToday();
+  const birthdays = useMemo(() => nextBirthdays(members, today, MAX_BIRTHDAYS), [members, today]);
   const open = (id: string) => router.push(id === myId ? '/profile' : `/user/${id}`);
 
   const row = (state: Parameters<typeof interactiveStyle>[1]) => ({

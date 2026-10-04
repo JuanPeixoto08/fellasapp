@@ -1,5 +1,5 @@
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { Stack, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { Divider, EmptyState, Screen } from '../components/ui';
 import { fetchNotifications, markNotificationsSeen } from '../lib/api/notifications';
 import type { AppNotification } from '../lib/notifications';
 import { setUnreadNotifications } from '../lib/notificationsStore';
+import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../lib/realtime';
 import { useTheme } from '../lib/theme';
 
 export default function NotificationsScreen() {
@@ -22,10 +23,13 @@ export default function NotificationsScreen() {
   // chaves que chegaram como novas nesta visita: abrir uma notificação e voltar não apaga o destaque das outras
   const newThisVisit = useRef(new Set<string>());
 
-  /** Busca, mostra (as novas já vêm marcadas) e só então marca tudo como visto. */
-  const load = useCallback(async (pull = false) => {
-    if (pull) setRefreshing(true);
-    else setLoading(true);
+  /**
+   * Busca, mostra (as novas já vêm marcadas) e só então marca tudo como visto.
+   * `silent` (ao vivo): sem carregando e, se falhar, fica a lista que já está na tela.
+   */
+  const load = useCallback(async (mode: 'show' | 'pull' | 'silent' = 'show') => {
+    if (mode === 'pull') setRefreshing(true);
+    else if (mode === 'show') setLoading(true);
     try {
       const list = await fetchNotifications();
       for (const n of list) if (n.unread) newThisVisit.current.add(n.key);
@@ -34,12 +38,27 @@ export default function NotificationsScreen() {
       await markNotificationsSeen().catch(() => {});
       setUnreadNotifications(0);
     } catch {
-      setError(true);
+      if (mode !== 'silent') setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
+
+  // tempo real: com a tela à vista, o que chega entra sozinho. Escondida atrás de um post aberto daqui
+  // ela não recarrega (nem marcaria como visto o que a pessoa ainda não viu); ao voltar, o foco recarrega.
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (!focused) return;
+    const live = debounce(() => void load('silent'), LIVE_DEBOUNCE_MS);
+    const off = onLive((event) => {
+      if (affectsNotifications(event)) live();
+    });
+    return () => {
+      live.cancel();
+      off();
+    };
+  }, [focused, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,7 +95,7 @@ export default function NotificationsScreen() {
         ItemSeparatorComponent={Divider}
         contentContainerStyle={{ paddingBottom: t.spacing.lg + insets.bottom }}
         refreshing={refreshing}
-        onRefresh={() => void load(true)}
+        onRefresh={() => void load('pull')}
         ListEmptyComponent={
           <EmptyState
             title="Nada por aqui ainda."

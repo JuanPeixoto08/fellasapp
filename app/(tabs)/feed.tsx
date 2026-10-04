@@ -1,13 +1,16 @@
 import { useRouter } from 'expo-router';
+import { useRef } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { Composer } from '../../components/feed/Composer';
+import { NewPostsPill } from '../../components/feed/NewPostsPill';
 import { NotificationsBell } from '../../components/notifications/NotificationsBell';
 import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { useLayoutTier } from '../../lib/layout';
 import { useTheme } from '../../lib/theme';
+import type { FeedPost } from '../../lib/api/posts';
 import { removePost, usePostList } from '../../lib/usePostList';
 
 export default function FeedScreen() {
@@ -16,11 +19,14 @@ export default function FeedScreen() {
   const { session } = useSession();
   const me = session?.user.id;
   const tier = useLayoutTier();
-  const { posts, loading, refreshing, error, refresh, reload, loadMore, like, react } = usePostList();
+  const { posts, newPosts, showNewPosts, loading, refreshing, error, refresh, reload, loadMore, like, react } =
+    usePostList();
+  const list = useRef<FlatList<FeedPost>>(null);
 
   return (
     <Screen flush>
       <FlatList
+        ref={list}
         data={posts}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ paddingBottom: t.spacing.xl }}
@@ -97,6 +103,13 @@ export default function FeedScreen() {
             />
           ) : null
         }
+      />
+      <NewPostsPill
+        count={newPosts}
+        onPress={() => {
+          showNewPosts();
+          list.current?.scrollToOffset({ offset: 0, animated: true });
+        }}
       />
     </Screen>
   );
