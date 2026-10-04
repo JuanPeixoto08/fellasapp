@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 injectWebStyles();
 
+import { AppShell } from '../components/shell/AppShell';
 import { AuthGuard } from '../lib/auth/AuthGuard';
 import { SessionProvider } from '../lib/auth/SessionProvider';
 import { injectWebStyles } from '../lib/webStyles';
@@ -36,15 +37,17 @@ export default function RootLayout() {
     <SessionProvider>
       <StatusBar style="auto" />
       <AuthGuard>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(auth)/login" />
-          <Stack.Screen name="not-invited" />
-          <Stack.Screen name="set-password" />
-          <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
-          <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
-          <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
-        </Stack>
+        <AppShell>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(auth)/login" />
+            <Stack.Screen name="not-invited" />
+            <Stack.Screen name="set-password" />
+            <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
+            <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
+            <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
+          </Stack>
+        </AppShell>
       </AuthGuard>
     </SessionProvider>
   );

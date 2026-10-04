@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import NewPostScreen from '../app/(tabs)/new';
 import { createPost } from '../lib/api/posts';
+import { clearDraft } from '../lib/composerDraft';
 
 const mockNavigate = jest.fn();
 const mockPick = jest.fn();
@@ -30,6 +31,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 beforeEach(() => {
+  clearDraft();
   mockNavigate.mockClear();
   mockPick.mockReset();
   createPostMock.mockClear();

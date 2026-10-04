@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
@@ -251,4 +252,21 @@ describe('ProfileView', () => {
     await screen.findByText('@ana_01');
     expect(screen.queryByLabelText('Apagar post')).toBeNull();
   });
+  it('grade de fotos usa a largura da coluna (moldura), não a da janela', async () => {
+    const { ShellContext } = require('../components/shell/ShellContext');
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 1440, height: 900 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
+      >
+        <ShellContext.Provider value={{ contentWidth: 600, openCompose: null }}>
+          <ProfileView userId="u1" />
+        </ShellContext.Provider>
+      </SafeAreaProvider>,
+    );
+    await fireEvent.press(await screen.findByText('Fotos'));
+    // (600 - 2*16 - 2*4) / 3 = 186
+    const style = StyleSheet.flatten(screen.getByTestId('post-tile').props.style);
+    expect(style).toMatchObject({ width: 186, height: 186 });
+  });
 });
+
