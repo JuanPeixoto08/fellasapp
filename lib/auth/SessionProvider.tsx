@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import * as authApi from '../api/auth';
 import type { Profile } from '../api/auth';
+import { useClearDraftOnUserChange } from '../composerDraft';
 import { DEV_FAKE_LOGIN, fakeProfile, fakeSession } from './devFakeLogin';
 
 type SessionContextValue = {
@@ -56,6 +57,7 @@ function RealSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const userId = session?.user.id;
+  useClearDraftOnUserChange(userId);
   useEffect(() => {
     if (!userId) {
       setProfile(null);
