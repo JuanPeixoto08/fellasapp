@@ -6,6 +6,7 @@ export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Icon, type IconName, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { interactiveStyle } from './interactive';
 export { Logo, type LogoProps } from './Logo';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { Screen, type ScreenProps } from './Screen';

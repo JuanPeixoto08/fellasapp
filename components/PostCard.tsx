@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
@@ -30,6 +30,7 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
   const t = useTheme();
   const [picking, setPicking] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const react = (emoji: string) => onReact?.(post, nextReaction(post.myReaction, emoji));
   const name = post.author.display_name || post.author.username;
   const date = shortDate(post.createdAt);
@@ -41,12 +42,18 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
 
   return (
     <View
+      testID="post-row"
+      // hover só na web: no RN 0.86 o toque também dispara pointerenter/leave e a linha piscaria no celular
+      {...(Platform.OS === 'web'
+        ? { onPointerEnter: () => setHovered(true), onPointerLeave: () => setHovered(false) }
+        : null)}
       style={{
         flexDirection: 'row',
         gap: t.spacing.md,
         paddingHorizontal: t.layout.gutter,
         paddingTop: t.spacing.md,
         paddingBottom: t.spacing.xs,
+        backgroundColor: hovered ? t.colors.surfaceSunken : 'transparent',
       }}
     >
       <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />

@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { FeedPost } from '../lib/api/posts';
@@ -13,6 +13,7 @@ import { onPostDeleted } from '../lib/postEvents';
 import { useTheme } from '../lib/theme';
 import { removePost, usePostList } from '../lib/usePostList';
 import { PostCard } from './PostCard';
+import { useContentWidth } from './shell/ShellContext';
 import { PostTile } from './profile/PostTile';
 import { ProfileHeader } from './profile/ProfileHeader';
 import { ProfileStats } from './profile/ProfileStats';
@@ -180,11 +181,11 @@ export function ProfileContent({
   onDelete,
 }: ContentProps) {
   const t = useTheme();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const contentWidth = useContentWidth();
   const name = profile.display_name || profile.username;
   const photosTab = tab === 'photos';
-  const content = Math.min(width, t.layout.maxContentWidth) - t.layout.gutter * 2;
+  const content = contentWidth - t.layout.gutter * 2;
   const tile = Math.floor((content - t.spacing.xs * (COLUMNS - 1)) / COLUMNS);
 
   const empty = (() => {
