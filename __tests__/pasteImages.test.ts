@@ -15,6 +15,12 @@ describe('imagesFromPaste', () => {
     expect(preventDefault).toHaveBeenCalled();
   });
 
+  it('texto do Word/Excel (vem com imagem junto) cola como texto', () => {
+    const { event, preventDefault } = pasteEvent([item('string', 'text/plain'), item('file', 'image/png')]);
+    expect(imagesFromPaste(event)).toEqual([]);
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
   it('texto colado segue normal', () => {
     const { event, preventDefault } = pasteEvent([item('string', 'text/plain')]);
     expect(imagesFromPaste(event)).toEqual([]);

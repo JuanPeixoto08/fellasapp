@@ -12,6 +12,8 @@ type PasteLike = {
  */
 export function imagesFromPaste(event: PasteLike): File[] {
   const items = Array.from(event.clipboardData?.items ?? []);
+  // Word/Excel/OneNote copiam o texto E uma imagem dele: aí a pessoa quer o texto
+  if (items.some((it) => it.kind === 'string' && it.type === 'text/plain')) return [];
   const files = items
     .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
     .map((it) => it.getAsFile())
