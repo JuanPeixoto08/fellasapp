@@ -26,10 +26,11 @@ npx expo start         # depois: i (iOS), a (Android) ou w (web)
 
 ## Deploy web no Cloudflare Pages
 
-O build web é um SPA estático (`web.output: "single"`) e pode ser instalado como PWA no iPhone.
+No ar em **https://fellasapp.pages.dev**. O build web é um SPA estático (`web.output: "single"`) e pode ser instalado como PWA (iPhone: Safari → Adicionar à Tela de Início).
 
-1. No Cloudflare Pages, crie um projeto conectado ao repositório.
-2. **Build command:** `npm run build:web` (ou `npx expo export -p web`)
-3. **Build output directory:** `dist`
-4. Em *Environment variables*, defina `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-5. `public/_redirects` (`/* /index.html 200`) é copiado para `dist/` e faz o fallback de SPA para o roteamento.
+- Projeto Pages `fellasapp` (upload direto, não ligado ao Git). Cada push no `main` publica pelo workflow `.github/workflows/deploy-web.yml` (typecheck + testes + build + `wrangler pages deploy`).
+- Segredos do repositório no GitHub: `CLOUDFLARE_API_TOKEN` (Account · Cloudflare Pages · Edit), `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Publicar na mão: `npm run build:web` e `npx wrangler pages deploy dist --project-name fellasapp --branch main`.
+- `npm run build:web` roda `scripts/fix-web-export.mjs` depois do `expo export`: o Pages ignora pastas `node_modules`, onde o Expo põe fontes e ícones; o script as move para `assets/vendor`.
+- `public/_redirects` (`/* /index.html 200`) é copiado para `dist/` e faz o fallback de SPA para o roteamento.
+- No Supabase, *Authentication → URL Configuration → Site URL* = `https://fellasapp.pages.dev`.
