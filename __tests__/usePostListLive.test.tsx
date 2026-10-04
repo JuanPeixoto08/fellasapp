@@ -108,6 +108,34 @@ describe('usePostList ao vivo', () => {
     expect(result.current.posts.find((p) => p.id === 'p2')?.likeCount).toBe(3);
   });
 
+  it('curtida minha ainda indo para o servidor não é desfeita por atualização ao vivo', async () => {
+    const { result } = await feed();
+    let finishLike: (v: boolean) => void = () => {};
+    const { toggleLike } = jest.requireMock('../lib/api/posts') as { toggleLike: jest.Mock };
+    toggleLike.mockReturnValue(new Promise<boolean>((r) => (finishLike = r)));
+    // o servidor ainda não tem a minha curtida
+    mockGetPost.mockResolvedValue(post('p1', { likeCount: 1, likedByMe: false }));
+    let liking: Promise<void> = Promise.resolve();
+    await act(async () => {
+      liking = result.current.like(result.current.posts[0]);
+    });
+    expect(result.current.posts[0].likedByMe).toBe(true);
+    await act(async () => {
+      change('likes', 'INSERT', { post_id: 'p1', user_id: 'bia' });
+    });
+    await settle();
+    expect(result.current.posts[0].likedByMe).toBe(true);
+    // a curtida chegou: agora busca a verdade do servidor (com a minha curtida e a da Bia)
+    mockGetPost.mockResolvedValue(post('p1', { likeCount: 2, likedByMe: true }));
+    await act(async () => {
+      finishLike(true);
+      await liking;
+    });
+    await settle();
+    await waitFor(() => expect(result.current.posts[0].likeCount).toBe(2));
+    expect(result.current.posts[0].likedByMe).toBe(true);
+  });
+
   it('minha própria curtida não busca de novo (a tela já atualizou na hora)', async () => {
     await feed();
     await act(async () => {

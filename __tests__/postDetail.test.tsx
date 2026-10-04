@@ -236,6 +236,26 @@ describe('PostDetailScreen ao vivo', () => {
     expect(getPostMock).toHaveBeenCalledTimes(3);
   });
 
+  it('curtida minha ainda indo para o servidor não é desfeita pela atualização ao vivo', async () => {
+    await renderLoaded();
+    let finishLike: (v: boolean) => void = () => {};
+    toggleLikeMock.mockReturnValue(new Promise<boolean>((r) => (finishLike = r)));
+    // sem await: o toque só termina quando a curtida chegar ao servidor (de propósito, lá embaixo)
+    void fireEvent.press(screen.getByLabelText('Curtir'));
+    await waitFor(() => expect(screen.getByLabelText('Descurtir')).toBeTruthy());
+    await change('comments', 'INSERT', { id: 'c2', post_id: 'p1', author_id: 'u2' });
+    await settle();
+    // o servidor ainda não tem a curtida: a tela não pode voltar para Curtir
+    expect(screen.getByLabelText('Descurtir')).toBeTruthy();
+    expect(getPostMock).toHaveBeenCalledTimes(1);
+    getPostMock.mockResolvedValueOnce({ ...(await getPostMock.mock.results[0].value), likedByMe: true, likeCount: 1 });
+    await act(async () => {
+      finishLike(true);
+    });
+    await waitFor(() => expect(getPostMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText('Descurtir')).toBeTruthy();
+  });
+
   it('o que é de outro post, ou meu, não recarrega', async () => {
     await renderLoaded();
     await change('comments', 'INSERT', { id: 'c3', post_id: 'p2', author_id: 'u2' });
