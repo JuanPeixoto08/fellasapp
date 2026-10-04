@@ -251,6 +251,24 @@ export type Database = {
           },
         ];
       };
+      stories: {
+        Row: { id: string; author_id: string; kind: string; media_url: string; duration_ms: number; created_at: string };
+        Insert: { id?: string; author_id: string; kind: string; media_url: string; duration_ms: number; created_at?: string };
+        Update: { id?: string; author_id?: string; kind?: string; media_url?: string; duration_ms?: number; created_at?: string };
+        Relationships: [];
+      };
+      story_views: {
+        Row: { story_id: string; viewer_id: string; viewed_at: string };
+        Insert: { story_id: string; viewer_id: string; viewed_at?: string };
+        Update: { story_id?: string; viewer_id?: string; viewed_at?: string };
+        Relationships: [];
+      };
+      story_reactions: {
+        Row: { story_id: string; user_id: string; emoji: string; created_at: string };
+        Insert: { story_id: string; user_id: string; emoji: string; created_at?: string };
+        Update: { story_id?: string; user_id?: string; emoji?: string; created_at?: string };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -264,6 +282,7 @@ export type Database = {
           kind: string;
           post_id: string | null;
           comment_id: string | null;
+          story_id: string | null;
           actor_ids: string[];
           actor_count: number;
           emojis: string[];
