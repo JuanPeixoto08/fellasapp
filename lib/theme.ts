@@ -14,6 +14,8 @@ export type Colors = {
   accent: string;
   onAccent: string;
   brand: string;
+  /** Texto sobre `brand` (bolinha de notificações). */
+  onBrand: string;
   /** Coração curtido: vermelho próprio, diferente do `danger`. */
   like: string;
   danger: string;
@@ -39,6 +41,7 @@ export const colors: Record<ColorScheme, Colors> = {
     accent: '#2E2B26',
     onAccent: '#F4F1EA',
     brand: '#5B3FD9',
+    onBrand: '#FFFFFF',
     like: '#C81E3A',
     danger: '#B3261E',
     onDanger: '#FFFFFF',
@@ -59,6 +62,7 @@ export const colors: Record<ColorScheme, Colors> = {
     accent: '#E0DCD3',
     onAccent: '#121212',
     brand: '#B8A2FF',
+    onBrand: '#121212',
     like: '#FF5A6E',
     danger: '#FF8A80',
     onDanger: '#121212',
@@ -133,6 +137,8 @@ export const layout = {
   maxDialogWidth: 400,
   /** Altura visual do chip de reação; o toque completa os 44 com hitSlop. */
   chipHeight: 28,
+  /** Altura (e largura mínima) da bolinha de contagem. */
+  badgeSize: 18,
   /** Fresta entre fotos de um mesmo post. */
   mediaGap: 2,
   /** Altura da marca FELLAS: lateral estreita (xs), topo do feed (sm), login/carregamento (lg). */
