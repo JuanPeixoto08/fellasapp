@@ -9,6 +9,9 @@ export type Post = Database['public']['Tables']['posts']['Row'];
 // de até 29 caracteres, então um limite menor aqui travava o "Salvar" de quem nunca mexeu no usuário.
 const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
+/** Tamanho máximo do nome e da bio (mesmo limite dos checks em 0006_profile_limits.sql). */
+export const PROFILE_LIMITS = { displayName: 50, bio: 160 } as const;
+
 export function validateUsername(username: string): string | null {
   if (!USERNAME_RE.test(username)) {
     return 'O usuário precisa ter de 3 a 30 caracteres: letras minúsculas, números e _';
@@ -87,12 +90,18 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   const username = input.username.trim().toLowerCase();
   const invalid = validateUsername(username);
   if (invalid) throw new Error(invalid);
+  const displayName = input.display_name.trim();
+  const bio = input.bio.trim();
+  if (displayName.length > PROFILE_LIMITS.displayName) {
+    throw new Error(`O nome pode ter até ${PROFILE_LIMITS.displayName} caracteres.`);
+  }
+  if (bio.length > PROFILE_LIMITS.bio) throw new Error(`A bio pode ter até ${PROFILE_LIMITS.bio} caracteres.`);
 
   const userId = await getCurrentUserId();
   const fields: Database['public']['Tables']['profiles']['Update'] = {
-    display_name: input.display_name.trim(),
+    display_name: displayName,
     username,
-    bio: input.bio.trim(),
+    bio,
   };
 
   if (input.accent_color !== undefined) fields.accent_color = emptyToNull(input.accent_color);

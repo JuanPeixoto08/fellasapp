@@ -44,3 +44,14 @@ describe('Editar perfil: aniversário', () => {
     expect(updateMyProfile).not.toHaveBeenCalled();
   });
 });
+
+describe('Editar perfil: limites', () => {
+  it('nome até 50 e bio até 160 com contador', async () => {
+    await renderScreen();
+    expect(screen.getByLabelText('Nome').props.maxLength).toBe(50);
+    expect(screen.getByLabelText('Bio').props.maxLength).toBe(160);
+    expect(screen.getByText('0/160')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('Bio'), 'oi fellas');
+    expect(screen.getByText('9/160')).toBeTruthy();
+  });
+});

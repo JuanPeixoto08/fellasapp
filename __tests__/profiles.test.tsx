@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
-import { formatBirthday, maskBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
+import { PROFILE_LIMITS, formatBirthday, maskBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
 
 const mockPush = jest.fn();
 const mockUsePostList = jest.fn();
@@ -162,6 +162,20 @@ describe('updateMyProfile', () => {
     await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'file://a.png' });
     expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/avatar-\d+\.png$/);
     expect(mockUpdate.mock.calls[0][0].avatar_url).toBe(mockUpload.mock.calls[0][0]);
+  });
+
+  it('rejeita nome acima de 50 e bio acima de 160 sem chamar o banco', async () => {
+    expect(PROFILE_LIMITS).toEqual({ displayName: 50, bio: 160 });
+    await expect(updateMyProfile({ display_name: 'a'.repeat(51), username: 'ana_01', bio: '' })).rejects.toThrow(
+      'O nome pode ter até 50 caracteres.',
+    );
+    await expect(updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: 'b'.repeat(161) })).rejects.toThrow(
+      'A bio pode ter até 160 caracteres.',
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+    // no limite (depois de tirar espaços) passa
+    await updateMyProfile({ display_name: ` ${'a'.repeat(50)} `, username: 'ana_01', bio: 'b'.repeat(160) });
+    expect(mockUpdate).toHaveBeenCalled();
   });
 
   it('rejeita username inválido sem chamar o banco', async () => {
