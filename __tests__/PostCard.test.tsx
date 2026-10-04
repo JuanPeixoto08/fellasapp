@@ -49,6 +49,15 @@ describe('PostCard like state', () => {
   });
 });
 
+describe('PostCard hover', () => {
+  it('no celular não registra eventos de ponteiro (toque não pode acender a linha do post)', async () => {
+    await render(<PostCard post={post} />);
+    const row = screen.getByTestId('post-row');
+    expect(row.props.onPointerEnter).toBeUndefined();
+    expect(row.props.onPointerLeave).toBeUndefined();
+  });
+});
+
 describe('PostCard layout', () => {
   it('shows the date next to the name', async () => {
     await render(<PostCard post={{ ...post, createdAt: '2025-02-07T12:00:00Z' }} />);

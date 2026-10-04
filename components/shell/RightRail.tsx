@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { resolveUrl } from '../../lib/api/storage';
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -18,6 +19,7 @@ export function RightRail() {
   const router = useRouter();
   const myId = useSession().session?.user.id;
   const { members, avatars, loading, error, reload } = useMembers();
+  const insets = useSafeAreaInsets();
   const birthdays = useMemo(() => nextBirthdays(members, new Date(), MAX_BIRTHDAYS), [members]);
   const open = (id: string) => router.push(id === myId ? '/profile' : `/user/${id}`);
 
@@ -33,8 +35,15 @@ export function RightRail() {
 
   return (
     <ScrollView
+      testID="right-rail"
       style={{ width: t.layout.railWidth, flexGrow: 0 }}
-      contentContainerStyle={{ padding: t.spacing.lg, gap: t.spacing.xl }}
+      contentContainerStyle={{
+        padding: t.spacing.lg,
+        // iPad/tablet: desvia da barra de status e do indicador de home
+        paddingTop: insets.top + t.spacing.lg,
+        paddingBottom: insets.bottom + t.spacing.lg,
+        gap: t.spacing.xl,
+      }}
     >
       <View style={{ gap: t.spacing.xs }}>
         <Heading level={3}>Os fellas</Heading>
