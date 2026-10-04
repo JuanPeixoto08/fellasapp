@@ -19,6 +19,8 @@ function kindIcon(t: Theme, kind: NotificationKind): { name: IconName; color?: s
       return { name: 'gift-outline' };
     case 'new_member':
       return { name: 'person-add-outline' };
+    case 'mention':
+      return { name: 'at-outline' };
   }
 }
 

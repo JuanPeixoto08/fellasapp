@@ -101,7 +101,7 @@ describe('NotificationsSync', () => {
     expect(mockFetchUnread).toHaveBeenCalledTimes(2);
     await act(async () => {
       change('likes', true); // eu mesmo
-      change('posts'); // post novo não é notificação
+      change('posts', true); // post meu
       change('profiles', false, 'UPDATE'); // alguém mexeu no perfil
       jest.advanceTimersByTime(LIVE_DEBOUNCE_MS);
     });
