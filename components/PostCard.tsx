@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
@@ -42,8 +42,11 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
 
   return (
     <View
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
+      testID="post-row"
+      // hover só na web: no RN 0.86 o toque também dispara pointerenter/leave e a linha piscaria no celular
+      {...(Platform.OS === 'web'
+        ? { onPointerEnter: () => setHovered(true), onPointerLeave: () => setHovered(false) }
+        : null)}
       style={{
         flexDirection: 'row',
         gap: t.spacing.md,

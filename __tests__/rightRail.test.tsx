@@ -1,5 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import type { ReactNode } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { RightRail } from '../components/shell/RightRail';
 
 const mockPush = jest.fn();
@@ -17,6 +21,14 @@ const member = (id: string, name: string, birthday: string | null = null) => ({
   birthday,
 });
 
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <SafeAreaProvider
+    initialMetrics={{ frame: { x: 0, y: 0, width: 1024, height: 768 }, insets: { top: 24, left: 0, right: 0, bottom: 20 } }}
+  >
+    {children}
+  </SafeAreaProvider>
+);
+
 beforeEach(() => {
   mockPush.mockClear();
   mockReload.mockClear();
@@ -26,7 +38,7 @@ beforeEach(() => {
 describe('RightRail', () => {
   it('lista até 8 fellas, abre perfil (o meu vai para /profile) e tem "Ver todos"', async () => {
     mockState.members = [member('me', 'Juan'), ...Array.from({ length: 9 }, (_, i) => member(`u${i}`, `Fella${i}`))];
-    await render(<RightRail />);
+    await render(<RightRail />, { wrapper: Wrapper });
     expect(screen.getAllByLabelText(/^Ver perfil de /)).toHaveLength(8);
     await fireEvent.press(screen.getByLabelText('Ver perfil de Juan'));
     expect(mockPush).toHaveBeenLastCalledWith('/profile');
@@ -38,7 +50,7 @@ describe('RightRail', () => {
 
   it('mostra próximos aniversários ou o convite quando ninguém preencheu', async () => {
     mockState.members = [member('a', 'Bia')];
-    await render(<RightRail />);
+    await render(<RightRail />, { wrapper: Wrapper });
     expect(screen.getByText(/Ninguém pôs o aniversário ainda/)).toBeTruthy();
   });
 
@@ -46,13 +58,19 @@ describe('RightRail', () => {
     const d = new Date();
     const iso = `2000-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     mockState.members = [member('a', 'Bia', iso)];
-    await render(<RightRail />);
+    await render(<RightRail />, { wrapper: Wrapper });
     expect(screen.getByLabelText('Aniversário de Bia: Hoje')).toBeTruthy();
+  });
+
+  it('respeita a área segura do iPad no topo e no pé', async () => {
+    await render(<RightRail />, { wrapper: Wrapper });
+    const style = StyleSheet.flatten(screen.getByTestId('right-rail').props.contentContainerStyle);
+    expect(style).toMatchObject({ paddingTop: 24 + 16, paddingBottom: 20 + 16 });
   });
 
   it('erro: avisa e deixa tentar de novo', async () => {
     mockState.error = 'x';
-    await render(<RightRail />);
+    await render(<RightRail />, { wrapper: Wrapper });
     expect(screen.getByText('Não deu pra carregar os fellas.')).toBeTruthy();
     await fireEvent.press(screen.getByText('Tentar de novo'));
     expect(mockReload).toHaveBeenCalled();

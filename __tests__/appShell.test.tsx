@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppShell, shellVisible } from '../components/shell/AppShell';
 
@@ -33,9 +34,11 @@ beforeEach(() => {
 
 const renderShell = () =>
   render(
-    <AppShell>
-      <Text>conteudo</Text>
-    </AppShell>,
+    <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 1440, height: 900 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+      <AppShell>
+        <Text>conteudo</Text>
+      </AppShell>
+    </SafeAreaProvider>,
   );
 
 describe('shellVisible', () => {

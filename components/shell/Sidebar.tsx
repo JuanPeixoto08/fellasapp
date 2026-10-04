@@ -1,5 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../../lib/auth/SessionProvider';
 import type { LayoutTier } from '../../lib/layout';
@@ -33,6 +34,8 @@ export function Sidebar({ tier, onCompose }: Props) {
   const me = useMyAvatar();
   const { profile } = useSession();
   const expanded = tier === 'expanded';
+  // iPad/tablet: a lateral vai do topo ao pé da tela, então desvia da barra de status e do indicador de home
+  const insets = useSafeAreaInsets();
 
   return (
     <View
@@ -41,7 +44,8 @@ export function Sidebar({ tier, onCompose }: Props) {
       style={{
         width: t.layout.sidebarWidth[tier],
         paddingHorizontal: expanded ? t.spacing.md : t.spacing.sm,
-        paddingVertical: t.spacing.lg,
+        paddingTop: insets.top + t.spacing.lg,
+        paddingBottom: insets.bottom + t.spacing.lg,
         gap: t.spacing.xs,
         alignItems: expanded ? 'stretch' : 'center',
       }}
