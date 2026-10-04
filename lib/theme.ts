@@ -157,14 +157,22 @@ export const avatarSizes = { sm: 32, md: 40, lg: 56, xl: 88 } as const;
 export const layout = {
   /** Largura máxima do conteúdo na web/tablet. */
   maxContentWidth: 640,
+  /** Faixas de largura (px): abaixo de `medium` é celular em pé (tab bar). */
+  breakpoints: { medium: 700, expanded: 1100 },
+  /** Coluna central nas faixas medium/expanded. */
+  centerWidth: 600,
+  /** Barra lateral: só ícones (medium) ou ícone + nome (expanded). */
+  sidebarWidth: { medium: 72, expanded: 260 },
+  /** Coluna da direita (só expanded). */
+  railWidth: 350,
   /** Largura máxima de diálogos (confirmação). */
   maxDialogWidth: 400,
   /** Altura visual do chip de reação; o toque completa os 44 com hitSlop. */
   chipHeight: 28,
   /** Fresta entre fotos de um mesmo post. */
   mediaGap: 2,
-  /** Altura da marca FELLAS: topo do feed (sm) e tela de carregamento (lg). */
-  logoHeight: { sm: 24, lg: 44 },
+  /** Altura da marca FELLAS: lateral estreita (xs), topo do feed (sm), login/carregamento (lg). */
+  logoHeight: { xs: 10, sm: 24, lg: 44 },
   /** Altura das folhas que sobem de baixo (seletor de emoji), como fração da tela. */
   sheetHeightRatio: 0.75,
   /** Proporções (largura/altura) das fotos no post: 1 foto fica entre min e max; 2+ usam grid. */
