@@ -31,11 +31,12 @@ export function NotificationRow({ item, onPress }: Props) {
   const t = useTheme();
   const who = item.actors[0];
   const icon = kindIcon(t, item.kind);
-  const date = postTime(item.latestAt);
+  // aniversário: o texto já diz "hoje" (o horário seria a meia-noite, "há 15 h")
+  const date = item.kind === 'birthday' ? null : postTime(item.latestAt);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${notificationText(item)}. ${date}`}
+      accessibilityLabel={date ? `${notificationText(item)}. ${date}` : notificationText(item)}
       onPress={() => onPress(item)}
       style={(state) => ({
         flexDirection: 'row',
@@ -83,9 +84,11 @@ export function NotificationRow({ item, onPress }: Props) {
             </Text>
           ))}
         </Text>
-        <Text variant="small" tone="muted">
-          {date}
-        </Text>
+        {date ? (
+          <Text variant="small" tone="muted">
+            {date}
+          </Text>
+        ) : null}
       </View>
       {item.thumbUrl ? (
         <Image
