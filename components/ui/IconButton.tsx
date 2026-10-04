@@ -14,7 +14,8 @@ export type IconButtonProps = {
    * solid = círculo cheio em tinta (ação principal compacta, ex.: enviar comentário).
    */
   variant?: 'outline' | 'ghost' | 'solid';
-  tone?: 'default' | 'muted' | 'danger';
+  /** onOverlay: claro, sobre foto/vídeo (visualizador, stories). */
+  tone?: 'default' | 'muted' | 'danger' | 'onOverlay';
   size?: IconSize;
   disabled?: boolean;
 };
@@ -55,7 +56,15 @@ export function IconButton({
         name={icon}
         size={size}
         tone={tone === 'muted' ? 'muted' : 'default'}
-        color={solid ? t.colors.onPrimary : tone === 'danger' ? t.colors.danger : undefined}
+        color={
+          solid
+            ? t.colors.onPrimary
+            : tone === 'danger'
+              ? t.colors.danger
+              : tone === 'onOverlay'
+                ? t.colors.onOverlay
+                : undefined
+        }
       />
     </Pressable>
   );

@@ -15,6 +15,7 @@ injectWebStyles();
 
 import { NotificationsSync } from '../components/notifications/NotificationsSync';
 import { EmojiPickerHost } from '../components/reactions/EmojiPickerHost';
+import { StoryViewerHost } from '../components/stories/StoryViewerHost';
 import { MemberDirectorySync } from '../components/realtime/MemberDirectorySync';
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
 import { AppShell } from '../components/shell/AppShell';
@@ -57,6 +58,7 @@ export default function RootLayout() {
           </Stack>
         </AppShell>
         <EmojiPickerHost />
+        <StoryViewerHost />
       </AuthGuard>
     </SessionProvider>
   );
