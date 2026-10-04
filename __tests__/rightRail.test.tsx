@@ -62,6 +62,31 @@ describe('RightRail', () => {
     expect(screen.getByLabelText('Aniversário de Bia: Hoje')).toBeTruthy();
   });
 
+  it('mais de 3 aniversários: mostra os 3 próximos e "Ver todos" abre a lista inteira', async () => {
+    const iso = (daysAhead: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + daysAhead);
+      return `2000-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    mockState.members = ['Ana', 'Bia', 'Caio', 'Duda', 'Edu'].map((name, i) => member(`u${i}`, name, iso(i * 10)));
+    await render(<RightRail />, { wrapper: Wrapper });
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(3);
+    expect(screen.queryByLabelText(/^Aniversário de Edu/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Ver todos os aniversários'));
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(5);
+    expect(screen.getByLabelText(/^Aniversário de Edu/)).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Ver menos aniversários'));
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(3);
+  });
+
+  it('até 3 aniversários: sem "Ver todos"', async () => {
+    const d = new Date();
+    const iso = `2000-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    mockState.members = [member('a', 'Bia', iso), member('b', 'Caio', iso)];
+    await render(<RightRail />, { wrapper: Wrapper });
+    expect(screen.queryByLabelText('Ver todos os aniversários')).toBeNull();
+  });
+
   it('respeita a área segura do iPad no topo e no pé', async () => {
     await render(<RightRail />, { wrapper: Wrapper });
     const style = StyleSheet.flatten(screen.getByTestId('right-rail').props.contentContainerStyle);
