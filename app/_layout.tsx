@@ -14,6 +14,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 injectWebStyles();
 
 import { NotificationsSync } from '../components/notifications/NotificationsSync';
+import { RealtimeSync } from '../components/realtime/RealtimeSync';
 import { AppShell } from '../components/shell/AppShell';
 import { AuthGuard } from '../lib/auth/AuthGuard';
 import { SessionProvider } from '../lib/auth/SessionProvider';
@@ -38,6 +39,7 @@ export default function RootLayout() {
     <SessionProvider>
       <StatusBar style="auto" />
       <NotificationsSync />
+      <RealtimeSync />
       <AuthGuard>
         <AppShell>
           <Stack screenOptions={{ headerShown: false }}>
