@@ -1,0 +1,10 @@
+# Worker dos stories: recebe o arquivo (só membro) e entrega pelo link secreto. Ver docs/superpowers/specs/2026-10-04-stories-design.md
+name = "fellas-stories"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "fellas-stories"
+
+# SUPABASE_URL e SUPABASE_ANON_KEY entram no deploy com --var (valores do .env; são públicos, mas ficam fora do repo)
