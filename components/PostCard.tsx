@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 
 import { CommentButton } from './feed/CommentButton';
@@ -30,6 +30,8 @@ type Props = {
 export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, onDelete }: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
+  // a barra de reações abre presa a este botão
+  const reactAnchor = useRef<View>(null);
   const [confirming, setConfirming] = useState(false);
   const [hovered, setHovered] = useState(false);
   const react = (emoji: string) => onReact?.(post, nextReaction(post.myReaction, emoji));
@@ -100,11 +102,12 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
           <CommentButton count={post.commentCount} onPress={() => onPress?.(post)} />
           <View style={{ flex: 1 }} />
           <View style={{ marginRight: -t.spacing.sm }}>
-            <ReactButton myReaction={post.myReaction} onPress={() => setPicking(true)} />
+            <ReactButton myReaction={post.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
           </View>
         </View>
       </View>
       <ReactionPicker
+        anchorRef={reactAnchor}
         visible={picking}
         selected={post.myReaction}
         onSelect={(emoji) => {

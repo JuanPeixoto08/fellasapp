@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { pushRecentEmoji, QUICK_REACTIONS } from '../../lib/emoji';
+import { placePopover, type Rect } from '../../lib/popover';
 import { useTheme } from '../../lib/theme';
-import { IconButton, Text } from '../ui';
+import { Emoji, IconButton } from '../ui';
 import { EmojiPicker } from './EmojiPicker';
 
 export const DEFAULT_REACTION_EMOJIS: readonly string[] = QUICK_REACTIONS;
+
+/** O que dá para medir na tela (o View em volta do botão de reagir). */
+type Measurable = { measureInWindow: (cb: (x: number, y: number, width: number, height: number) => void) => void };
 
 type Props = {
   visible: boolean;
@@ -14,22 +18,40 @@ type Props = {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   emojis?: readonly string[];
+  /** Botão de reagir: a barra (e o painel de mais emojis no computador) abre presa a ele. */
+  anchorRef?: RefObject<Measurable | View | null>;
 };
 
 /**
- * Barra flutuante em pílula com os emojis rápidos e um "+" que abre o seletor completo.
- * Se a minha reação não é um dos rápidos, ela aparece primeiro (tocar remove). Toque fora fecha.
+ * Barra em pílula com os emojis rápidos e um "+" que abre o seletor completo, presa ao botão de reagir
+ * (acima dele; sem espaço, embaixo). Se a minha reação não é um dos rápidos, ela aparece primeiro
+ * (tocar remove). Toque fora fecha.
  */
-export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = DEFAULT_REACTION_EMOJIS }: Props) {
+export function ReactionPicker({
+  visible,
+  selected,
+  onSelect,
+  onClose,
+  emojis = DEFAULT_REACTION_EMOJIS,
+  anchorRef,
+}: Props) {
   const t = useTheme();
+  const viewport = useWindowDimensions();
   const anim = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const reduceMotion = useRef(false);
   const [full, setFull] = useState(false);
+  const [anchor, setAnchor] = useState<Rect | null>(null);
   const quick = selected && !emojis.includes(selected) ? [selected, ...emojis.slice(0, emojis.length - 1)] : emojis;
 
   useEffect(() => {
-    if (!visible) setFull(false);
-  }, [visible]);
+    if (!visible) {
+      setFull(false);
+      setAnchor(null);
+      return;
+    }
+    const node = anchorRef?.current as Measurable | null | undefined;
+    node?.measureInWindow?.((x, y, width, height) => setAnchor({ x, y, width, height }));
+  }, [visible, anchorRef]);
 
   const pick = (emoji: string) => {
     pushRecentEmoji(emoji);
@@ -59,12 +81,22 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
     }).start();
   }, [visible, anim, t.motion.base]);
 
+  // tamanho da pílula: os rápidos + o "+", cada um com alvo de 44
+  const slots = quick.length + 1;
+  const size = {
+    width: slots * t.layout.minTouch + (slots - 1) * t.spacing.xs + t.spacing.xs * 2,
+    height: t.layout.minTouch + t.spacing.xs * 2,
+  };
+  const place = anchor ? placePopover(anchor, size, viewport, t.layout.gutter, t.spacing.xs) : null;
+
   return (
     <>
       {/* só monta quando o "+" é tocado: cada post tem um ReactionPicker */}
-      {visible && full ? <EmojiPicker visible selected={selected} onSelect={onSelect} onClose={onClose} /> : null}
+      {visible && full ? (
+        <EmojiPicker visible selected={selected} onSelect={onSelect} onClose={onClose} anchor={anchor} />
+      ) : null}
       <Modal visible={visible && !full} transparent animationType="none" onRequestClose={onClose}>
-        <View style={{ flex: 1, backgroundColor: t.colors.overlay, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
@@ -87,6 +119,8 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
                 opacity: anim,
                 transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
               },
+              // preso ao botão; sem medida (ex.: teste), fica no centro
+              place ? { position: 'absolute', left: place.left, top: place.top, width: size.width } : null,
               t.shadows.raised,
             ]}
           >
@@ -110,7 +144,7 @@ export function ReactionPicker({ visible, selected, onSelect, onClose, emojis = 
                       backgroundColor: isSelected ? t.colors.accent : 'transparent',
                     }}
                   >
-                    <Text variant="title">{emoji}</Text>
+                    <Emoji emoji={emoji} size="lg" />
                   </View>
                 </Pressable>
               );
