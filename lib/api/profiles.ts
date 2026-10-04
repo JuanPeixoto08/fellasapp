@@ -63,8 +63,16 @@ export function parseBirthday(text: string): string | null | undefined {
   if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) {
     return undefined;
   }
-  if (date.getTime() > Date.now()) return undefined;
+  if (y < MIN_BIRTH_YEAR || date.getTime() > Date.now()) return undefined;
   return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+const MIN_BIRTH_YEAR = 1900;
+
+/** Máscara do campo de aniversário: só dígitos (até 8) e as barras de DD/MM/AAAA entram sozinhas. */
+export function maskBirthday(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
 }
 
 /** "AAAA-MM-DD" -> "DD/MM/AAAA". */

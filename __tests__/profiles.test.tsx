@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileView from '../components/ProfileView';
-import { formatBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
+import { formatBirthday, maskBirthday, parseBirthday, updateMyProfile, validateUsername } from '../lib/api/profiles';
 
 const mockPush = jest.fn();
 const mockUsePostList = jest.fn();
@@ -103,8 +103,20 @@ describe('birthday', () => {
     expect(parseBirthday('20/05/1999')).toBe('1999-05-20');
     expect(parseBirthday('')).toBeNull();
   });
-  it.each(['31/02/2000', '2000-01-01', '1/1/2000', '01/01/2999'])('rejeita %s', (v) => {
+  it.each(['31/02/2000', '2000-01-01', '1/1/2000', '01/01/2999', '01/01/0001', '10/10/1899', 'ab/cd/efgh'])('rejeita %s', (v) => {
     expect(parseBirthday(v)).toBeUndefined();
+  });
+  it('máscara: só números, barras entram sozinhas, no máximo 8 dígitos', () => {
+    expect(maskBirthday('2')).toBe('2');
+    expect(maskBirthday('20')).toBe('20');
+    expect(maskBirthday('205')).toBe('20/5');
+    expect(maskBirthday('2005')).toBe('20/05');
+    expect(maskBirthday('20051999')).toBe('20/05/1999');
+    expect(maskBirthday('20/05/19991')).toBe('20/05/1999');
+    expect(maskBirthday('ab20c05x')).toBe('20/05');
+    expect(maskBirthday('20/0')).toBe('20/0'); // apagando: não volta a barra sozinha
+    expect(maskBirthday('20/')).toBe('20');
+    expect(maskBirthday('')).toBe('');
   });
   it('formata ISO', () => {
     expect(formatBirthday('1999-05-20')).toBe('20/05/1999');
