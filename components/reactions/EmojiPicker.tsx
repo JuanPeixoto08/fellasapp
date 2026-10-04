@@ -11,14 +11,17 @@ import {
   type EmojiItem,
 } from '../../lib/emoji';
 import { useLayoutTier } from '../../lib/layout';
+import { placePopover, type Rect } from '../../lib/popover';
 import { useTheme } from '../../lib/theme';
-import { EmptyState, Icon, IconButton, Text, TextField, type IconName } from '../ui';
+import { Emoji, EmptyState, Icon, IconButton, Text, TextField, type IconName } from '../ui';
 
 type Props = {
   visible: boolean;
   selected: string | null;
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  /** Botão de reagir (medido): no computador o painel abre preso a ele. */
+  anchor?: Rect | null;
 };
 
 type Row =
@@ -50,8 +53,11 @@ function toRows(groups: EmojiGroup[], columns: number, withHeaders: boolean): Ro
   return rows;
 }
 
-/** Seletor com todos os emojis: busca em português, recentes e categorias. Sobe de baixo no celular; no desktop abre como painel centralizado. */
-export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
+/**
+ * Seletor com todos os emojis (desenhados pelo app): busca em português, recentes e categorias. Sobe de
+ * baixo no celular; no computador é um painel de altura fixa preso ao botão de reagir (ou centralizado).
+ */
+export function EmojiPicker({ visible, selected, onSelect, onClose, anchor }: Props) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -84,6 +90,11 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
   const columns = Math.max(1, Math.floor((sheetWidth - t.layout.gutter * 2) / t.layout.minTouch));
   const cell = Math.floor((sheetWidth - t.layout.gutter * 2) / columns);
   const headerHeight = t.spacing.xxl;
+  const panelHeight = Math.min(t.layout.emojiPanelHeight, height - t.layout.gutter * 2);
+  const place =
+    panel && anchor
+      ? placePopover(anchor, { width: sheetWidth, height: panelHeight }, { width, height }, t.layout.gutter, t.spacing.xs)
+      : null;
 
   const byEmoji = useMemo(() => {
     const map = new Map<string, EmojiItem>();
@@ -137,7 +148,14 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: t.colors.overlay, justifyContent: panel ? 'center' : 'flex-end' }}>
+      <View
+        style={{
+          flex: 1,
+          // preso ao botão (computador) não escurece a tela; folha de baixo (celular) escurece
+          backgroundColor: place ? 'transparent' : t.colors.overlay,
+          justifyContent: panel ? 'center' : 'flex-end',
+        }}
+      >
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Fechar emojis" style={StyleSheet.absoluteFill} />
         <View
           testID="emoji-sheet"
@@ -146,7 +164,11 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
             width: panel ? sheetWidth : '100%',
             maxWidth: t.layout.maxContentWidth,
             alignSelf: 'center',
-            height: height * t.layout.sheetHeightRatio,
+            height: panel ? panelHeight : height * t.layout.sheetHeightRatio,
+            // a lista rola por dentro: nada passa da borda do painel
+            overflow: 'hidden',
+            ...(place ? { position: 'absolute', left: place.left, top: place.top } : null),
+            ...(panel ? t.shadows.raised : null),
             backgroundColor: t.colors.surface,
             ...(panel
               ? { borderRadius: t.radii.lg }
@@ -218,6 +240,7 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
           ) : (
             <FlatList
               ref={list}
+              style={{ flex: 1 }}
               data={rows}
               keyExtractor={(r) => r.key}
               keyboardShouldPersistTaps="handled"
@@ -258,7 +281,7 @@ export function EmojiPicker({ visible, selected, onSelect, onClose }: Props) {
                             backgroundColor: isSelected ? t.colors.accent : pressed ? t.colors.surfaceSunken : 'transparent',
                           })}
                         >
-                          <Text variant="title">{e.emoji}</Text>
+                          <Emoji emoji={e.emoji} size="lg" />
                         </Pressable>
                       );
                     })}

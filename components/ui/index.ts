@@ -4,6 +4,7 @@ export { Button, type ButtonProps } from './Button';
 export { Card, type CardProps } from './Card';
 export { Divider } from './Divider';
 export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
+export { Emoji, type EmojiProps } from './Emoji';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Icon, type IconName, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';

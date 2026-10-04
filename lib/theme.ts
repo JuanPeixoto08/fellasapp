@@ -119,6 +119,10 @@ export const borders = { hairline: 1, selected: 3 } as const;
 export const iconSizes = { sm: 16, md: 20, lg: 24 } as const;
 export type IconSize = keyof typeof iconSizes;
 
+/** Emojis desenhados (Twemoji): chip de reação (sm), botão de reagir (md), barra e seletor (lg). */
+export const emojiSizes = { sm: 16, md: 20, lg: 28 } as const;
+export type EmojiSize = keyof typeof emojiSizes;
+
 /** Avatares: sm comentário · md card do feed · lg cabeçalho do perfil · xl edição de perfil. */
 export const avatarSizes = { sm: 32, md: 40, lg: 56, xl: 88 } as const;
 
@@ -137,6 +141,8 @@ export const layout = {
   maxDialogWidth: 400,
   /** Altura visual do chip de reação; o toque completa os 44 com hitSlop. */
   chipHeight: 28,
+  /** Painel "mais emojis" no computador (preso ao botão de reagir). */
+  emojiPanelHeight: 420,
   /** Altura (e largura mínima) da bolinha de contagem. */
   badgeSize: 18,
   /** Fresta entre fotos de um mesmo post. */
@@ -177,6 +183,7 @@ export type Theme = {
   radii: typeof radii;
   borders: typeof borders;
   iconSizes: typeof iconSizes;
+  emojiSizes: typeof emojiSizes;
   avatarSizes: typeof avatarSizes;
   layout: typeof layout;
   motion: typeof motion;
@@ -193,6 +200,7 @@ export function getTheme(scheme: ColorScheme): Theme {
     radii,
     borders,
     iconSizes,
+    emojiSizes,
     avatarSizes,
     layout,
     motion,

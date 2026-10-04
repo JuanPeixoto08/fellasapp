@@ -24,6 +24,10 @@ npx expo start         # depois: i (iOS), a (Android) ou w (web)
 - `npx tsc --noEmit` — checagem de tipos
 - `npm run build:web` — `expo export -p web`, gera `dist/`
 
+## Créditos
+
+Emojis das reações: [Twemoji](https://github.com/jdecked/twemoji) (gráficos sob CC-BY 4.0), servidos pelo jsDelivr.
+
 ## Deploy web no Cloudflare Pages
 
 No ar em **https://fellasapp.pages.dev**. O build web é um SPA estático (`web.output: "single"`) e pode ser instalado como PWA (iPhone: Safari → Adicionar à Tela de Início).
