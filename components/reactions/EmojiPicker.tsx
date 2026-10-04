@@ -244,7 +244,8 @@ export function EmojiPicker({ visible, selected, onSelect, onClose, anchor }: Pr
               data={rows}
               keyExtractor={(r) => r.key}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingBottom: t.spacing.lg }}
+              // a margem lateral vai em cada linha: no react-native-web o padding do contentContainer não chega
+              contentContainerStyle={{ paddingBottom: t.spacing.lg }}
               getItemLayout={(_, index) => ({ ...layout[index], index })}
               initialNumToRender={12}
               windowSize={7}
@@ -256,13 +257,20 @@ export function EmojiPicker({ visible, selected, onSelect, onClose, anchor }: Pr
               }
               renderItem={({ item }) =>
                 item.type === 'header' ? (
-                  <View style={{ height: headerHeight, justifyContent: 'flex-end', paddingBottom: t.spacing.xs }}>
+                  <View
+                    style={{
+                      height: headerHeight,
+                      justifyContent: 'flex-end',
+                      paddingBottom: t.spacing.xs,
+                      paddingHorizontal: t.layout.gutter,
+                    }}
+                  >
                     <Text variant="caption" tone="muted" accessibilityRole="header">
                       {item.title}
                     </Text>
                   </View>
                 ) : (
-                  <View style={{ flexDirection: 'row', height: cell }}>
+                  <View style={{ flexDirection: 'row', height: cell, paddingHorizontal: t.layout.gutter }}>
                     {item.emojis.map((e) => {
                       const isSelected = e.emoji === selected;
                       return (

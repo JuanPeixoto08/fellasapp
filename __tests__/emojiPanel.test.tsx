@@ -46,4 +46,17 @@ describe('EmojiPicker por faixa', () => {
     expect(style.top + 420).toBeLessThanOrEqual(900);
     expect(style.left + 400).toBe(644);
   });
+
+  it('títulos e emojis não ficam colados na borda do painel', async () => {
+    mockTier = 'expanded';
+    await renderPicker();
+    const title = await screen.findByText('Sorrisos e emoção');
+    type Node = { props: { style?: object }; parent: Node | null };
+    let node = title.parent as unknown as Node | null;
+    let padded = false;
+    for (let i = 0; i < 4 && node; i++, node = node.parent) {
+      if (StyleSheet.flatten(node.props.style)?.paddingHorizontal === 16) padded = true;
+    }
+    expect(padded).toBe(true);
+  });
 });
