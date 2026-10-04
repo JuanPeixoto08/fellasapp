@@ -1,14 +1,19 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { AppNotification } from '../lib/notifications';
 
 const mockPush = jest.fn();
+/** Último callback de foco: chamar de novo simula voltar para a tela. */
+let mockRefocus: () => void = () => {};
 jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     useRouter: () => ({ push: mockPush }),
-    useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
+    useFocusEffect: (cb: () => void) => {
+      mockRefocus = cb;
+      useEffect(cb, [cb]);
+    },
     Stack: { Screen: () => null },
   };
 });
@@ -68,6 +73,21 @@ describe('Tela de notificações', () => {
     await open();
     await screen.findByLabelText(/Ana curtiu seu post/);
     expect(screen.getAllByTestId('unread-dot')).toHaveLength(1);
+  });
+
+  it('voltar de uma notificação mantém o destaque das novas desta visita', async () => {
+    mockFetch.mockResolvedValueOnce([item({ unread: true }), item({ kind: 'comment', commentId: 'c1', body: 'oi', unread: true })]);
+    // na volta, o banco já marcou tudo como visto
+    mockFetch.mockResolvedValueOnce([item({}), item({ kind: 'comment', commentId: 'c1', body: 'oi' })]);
+    await open();
+    await screen.findByLabelText(/Ana curtiu seu post/);
+    await waitFor(() => expect(mockMarkSeen).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      mockRefocus();
+    });
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockMarkSeen).toHaveBeenCalledTimes(2));
+    expect(screen.getAllByTestId('unread-dot')).toHaveLength(2);
   });
 
   it('toque leva ao post ou ao perfil', async () => {

@@ -1,5 +1,5 @@
 import type { Database } from '../../types/database';
-import type { AppNotification, NotificationKind, NotificationPerson } from '../notifications';
+import { isNotificationKind, type AppNotification, type NotificationKind, type NotificationPerson } from '../notifications';
 import { supabase } from '../supabase';
 import { resolveUrl, signPaths } from './storage';
 
@@ -14,7 +14,8 @@ type PostRow = { id: string; image_url: string | null; images: string[] | null }
 export async function fetchNotifications(): Promise<AppNotification[]> {
   const { data, error } = await supabase.rpc('notifications_feed', { p_limit: FEED_LIMIT });
   if (error) throw error;
-  const rows = (data ?? []) as FeedRow[];
+  // tipo desconhecido (app aberto mais velho que a migração) fica de fora em vez de quebrar a tela
+  const rows = ((data ?? []) as FeedRow[]).filter((r) => isNotificationKind(r.kind));
   if (rows.length === 0) return [];
 
   const personIds = [...new Set(rows.flatMap((r) => r.actor_ids ?? []))];

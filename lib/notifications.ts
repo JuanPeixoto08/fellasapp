@@ -7,6 +7,21 @@ export type NotificationKind =
   | 'birthday'
   | 'new_member';
 
+const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
+  'like',
+  'post_reaction',
+  'comment_reaction',
+  'comment',
+  'thread_reply',
+  'birthday',
+  'new_member',
+]);
+
+/** Tipo que este app sabe mostrar (uma migração mais nova pode trazer outros). */
+export function isNotificationKind(kind: string): kind is NotificationKind {
+  return KINDS.has(kind);
+}
+
 export type NotificationPerson = { id: string; name: string; avatarUrl: string | null };
 
 /** Uma linha da tela de notificações (já com pessoas e miniatura resolvidas). */

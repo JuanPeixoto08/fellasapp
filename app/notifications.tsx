@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +19,8 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  // chaves que chegaram como novas nesta visita: abrir uma notificação e voltar não apaga o destaque das outras
+  const newThisVisit = useRef(new Set<string>());
 
   /** Busca, mostra (as novas já vêm marcadas) e só então marca tudo como visto. */
   const load = useCallback(async (pull = false) => {
@@ -26,7 +28,8 @@ export default function NotificationsScreen() {
     else setLoading(true);
     try {
       const list = await fetchNotifications();
-      setItems(list);
+      for (const n of list) if (n.unread) newThisVisit.current.add(n.key);
+      setItems(list.map((n) => (newThisVisit.current.has(n.key) ? { ...n, unread: true } : n)));
       setError(false);
       await markNotificationsSeen().catch(() => {});
       setUnreadNotifications(0);

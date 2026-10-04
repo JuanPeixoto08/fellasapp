@@ -24,14 +24,24 @@ export function NotificationsSync(): null {
         })
         .catch(() => {});
     };
-    refresh();
-    const timer = setInterval(refresh, UNREAD_POLL_MS);
+    // o intervalo só roda com o app na frente (aba visível na web); ao voltar, busca na hora
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      refresh();
+      if (!timer) timer = setInterval(refresh, UNREAD_POLL_MS);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    start();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
+      if (state === 'active') start();
+      else stop();
     });
     return () => {
       alive = false;
-      clearInterval(timer);
+      stop();
       sub.remove();
     };
   }, [userId]);
