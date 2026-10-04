@@ -67,11 +67,14 @@ Token `borders`: `hairline` 1 (contornos de chip, cartão, divisória) · `selec
 ## Layout por largura
 Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celular em pé: tab bar, como sempre) · **medium** 700–1099 (lateral só com ícones) · **expanded** ≥ 1100 (lateral com nomes + coluna direita).
 - `AppShell` envolve a pilha de telas: `[Sidebar][coluna central 600 (layout.centerWidth), fios dos dois lados][RightRail 350]`, centralizado. Login, "sem convite" e carregamento ficam fora.
-- Sidebar: logo (→ feed), Feed/Perfil/Membros (ativo = ícone cheio + `brand` + negrito), botão Postar (abre a janela do compositor), eu no pé.
+- Sidebar: logo (→ feed), Feed/Notificações/Perfil/Membros (Notificações com `Badge`; ativo = ícone cheio + `brand` + negrito), botão Postar (abre a janela do compositor), eu no pé.
 - RightRail: "Os fellas" (até 8 + Ver todos) e "Aniversários" (próximos 3; Hoje/Amanhã/12 out; ícone `gift-outline`).
 - Compositor (`components/feed/Composer`): página no celular, topo do feed e janela no desktop, um rascunho só (limpo quando o usuário logado muda).
 - Tamanhos que dependem da largura usam `useContentWidth()` (coluna), nunca a janela. Seletor de emojis vira painel de 400 no desktop.
 - Web/desktop: hover `surfaceSunken` + cursor de mão em clicáveis (`interactiveStyle`); ← → Esc no visualizador.
+
+## Notificações
+Tela `/notifications` no padrão "sem caixa" (linhas com `Divider`). Linha: ponto `brand` de não lida + fundo `surfaceSunken` só na visita em que chegou; avatar `md` com o ícone do tipo num círculo `bg` encostado no canto (coração `like`, balão, carinha, presente, pessoa+); texto com nomes em negrito e data `shortDate` em `textMuted`; miniatura quadrada `avatarSizes.md` raio `md` quando o post tem foto. Entrada: no celular, sino (`IconButton` ghost) à direita da marca no topo do feed; no computador, item da lateral. `Badge` (components/ui): pílula `brand` + texto `onBrand` caption bold, altura `layout.badgeSize`, "9+" acima de 9, 0 não aparece. Sem emoji no texto do sistema; os emojis de reação são conteúdo.
 
 ## Não fazer
 Embutir o arquivo .otf da Galaxia; usar a Galaxia em outro texto que não a marca; cartão dentro de cartão; eyebrow acima de título; texto em gradiente; borda lateral colorida; cinza puro; fonte de sistema como display.

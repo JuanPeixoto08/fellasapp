@@ -13,6 +13,8 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockPath,
 }));
 jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan Peixoto', uri: null }) }));
+let mockUnread = 0;
+jest.mock('../lib/notificationsStore', () => ({ useUnreadNotifications: () => mockUnread }));
 jest.mock('../lib/auth/SessionProvider', () => ({
   useSession: () => ({ profile: { username: 'juanzin' } }),
 }));
@@ -35,6 +37,7 @@ describe('activeNavItem', () => {
     ['/user/abc', null],
     ['/post/123', null],
     ['/new', null],
+    ['/notifications', 'notifications'],
   ] as const)('%s → %s', (path, key) => {
     expect(activeNavItem(path)).toBe(key);
   });
@@ -44,6 +47,7 @@ describe('Sidebar', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockPath = '/feed';
+    mockUnread = 0;
   });
 
   it('expanded: nomes visíveis, item ativo marcado, navega', async () => {
@@ -55,6 +59,19 @@ describe('Sidebar', () => {
     await fireEvent.press(screen.getByLabelText('Perfil'));
     expect(mockNavigate).toHaveBeenCalledWith('/profile');
     expect(screen.getByText('@juanzin')).toBeTruthy();
+  });
+
+  it('Notificações entre Feed e Perfil, com bolinha e rótulo', async () => {
+    mockUnread = 2;
+    mockPath = '/notifications';
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    const item = screen.getByLabelText('Notificações, 2 novas');
+    expect(item.props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByText('2', { includeHiddenElements: true })).toBeTruthy();
+    const labels = screen.getAllByRole('link').map((el) => el.props.accessibilityLabel);
+    expect(labels.indexOf('Notificações, 2 novas')).toBe(labels.indexOf('Feed') + 1);
+    await fireEvent.press(item);
+    expect(mockNavigate).toHaveBeenCalledWith('/notifications');
   });
 
   it('medium: só ícones (sem nomes) e Postar redondo', async () => {

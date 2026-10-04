@@ -34,6 +34,11 @@ describe('cores do tema', () => {
     expect(contrast(colors.light.brand, colors.light.bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.dark.brand, colors.dark.bg)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it('onBrand tem contraste AA sobre brand (bolinha de notificações)', () => {
+    expect(contrast(colors.light.onBrand, colors.light.brand)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.dark.onBrand, colors.dark.brand)).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 describe('cor de perfil (removida)', () => {
