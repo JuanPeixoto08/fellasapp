@@ -152,6 +152,13 @@ describe('Tela de notificações', () => {
     expect(mockPush).toHaveBeenCalledWith('/user/u2');
   });
 
+  it('aniversário não mostra "há 15 h" (o texto já diz hoje)', async () => {
+    mockFetch.mockResolvedValue([item({ kind: 'birthday', postId: null, latestAt: '2026-10-04T03:00:00Z' })]);
+    await open();
+    expect(await screen.findByLabelText('Hoje é aniversário de Ana')).toBeTruthy();
+    expect(screen.queryByText(/^há /)).toBeNull();
+  });
+
   it('lista vazia convida', async () => {
     mockFetch.mockResolvedValue([]);
     await open();

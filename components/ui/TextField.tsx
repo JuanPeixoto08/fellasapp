@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import { TextInput, View, type TextInputProps } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
@@ -13,6 +13,8 @@ export type TextFieldProps = Omit<TextInputProps, 'style'> & {
   help?: string;
   /** field = caixa padrão de formulário; pill = campo arredondado de composer (comentário), cresce até ~3 linhas. */
   shape?: 'field' | 'pill';
+  /** Para focar o campo por código (ex.: depois de escolher uma @menção). Vai direto para o TextInput. */
+  ref?: Ref<TextInput>;
 };
 
 export function TextField({

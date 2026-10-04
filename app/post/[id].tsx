@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentItem } from '../../components/feed/CommentItem';
@@ -37,6 +37,7 @@ export default function PostDetailScreen() {
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
+  const commentInput = useRef<TextInput>(null);
   // @: posição do cursor (null = fim do texto) e a menção sendo escrita
   const [cursor, setCursor] = useState<number | null>(null);
   const mention = activeMention(text, Math.min(cursor ?? text.length, text.length));
@@ -250,6 +251,8 @@ export default function PostDetailScreen() {
               onPick={(username) => {
                 setText((cur) => insertMention(cur, mention, username));
                 setCursor(null);
+                // na web, clicar na sugestão tira o foco do campo: devolve para continuar digitando
+                commentInput.current?.focus();
               }}
             />
           ) : null}
@@ -260,6 +263,7 @@ export default function PostDetailScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <TextField
+                ref={commentInput}
                 label="Comentar"
                 hideLabel
                 shape="pill"

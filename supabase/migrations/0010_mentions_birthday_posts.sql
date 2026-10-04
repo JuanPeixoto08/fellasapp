@@ -229,27 +229,34 @@ as $$
 declare
   inserted integer;
 begin
-  insert into public.posts (author_id, body)
-  select f.id, '@' || b.username || ' parabéns'
-    from public.profiles b
-    join public.profiles f on f.is_member and f.id <> b.id
-   where b.is_member
-     and b.birthday is not null
-     and (
-           to_char(b.birthday, 'MM-DD') = to_char(p_today, 'MM-DD')
-           or (
-                to_char(b.birthday, 'MM-DD') = '02-29'
-                and to_char(p_today, 'MM-DD') = '02-28'
-                and extract(day from (make_date(extract(year from p_today)::integer, 3, 1) - 1)) = 28
-              )
-         )
-     and not exists (
-           select 1
-             from public.posts x
-            where x.author_id = f.id
-              and x.body = '@' || b.username || ' parabéns'
-              and (x.created_at at time zone 'America/Sao_Paulo')::date = p_today
-         );
+  -- cada parabéns 1 ms depois do anterior: o feed pagina por created_at, e horários iguais na divisa
+  -- entre páginas fariam alguns parabéns sumirem
+  insert into public.posts (author_id, body, created_at)
+  select g.author_id,
+         g.body,
+         now() + (row_number() over (order by g.body, g.author_id)) * interval '1 millisecond'
+    from (
+          select f.id as author_id, '@' || b.username || ' parabéns' as body
+            from public.profiles b
+            join public.profiles f on f.is_member and f.id <> b.id
+           where b.is_member
+             and b.birthday is not null
+             and (
+                   to_char(b.birthday, 'MM-DD') = to_char(p_today, 'MM-DD')
+                   or (
+                        to_char(b.birthday, 'MM-DD') = '02-29'
+                        and to_char(p_today, 'MM-DD') = '02-28'
+                        and extract(day from (make_date(extract(year from p_today)::integer, 3, 1) - 1)) = 28
+                      )
+                 )
+             and not exists (
+                   select 1
+                     from public.posts x
+                    where x.author_id = f.id
+                      and x.body = '@' || b.username || ' parabéns'
+                      and (x.created_at at time zone 'America/Sao_Paulo')::date = p_today
+                 )
+         ) g;
   get diagnostics inserted = row_count;
   return inserted;
 end;
