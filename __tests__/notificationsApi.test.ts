@@ -83,9 +83,9 @@ describe('fetchNotifications', () => {
   });
 
   it('tipo que o app não conhece (migração mais nova) é descartado em vez de quebrar a tela', async () => {
-    mockRpc.mockResolvedValue({ data: [row({ kind: 'mention' }), row({})], error: null });
+    mockRpc.mockResolvedValue({ data: [row({ kind: 'repost' }), row({ kind: 'mention' }), row({})], error: null });
     const list = await fetchNotifications();
-    expect(list.map((n) => n.kind)).toEqual(['like']);
+    expect(list.map((n) => n.kind)).toEqual(['mention', 'like']);
   });
 
   it('lista vazia não busca perfis nem posts', async () => {

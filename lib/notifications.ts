@@ -5,7 +5,8 @@ export type NotificationKind =
   | 'comment'
   | 'thread_reply'
   | 'birthday'
-  | 'new_member';
+  | 'new_member'
+  | 'mention';
 
 const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'like',
@@ -15,6 +16,7 @@ const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'thread_reply',
   'birthday',
   'new_member',
+  'mention',
 ]);
 
 /** Tipo que este app sabe mostrar (uma migração mais nova pode trazer outros). */
@@ -85,6 +87,8 @@ export function describeNotification(n: AppNotification): TextPart[] {
       return [{ text: 'Hoje é aniversário de ' }, ...who];
     case 'new_member':
       return [...who, { text: ' entrou no fellas' }];
+    case 'mention':
+      return [...who, { text: ` te marcou num ${n.commentId ? 'comentário' : 'post'}: “${snippet(n.body)}”` }];
   }
 }
 
