@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, type AccessibilityState, type AccessibilityValue } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
-import { Text } from '../ui';
+import { interactiveStyle, Text } from '../ui';
 
 type Props = {
   /** Ícone (ou emoji) da ação. */
@@ -26,7 +26,7 @@ export function ActionButton({ children, count, countColor, onPress, ...a11y }: 
       accessibilityRole="button"
       {...a11y}
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={(state) => ({
         minHeight: t.layout.minTouch,
         minWidth: t.layout.minTouch,
         paddingHorizontal: t.spacing.sm,
@@ -35,7 +35,7 @@ export function ActionButton({ children, count, countColor, onPress, ...a11y }: 
         justifyContent: 'center',
         gap: t.spacing.xs,
         borderRadius: t.radii.pill,
-        backgroundColor: pressed ? t.colors.surfaceSunken : 'transparent',
+        ...interactiveStyle(t, state),
       })}
     >
       {children}

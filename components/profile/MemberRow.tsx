@@ -2,7 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import type { Profile } from '../../lib/api/profiles';
 import { useTheme } from '../../lib/theme';
-import { Avatar, Text } from '../ui';
+import { Avatar, interactiveStyle, Text } from '../ui';
 
 type Props = { member: Profile; avatarUri?: string | null; onPress: () => void };
 
@@ -14,13 +14,13 @@ export function MemberRow({ member, avatarUri, onPress }: Props) {
       accessibilityRole="button"
       accessibilityLabel={`Ver perfil de ${name}`}
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={(state) => ({
         minHeight: t.layout.minTouch + t.spacing.lg,
         flexDirection: 'row',
         alignItems: 'center',
         gap: t.spacing.md,
         paddingVertical: t.spacing.sm,
-        backgroundColor: pressed ? t.colors.surfaceSunken : 'transparent',
+        ...interactiveStyle(t, state),
       })}
     >
       <Avatar name={name} uri={avatarUri} size={t.layout.minTouch} />
