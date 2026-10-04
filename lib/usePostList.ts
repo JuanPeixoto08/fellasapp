@@ -12,6 +12,13 @@ export async function removePost(postId: string): Promise<void> {
   emitPostDeleted(postId);
 }
 
+function without(set: ReadonlySet<string>, ids: string[]): ReadonlySet<string> {
+  if (!ids.some((id) => set.has(id))) return set;
+  const next = new Set(set);
+  for (const id of ids) next.delete(id);
+  return next;
+}
+
 type Options = FeedFilter & {
   /** Só começa a buscar quando true (ex.: aba que ainda não foi aberta). */
   enabled?: boolean;
@@ -31,7 +38,8 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
-  const [newPosts, setNewPosts] = useState(0);
+  /** Posts de outras pessoas que chegaram ao vivo e ainda não estão na lista. */
+  const [newIds, setNewIds] = useState<ReadonlySet<string>>(new Set());
   const postsRef = useRef(posts);
   postsRef.current = posts;
 
@@ -44,6 +52,8 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
       try {
         const page = await listFeed({ cursor: reset ? null : from, authorId, photosOnly });
         setPosts((prev) => (reset ? page.posts : [...prev, ...page.posts]));
+        // recarregou do topo: o que era novo já está na lista
+        if (reset) setNewIds((prev) => without(prev, page.posts.map((p) => p.id)));
         setCursor(page.nextCursor);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Erro ao carregar os posts');
@@ -90,13 +100,15 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
       (!photosOnly || !!row.image_url || (Array.isArray(row.images) && row.images.length > 0));
     const onChange = (c: LiveChange) => {
       if (c.table === 'posts' && c.type === 'INSERT') {
-        if (!c.mine && belongsHere(c.row)) setNewPosts((n) => n + 1);
+        const newId = postIdOf(c);
+        if (newId && !c.mine && belongsHere(c.row)) setNewIds((prev) => new Set(prev).add(newId));
         return;
       }
       const id = postIdOf(c);
       if (!id) return;
       if (c.table === 'posts' && c.type === 'DELETE') {
         setPosts((prev) => prev.filter((p) => p.id !== id));
+        setNewIds((prev) => without(prev, [id]));
         return;
       }
       // minha curtida/reação a tela já aplicou na hora
@@ -109,7 +121,7 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
       listFeed({ cursor: null, authorId, photosOnly })
         .then((page) => {
           const shown = new Set(postsRef.current.map((p) => p.id));
-          setNewPosts(page.posts.filter((p) => !shown.has(p.id)).length);
+          setNewIds(new Set(page.posts.filter((p) => !shown.has(p.id)).map((p) => p.id)));
           const fresh = new Map(page.posts.map((p) => [p.id, p]));
           setPosts((prev) => prev.map((p) => fresh.get(p.id) ?? p));
         })
@@ -152,12 +164,9 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
   return {
     posts,
     /** Posts de outras pessoas que chegaram depois do carregamento (botão "Posts novos"). */
-    newPosts,
-    /** Traz os posts novos para o topo. */
-    showNewPosts: () => {
-      setNewPosts(0);
-      refresh();
-    },
+    newPosts: newIds.size,
+    /** Traz os posts novos para o topo (o botão some quando a recarga chega). */
+    showNewPosts: refresh,
     /** Primeira página já respondeu (com ou sem erro). */
     loaded,
     loading,
