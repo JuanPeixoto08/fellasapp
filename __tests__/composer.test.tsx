@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { Composer } from '../components/feed/Composer';
 import { createPost } from '../lib/api/posts';
 import { clearDraft } from '../lib/composerDraft';
+import { setMemberDirectory } from '../lib/memberDirectory';
 
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan', uri: null }) }));
@@ -16,6 +17,19 @@ beforeEach(() => {
 });
 
 describe('Composer', () => {
+  it('@: sugere fellas enquanto digita e escolher completa o usuário', async () => {
+    setMemberDirectory([
+      { id: 'u1', username: 'ana', name: 'Ana', avatarUrl: null },
+      { id: 'u2', username: 'bia', name: 'Bia', avatarUrl: null },
+    ]);
+    await render(<Composer variant="inline" />);
+    await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'parabéns @a');
+    expect(screen.queryByLabelText('Marcar Bia (@bia)')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Marcar Ana (@ana)'));
+    expect(screen.getByDisplayValue('parabéns @ana ')).toBeTruthy();
+    expect(screen.queryByLabelText('Marcar Ana (@ana)')).toBeNull();
+  });
+
   it('inline: sem Cancelar, posta e limpa sem navegar', async () => {
     const onPosted = jest.fn();
     await render(<Composer variant="inline" onPosted={onPosted} />);
