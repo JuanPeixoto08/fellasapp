@@ -43,6 +43,44 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
   const postsRef = useRef(posts);
   postsRef.current = posts;
 
+  // curtida/reação minha ainda indo para o servidor: a atualização ao vivo daquele post espera ela chegar
+  // (senão a resposta antiga do servidor desfaz na tela o que eu acabei de fazer)
+  const inFlight = useRef(new Map<string, number>());
+  const version = useRef(new Map<string, number>());
+  const deferred = useRef(new Set<string>());
+  const busyWith = (id: string) => (inFlight.current.get(id) ?? 0) > 0;
+
+  const refetch = useCallback((id: string) => {
+    if (busyWith(id)) {
+      deferred.current.add(id);
+      return;
+    }
+    const asked = version.current.get(id) ?? 0;
+    getPost(id)
+      .then((fresh) => {
+        // mexi nele enquanto a resposta vinha: ela já está velha
+        if (busyWith(id) || (version.current.get(id) ?? 0) !== asked) {
+          deferred.current.add(id);
+          return;
+        }
+        setPosts((prev) => prev.map((p) => (p.id === id ? fresh : p)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const mutating = async (id: string, run: () => Promise<void>) => {
+    inFlight.current.set(id, (inFlight.current.get(id) ?? 0) + 1);
+    version.current.set(id, (version.current.get(id) ?? 0) + 1);
+    try {
+      await run();
+    } finally {
+      const left = (inFlight.current.get(id) ?? 1) - 1;
+      if (left > 0) inFlight.current.set(id, left);
+      else inFlight.current.delete(id);
+      if (left <= 0 && deferred.current.delete(id)) refetch(id);
+    }
+  };
+
   const load = useCallback(
     async (reset: boolean, from: string | null) => {
       if (busy.current) return;
@@ -89,11 +127,7 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
     const flush = debounce(() => {
       const ids = [...stale];
       stale.clear();
-      for (const id of ids) {
-        getPost(id)
-          .then((fresh) => setPosts((prev) => prev.map((p) => (p.id === id ? fresh : p))))
-          .catch(() => {});
-      }
+      for (const id of ids) refetch(id);
     }, LIVE_DEBOUNCE_MS);
     const belongsHere = (row: Record<string, unknown>) =>
       (!authorId || row.author_id === authorId) &&
@@ -123,7 +157,13 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
           const shown = new Set(postsRef.current.map((p) => p.id));
           setNewIds(new Set(page.posts.filter((p) => !shown.has(p.id)).map((p) => p.id)));
           const fresh = new Map(page.posts.map((p) => [p.id, p]));
-          setPosts((prev) => prev.map((p) => fresh.get(p.id) ?? p));
+          setPosts((prev) =>
+            prev.map((p) => {
+              if (!busyWith(p.id)) return fresh.get(p.id) ?? p;
+              deferred.current.add(p.id);
+              return p;
+            }),
+          );
         })
         .catch(() => {});
     };
@@ -132,7 +172,7 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
       flush.cancel();
       off();
     };
-  }, [enabled, loaded, authorId, photosOnly]);
+  }, [enabled, loaded, authorId, photosOnly, refetch]);
 
   const refresh = () => {
     setRefreshing(true);
@@ -143,22 +183,26 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
     const apply = (liked: boolean) =>
       setPosts((prev) => prev.map((p) => (p.id === post.id ? withLike(p, liked) : p)));
     apply(!post.likedByMe);
-    try {
-      await toggleLike(post.id);
-    } catch {
-      apply(post.likedByMe);
-    }
+    await mutating(post.id, async () => {
+      try {
+        await toggleLike(post.id);
+      } catch {
+        apply(post.likedByMe);
+      }
+    });
   };
 
   const react = async (post: FeedPost, emoji: string | null) => {
     const apply = (fn: (p: FeedPost) => FeedPost) =>
       setPosts((prev) => prev.map((p) => (p.id === post.id ? fn(p) : p)));
     apply((p) => withReaction(p, emoji));
-    try {
-      await setPostReaction(post.id, emoji);
-    } catch {
-      apply((p) => ({ ...p, reactions: post.reactions, myReaction: post.myReaction }));
-    }
+    await mutating(post.id, async () => {
+      try {
+        await setPostReaction(post.id, emoji);
+      } catch {
+        apply((p) => ({ ...p, reactions: post.reactions, myReaction: post.myReaction }));
+      }
+    });
   };
 
   return {

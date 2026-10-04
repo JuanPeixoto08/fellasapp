@@ -54,11 +54,47 @@ export default function PostDetailScreen() {
     load();
   }, [load]);
 
-  // ao vivo: o que outras pessoas fazem neste post (ou nos comentários dele) aparece sozinho
+  // ao vivo: o que outras pessoas fazem neste post (ou nos comentários dele) aparece sozinho.
+  // Com curtida/reação minha ainda indo para o servidor, espera ela chegar: a resposta antiga desfaria na
+  // tela o que acabei de fazer.
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
+  const inFlight = useRef(0);
+  const version = useRef(0);
+  const deferred = useRef(false);
+  const liveLoad = useCallback(async () => {
+    if (inFlight.current > 0) {
+      deferred.current = true;
+      return;
+    }
+    const asked = version.current;
+    try {
+      const [p, c] = await Promise.all([getPost(id), listComments(id)]);
+      if (inFlight.current > 0 || version.current !== asked) {
+        deferred.current = true;
+        return;
+      }
+      setPost(p);
+      setComments(c);
+    } catch {
+      // a próxima mudança (ou a volta para a aba) tenta de novo
+    }
+  }, [id]);
+  const mutating = async (run: () => Promise<void>) => {
+    inFlight.current += 1;
+    version.current += 1;
+    try {
+      await run();
+    } finally {
+      inFlight.current -= 1;
+      if (inFlight.current === 0 && deferred.current) {
+        deferred.current = false;
+        void liveLoad();
+      }
+    }
+  };
   useEffect(() => {
-    const live = debounce(() => void load(), LIVE_DEBOUNCE_MS);
+    const live = debounce(() => void liveLoad(), LIVE_DEBOUNCE_MS);
     const concernsThisPost = (event: LiveEvent) => {
       if (event.kind === 'resync') return true;
       if (event.mine) return false; // o que eu fiz a tela já mostrou
@@ -73,15 +109,17 @@ export default function PostDetailScreen() {
       live.cancel();
       off();
     };
-  }, [id, load]);
+  }, [id, liveLoad]);
 
   const onLike = async (p: FeedPost) => {
     setPost((cur) => (cur ? withLike(cur, !p.likedByMe) : cur));
-    try {
-      await toggleLike(p.id);
-    } catch {
-      setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
-    }
+    await mutating(async () => {
+      try {
+        await toggleLike(p.id);
+      } catch {
+        setPost((cur) => (cur ? withLike(cur, p.likedByMe) : cur));
+      }
+    });
   };
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -93,22 +131,26 @@ export default function PostDetailScreen() {
 
   const onReactPost = async (p: FeedPost, emoji: string | null) => {
     setPost((cur) => (cur ? withReaction(cur, emoji) : cur));
-    try {
-      await setPostReaction(p.id, emoji);
-    } catch {
-      setPost((cur) => (cur ? { ...cur, reactions: p.reactions, myReaction: p.myReaction } : cur));
-    }
+    await mutating(async () => {
+      try {
+        await setPostReaction(p.id, emoji);
+      } catch {
+        setPost((cur) => (cur ? { ...cur, reactions: p.reactions, myReaction: p.myReaction } : cur));
+      }
+    });
   };
 
   const onReactComment = async (c: Comment, emoji: string | null) => {
     const apply = (fn: (x: Comment) => Comment) =>
       setComments((prev) => prev.map((x) => (x.id === c.id ? fn(x) : x)));
     apply((x) => withReaction(x, emoji));
-    try {
-      await setCommentReaction(c.id, emoji);
-    } catch {
-      apply((x) => ({ ...x, reactions: c.reactions, myReaction: c.myReaction }));
-    }
+    await mutating(async () => {
+      try {
+        await setCommentReaction(c.id, emoji);
+      } catch {
+        apply((x) => ({ ...x, reactions: c.reactions, myReaction: c.myReaction }));
+      }
+    });
   };
 
   const send = async () => {
