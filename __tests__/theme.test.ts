@@ -1,4 +1,6 @@
-import { colors, profileColor, profileColorKeys, profilePalette } from '../lib/theme';
+import * as theme from '../lib/theme';
+
+const { colors } = theme;
 
 function luminance(hex: string) {
   const c = [1, 3, 5].map((i) => {
@@ -12,11 +14,7 @@ function contrast(a: string, b: string) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe('profilePalette', () => {
-  it.each(profileColorKeys)('%s: ink tem contraste AA sobre bg', (key) => {
-    expect(contrast(profilePalette[key].bg, profilePalette[key].ink)).toBeGreaterThanOrEqual(4.5);
-  });
-
+describe('cores do tema', () => {
   it('acento neutro (sem amarelo) e onAccent têm contraste AA nos dois temas', () => {
     for (const scheme of [colors.light, colors.dark]) {
       expect(scheme.accent).not.toBe('#FFE14D');
@@ -38,23 +36,9 @@ describe('profilePalette', () => {
   });
 });
 
-describe('profileColor', () => {
-  it('usa a chave válida', () => {
-    expect(profileColor('u1', 'mint')).toEqual({ key: 'mint', ...profilePalette.mint });
-  });
-
-  it('é determinístico por userId', () => {
-    expect(profileColor('user-abc')).toEqual(profileColor('user-abc'));
-    expect(profileColor('user-abc', null)).toEqual(profileColor('user-abc'));
-  });
-
-  it.each([undefined, null, '', 'roxo', 'toString'])('chave inválida (%p) cai no fallback do userId', (bad) => {
-    expect(profileColor('user-abc', bad)).toEqual(profileColor('user-abc'));
-    expect(profileColorKeys).toContain(profileColor('user-abc', bad).key);
-  });
-
-  it('distribui ids diferentes em mais de uma cor', () => {
-    const keys = new Set(Array.from({ length: 40 }, (_, i) => profileColor(`id-${i}`).key));
-    expect(keys.size).toBeGreaterThan(3);
+describe('cor de perfil (removida)', () => {
+  it('o tema não tem mais paleta nem cor por fella', () => {
+    expect(theme).not.toHaveProperty('profilePalette');
+    expect(theme).not.toHaveProperty('profileColor');
   });
 });

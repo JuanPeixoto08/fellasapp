@@ -48,7 +48,6 @@ export type UpdateProfileInput = {
   bio: string;
   avatarUri?: string;
   /** Campos extras: string vazia vira null; undefined não altera. */
-  accent_color?: string | null;
   status?: string | null;
   location?: string | null;
   /** ISO `AAAA-MM-DD`. */
@@ -104,7 +103,6 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
     bio,
   };
 
-  if (input.accent_color !== undefined) fields.accent_color = emptyToNull(input.accent_color);
   if (input.status !== undefined) fields.status = emptyToNull(input.status);
   if (input.location !== undefined) fields.location = emptyToNull(input.location);
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
