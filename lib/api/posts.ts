@@ -1,3 +1,4 @@
+import { shrinkForUpload } from '../imageUpload';
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
 import {
@@ -172,7 +173,9 @@ export async function getPost(postId: string): Promise<FeedPost> {
 }
 
 async function uploadImage(userId: string, uri: string, index: number): Promise<string> {
-  const blob = await (await fetch(uri)).blob();
+  const original = await (await fetch(uri)).blob();
+  // GIF sobe como está; o resto vai reduzido (lib/imageUpload)
+  const blob = original.type === 'image/gif' ? original : await (await fetch(await shrinkForUpload(uri))).blob();
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
   // o índice evita colisão de nome quando várias sobem no mesmo milissegundo
   const path = `${userId}/${Date.now()}-${index}.${ext}`;

@@ -58,7 +58,8 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.7,
+        // sem compressão aqui: a foto é reduzida uma vez só, no envio (lib/imageUpload)
+        quality: 1,
         allowsMultipleSelection: room > 1,
         selectionLimit: room,
       });
