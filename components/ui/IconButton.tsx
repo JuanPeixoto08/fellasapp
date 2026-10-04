@@ -2,6 +2,7 @@ import { Pressable } from 'react-native';
 
 import { useTheme, type IconSize } from '../../lib/theme';
 import { Icon, type IconName } from './Icon';
+import { interactiveStyle } from './interactive';
 
 export type IconButtonProps = {
   icon: IconName;
@@ -38,7 +39,7 @@ export function IconButton({
       disabled={disabled}
       onPress={onPress}
       hitSlop={variant === 'ghost' ? t.spacing.xs : undefined}
-      style={({ pressed }) => ({
+      style={(state) => ({
         width: t.layout.minTouch,
         height: t.layout.minTouch,
         borderRadius: t.radii.pill,
@@ -46,8 +47,8 @@ export function IconButton({
         borderColor: t.colors.border,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: solid ? t.colors.primary : pressed ? t.colors.surfaceSunken : 'transparent',
-        opacity: disabled ? 0.4 : pressed && solid ? 0.85 : 1,
+        ...(solid ? { backgroundColor: t.colors.primary, cursor: 'pointer' as const } : interactiveStyle(t, state)),
+        opacity: disabled ? 0.4 : state.pressed && solid ? 0.85 : 1,
       })}
     >
       <Icon
