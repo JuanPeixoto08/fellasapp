@@ -1,6 +1,6 @@
 import { Image, Pressable, View } from 'react-native';
 
-import { shortDate } from '../../lib/format';
+import { postTime } from '../../lib/format';
 import { describeNotification, notificationText, type AppNotification, type NotificationKind } from '../../lib/notifications';
 import { useTheme, type Theme } from '../../lib/theme';
 import { Avatar, Icon, interactiveStyle, Text, type IconName } from '../ui';
@@ -29,7 +29,7 @@ export function NotificationRow({ item, onPress }: Props) {
   const t = useTheme();
   const who = item.actors[0];
   const icon = kindIcon(t, item.kind);
-  const date = shortDate(item.latestAt);
+  const date = postTime(item.latestAt);
   return (
     <Pressable
       accessibilityRole="button"
