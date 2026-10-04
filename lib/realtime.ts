@@ -57,6 +57,14 @@ export function postIdOf(change: LiveChange): string | null {
   return null;
 }
 
+/** Mudança que pode virar notificação para mim (curtida, comentário, reação de outra pessoa; fella novo). */
+export function affectsNotifications(event: LiveEvent): boolean {
+  if (event.kind === 'resync') return true;
+  if (event.mine) return false;
+  if (event.table === 'profiles') return event.type === 'INSERT';
+  return event.table !== 'posts';
+}
+
 export function debounce(fn: () => void, ms: number): (() => void) & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const run = () => {

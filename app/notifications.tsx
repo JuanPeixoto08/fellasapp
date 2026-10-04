@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { Divider, EmptyState, Screen } from '../components/ui';
 import { fetchNotifications, markNotificationsSeen } from '../lib/api/notifications';
 import type { AppNotification } from '../lib/notifications';
 import { setUnreadNotifications } from '../lib/notificationsStore';
+import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../lib/realtime';
 import { useTheme } from '../lib/theme';
 
 export default function NotificationsScreen() {
@@ -40,6 +41,18 @@ export default function NotificationsScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  // tempo real: com a tela aberta, o que chega entra sozinho (sem piscar o carregando)
+  useEffect(() => {
+    const live = debounce(() => void load(), LIVE_DEBOUNCE_MS);
+    const off = onLive((event) => {
+      if (affectsNotifications(event)) live();
+    });
+    return () => {
+      live.cancel();
+      off();
+    };
+  }, [load]);
 
   useFocusEffect(
     useCallback(() => {
