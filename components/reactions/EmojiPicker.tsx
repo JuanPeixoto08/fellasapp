@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -240,6 +240,10 @@ export function EmojiPicker({ visible, selected, onSelect, onClose, anchor }: Pr
           ) : (
             <FlatList
               ref={list}
+              testID="emoji-list"
+              // o seletor abre de dentro de um post do feed (outra lista vertical): sem isto a lista vira um View
+              // comum que não rola, porque acha que a lista de fora rola por ela (mas ela está num modal)
+              renderScrollComponent={(props) => <ScrollView {...props} />}
               style={{ flex: 1 }}
               data={rows}
               keyExtractor={(r) => r.key}

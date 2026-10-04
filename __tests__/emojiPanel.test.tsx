@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { EmojiPicker } from '../components/reactions/EmojiPicker';
@@ -45,6 +45,23 @@ describe('EmojiPicker por faixa', () => {
     expect(style).toMatchObject({ position: 'absolute', width: 400, height: 420, overflow: 'hidden' });
     expect(style.top + 420).toBeLessThanOrEqual(900);
     expect(style.left + 400).toBe(644);
+  });
+
+  it('aberto de dentro do feed (outra lista), a lista de emojis rola sozinha', async () => {
+    mockTier = 'expanded';
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 750, height: 1334 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
+      >
+        <FlatList
+          data={[1]}
+          keyExtractor={String}
+          renderItem={() => <EmojiPicker visible selected={null} onSelect={() => {}} onClose={() => {}} />}
+        />
+      </SafeAreaProvider>,
+    );
+    await screen.findByText('Sorrisos e emoção');
+    expect(screen.getByTestId('emoji-list').type).toBe('RCTScrollView');
   });
 
   it('títulos e emojis não ficam colados na borda do painel', async () => {
