@@ -6,6 +6,19 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
+// a tela de ajuste tem teste próprio (avatarCropper.test); aqui só o fluxo escolher → ajustar → salvar
+jest.mock('../components/profile/AvatarCropper', () => {
+  const { Pressable, View } = require('react-native');
+  return {
+    AvatarCropper: ({ uri, onCancel, onConfirm }: { uri: string | null; onCancel: () => void; onConfirm: (u: string) => void }) =>
+      uri ? (
+        <View testID="cropper-stub">
+          <Pressable accessibilityLabel="Usar recorte de teste" onPress={() => onConfirm(uri + '#recortada')} />
+          <Pressable accessibilityLabel="Cancelar recorte de teste" onPress={onCancel} />
+        </View>
+      ) : null,
+  };
+});
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ signOut: jest.fn() }) }));
 jest.mock('../lib/api/profiles', () => ({
   ...jest.requireActual('../lib/api/profiles'),
@@ -58,5 +71,33 @@ describe('Editar perfil: limites', () => {
   it('não tem mais seletor de cor do perfil', async () => {
     await renderScreen();
     expect(screen.queryByText('Cor do perfil')).toBeNull();
+  });
+});
+
+describe('Editar perfil: foto com recorte', () => {
+  const ImagePicker = jest.requireMock('expo-image-picker') as { launchImageLibraryAsync: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://eu.jpg' }] });
+  });
+
+  it('escolher a foto abre "Ajustar foto" e salva o recorte', async () => {
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Escolher foto'));
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith({ mediaTypes: ['images'], quality: 1 });
+    await fireEvent.press(await screen.findByLabelText('Usar recorte de teste'));
+    expect(screen.queryByTestId('cropper-stub')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: 'file://eu.jpg#recortada' }));
+  });
+
+  it('cancelar o ajuste não troca a foto', async () => {
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Escolher foto'));
+    await fireEvent.press(await screen.findByLabelText('Cancelar recorte de teste'));
+    expect(screen.queryByTestId('cropper-stub')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: undefined }));
   });
 });
