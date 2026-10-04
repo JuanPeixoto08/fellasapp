@@ -41,6 +41,7 @@ export type Database = {
           birthday: string | null;
           is_member: boolean;
           created_at: string;
+          notifications_seen_at: string;
         };
         Insert: {
           id: string;
@@ -53,6 +54,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           created_at?: string;
+          notifications_seen_at?: string;
         };
         Update: {
           id?: string;
@@ -65,6 +67,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           created_at?: string;
+          notifications_seen_at?: string;
         };
         Relationships: [];
       };
@@ -254,6 +257,28 @@ export type Database = {
       is_member: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      notifications_feed: {
+        Args: { p_limit?: number };
+        Returns: {
+          kind: string;
+          post_id: string | null;
+          comment_id: string | null;
+          actor_ids: string[];
+          actor_count: number;
+          emojis: string[];
+          body: string | null;
+          latest_at: string;
+          unread: boolean;
+        }[];
+      };
+      unread_notifications_count: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      mark_notifications_seen: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
       };
     };
     Enums: { [_ in never]: never };
