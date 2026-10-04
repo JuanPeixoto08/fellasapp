@@ -5,9 +5,12 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput
 import { createPost, MAX_IMAGES } from '../../lib/api/posts';
 import { clearDraft, setDraft, useDraft } from '../../lib/composerDraft';
 import { friendlyError } from '../../lib/errors';
+import { activeMention, insertMention } from '../../lib/mentions';
+import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { emitPostCreated } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
+import { MentionSuggestions } from '../MentionSuggestions';
 import { useContentWidth } from '../shell/ShellContext';
 import { Avatar, Button, ConfirmDialog, Icon, IconButton, Text, useAutoGrow } from '../ui';
 
@@ -47,11 +50,28 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     min: t.typography.lead.lineHeight + t.spacing.sm,
   });
 
+  // @: posição do cursor (null = fim do texto, logo depois de digitar) e a menção sendo escrita
+  const [cursor, setCursor] = useState<number | null>(null);
+  const mention = activeMention(body, Math.min(cursor ?? body.length, body.length));
+
   const room = MAX_IMAGES - imageUris.length;
   const hasDraft = body.trim().length > 0 || imageUris.length > 0;
   // coluna de conteúdo - margens - avatar - espaço entre avatar e conteúdo
   const column = contentWidth - t.layout.gutter * 2 - t.avatarSizes.md - t.spacing.md;
   const thumb = Math.floor((column - t.spacing.sm * (MAX_IMAGES - 1)) / MAX_IMAGES);
+
+  /** Escolhidas na galeria ou coladas (Ctrl+V): até MAX_IMAGES, avisando quando sobra. */
+  const addImages = (picked: string[]) => {
+    const { uris, overflow } = addPasted(imageUris, picked, MAX_IMAGES);
+    if (overflow) setError(`Cabem ${MAX_IMAGES} fotos por post. Fiquei com as primeiras.`);
+    setDraft((d) => ({ ...d, imageUris: uris }));
+  };
+  // web: Ctrl+V com imagem no campo vira foto do post
+  usePasteImages(input, (uris) => {
+    if (saving) return;
+    setError(null);
+    addImages(uris);
+  });
 
   const pickImages = async () => {
     setError(null);
@@ -63,13 +83,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         allowsMultipleSelection: room > 1,
         selectionLimit: room,
       });
-      if (!result.canceled) {
-        const picked = result.assets.map((a) => a.uri);
-        if (imageUris.length + picked.length > MAX_IMAGES) {
-          setError(`Cabem ${MAX_IMAGES} fotos por post. Fiquei com as primeiras.`);
-        }
-        setDraft((d) => ({ ...d, imageUris: [...d.imageUris, ...picked].slice(0, MAX_IMAGES) }));
-      }
+      if (!result.canceled) addImages(result.assets.map((a) => a.uri));
     } catch {
       setError('Não consegui abrir suas fotos. Confere a permissão do app e tenta de novo.');
     }
@@ -124,12 +138,26 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             multiline
             maxLength={MAX_BODY}
             value={body}
-            onChangeText={(text) => setDraft((d) => ({ ...d, body: text }))}
+            onChangeText={(text) => {
+              setDraft((d) => ({ ...d, body: text }));
+              setCursor(null);
+            }}
+            onSelectionChange={(e) => setCursor(e.nativeEvent.selection.end)}
             editable={!saving}
             textAlignVertical="top"
             style={[t.typography.lead, { color: t.colors.text, paddingTop: t.spacing.sm, height: grow.height }]}
           />
         </View>
+        {mention ? (
+          <MentionSuggestions
+            query={mention.query}
+            onPick={(username) => {
+              setDraft((d) => ({ ...d, body: insertMention(d.body, mention, username) }));
+              setCursor(null);
+              input.current?.focus();
+            }}
+          />
+        ) : null}
         {!hasDraft && variant !== 'inline' ? (
           <Text variant="small" tone="muted">
             Uma frase, até {MAX_IMAGES} fotos, ou os dois. Só os fellas veem.

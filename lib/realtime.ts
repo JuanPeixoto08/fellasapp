@@ -57,12 +57,12 @@ export function postIdOf(change: LiveChange): string | null {
   return null;
 }
 
-/** Mudança que pode virar notificação para mim (curtida, comentário, reação de outra pessoa; fella novo). */
+/** Mudança que pode virar notificação para mim (curtida, comentário, reação, post que me marca; fella novo). */
 export function affectsNotifications(event: LiveEvent): boolean {
   if (event.kind === 'resync') return true;
   if (event.mine) return false;
-  if (event.table === 'profiles') return event.type === 'INSERT';
-  return event.table !== 'posts';
+  if (event.table === 'profiles' || event.table === 'posts') return event.type === 'INSERT';
+  return true;
 }
 
 export function debounce(fn: () => void, ms: number): (() => void) & { cancel: () => void } {

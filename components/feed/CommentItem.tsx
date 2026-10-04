@@ -5,7 +5,8 @@ import { ReactButton, ReactionBar, ReactionPicker } from '../reactions';
 import { Avatar, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
-import { shortDate } from '../../lib/format';
+import { postTime } from '../../lib/format';
+import { MentionText } from '../MentionText';
 import { nextReaction } from '../../lib/reactionState';
 
 type Props = {
@@ -19,7 +20,7 @@ export function CommentItem({ comment, onReact }: Props) {
   const [picking, setPicking] = useState(false);
   const react = (emoji: string) => onReact?.(comment, nextReaction(comment.myReaction, emoji));
   const name = comment.author.display_name || comment.author.username;
-  const date = shortDate(comment.createdAt);
+  const date = postTime(comment.createdAt);
   return (
     <View style={{ flexDirection: 'row', gap: t.spacing.md, paddingHorizontal: t.layout.gutter, paddingTop: t.spacing.sm }}>
       <Avatar name={name} uri={comment.author.avatar_url} size={t.avatarSizes.sm} />
@@ -42,7 +43,7 @@ export function CommentItem({ comment, onReact }: Props) {
             accessibilityLabel={`Comentário de ${name}`}
             style={{ flex: 1 }}
           >
-            <Text>{comment.body}</Text>
+            <MentionText text={comment.body} />
           </Pressable>
           <View style={{ marginVertical: -t.spacing.sm, marginRight: -t.spacing.sm }}>
             <ReactButton myReaction={comment.myReaction} onPress={() => setPicking(true)} />

@@ -7,6 +7,7 @@ import PostDetailScreen from '../app/post/[id]';
 import { addComment, deletePost, getPost, listComments, toggleLike } from '../lib/api/posts';
 import { setCommentReaction, setPostReaction } from '../lib/api/reactions';
 import { emitLive, LIVE_DEBOUNCE_MS, type LiveChange } from '../lib/realtime';
+import { setMemberDirectory } from '../lib/memberDirectory';
 
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
 const mockBack = jest.fn();
@@ -208,6 +209,35 @@ describe('PostDetailScreen', () => {
     await fireEvent.press(screen.getByLabelText('Reagir com 😮'));
     await waitFor(() => expect(setComment).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByLabelText('😮 1 reação')).toBeNull());
+  });
+});
+
+describe('PostDetailScreen: marcar com @', () => {
+  it('no comentário, @ sugere fellas e escolher completa', async () => {
+    setMemberDirectory([
+      { id: 'u1', username: 'ana', name: 'Ana', avatarUrl: null },
+      { id: 'u2', username: 'bia', name: 'Bia', avatarUrl: null },
+    ]);
+    await renderLoaded();
+    await fireEvent.changeText(screen.getByPlaceholderText('Comentar como Você…'), 'boa @b');
+    await fireEvent.press(screen.getByLabelText('Marcar Bia (@bia)'));
+    expect(screen.getByDisplayValue('boa @bia ')).toBeTruthy();
+  });
+
+  it('@ de fella no comentário aparece como link', async () => {
+    setMemberDirectory([{ id: 'u2', username: 'bia', name: 'Bia', avatarUrl: null }]);
+    listCommentsMock.mockResolvedValueOnce([
+      {
+        id: 'c1',
+        body: 'valeu @bia',
+        createdAt: '2026-01-01T00:00:00Z',
+        author: { id: 'u2', username: 'bia', display_name: 'Bia', avatar_url: null },
+        reactions: [],
+        myReaction: null,
+      },
+    ]);
+    await render(<PostDetailScreen />, { wrapper: SafeArea });
+    expect(await screen.findByLabelText('Ver perfil de Bia')).toBeTruthy();
   });
 });
 

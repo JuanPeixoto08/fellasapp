@@ -14,6 +14,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 injectWebStyles();
 
 import { NotificationsSync } from '../components/notifications/NotificationsSync';
+import { MemberDirectorySync } from '../components/realtime/MemberDirectorySync';
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
 import { AppShell } from '../components/shell/AppShell';
 import { AuthGuard } from '../lib/auth/AuthGuard';
@@ -40,6 +41,7 @@ export default function RootLayout() {
       <StatusBar style="auto" />
       <NotificationsSync />
       <RealtimeSync />
+      <MemberDirectorySync />
       <AuthGuard>
         <AppShell>
           <Stack screenOptions={{ headerShown: false }}>

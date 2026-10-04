@@ -62,6 +62,13 @@ describe('describeNotification', () => {
     );
   });
 
+  it('marcação em post e em comentário', () => {
+    expect(notificationText(n({ kind: 'mention', body: '@juan parabéns' }))).toBe('Ana te marcou num post: “@juan parabéns”');
+    expect(notificationText(n({ kind: 'mention', commentId: 'c1', body: 'olha isso @juan' }))).toBe(
+      'Ana te marcou num comentário: “olha isso @juan”',
+    );
+  });
+
   it('aniversário e fella novo', () => {
     expect(notificationText(n({ kind: 'birthday', postId: null, actors: [p('Juan')] }))).toBe(
       'Hoje é aniversário de Juan',

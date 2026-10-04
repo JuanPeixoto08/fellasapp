@@ -74,7 +74,10 @@ Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celula
 - Web/desktop: hover `surfaceSunken` + cursor de mão em clicáveis (`interactiveStyle`); ← → Esc no visualizador.
 
 ## Notificações
-Tela `/notifications` no padrão "sem caixa" (linhas com `Divider`). Linha: ponto `brand` de não lida + fundo `surfaceSunken` só na visita em que chegou; avatar `md` com o ícone do tipo num círculo `bg` encostado no canto (coração `like`, balão, carinha, presente, pessoa+); texto com nomes em negrito e data `shortDate` em `textMuted`; miniatura quadrada `avatarSizes.md` raio `md` quando o post tem foto. Entrada: no celular, sino (`IconButton` ghost) à direita da marca no topo do feed; no computador, item da lateral. `Badge` (components/ui): pílula `brand` + texto `onBrand` caption bold, altura `layout.badgeSize`, "9+" acima de 9, 0 não aparece. Sem emoji no texto do sistema; os emojis de reação são conteúdo.
+Tela `/notifications` no padrão "sem caixa" (linhas com `Divider`). Linha: ponto `brand` de não lida + fundo `surfaceSunken` só na visita em que chegou; avatar `md` com o ícone do tipo num círculo `bg` encostado no canto (coração `like`, balão, carinha, presente, pessoa+); texto com nomes em negrito e horário `postTime` em `textMuted` (aniversário sem horário: o texto já diz "hoje"); miniatura quadrada `avatarSizes.md` raio `md` quando o post tem foto. Entrada: no celular, sino (`IconButton` ghost) à direita da marca no topo do feed; no computador, item da lateral. `Badge` (components/ui): pílula `brand` + texto `onBrand` caption bold, altura `layout.badgeSize`, "9+" acima de 9, 0 não aparece. Sem emoji no texto do sistema; os emojis de reação são conteúdo.
+
+## Menções e horário
+@usuario de fella em post/comentário: negrito na cor `brand`, toque abre o perfil (`MentionText`). Ao digitar @ no compositor ou no comentário aparece `MentionSuggestions` (até 5 fellas: avatar `sm`, nome em negrito, @usuario em `textMuted`, caixa `surface` com fio `border` e raio `md`). Horário de post/comentário/notificação: "agora", "há 5 min", "há 3 h", "ontem 14:32", "3 out 14:32" (`postTime`).
 
 ## Não fazer
 Embutir o arquivo .otf da Galaxia; usar a Galaxia em outro texto que não a marca; cartão dentro de cartão; eyebrow acima de título; texto em gradiente; borda lateral colorida; cinza puro; fonte de sistema como display.
