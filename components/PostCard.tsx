@@ -8,7 +8,7 @@ import { ReactButton, ReactionBar, ReactionPicker } from './reactions';
 import { Avatar, ConfirmDialog, IconButton, Text } from './ui';
 import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
-import { shortDate } from '../lib/format';
+import { postTime } from '../lib/format';
 import { nextReaction } from '../lib/reactionState';
 
 type Props = {
@@ -33,7 +33,7 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
   const [hovered, setHovered] = useState(false);
   const react = (emoji: string) => onReact?.(post, nextReaction(post.myReaction, emoji));
   const name = post.author.display_name || post.author.username;
-  const date = shortDate(post.createdAt);
+  const date = postTime(post.createdAt);
   const pressImage = onPressImage
     ? (i: number) => onPressImage(post, i)
     : onPress

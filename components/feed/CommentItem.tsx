@@ -5,7 +5,7 @@ import { ReactButton, ReactionBar, ReactionPicker } from '../reactions';
 import { Avatar, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
-import { shortDate } from '../../lib/format';
+import { postTime } from '../../lib/format';
 import { nextReaction } from '../../lib/reactionState';
 
 type Props = {
@@ -19,7 +19,7 @@ export function CommentItem({ comment, onReact }: Props) {
   const [picking, setPicking] = useState(false);
   const react = (emoji: string) => onReact?.(comment, nextReaction(comment.myReaction, emoji));
   const name = comment.author.display_name || comment.author.username;
-  const date = shortDate(comment.createdAt);
+  const date = postTime(comment.createdAt);
   return (
     <View style={{ flexDirection: 'row', gap: t.spacing.md, paddingHorizontal: t.layout.gutter, paddingTop: t.spacing.sm }}>
       <Avatar name={name} uri={comment.author.avatar_url} size={t.avatarSizes.sm} />

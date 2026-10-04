@@ -1,6 +1,6 @@
 import { resolveUrl } from '../lib/api/storage';
 import { friendlyError, isUniqueViolation } from '../lib/errors';
-import { memberSince, shortDate } from '../lib/format';
+import { memberSince, postTime, shortDate } from '../lib/format';
 import { emitPostCreated, emitPostDeleted, onPostCreated, onPostDeleted } from '../lib/postEvents';
 import { withLike } from '../lib/reactionState';
 
@@ -93,5 +93,28 @@ describe('resolveUrl', () => {
     expect(resolveUrl('https://cdn/x.png', signed)).toBe('https://cdn/x.png');
     expect(resolveUrl('u1/sem-assinatura.jpg', signed)).toBeNull();
     expect(resolveUrl(null, signed)).toBeNull();
+  });
+});
+
+describe('postTime', () => {
+  const now = new Date(2026, 9, 4, 15, 0, 0); // 4 out 2026, 15:00 (hora local)
+  const at = (...a: number[]) => new Date(a[0], a[1], a[2], a[3] ?? 0, a[4] ?? 0, a[5] ?? 0).toISOString();
+
+  it('agora, minutos e horas', () => {
+    expect(postTime(at(2026, 9, 4, 14, 59, 30), now)).toBe('agora');
+    expect(postTime(at(2026, 9, 4, 14, 55), now)).toBe('há 5 min');
+    expect(postTime(at(2026, 9, 4, 12, 0), now)).toBe('há 3 h');
+    expect(postTime(at(2026, 9, 3, 16, 0), now)).toBe('há 23 h');
+  });
+
+  it('depois de um dia: ontem ou data, sempre com a hora', () => {
+    expect(postTime(at(2026, 9, 3, 9, 5), now)).toBe('ontem 09:05');
+    expect(postTime(at(2026, 9, 1, 14, 32), now)).toBe('1 out 14:32');
+    expect(postTime(at(2025, 11, 25, 20, 0), now)).toBe('25 dez 2025 20:00');
+  });
+
+  it('relógio adiantado (data no futuro) vira "agora"; inválida, vazio', () => {
+    expect(postTime(at(2026, 9, 4, 15, 2), now)).toBe('agora');
+    expect(postTime('nada', now)).toBe('');
   });
 });
