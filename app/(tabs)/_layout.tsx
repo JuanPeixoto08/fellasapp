@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useLayoutTier } from '../../lib/layout';
 import { getTabBarStyle } from '../../lib/tabBarStyle';
 import { useTheme } from '../../lib/theme';
 
@@ -17,6 +18,7 @@ function tabIcon(active: IconName, inactive: IconName) {
 export default function TabsLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const tier = useLayoutTier();
 
   return (
     <Tabs
@@ -26,7 +28,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: t.colors.brand,
         tabBarInactiveTintColor: t.colors.textMuted,
         tabBarLabelStyle: { fontFamily: t.fonts.bodyMedium, fontSize: t.typography.caption.fontSize },
-        tabBarStyle: getTabBarStyle(t, insets),
+        // no desktop a navegação é a barra lateral da moldura
+        tabBarStyle: tier === 'compact' ? getTabBarStyle(t, insets) : { display: 'none' },
       }}
     >
       <Tabs.Screen
