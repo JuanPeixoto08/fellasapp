@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
@@ -9,7 +9,9 @@ import { Avatar, Heading, Icon, Text, type IconName } from '../ui';
 type Props = {
   profile: Profile;
   avatarUri: string | null;
-  /** Botões de ícone à direita do nome (só no meu perfil). */
+  /** Banner (URL assinada); sem banner, faixa lisa do mesmo tamanho. */
+  bannerUri?: string | null;
+  /** Botões de ícone à direita, logo abaixo do banner (só no meu perfil). */
   actions?: ReactNode;
 };
 
@@ -20,9 +22,11 @@ function birthdayDayMonth(iso: string | null | undefined): string | null {
 }
 
 /**
- * Cabeçalho compacto: avatar, nome e ações numa linha; status como chip neutro, bio e info logo abaixo.
+ * Cabeçalho estilo Twitter: banner 3:1 de ponta a ponta, foto grande com anel da cor do fundo encostada
+ * na borda de baixo do banner e ações à direita; nome, status como chip neutro, bio e info logo abaixo.
+ * Ocupa a largura toda (o banner encosta nas bordas); o resto tem o gutter da tela.
  */
-export function ProfileHeader({ profile, avatarUri, actions }: Props) {
+export function ProfileHeader({ profile, avatarUri, bannerUri, actions }: Props) {
   const t = useTheme();
   const name = profile.display_name || profile.username;
   const birthday = birthdayDayMonth(profile.birthday);
@@ -32,11 +36,32 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
   if (birthday) info.push({ icon: 'gift-outline', label: 'Aniversário', text: birthday });
   if (since) info.push({ icon: 'calendar-clear-outline', label: 'Membro', text: since });
 
+  const banner = { width: '100%' as const, aspectRatio: t.layout.bannerAspect, backgroundColor: t.colors.surfaceSunken };
+  // a foto fica metade em cima do banner: o anel (cor do fundo) separa ela da imagem
+  const ringed = t.avatarSizes.xl + t.borders.selected * 2;
+
   return (
-    <View style={{ gap: t.spacing.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-        <Avatar name={name} uri={avatarUri} size={t.avatarSizes.lg} />
-        <View style={{ flex: 1 }}>
+    <View>
+      {bannerUri ? (
+        <Image accessibilityLabel={`Banner de ${name}`} source={{ uri: bannerUri }} style={banner} />
+      ) : (
+        <View testID="profile-banner-empty" style={banner} />
+      )}
+      <View style={{ gap: t.spacing.md, paddingHorizontal: t.layout.gutter, marginTop: -ringed / 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View
+            style={{
+              borderRadius: t.radii.pill,
+              borderWidth: t.borders.selected,
+              borderColor: t.colors.bg,
+              backgroundColor: t.colors.bg,
+            }}
+          >
+            <Avatar name={name} uri={avatarUri} size={t.avatarSizes.xl} />
+          </View>
+          {actions ? <View style={{ flexDirection: 'row', gap: t.spacing.xs }}>{actions}</View> : null}
+        </View>
+        <View>
           <Heading level={2} numberOfLines={2}>
             {name}
           </Heading>
@@ -44,42 +69,41 @@ export function ProfileHeader({ profile, avatarUri, actions }: Props) {
             @{profile.username}
           </Text>
         </View>
-        {actions ? <View style={{ flexDirection: 'row', gap: t.spacing.xs }}>{actions}</View> : null}
+        {profile.status ? (
+          <View
+            testID="profile-status"
+            style={{
+              alignSelf: 'flex-start',
+              backgroundColor: t.colors.surfaceSunken,
+              borderRadius: t.radii.pill,
+              paddingHorizontal: t.spacing.md,
+              paddingVertical: t.spacing.xs,
+            }}
+          >
+            <Text variant="small" bold>
+              {profile.status}
+            </Text>
+          </View>
+        ) : null}
+        {profile.bio ? <Text>{profile.bio}</Text> : null}
+        {info.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: t.spacing.lg, rowGap: t.spacing.xs }}>
+            {info.map((item) => (
+              <View
+                key={item.label}
+                accessible
+                accessibilityLabel={`${item.label}: ${item.text}`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}
+              >
+                <Icon name={item.icon} size="sm" tone="muted" />
+                <Text variant="small" tone="muted">
+                  {item.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
-      {profile.status ? (
-        <View
-          testID="profile-status"
-          style={{
-            alignSelf: 'flex-start',
-            backgroundColor: t.colors.surfaceSunken,
-            borderRadius: t.radii.pill,
-            paddingHorizontal: t.spacing.md,
-            paddingVertical: t.spacing.xs,
-          }}
-        >
-          <Text variant="small" bold>
-            {profile.status}
-          </Text>
-        </View>
-      ) : null}
-      {profile.bio ? <Text>{profile.bio}</Text> : null}
-      {info.length > 0 ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: t.spacing.lg, rowGap: t.spacing.xs }}>
-          {info.map((item) => (
-            <View
-              key={item.label}
-              accessible
-              accessibilityLabel={`${item.label}: ${item.text}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}
-            >
-              <Icon name={item.icon} size="sm" tone="muted" />
-              <Text variant="small" tone="muted">
-                {item.text}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }

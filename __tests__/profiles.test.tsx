@@ -263,6 +263,24 @@ describe('ProfileView', () => {
     expect(mockUsePostList).toHaveBeenCalledWith({ authorId: 'u1' });
   });
 
+  it('banner no topo quando a pessoa tem um', async () => {
+    (profileRow as Record<string, unknown>).banner_url = 'u1/banner-1.jpg';
+    try {
+      await renderProfile();
+      const banner = await screen.findByLabelText('Banner de Ana');
+      expect(banner.props.source).toEqual({ uri: 'https://x/u1/banner-1.jpg' });
+    } finally {
+      delete (profileRow as Record<string, unknown>).banner_url;
+    }
+  });
+
+  it('sem banner: faixa lisa do mesmo tamanho (o layout não pula)', async () => {
+    await renderProfile();
+    await screen.findByText('@ana_01');
+    expect(screen.queryByLabelText('Banner de Ana')).toBeNull();
+    expect(screen.getByTestId('profile-banner-empty')).toBeTruthy();
+  });
+
   it('mostra status, info e estatísticas, sem cor de perfil', async () => {
     await renderProfile();
     expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();

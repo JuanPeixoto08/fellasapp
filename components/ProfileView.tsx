@@ -51,6 +51,7 @@ export default function ProfileView({ userId, actions, header }: Props) {
   const isMe = useSession().session?.user.id === userId;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,11 +66,12 @@ export default function ProfileView({ userId, actions, header }: Props) {
       const p = await getProfile(userId);
       // avatar e estatísticas são extras: se falharem, o resto do perfil continua
       const [signed, st] = await Promise.all([
-        signPaths([p.avatar_url]).catch(() => new Map<string, string>()),
+        signPaths([p.avatar_url, p.banner_url]).catch(() => new Map<string, string>()),
         getProfileStats(userId).catch(() => null),
       ]);
       setProfile(p);
       setAvatarUri(resolveUrl(p.avatar_url, signed));
+      setBannerUri(resolveUrl(p.banner_url, signed));
       setStats(st);
       setError(null);
     } catch (e) {
@@ -143,6 +145,7 @@ export default function ProfileView({ userId, actions, header }: Props) {
     <ProfileContent
       profile={profile}
       avatarUri={avatarUri}
+      bannerUri={bannerUri}
       stats={stats}
       actions={actions}
       isMe={isMe}
@@ -169,6 +172,7 @@ export default function ProfileView({ userId, actions, header }: Props) {
 type ContentProps = {
   profile: Profile;
   avatarUri: string | null;
+  bannerUri?: string | null;
   stats: Stats | Pick<Stats, 'posts' | 'likesReceived' | 'commentsReceived'> | null;
   actions?: ReactNode;
   isMe: boolean;
@@ -191,6 +195,7 @@ type ContentProps = {
 export function ProfileContent({
   profile,
   avatarUri,
+  bannerUri,
   stats,
   actions,
   isMe,
@@ -266,11 +271,13 @@ export function ProfileContent({
           gap: photosTab ? t.spacing.xs : 0,
         }}
         ListHeaderComponent={
-          <View style={{ gap: t.spacing.lg, paddingTop: t.spacing.lg, marginBottom: photosTab ? t.spacing.sm : 0 }}>
-            <View style={{ gap: t.spacing.lg, paddingHorizontal: t.layout.gutter }}>
-              <ProfileHeader profile={profile} avatarUri={avatarUri} actions={actions} />
-              {stats ? <ProfileStats stats={stats} /> : null}
-            </View>
+          <View style={{ gap: t.spacing.lg, marginBottom: photosTab ? t.spacing.sm : 0 }}>
+            <ProfileHeader profile={profile} avatarUri={avatarUri} bannerUri={bannerUri} actions={actions} />
+            {stats ? (
+              <View style={{ paddingHorizontal: t.layout.gutter }}>
+                <ProfileStats stats={stats} />
+              </View>
+            ) : null}
             <Tabs
               items={[
                 { key: 'posts', label: 'Posts' },
