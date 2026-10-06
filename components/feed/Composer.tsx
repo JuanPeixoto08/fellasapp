@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/errors';
 import { activeMention, insertMention } from '../../lib/mentions';
 import { activeTag, insertTag } from '../../lib/tags';
 import { cleanPlace } from '../../lib/places';
+import { isFieldTarget } from '../../lib/fieldTarget';
 import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { emitPostCreated } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
@@ -136,7 +137,10 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       <Avatar name={me.name} uri={me.uri} size={t.avatarSizes.md} />
       {/* a coluna inteira foca o campo, como no Twitter: tocar no vazio abre o teclado */}
       <Pressable
-        onPress={() => input.current?.focus()}
+        // web: o clique num campo daqui de dentro (o do local) também sobe até aqui; não roubar o foco dele
+        onPress={(e) => {
+          if (!isFieldTarget(e.target)) input.current?.focus();
+        }}
         accessible={false}
         style={{
           flex: 1,
