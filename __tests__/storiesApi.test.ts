@@ -198,6 +198,7 @@ describe('listActiveStories', () => {
     expect(groups.find((g) => g.author.id === 'bia')!.author.name).toBe('bia');
     expect(ana.stories[1].mediaUrl).toBe(`https://res.cloudinary.com/slxposvw/video/upload/c_limit,w_1280,h_1280,q_auto,f_mp4/stories/${'2'.repeat(64)}`);
     expect(ana.stories[1].originalUrl).toBe(`https://res.cloudinary.com/slxposvw/video/upload/stories/${'2'.repeat(64)}`);
+    expect(ana.stories[1].thumbUrl).toBe(`https://res.cloudinary.com/slxposvw/video/upload/so_0,c_fill,w_360,h_640,q_auto,f_jpg/stories/${'2'.repeat(64)}`);
   });
 });
 

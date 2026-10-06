@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { storyMediaUrl, storyOriginalUrl } from '../cloudinary';
+import { storyMediaUrl, storyOriginalUrl, storyThumbUrl } from '../cloudinary';
 import { STORIES_FUNCTION_URL } from '../storiesConfig';
 import { supabase } from '../supabase';
 import { isValidReactionEmoji } from './reactions';
@@ -8,7 +8,7 @@ import { getCurrentUserId } from './profiles';
 import { resolveUrl, signPaths } from './storage';
 
 export type StoryKind = 'photo' | 'video';
-export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; /** Original: toca enquanto a versão reduzida do vídeo ainda processa. */ originalUrl?: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null };
+export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; /** Original: toca enquanto a versão reduzida do vídeo ainda processa. */ originalUrl?: string; /** Miniatura dos cartões do carrossel (computador). */ thumbUrl?: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null };
 export type StoryAuthor = { id: string; name: string; username: string; avatarUrl: string | null };
 export type StoryGroup = { author: StoryAuthor; stories: Story[]; hasUnseen: boolean; latestAt: string };
 export type StoryViewer = { person: StoryAuthor; viewedAt: string; emoji: string | null };
@@ -149,6 +149,7 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
     const story: Story = {
       id: r.id, authorId: r.author_id, kind: r.kind,
       mediaUrl: storyMediaUrl(r.media_id, r.kind), originalUrl: storyOriginalUrl(r.media_id, r.kind),
+      thumbUrl: storyThumbUrl(r.media_id, r.kind),
       durationMs: r.duration_ms, createdAt: r.created_at, seen: seen.has(r.id), myReaction: mine.get(r.id) ?? null,
     };
     g.stories.push(story);

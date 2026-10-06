@@ -11,6 +11,12 @@ export function tierForWidth(width: number): LayoutTier {
   return 'compact';
 }
 
+/** Tamanho da janela (para quem desenha pela janela inteira, como o story no computador). */
+export function useWindowSize(): { width: number; height: number } {
+  const { width, height } = useWindowDimensions();
+  return { width, height };
+}
+
 /** Faixa atual pela largura da janela; muda na hora ao redimensionar. */
 export function useLayoutTier(): LayoutTier {
   return tierForWidth(useWindowDimensions().width);

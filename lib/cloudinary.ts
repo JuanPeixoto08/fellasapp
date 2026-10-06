@@ -14,5 +14,9 @@ const base = (kind: StoryKind) =>
 
 /** Versão reduzida (a que o app mostra). */
 export const storyMediaUrl = (mediaId: string, kind: StoryKind) => `${base(kind)}/${STORY_TRANSFORMATIONS[kind]}/${mediaId}`;
+/** Miniatura dos cartões do carrossel (vídeo: o primeiro quadro), pequena e em JPG. */
+const THUMB = 'c_fill,w_360,h_640,q_auto,f_jpg';
+export const storyThumbUrl = (mediaId: string, kind: StoryKind) =>
+  `${base(kind)}/${kind === 'video' ? `so_0,${THUMB}` : THUMB}/${mediaId}`;
 /** O arquivo como foi enviado (vídeo: enquanto a reduzida ainda processa). */
 export const storyOriginalUrl = (mediaId: string, kind: StoryKind) => `${base(kind)}/${mediaId}`;

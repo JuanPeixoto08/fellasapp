@@ -159,6 +159,11 @@ export const layout = {
   mediaAspect: { min: 3 / 4, max: 1.91, grid: 16 / 9 },
   /** Banner do perfil (largura/altura), como no Twitter. */
   bannerAspect: 3,
+  /** Story em pé (largura/altura) e, no computador, a altura dos cartões ao lado como fração do aberto. */
+  storyAspect: 9 / 16,
+  storySideScale: 0.45,
+  /** Desfoque da imagem que preenche o story atrás de uma foto/vídeo que não é em pé. */
+  storyBackdropBlur: 24,
   gutter: spacing.lg,
   minTouch: 44,
 } as const;

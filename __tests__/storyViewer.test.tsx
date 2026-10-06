@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const mockStatus: ((e: { status: string }) => void)[] = [];
@@ -34,6 +34,13 @@ jest.mock('../lib/api/stories', () => ({
   reactToStory: (id: string, e: string | null) => mockReact(id, e),
 }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
+let mockTier = 'compact';
+let mockSize = { width: 400, height: 800 };
+jest.mock('../lib/layout', () => ({
+  ...jest.requireActual('../lib/layout'),
+  useLayoutTier: () => mockTier,
+  useWindowSize: () => mockSize,
+}));
 
 import { StoryViewerHost } from '../components/stories/StoryViewerHost';
 import type { StoryGroup } from '../lib/api/stories';
@@ -58,6 +65,8 @@ beforeEach(() => {
     doNotFake: ['setImmediate', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'nextTick', 'performance', 'Date', 'requestAnimationFrame', 'cancelAnimationFrame'],
   });
   jest.clearAllMocks();
+  mockTier = 'compact';
+  mockSize = { width: 400, height: 800 };
   closeStories(); // nada montado ainda: sem act (um act síncrono aqui trava o render seguinte no RNTL 14)
 });
 afterEach(() => jest.useRealTimers());
@@ -182,5 +191,70 @@ describe('StoryViewer: revisão', () => {
     await fireEvent.press(screen.getByLabelText('Reagir'));
     expect(screen.getByLabelText('Reagir com 😂')).toBeTruthy();
     expect(screen.queryByLabelText('Mais emojis')).toBeNull();
+  });
+});
+
+describe('StoryViewer: pausar e computador', () => {
+  it('botão de pausar no topo: pausa e continua; soltar o dedo não desfaz a pausa do botão', async () => {
+    await open([g('ana', s('a1'), s('a2'))], 'ana');
+    await loaded();
+    await fireEvent.press(screen.getByLabelText('Pausar'));
+    expect(screen.getByLabelText('Continuar')).toBeTruthy();
+    await act(async () => {
+      jest.advanceTimersByTime(8000);
+    });
+    expect(screen.getByLabelText('Story 1 de 2 de ANA')).toBeTruthy();
+    await fireEvent(screen.getByLabelText('Próximo'), 'longPress');
+    await fireEvent(screen.getByLabelText('Próximo'), 'pressOut');
+    await act(async () => {
+      jest.advanceTimersByTime(8000);
+    });
+    expect(screen.getByLabelText('Story 1 de 2 de ANA')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Continuar'));
+    await act(async () => {
+      jest.advanceTimersByTime(5100);
+    });
+    expect(screen.getByLabelText('Story 2 de 2 de ANA')).toBeTruthy();
+  });
+
+  it('celular: tela cheia, sem cartões nem setas; segurar não seleciona texto (data-no-select)', async () => {
+    await open([g('ana', s('a1')), g('bia', s('b1'))], 'ana');
+    expect(screen.queryByLabelText(/Ver stories de/)).toBeNull();
+    expect(screen.queryByLabelText('Próximo story')).toBeNull();
+    expect(screen.getByTestId('story-viewer').props.dataSet).toEqual({ noSelect: 'true' });
+  });
+
+  it('computador: story aberto num quadro 9:16; as outras pessoas em cartões; clicar pula para ela', async () => {
+    mockTier = 'expanded';
+    mockSize = { width: 2000, height: 900 };
+    await open([g('ana', s('a1')), g('bia', s('b1')), g('caio', s('c1'))], 'ana');
+    const frame = StyleSheet.flatten(screen.getByTestId('story-frame').props.style);
+    expect(Math.abs(frame.width / frame.height - 9 / 16)).toBeLessThan(0.01);
+    expect(frame.height).toBeLessThan(900);
+    expect(screen.getByLabelText('Ver stories de BIA')).toBeTruthy();
+    expect(screen.getByLabelText('Ver stories de CAIO')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Ver stories de CAIO'));
+    expect(screen.getByLabelText('Story 1 de 1 de CAIO')).toBeTruthy();
+    // agora há alguém antes: a ANA aparece à esquerda
+    expect(screen.getByLabelText('Ver stories de ANA')).toBeTruthy();
+  });
+
+  it('atrás da foto, a mesma imagem desfocada preenche o quadro (foto deitada não deixa faixa preta)', async () => {
+    await open([g('ana', s('a1'))], 'ana');
+    const backdrop = screen.getByTestId('story-backdrop');
+    expect(backdrop.props.source).toEqual({ uri: 'https://w/m/a1' });
+    expect(backdrop.props.blurRadius).toBeGreaterThan(0);
+  });
+
+  it('computador: setas ‹ › ao lado do story (sem "anterior" no primeiro de todos)', async () => {
+    mockTier = 'expanded';
+    mockSize = { width: 1600, height: 900 };
+    await open([g('ana', s('a1'), s('a2'))], 'ana');
+    expect(screen.queryByLabelText('Story anterior')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Próximo story'));
+    expect(screen.getByLabelText('Story 2 de 2 de ANA')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Story anterior'));
+    expect(screen.getByLabelText('Story 1 de 2 de ANA')).toBeTruthy();
+    expect(screen.getByLabelText('Fechar')).toBeTruthy();
   });
 });

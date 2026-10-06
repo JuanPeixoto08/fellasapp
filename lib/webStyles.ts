@@ -8,6 +8,8 @@ import { colors } from './theme';
  * - `#root` em 100dvh: a altura acompanha a barra do navegador móvel e as colunas do desktop ocupam a tela.
  * - Campos de texto sem o anel de foco do navegador: os campos com moldura mostram o foco pela cor da
  *   borda e os sem moldura (composer) pelo cursor. Botões e links mantêm o anel (navegação por teclado).
+ * - `[data-no-select]` (tela do story): segurar só pausa — sem selecionar texto nem abrir o menu de
+ *   copiar/salvar imagem do navegador do celular.
  * - Barra de rolagem fina, trilho transparente e alça na cor da borda do tema. O tema segue o sistema
  *   (`useColorScheme`), então o media query bate com o que o app desenha; `color-scheme` deixa o resto
  *   do navegador (barras, campos nativos) no mesmo tema.
@@ -16,6 +18,7 @@ export const WEB_CSS = `
 html, body { height: 100%; }
 #root { height: 100dvh; }
 input:focus, input:focus-visible, textarea:focus, textarea:focus-visible { outline: none; }
+[data-no-select], [data-no-select] * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 :root { color-scheme: light; }
 * { scrollbar-width: thin; scrollbar-color: ${colors.light.border} transparent; }
 @media (prefers-color-scheme: dark) {

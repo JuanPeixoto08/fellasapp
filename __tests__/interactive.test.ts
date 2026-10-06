@@ -30,4 +30,11 @@ describe('CSS global da web', () => {
     expect(WEB_CSS).toContain(`scrollbar-color: ${colors.dark.border} transparent`);
     expect(WEB_CSS).toContain('color-scheme: dark');
   });
+
+  it('área marcada com data-no-select: segurar não seleciona texto nem abre o menu de copiar/salvar', () => {
+    const { WEB_CSS } = require('../lib/webStyles');
+    expect(WEB_CSS).toContain('[data-no-select], [data-no-select] *');
+    expect(WEB_CSS).toContain('user-select: none');
+    expect(WEB_CSS).toContain('-webkit-touch-callout: none');
+  });
 });
