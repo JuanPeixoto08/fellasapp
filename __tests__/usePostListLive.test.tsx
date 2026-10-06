@@ -201,3 +201,19 @@ describe('usePostList: contador de comentários', () => {
     expect(result.current.posts.find((p) => p.id === 'p2')?.commentCount).toBe(0);
   });
 });
+
+describe('usePostList por tag', () => {
+  it('busca filtrando pela tag', async () => {
+    await feed({ tag: 'artes' });
+    expect(mockListFeed).toHaveBeenCalledWith(expect.objectContaining({ tag: 'artes' }));
+  });
+
+  it('post novo ao vivo só conta se tiver a tag', async () => {
+    const { result } = await feed({ tag: 'artes' });
+    await act(async () => {
+      change('posts', 'INSERT', { id: 'p8', author_id: 'bia', body: 'sem tag nenhuma' });
+      change('posts', 'INSERT', { id: 'p9', author_id: 'bia', body: 'olha #Artes' });
+    });
+    expect(result.current.newPosts).toBe(1);
+  });
+});
