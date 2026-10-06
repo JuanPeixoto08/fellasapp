@@ -292,6 +292,19 @@ export async function listComments(postId: string): Promise<Comment[]> {
   });
 }
 
+/** Apaga um comentário meu (RLS só deixa o autor); reações nele vão junto por cascade. */
+export async function deleteComment(commentId: string): Promise<void> {
+  const userId = await currentUserId();
+  const { data, error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('author_id', userId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Comentário não encontrado ou não é seu');
+}
+
 /**
  * Apaga um post meu (RLS só deixa o autor). Curtidas, comentários e reações vão junto por cascade;
  * a foto no bucket é removida em seguida, sem falhar a operação se a limpeza der errado.

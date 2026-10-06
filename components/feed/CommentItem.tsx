@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ReactButton, ReactionBar, ReactionPicker } from '../reactions';
-import { Avatar, Text } from '../ui';
+import { Avatar, ConfirmDialog, IconButton, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
 import { postTime } from '../../lib/format';
@@ -13,12 +13,15 @@ import { nextReaction } from '../../lib/reactionState';
 type Props = {
   comment: Comment;
   onReact?: (comment: Comment, emoji: string | null) => void;
+  /** Só para comentários meus: mostra a lixeira e pede confirmação antes de chamar. */
+  onDelete?: (comment: Comment) => Promise<void>;
 };
 
 /** Comentário no mesmo desenho do post: sem caixa, data à direita, chips e carinha de reagir. */
-export function CommentItem({ comment, onReact }: Props) {
+export function CommentItem({ comment, onReact, onDelete }: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   // a barra de reações abre presa a este botão
   const reactAnchor = useRef<View>(null);
   const react = (emoji: string) => onReact?.(comment, nextReaction(comment.myReaction, emoji));
@@ -41,6 +44,19 @@ export function CommentItem({ comment, onReact }: Props) {
             <Text variant="caption" tone="muted">
               {date}
             </Text>
+          ) : null}
+          {onDelete ? (
+            // a lixeira mantém 44pt de toque sem esticar a linha do nome
+            <View style={{ marginVertical: -t.spacing.md, marginRight: -t.spacing.md }}>
+              <IconButton
+                icon="trash-outline"
+                accessibilityLabel="Apagar comentário"
+                variant="ghost"
+                tone="muted"
+                size="sm"
+                onPress={() => setConfirming(true)}
+              />
+            </View>
           ) : null}
         </View>
         {/* carinha ao lado do texto, como no WhatsApp; os chips só ocupam linha quando existem */}
@@ -68,6 +84,20 @@ export function CommentItem({ comment, onReact }: Props) {
           onClose={() => setPicking(false)}
         />
       </View>
+      {onDelete ? (
+        <ConfirmDialog
+          visible={confirming}
+          title="Apagar comentário?"
+          message="Some do post junto com as reações. Não tem volta."
+          confirmLabel="Apagar"
+          errorMessage="Não rolou apagar. Tenta de novo."
+          onConfirm={async () => {
+            await onDelete(comment);
+            setConfirming(false);
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      ) : null}
     </View>
   );
 }

@@ -4,7 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { ReactNode } from 'react';
 
 import PostDetailScreen from '../app/post/[id]';
-import { addComment, deletePost, getPost, listComments, toggleLike } from '../lib/api/posts';
+import { addComment, deleteComment, deletePost, getPost, listComments, toggleLike } from '../lib/api/posts';
 import { setCommentReaction, setPostReaction } from '../lib/api/reactions';
 import { emitLive, LIVE_DEBOUNCE_MS, type LiveChange } from '../lib/realtime';
 import { setMemberDirectory } from '../lib/memberDirectory';
@@ -51,6 +51,7 @@ jest.mock('../lib/api/posts', () => ({
   addComment: jest.fn(),
   toggleLike: jest.fn(),
   deletePost: jest.fn(),
+  deleteComment: jest.fn(),
 }));
 
 const setPost = setPostReaction as jest.Mock;
@@ -60,6 +61,7 @@ const toggleLikeMock = toggleLike as jest.Mock;
 const addCommentMock = addComment as jest.Mock;
 const listCommentsMock = listComments as jest.Mock;
 const deletePostMock = deletePost as jest.Mock;
+const deleteCommentMock = deleteComment as jest.Mock;
 
 beforeEach(() => {
   setPost.mockClear().mockResolvedValue(undefined);
@@ -69,6 +71,7 @@ beforeEach(() => {
   toggleLikeMock.mockReset().mockResolvedValue(true);
   addCommentMock.mockReset();
   deletePostMock.mockReset().mockResolvedValue(undefined);
+  deleteCommentMock.mockReset().mockResolvedValue(undefined);
   mockBack.mockClear();
   mockMe = 'u9';
 });
@@ -190,6 +193,34 @@ describe('PostDetailScreen', () => {
     await fireEvent.press(screen.getByLabelText('Apagar'));
     expect(await screen.findByText('Não rolou apagar. Tenta de novo.')).toBeTruthy();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('lixeira só no meu comentário', async () => {
+    mockMe = 'u9';
+    await renderLoaded();
+    expect(screen.queryByLabelText('Apagar comentário')).toBeNull();
+  });
+
+  it('apaga meu comentário confirmando: some da lista e o contador desce', async () => {
+    mockMe = 'u2';
+    await renderLoaded();
+    expect(screen.getByText('1')).toBeTruthy(); // contador de comentários do post
+    await fireEvent.press(screen.getByLabelText('Apagar comentário'));
+    expect(screen.getByText('Apagar comentário?')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Apagar'));
+    await waitFor(() => expect(deleteCommentMock).toHaveBeenCalledWith('c1'));
+    await waitFor(() => expect(screen.queryByText('Boa!')).toBeNull());
+    expect(screen.queryByText('1')).toBeNull(); // zero não aparece
+  });
+
+  it('erro ao apagar comentário fica no diálogo e o comentário fica', async () => {
+    mockMe = 'u2';
+    deleteCommentMock.mockRejectedValueOnce(new Error('permission denied'));
+    await renderLoaded();
+    await fireEvent.press(screen.getByLabelText('Apagar comentário'));
+    await fireEvent.press(screen.getByLabelText('Apagar'));
+    expect(await screen.findByText('Não rolou apagar. Tenta de novo.')).toBeTruthy();
+    expect(screen.getByText('Boa!')).toBeTruthy();
   });
 
   it('tapping a photo opens the full-screen viewer on that photo', async () => {

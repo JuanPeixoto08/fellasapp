@@ -11,6 +11,7 @@ import { stackHeader } from '../../components/profile/headerOptions';
 import { Avatar, EmptyState, IconButton, Screen, Text, TextField } from '../../components/ui';
 import {
   addComment,
+  deleteComment,
   getPost,
   listComments,
   toggleLike,
@@ -159,6 +160,14 @@ export default function PostDetailScreen() {
     });
   };
 
+  const onDeleteComment = async (c: Comment) => {
+    await mutating(async () => {
+      await deleteComment(c.id);
+      setComments((prev) => prev.filter((x) => x.id !== c.id));
+      setPost((cur) => (cur ? { ...cur, commentCount: Math.max(0, cur.commentCount - 1) } : cur));
+    });
+  };
+
   const send = async () => {
     if (sending || !text.trim()) return;
     setSending(true);
@@ -227,7 +236,13 @@ export default function PostDetailScreen() {
               </Text>
             )
           }
-          renderItem={({ item }) => <CommentItem comment={item} onReact={onReactComment} />}
+          renderItem={({ item }) => (
+            <CommentItem
+              comment={item}
+              onReact={onReactComment}
+              onDelete={item.author.id === myId ? onDeleteComment : undefined}
+            />
+          )}
         />
         <View
           style={{

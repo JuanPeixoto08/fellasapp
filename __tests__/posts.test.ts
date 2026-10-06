@@ -1,4 +1,4 @@
-import { createPost, deletePost, listComments, listFeed, toggleLike } from '../lib/api/posts';
+import { createPost, deleteComment, deletePost, listComments, listFeed, toggleLike } from '../lib/api/posts';
 import { clearSignedUrlCache } from '../lib/api/storage';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
@@ -163,6 +163,20 @@ describe('deletePost', () => {
     mockResults['posts.delete'] = { data: [], error: null };
     await expect(deletePost('p1')).rejects.toThrow();
     expect(mockRemoved).toEqual([]);
+  });
+});
+
+describe('deleteComment', () => {
+  it('apaga só o meu comentário', async () => {
+    mockResults['comments.delete'] = { data: [{ id: 'c1' }], error: null };
+    await deleteComment('c1');
+    expect(mockCalls).toContainEqual({ table: 'comments', op: 'eq', args: ['id', 'c1'] });
+    expect(mockCalls).toContainEqual({ table: 'comments', op: 'eq', args: ['author_id', 'me'] });
+  });
+
+  it('falha quando nada foi apagado (comentário de outro ou já apagado)', async () => {
+    mockResults['comments.delete'] = { data: [], error: null };
+    await expect(deleteComment('c1')).rejects.toThrow();
   });
 });
 
