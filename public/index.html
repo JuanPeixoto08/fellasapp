@@ -3,17 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <!-- iPhone: atalho da tela inicial abre como app. Modo claro: barra de status padrão (clara). Modo escuro:
-         o app desenha embaixo do relógio (black-translucent), senão o iOS pinta a barra de preto e ela emenda
-         com o cinza do app; a faixa do topo (lib/webStyles) cobre o relógio na cor do fundo. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <!-- iPhone: atalho da tela inicial abre como app; barra de status opaca na cor do fundo (lib/theme bg) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="fellas" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" id="ios-status-bar" />
-    <script>
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.getElementById('ios-status-bar').setAttribute('content', 'black-translucent');
-    </script>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F1EA" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212" />
     <title>%WEB_TITLE%</title>
