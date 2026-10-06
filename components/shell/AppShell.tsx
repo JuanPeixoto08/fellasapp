@@ -1,5 +1,5 @@
 import { useSegments } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -9,6 +9,7 @@ import { ComposeDialog } from './ComposeDialog';
 import { RightRail } from './RightRail';
 import { ShellContext } from './ShellContext';
 import { Sidebar } from './Sidebar';
+import { useForwardWheel } from './wheelForward';
 
 /** Telas que ficam sem as colunas dos lados, só com o conteúdo no meio. */
 const UNFRAMED = ['(auth)', 'not-invited', 'set-password', 'invites'];
@@ -30,6 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { session, profile, loading } = useSession();
   const first = useSegments()[0] as string | undefined;
   const [composing, setComposing] = useState(false);
+  const center = useRef<View>(null);
 
   const framed =
     tier !== 'compact' && shellVisible({ loading, hasSession: !!session, isMember: !!profile?.is_member, first });
@@ -38,6 +40,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     () => ({ contentWidth, openCompose: framed ? () => setComposing(true) : null }),
     [contentWidth, framed],
   );
+  // computador: a roda em qualquer lugar da página rola o meio
+  useForwardWheel(center, framed);
 
   return (
     <ShellContext.Provider value={value}>
@@ -45,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* `framed` já exclui compact: o TS estreita `tier` por essa condição */}
         {framed ? <Sidebar tier={tier} onCompose={() => setComposing(true)} /> : null}
         <View
+          ref={center}
           style={
             framed
               ? {
