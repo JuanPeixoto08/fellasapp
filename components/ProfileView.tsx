@@ -266,6 +266,7 @@ export function ProfileContent({
               onReact={list.react}
               onPress={onOpenPost}
               onDelete={onDelete}
+              linkAuthor={false}
             />
           )
         }

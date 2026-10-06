@@ -231,7 +231,8 @@ describe('PostDetailScreen: marcar com @', () => {
         id: 'c1',
         body: 'valeu @bia',
         createdAt: '2026-01-01T00:00:00Z',
-        author: { id: 'u2', username: 'bia', display_name: 'Bia', avatar_url: null },
+        // autor diferente da marcada: a foto/nome do autor também viram "Ver perfil de …"
+        author: { id: 'u3', username: 'pedro', display_name: 'Pedro', avatar_url: null },
         reactions: [],
         myReaction: null,
       },

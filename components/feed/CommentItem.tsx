@@ -7,6 +7,7 @@ import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
 import { postTime } from '../../lib/format';
 import { MentionText } from '../MentionText';
+import { AuthorLink } from '../profile/AuthorLink';
 import { nextReaction } from '../../lib/reactionState';
 
 type Props = {
@@ -25,12 +26,16 @@ export function CommentItem({ comment, onReact }: Props) {
   const date = postTime(comment.createdAt);
   return (
     <View style={{ flexDirection: 'row', gap: t.spacing.md, paddingHorizontal: t.layout.gutter, paddingTop: t.spacing.sm }}>
-      <Avatar name={name} uri={comment.author.avatar_url} size={t.avatarSizes.sm} />
+      <AuthorLink userId={comment.author.id} name={name}>
+        <Avatar name={name} uri={comment.author.avatar_url} size={t.avatarSizes.sm} />
+      </AuthorLink>
       <View style={{ flex: 1, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
-          <Text variant="small" bold numberOfLines={1} style={{ flexShrink: 1 }}>
-            {name}
-          </Text>
+          <AuthorLink userId={comment.author.id} name={name} style={{ flexShrink: 1 }}>
+            <Text variant="small" bold numberOfLines={1}>
+              {name}
+            </Text>
+          </AuthorLink>
           <View style={{ flex: 1 }} />
           {date ? (
             <Text variant="caption" tone="muted">

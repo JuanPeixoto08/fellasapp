@@ -10,6 +10,7 @@ import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
 import { MentionText } from './MentionText';
+import { AuthorLink } from './profile/AuthorLink';
 import { nextReaction } from '../lib/reactionState';
 
 type Props = {
@@ -21,13 +22,15 @@ type Props = {
   onReact?: (post: FeedPost, emoji: string | null) => void;
   /** Só para posts meus: mostra a lixeira e pede confirmação antes de chamar. */
   onDelete?: (post: FeedPost) => Promise<void>;
+  /** Foto e nome abrem o perfil do autor (padrão). Desligado no perfil da própria pessoa. */
+  linkAuthor?: boolean;
 };
 
 /**
  * Post sem caixa, direto no papel (as listas separam com fio): avatar numa coluna, conteúdo na outra.
  * Ações discretas embaixo (curtir, comentar) e a carinha de reagir isolada à direita.
  */
-export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, onDelete }: Props) {
+export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, onDelete, linkAuthor = true }: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
   // a barra de reações abre presa a este botão
@@ -59,12 +62,16 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
         backgroundColor: hovered ? t.colors.surfaceSunken : 'transparent',
       }}
     >
-      <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
+      <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor}>
+        <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
+      </AuthorLink>
       <View style={{ flex: 1, gap: t.spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
-          <Text bold numberOfLines={1} style={{ flexShrink: 1 }}>
-            {name}
-          </Text>
+          <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
+            <Text bold numberOfLines={1}>
+              {name}
+            </Text>
+          </AuthorLink>
           <View style={{ flex: 1 }} />
           {date ? (
             <Text variant="caption" tone="muted">
