@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 jest.mock('expo-router', () => ({
@@ -47,6 +47,13 @@ jest.mock('../lib/api/storage', () => ({
   ...jest.requireActual('../lib/api/storage'),
   signPaths: async (paths: (string | null | undefined)[]) =>
     new Map(paths.filter((p): p is string => !!p).map((p) => [p, `https://signed/${p}`])),
+}));
+
+const mockGetUserInfo = jest.fn();
+jest.mock('../lib/lastfm/api', () => ({
+  ...jest.requireActual('../lib/lastfm/api'),
+  hasLastfmKey: () => true,
+  getUserInfo: (u: string) => mockGetUserInfo(u),
 }));
 
 import EditProfileScreen from '../app/profile/edit';
@@ -190,5 +197,58 @@ describe('Editar perfil: banner', () => {
     await screen.findByLabelText('Seu banner');
     await fireEvent.press(screen.getByLabelText('Salvar'));
     expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ bannerUri: undefined, removeBanner: false }));
+  });
+});
+
+describe('Editar perfil: Last.fm', () => {
+  const { LastfmError } = jest.requireActual('../lib/lastfm/api');
+  beforeEach(() => {
+    (updateMyProfile as jest.Mock).mockClear();
+    mockGetUserInfo.mockReset().mockResolvedValue({ name: 'juanfm', playcount: 1, registeredAt: null });
+  });
+
+  it('usuário que existe: confere no Last.fm e salva', async () => {
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Last.fm'), 'juanfm');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(mockGetUserInfo).toHaveBeenCalledWith('juanfm');
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ lastfmUser: 'juanfm' }));
+  });
+
+  it('usuário que não existe: erro no campo e não salva', async () => {
+    mockGetUserInfo.mockRejectedValue(new LastfmError('not_found'));
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Last.fm'), 'naoexiste');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(await screen.findByText('Não achamos esse usuário no Last.fm.')).toBeTruthy();
+    expect(updateMyProfile).not.toHaveBeenCalled();
+  });
+
+  it('formato inválido: nem pergunta ao Last.fm', async () => {
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Last.fm'), 'juan peixoto');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(await screen.findByText('Usuário do Last.fm inválido.')).toBeTruthy();
+    expect(mockGetUserInfo).not.toHaveBeenCalled();
+    expect(updateMyProfile).not.toHaveBeenCalled();
+  });
+
+  it('usuário igual ao salvo (mesmo com o Last.fm fora): não pergunta e salva', async () => {
+    mockGetUserInfo.mockRejectedValue(new LastfmError('network'));
+    (getProfile as jest.Mock).mockResolvedValueOnce({ id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null, lastfm_user: 'juanfm' });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Usuário no Last.fm').props.value).toBe('juanfm'));
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(mockGetUserInfo).not.toHaveBeenCalled();
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ lastfmUser: 'juanfm' }));
+  });
+
+  it('apagar o campo desconecta', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null, lastfm_user: 'juanfm' });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Usuário no Last.fm').props.value).toBe('juanfm'));
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Last.fm'), '');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ lastfmUser: '' }));
   });
 });

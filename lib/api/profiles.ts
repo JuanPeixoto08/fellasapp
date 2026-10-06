@@ -56,6 +56,8 @@ export type UpdateProfileInput = {
   /** Banner novo (já recortado 3:1); `removeBanner` tira o atual. */
   bannerUri?: string;
   removeBanner?: boolean;
+  /** Usuário do Last.fm; vazio desconecta (null); undefined não altera. */
+  lastfmUser?: string | null;
   /** Campos extras: string vazia vira null; undefined não altera. */
   status?: string | null;
   location?: string | null;
@@ -125,6 +127,7 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (input.status !== undefined) fields.status = emptyToNull(input.status);
   if (input.location !== undefined) fields.location = emptyToNull(input.location);
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
+  if (input.lastfmUser !== undefined) fields.lastfm_user = emptyToNull(input.lastfmUser);
 
   if (input.avatarUri) fields.avatar_url = await uploadProfileImage(userId, 'avatar', input.avatarUri);
   if (input.bannerUri) fields.banner_url = await uploadProfileImage(userId, 'banner', input.bannerUri);

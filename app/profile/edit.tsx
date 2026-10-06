@@ -19,6 +19,8 @@ import {
   validateUsername,
 } from '../../lib/api/profiles';
 import { resolveUrl, signPaths } from '../../lib/api/storage';
+import { getUserInfo, hasLastfmKey, LastfmError } from '../../lib/lastfm/api';
+import { isValidLastfmUser } from '../../lib/lastfm/map';
 import { friendlyError, isUniqueViolation } from '../../lib/errors';
 import { useTheme } from '../../lib/theme';
 
@@ -48,6 +50,10 @@ export default function EditProfileScreen() {
   const [crop, setCrop] = useState<{ uri: string; shape: 'circle' | 'banner' } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | undefined>();
+  const [lastfm, setLastfm] = useState('');
+  /** O que está salvo: igual a isso, não pergunta de novo ao Last.fm. */
+  const [savedLastfm, setSavedLastfm] = useState('');
+  const [lastfmError, setLastfmError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -60,6 +66,8 @@ export default function EditProfileScreen() {
         setDisplayName(p.display_name ?? '');
         setUsername(p.username);
         setBio(p.bio ?? '');
+        setLastfm(p.lastfm_user ?? '');
+        setSavedLastfm(p.lastfm_user ?? '');
         // foto e banner são extras: se a assinatura falhar, a tela continua com a letra e a faixa lisa
         signPaths([p.avatar_url, p.banner_url])
           .then((signed) => {
@@ -89,6 +97,26 @@ export default function EditProfileScreen() {
     setError(null);
     setBirthdayError(undefined);
     setUsernameError(undefined);
+    setLastfmError(undefined);
+    const lastfmUser = lastfm.trim();
+    if (lastfmUser && lastfmUser !== savedLastfm) {
+      if (!isValidLastfmUser(lastfmUser)) {
+        setSaving(false);
+        return setLastfmError('Usuário do Last.fm inválido.');
+      }
+      if (hasLastfmKey()) {
+        try {
+          await getUserInfo(lastfmUser);
+        } catch (e) {
+          setSaving(false);
+          return setLastfmError(
+            e instanceof LastfmError && e.kind === 'not_found'
+              ? 'Não achamos esse usuário no Last.fm.'
+              : 'Não deu pra conferir no Last.fm agora. Tenta de novo.',
+          );
+        }
+      }
+    }
     try {
       await updateMyProfile({
         display_name: displayName,
@@ -100,6 +128,7 @@ export default function EditProfileScreen() {
         status,
         location,
         birthday: parsedBirthday,
+        lastfmUser,
       });
       // a cópia do perfil na sessão alimenta minha foto na lateral, no compositor e no comentário
       await refreshProfile();
@@ -216,6 +245,20 @@ export default function EditProfileScreen() {
           maxLength={60}
           value={location}
           onChangeText={setLocation}
+        />
+        <TextField
+          label="Usuário no Last.fm"
+          placeholder="seu_usuario"
+          help="Pra mostrar o que você ouve no seu perfil."
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={15}
+          value={lastfm}
+          onChangeText={(v) => {
+            setLastfm(v);
+            if (lastfmError) setLastfmError(undefined);
+          }}
+          error={lastfmError}
         />
         <TextField
           label="Aniversário"

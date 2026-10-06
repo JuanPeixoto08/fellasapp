@@ -198,6 +198,14 @@ describe('updateMyProfile', () => {
     expect(mockUpdate.mock.calls[0][0].banner_url).toBeNull();
   });
 
+  it('usuário do Last.fm: grava aparado; vazio vira null', async () => {
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', lastfmUser: ' juanfm ' });
+    expect(mockUpdate.mock.calls[0][0].lastfm_user).toBe('juanfm');
+    mockUpdate.mockClear();
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', lastfmUser: '' });
+    expect(mockUpdate.mock.calls[0][0].lastfm_user).toBeNull();
+  });
+
   it('rejeita nome acima de 50 e bio acima de 160 sem chamar o banco', async () => {
     expect(PROFILE_LIMITS).toEqual({ displayName: 50, bio: 160 });
     await expect(updateMyProfile({ display_name: 'a'.repeat(51), username: 'ana_01', bio: '' })).rejects.toThrow(
