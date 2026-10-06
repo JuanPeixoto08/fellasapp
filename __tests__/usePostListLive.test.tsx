@@ -233,3 +233,19 @@ describe('usePostList por tag', () => {
     expect(result.current.newPosts).toBe(1);
   });
 });
+
+describe('usePostList por local', () => {
+  it('busca filtrando pelo local', async () => {
+    await feed({ place: 'bar do ze' });
+    expect(mockListFeed).toHaveBeenCalledWith(expect.objectContaining({ place: 'bar do ze' }));
+  });
+
+  it('post novo ao vivo só conta se for do local', async () => {
+    const { result } = await feed({ place: 'bar do ze' });
+    await act(async () => {
+      change('posts', 'INSERT', { id: 'p8', author_id: 'bia', place_key: null });
+      change('posts', 'INSERT', { id: 'p9', author_id: 'bia', place_key: 'bar do ze' });
+    });
+    expect(result.current.newPosts).toBe(1);
+  });
+});

@@ -1,4 +1,5 @@
 import { shrinkForUpload } from '../imageUpload';
+import { cleanPlace } from '../places';
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
 import {
@@ -28,6 +29,10 @@ export type FeedPost = {
   /** Atalho para a primeira foto (capa na aba Fotos), ou null. */
   imageUrl: string | null;
   createdAt: string;
+  /** Local escrito por quem postou ("Bar do Zé"), ou null. Falta em dados antigos/de teste. */
+  location?: string | null;
+  /** Chave do local (minúsculas, sem acento): leva à página do local. */
+  placeKey?: string | null;
   author: Author;
   likeCount: number;
   commentCount: number;
@@ -98,6 +103,8 @@ async function mapPosts(
       images,
       imageUrl: images[0] ?? null,
       createdAt: row.created_at,
+      location: row.location ?? null,
+      placeKey: row.place_key ?? null,
       author: mapAuthor(row.author, row.author_id, signed),
       likeCount: row.likes?.[0]?.count ?? 0,
       commentCount: row.comments?.[0]?.count ?? 0,
@@ -127,10 +134,12 @@ export type FeedFilter = {
   photosOnly?: boolean;
   /** Só posts com esta #tag (página da tag), já em minúsculas. */
   tag?: string;
+  /** Só posts deste local (página do local): a chave, já normalizada. */
+  place?: string;
 };
 
 export async function listFeed(
-  { cursor, authorId, photosOnly, tag }: { cursor?: string | null } & FeedFilter = {},
+  { cursor, authorId, photosOnly, tag, place }: { cursor?: string | null } & FeedFilter = {},
 ): Promise<FeedPage> {
   const userId = await currentUserId();
   let query = supabase
@@ -142,6 +151,7 @@ export async function listFeed(
   if (authorId) query = query.eq('author_id', authorId);
   if (photosOnly) query = query.not('image_url', 'is', null);
   if (tag) query = query.contains('tags', [tag]);
+  if (place) query = query.eq('place_key', place);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -198,15 +208,19 @@ async function removeImages(paths: string[]): Promise<void> {
 export async function createPost({
   body,
   imageUris = [],
+  location = null,
 }: {
   body: string;
   /** Fotos locais (até 4), na ordem de exibição. */
   imageUris?: string[];
+  /** Local escrito por quem posta; limpo aqui (pontas, espaços repetidos). */
+  location?: string | null;
 }): Promise<Tables<'posts'>> {
   const text = body.trim();
   if (!text && imageUris.length === 0) throw new Error('Escreva algo ou escolha uma imagem');
   if (imageUris.length > MAX_IMAGES) throw new Error(`No máximo ${MAX_IMAGES} fotos por post`);
   const userId = await currentUserId();
+  const place = cleanPlace(location);
 
   const results = await Promise.allSettled(imageUris.map((uri, i) => uploadImage(userId, uri, i)));
   const paths = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
@@ -224,6 +238,8 @@ export async function createPost({
     body: text,
     image_url: paths[0] ?? null,
     ...(paths.length > 1 ? { images: paths } : {}),
+    // só com local: sem ele o insert é o mesmo de antes (funciona mesmo sem a migration 0020)
+    ...(place ? { location: place } : {}),
   };
   const { data, error } = await supabase.from('posts').insert(row).select().single();
   if (error) {

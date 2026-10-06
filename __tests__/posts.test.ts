@@ -302,3 +302,52 @@ describe('listFeed por tag', () => {
     expect(mockCalls).toContainEqual({ table: 'posts', op: 'contains', args: ['tags', ['artes']] });
   });
 });
+
+describe('local no post', () => {
+  it('createPost manda o local limpo', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: 'oi', location: '  Bar   do Zé ' });
+    const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+    expect(row.location).toBe('Bar do Zé');
+  });
+
+  it('sem local (ou só espaços) não manda a coluna: funciona mesmo sem a migration 0020', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: 'oi', location: '   ' });
+    const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+    expect(row).not.toHaveProperty('location');
+  });
+
+  it('post só com local é recusado', async () => {
+    await expect(createPost({ body: '', location: 'Bar do Zé' })).rejects.toThrow('Escreva algo ou escolha uma imagem');
+  });
+
+  it('listFeed traz o local e a chave', async () => {
+    mockResults['posts.select'] = {
+      data: [
+        {
+          id: 'p1',
+          author_id: 'u1',
+          body: 'oi',
+          image_url: null,
+          images: [],
+          created_at: '2026-10-06T12:00:00Z',
+          location: 'Bar do Zé',
+          place_key: 'bar do ze',
+          author: null,
+          likes: [],
+          comments: [],
+        },
+      ],
+      error: null,
+    };
+    const { posts } = await listFeed();
+    expect(posts[0]).toMatchObject({ location: 'Bar do Zé', placeKey: 'bar do ze' });
+  });
+
+  it('listFeed por local filtra pela chave', async () => {
+    mockResults['posts.select'] = { data: [], error: null };
+    await listFeed({ place: 'bar do ze' });
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'eq', args: ['place_key', 'bar do ze'] });
+  });
+});
