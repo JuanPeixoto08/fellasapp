@@ -164,6 +164,8 @@ export const layout = {
   storySideScale: 0.45,
   /** Desfoque da imagem que preenche o story atrás de uma foto/vídeo que não é em pé. */
   storyBackdropBlur: 24,
+  /** Barra deslizante (volume dos stories): comprimento, espessura do trilho e bolinha. O toque tem `minTouch` de altura. */
+  slider: { width: 88, track: 4, thumb: 12 },
   /** Imagens de um comentário: largura máxima do bloco e lado da miniatura no campo de comentar. */
   commentMediaWidth: 280,
   commentThumb: 64,

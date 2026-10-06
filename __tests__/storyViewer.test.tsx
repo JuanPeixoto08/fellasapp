@@ -7,6 +7,7 @@ const mockPlayer = {
   play: jest.fn(),
   pause: jest.fn(),
   muted: false,
+  volume: 1,
   loop: false,
   playing: true,
   status: 'loading',
@@ -45,6 +46,7 @@ jest.mock('../lib/layout', () => ({
 import { StoryViewerHost } from '../components/stories/StoryViewerHost';
 import type { StoryGroup } from '../lib/api/stories';
 import { closeStories, onStoriesChanged, openStories } from '../lib/storyViewerStore';
+import { loadVolume, saveVolume } from '../lib/storyVolume';
 
 const s = (id: string, kind: 'photo' | 'video' = 'photo') => ({ id, authorId: '', kind, mediaUrl: `https://w/m/${id}`, durationMs: 5000, createdAt: '2026-10-04T10:00:00Z', seen: false, myReaction: null });
 const g = (id: string, ...stories: ReturnType<typeof s>[]): StoryGroup => ({ author: { id, name: id.toUpperCase(), username: id, avatarUrl: null }, stories, hasUnseen: true, latestAt: '' });
@@ -263,5 +265,88 @@ describe('StoryViewer: pausar e computador', () => {
     await fireEvent.press(screen.getByLabelText('Story anterior'));
     expect(screen.getByLabelText('Story 1 de 2 de ANA')).toBeTruthy();
     expect(screen.getByLabelText('Fechar')).toBeTruthy();
+  });
+});
+
+describe('StoryViewer: volume no computador', () => {
+  afterEach(() => {
+    saveVolume(1);
+    mockPlayer.volume = 1;
+    mockPlayer.muted = false;
+  });
+  const bar = async () => {
+    const el = screen.getByLabelText('Volume');
+    await fireEvent(el, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 100, height: 44 } } });
+    return el;
+  };
+
+  it('passar o mouse no som mostra a barra; arrastar muda o volume do vídeo e fica guardado', async () => {
+    mockTier = 'expanded';
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    expect(screen.queryByLabelText('Volume')).toBeNull();
+    await fireEvent(screen.getByTestId('story-sound'), 'mouseEnter');
+    const el = await bar();
+    await fireEvent(el, 'responderGrant', { nativeEvent: { locationX: 30, pageX: 130 } });
+    expect(mockPlayer.volume).toBe(0.3);
+    expect(loadVolume()).toBe(0.3);
+    // arrastando, o mouse pode sair do botão sem a barra sumir
+    await fireEvent(screen.getByTestId('story-sound'), 'mouseLeave');
+    expect(screen.getByLabelText('Volume')).toBeTruthy();
+    await fireEvent(el, 'responderRelease', { nativeEvent: { locationX: 30, pageX: 130 } });
+    expect(screen.queryByLabelText('Volume')).toBeNull();
+  });
+
+  it('arrastar até o 0 é mudo; ligar o som volta no volume de antes do arraste', async () => {
+    saveVolume(0.8);
+    mockTier = 'expanded';
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    await fireEvent(screen.getByTestId('story-sound'), 'mouseEnter');
+    const el = await bar();
+    await fireEvent(el, 'responderGrant', { nativeEvent: { locationX: 40, pageX: 140 } });
+    await fireEvent(el, 'responderMove', { nativeEvent: { locationX: 0, pageX: 90 } });
+    expect(screen.getByLabelText('Ligar som')).toBeTruthy();
+    expect(mockPlayer.muted).toBe(true);
+    expect(screen.getByLabelText('Volume').props['aria-valuenow']).toBe(0);
+    await fireEvent(el, 'responderRelease', { nativeEvent: { locationX: 0, pageX: 90 } });
+    await fireEvent.press(screen.getByLabelText('Ligar som'));
+    expect(mockPlayer.muted).toBe(false);
+    // não fica nos 40% por onde o arraste passou: volta nos 80% de antes
+    expect(mockPlayer.volume).toBe(0.8);
+    expect(loadVolume()).toBe(0.8);
+    expect(screen.getByLabelText('Volume').props['aria-valuenow']).toBe(80);
+  });
+
+  it('o volume escolhido vale para o próximo story aberto', async () => {
+    saveVolume(0.6);
+    mockTier = 'expanded';
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    expect(mockPlayer.volume).toBe(0.6);
+  });
+
+  it('celular: sem barra de volume (lá o volume é o do aparelho)', async () => {
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    await fireEvent(screen.getByTestId('story-sound'), 'mouseEnter');
+    expect(screen.queryByLabelText('Volume')).toBeNull();
+    expect(screen.getByLabelText('Desligar som')).toBeTruthy();
+  });
+
+  it('teclado: focar o som mostra a barra; ela some quando o foco sai dos dois', async () => {
+    mockTier = 'expanded';
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    const sound = screen.getByTestId('story-sound');
+    await fireEvent(sound, 'focus');
+    expect(screen.getByLabelText('Volume')).toBeTruthy();
+    // do botão para a barra: perde e ganha foco em seguida, sem sumir no meio
+    await fireEvent(sound, 'blur');
+    await fireEvent(sound, 'focus');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(screen.getByLabelText('Volume')).toBeTruthy();
+    await fireEvent(sound, 'blur');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(screen.queryByLabelText('Volume')).toBeNull();
   });
 });

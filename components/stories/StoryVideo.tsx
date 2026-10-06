@@ -14,6 +14,8 @@ type Props = {
   fallbackUri?: string;
   paused: boolean;
   muted: boolean;
+  /** De 0 a 1 (barra de volume do computador); o mudo é à parte. */
+  volume?: number;
   /** O vídeo carregou (ou falhou): o relógio do story pode andar. */
   onReady: () => void;
   /** Navegador não deixou tocar com som: o story passa para mudo. */
@@ -21,7 +23,7 @@ type Props = {
 };
 
 /** Vídeo do story: toca uma vez, sem controles, dentro da tela (playsInline); pausa junto com o story. */
-export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked }: Props) {
+export function StoryVideo({ uri, fallbackUri, paused, muted, volume = 1, onReady, onBlocked }: Props) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     p.play();
@@ -73,6 +75,10 @@ export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked
   useEffect(() => {
     player.muted = muted;
   }, [player, muted]);
+
+  useEffect(() => {
+    player.volume = volume;
+  }, [player, volume]);
 
   useEffect(() => {
     if (paused) {

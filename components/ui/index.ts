@@ -11,6 +11,7 @@ export { IconButton, type IconButtonProps } from './IconButton';
 export { ImageThumbs, type ImageThumbsProps } from './ImageThumbs';
 export { interactiveStyle } from './interactive';
 export { Logo, type LogoProps } from './Logo';
+export { Slider, type SliderProps } from './Slider';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { Screen, type ScreenProps } from './Screen';
 export { TextField, type TextFieldProps } from './TextField';

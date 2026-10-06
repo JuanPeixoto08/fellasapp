@@ -17,9 +17,10 @@ import { nextReaction } from '../../lib/reactionState';
 import { carouselLayout } from '../../lib/storyCarousel';
 import { nextCursor, prevCursor, startAt, type Cursor } from '../../lib/storyPlayer';
 import { emitStoriesChanged } from '../../lib/storyViewerStore';
+import { loadVolume, saveVolume } from '../../lib/storyVolume';
 import { useTheme } from '../../lib/theme';
 import { ReactionPicker } from '../reactions';
-import { Avatar, ConfirmDialog, Emoji, IconButton, Text } from '../ui';
+import { Avatar, ConfirmDialog, Emoji, IconButton, Slider, Text } from '../ui';
 import { StoryCarouselCard } from './StoryCarouselCard';
 import { StoryVideo } from './StoryVideo';
 
@@ -48,6 +49,28 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
   const [held, setHeld] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [muted, setMuted] = useState(false);
+  // volume (só no computador; no celular é o do aparelho): nunca guarda 0 — arrastar até o 0 é o mudo
+  const [volume, setVolume] = useState(loadVolume);
+  const [soundHover, setSoundHover] = useState(false);
+  const [soundFocus, setSoundFocus] = useState(false);
+  const [sliding, setSliding] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // volume de quando o arraste começou: arrastar até o 0 e religar volta nele, não no ponto do meio do caminho
+  const dragFrom = useRef<number | null>(null);
+  useEffect(() => () => clearTimeout(blurTimer.current), []);
+  const changeVolume = (v: number) => {
+    if (v === 0) {
+      setMuted(true);
+      if (dragFrom.current !== null) {
+        setVolume(dragFrom.current);
+        saveVolume(dragFrom.current);
+      }
+      return;
+    }
+    setVolume(v);
+    saveVolume(v);
+    setMuted(false);
+  };
   const [viewers, setViewers] = useState<Viewer[] | null>(null);
   const [viewersOpen, setViewersOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -188,6 +211,7 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
             fallbackUri={story.originalUrl}
             paused={halted}
             muted={muted}
+            volume={desktop ? volume : 1}
             onReady={() => setReadyId(story.id)}
             onBlocked={() => setMuted(true)}
           />
@@ -269,13 +293,50 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
           onPress={() => setPinned((p) => !p)}
         />
         {story.kind === 'video' ? (
-          <IconButton
-            icon={muted ? 'volume-mute-outline' : 'volume-high-outline'}
-            accessibilityLabel={muted ? 'Ligar som' : 'Desligar som'}
-            variant="ghost"
-            tone="onOverlay"
-            onPress={() => setMuted((m) => !m)}
-          />
+          // computador: a barra de volume abre ao passar o mouse (ou com o foco do teclado) no som
+          <View
+            testID="story-sound"
+            {...({
+              // react-native-web repassa mouse e foco para o <div>; no app nada disso acontece
+              onMouseEnter: () => setSoundHover(true),
+              onMouseLeave: () => setSoundHover(false),
+              // foco que entra/sai do botão ou da barra (no site o evento sobe); a saída espera um instante
+              // porque do botão para a barra o foco sai de um e entra no outro
+              onFocus: () => {
+                clearTimeout(blurTimer.current);
+                setSoundFocus(true);
+              },
+              onBlur: () => {
+                clearTimeout(blurTimer.current);
+                blurTimer.current = setTimeout(() => setSoundFocus(false), 0);
+              },
+            } as object)}
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            {desktop && (soundHover || soundFocus || sliding) ? (
+              <Slider
+                value={muted ? 0 : volume}
+                onChange={changeVolume}
+                accessibilityLabel="Volume"
+                tone="onOverlay"
+                onSlidingStart={() => {
+                  dragFrom.current = muted ? null : volume;
+                  setSliding(true);
+                }}
+                onSlidingEnd={() => {
+                  dragFrom.current = null;
+                  setSliding(false);
+                }}
+              />
+            ) : null}
+            <IconButton
+              icon={muted ? 'volume-mute-outline' : 'volume-high-outline'}
+              accessibilityLabel={muted ? 'Ligar som' : 'Desligar som'}
+              variant="ghost"
+              tone="onOverlay"
+              onPress={() => setMuted((m) => !m)}
+            />
+          </View>
         ) : null}
         {desktop ? null : (
           <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" tone="onOverlay" onPress={onClose} />

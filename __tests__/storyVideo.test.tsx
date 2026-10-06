@@ -6,6 +6,7 @@ const mockPlayer = {
   pause: jest.fn(),
   replaceAsync: jest.fn().mockResolvedValue(undefined),
   muted: false,
+  volume: 1,
   loop: false,
   playing: true,
   status: 'loading',
@@ -110,5 +111,13 @@ describe('StoryVideo', () => {
       await act(async () => { jest.advanceTimersByTime(5000); });
       expect(mockPlayer.replaceAsync).not.toHaveBeenCalled();
     });
+  });
+
+  it('volume vai para o player (o mudo continua à parte)', async () => {
+    const view = await render(<StoryVideo uri="https://r/a" paused={false} muted={false} volume={0.3} onReady={() => {}} onBlocked={() => {}} />);
+    expect(mockPlayer.volume).toBe(0.3);
+    await view.rerender(<StoryVideo uri="https://r/a" paused={false} muted volume={0.7} onReady={() => {}} onBlocked={() => {}} />);
+    expect(mockPlayer.volume).toBe(0.7);
+    expect(mockPlayer.muted).toBe(true);
   });
 });
