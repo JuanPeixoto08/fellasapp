@@ -281,6 +281,19 @@ describe('ProfileView', () => {
     expect(screen.getByTestId('profile-banner-empty')).toBeTruthy();
   });
 
+  it('avisa quem abriu quando o perfil carregou (título com o @)', async () => {
+    const onLoaded = jest.fn();
+    await render(
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
+      >
+        <ProfileView userId="u1" header onLoaded={onLoaded} />
+      </SafeAreaProvider>,
+    );
+    await screen.findByText('@ana_01');
+    expect(onLoaded).toHaveBeenCalledWith(expect.objectContaining({ username: 'ana_01' }));
+  });
+
   it('mostra status, info e estatísticas, sem cor de perfil', async () => {
     await renderProfile();
     expect(await screen.findByText('🎧 ouvindo pagode')).toBeTruthy();

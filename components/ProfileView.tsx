@@ -25,6 +25,8 @@ type Props = {
   actions?: ReactNode;
   /** A tela tem cabeçalho de navegação (perfil de outro fella): não soma a área segura do topo. */
   header?: boolean;
+  /** O perfil chegou (ex.: a tela põe o @ da pessoa no título). */
+  onLoaded?: (profile: Profile) => void;
 };
 
 export type ProfileTab = 'posts' | 'photos';
@@ -45,7 +47,7 @@ export type PostListView = {
 
 const COLUMNS = 3;
 
-export default function ProfileView({ userId, actions, header }: Props) {
+export default function ProfileView({ userId, actions, header, onLoaded }: Props) {
   const t = useTheme();
   const router = useRouter();
   const isMe = useSession().session?.user.id === userId;
@@ -70,6 +72,7 @@ export default function ProfileView({ userId, actions, header }: Props) {
         getProfileStats(userId).catch(() => null),
       ]);
       setProfile(p);
+      onLoaded?.(p);
       setAvatarUri(resolveUrl(p.avatar_url, signed));
       setBannerUri(resolveUrl(p.banner_url, signed));
       setStats(st);
@@ -79,7 +82,7 @@ export default function ProfileView({ userId, actions, header }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, onLoaded]);
 
   // ao ganhar foco (ex.: voltando de "Editar perfil") o cabeçalho e os números se atualizam;
   // a lista fica como está, com a aba e a rolagem
