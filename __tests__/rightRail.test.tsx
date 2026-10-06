@@ -36,10 +36,10 @@ beforeEach(() => {
 });
 
 describe('RightRail', () => {
-  it('lista até 8 fellas, abre perfil (o meu vai para /profile) e tem "Ver todos"', async () => {
+  it('lista até 4 fellas, abre perfil (o meu vai para /profile) e tem "Ver todos"', async () => {
     mockState.members = [member('me', 'Juan'), ...Array.from({ length: 9 }, (_, i) => member(`u${i}`, `Fella${i}`))];
     await render(<RightRail />, { wrapper: Wrapper });
-    expect(screen.getAllByLabelText(/^Ver perfil de /)).toHaveLength(8);
+    expect(screen.getAllByLabelText(/^Ver perfil de /)).toHaveLength(4);
     await fireEvent.press(screen.getByLabelText('Ver perfil de Juan'));
     expect(mockPush).toHaveBeenLastCalledWith('/profile');
     await fireEvent.press(screen.getByLabelText('Ver perfil de Fella0'));
@@ -68,7 +68,7 @@ describe('RightRail', () => {
     expect(screen.getByLabelText('Aniversário de Bia: Hoje')).toBeTruthy();
   });
 
-  it('mais de 3 aniversários: mostra os 3 próximos e "Ver todos" abre a lista inteira', async () => {
+  it('mais de 4 aniversários: mostra os 4 próximos e "Ver todos" abre a lista inteira', async () => {
     const iso = (daysAhead: number) => {
       const d = new Date();
       d.setDate(d.getDate() + daysAhead);
@@ -76,20 +76,21 @@ describe('RightRail', () => {
     };
     mockState.members = ['Ana', 'Bia', 'Caio', 'Duda', 'Edu'].map((name, i) => member(`u${i}`, name, iso(i * 10)));
     await render(<RightRail />, { wrapper: Wrapper });
-    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(3);
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(4);
     expect(screen.queryByLabelText(/^Aniversário de Edu/)).toBeNull();
     await fireEvent.press(screen.getByLabelText('Ver todos os aniversários'));
     expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(5);
     expect(screen.getByLabelText(/^Aniversário de Edu/)).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Ver menos aniversários'));
-    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(3);
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(4);
   });
 
-  it('até 3 aniversários: sem "Ver todos"', async () => {
+  it('até 4 aniversários: sem "Ver todos"', async () => {
     const d = new Date();
     const iso = `2000-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    mockState.members = [member('a', 'Bia', iso), member('b', 'Caio', iso)];
+    mockState.members = ['Bia', 'Caio', 'Duda', 'Edu'].map((name, i) => member(`u${i}`, name, iso));
     await render(<RightRail />, { wrapper: Wrapper });
+    expect(screen.getAllByLabelText(/^Aniversário de /)).toHaveLength(4);
     expect(screen.queryByLabelText('Ver todos os aniversários')).toBeNull();
   });
 

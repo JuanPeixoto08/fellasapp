@@ -11,8 +11,8 @@ import { useMembers } from '../../lib/useMembers';
 import { useToday } from '../../lib/useToday';
 import { Avatar, Button, Heading, Icon, interactiveStyle, NameWithBadge, Text } from '../ui';
 
-const MAX_MEMBERS = 8;
-const MAX_BIRTHDAYS = 3;
+const MAX_MEMBERS = 4;
+const MAX_BIRTHDAYS = 4;
 
 /** Coluna da direita (desktop largo): gente do grupo antes de qualquer métrica. */
 export function RightRail() {
@@ -22,7 +22,7 @@ export function RightRail() {
   const { members, avatars, loading, error, reload } = useMembers();
   const insets = useSafeAreaInsets();
   const today = useToday();
-  // todos os próximos, em ordem; a coluna mostra os 3 primeiros e "Ver todos" abre o resto ali mesmo
+  // todos os próximos, em ordem; a coluna mostra os 4 primeiros e "Ver todos" abre o resto ali mesmo
   const allBirthdays = useMemo(() => nextBirthdays(members, today, Infinity), [members, today]);
   const [allShown, setAllShown] = useState(false);
   const birthdays = allShown ? allBirthdays : allBirthdays.slice(0, MAX_BIRTHDAYS);

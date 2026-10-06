@@ -69,7 +69,7 @@ Token `borders`: `hairline` 1 (contornos de chip, cartão, divisória) · `selec
 Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celular em pé: tab bar, como sempre) · **medium** 700–1099 (lateral só com ícones) · **expanded** ≥ 1100 (lateral com nomes + coluna direita).
 - `AppShell` envolve a pilha de telas: `[Sidebar][coluna central 600 (layout.centerWidth), fios dos dois lados][RightRail 350]`, centralizado. Login, "sem convite" e carregamento ficam fora.
 - Sidebar: logo (→ feed), Feed/Notificações/Perfil/Membros (Notificações com `Badge`; ativo = ícone cheio + `brand` + negrito), botão Postar (abre a janela do compositor), eu no pé.
-- RightRail: "Os fellas" (até 8 + Ver todos) e "Aniversários" (próximos 3; Hoje/Amanhã/12 out; ícone `gift-outline`).
+- RightRail: "Os fellas" (até 4 + Ver todos) e "Aniversários" (próximos 4; Hoje/Amanhã/12 out; ícone `gift-outline`).
 - Compositor (`components/feed/Composer`): página no celular, topo do feed e janela no desktop, um rascunho só (limpo quando o usuário logado muda). Local: botão `location-outline` na barra (depois de "0/4 fotos") abre campo abaixo do texto ("Onde você tá?", até 60) com `PlaceSuggestions` (caixa igual à das tags; última linha "Usar "…"" quando o digitado é novo); escolhido vira chip `chipHeight` com contorno `hairline`, raio `pill`, toque edita e ✕ tira. Mesmo lugar com grafias diferentes = mesma chave (minúsculas, sem acento).
 - Tamanhos que dependem da largura usam `useContentWidth()` (coluna), nunca a janela. Seletor de emojis vira painel de 400 preso ao botão de reagir no desktop.
 - Web/desktop: hover `surfaceSunken` + cursor de mão em clicáveis (`interactiveStyle`); ← → Esc no visualizador.
