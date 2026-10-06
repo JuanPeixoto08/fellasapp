@@ -10,13 +10,20 @@ import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, Text, type IconName } from '../ui';
 
-export type NavKey = 'feed' | 'notifications' | 'profile' | 'members';
+export type NavKey = 'feed' | 'notifications' | 'profile' | 'members' | 'ideas';
 
-const ITEMS: { key: NavKey; label: string; href: '/feed' | '/notifications' | '/profile' | '/members'; icon: IconName; iconActive: IconName }[] = [
+const ITEMS: {
+  key: NavKey;
+  label: string;
+  href: '/feed' | '/notifications' | '/profile' | '/members' | '/ideas';
+  icon: IconName;
+  iconActive: IconName;
+}[] = [
   { key: 'feed', label: 'Feed', href: '/feed', icon: 'newspaper-outline', iconActive: 'newspaper' },
   { key: 'notifications', label: 'Notificações', href: '/notifications', icon: 'notifications-outline', iconActive: 'notifications' },
   { key: 'profile', label: 'Perfil', href: '/profile', icon: 'person-outline', iconActive: 'person' },
   { key: 'members', label: 'Membros', href: '/members', icon: 'people-outline', iconActive: 'people' },
+  { key: 'ideas', label: 'Ideias', href: '/ideas', icon: 'bulb-outline', iconActive: 'bulb' },
 ];
 
 /** Item ativo pela rota exata; rotas filhas (post, perfil de outro, editar) não marcam nada. */
@@ -25,12 +32,13 @@ export function activeNavItem(pathname: string): NavKey | null {
   if (pathname === '/profile') return 'profile';
   if (pathname === '/members') return 'members';
   if (pathname === '/notifications') return 'notifications';
+  if (pathname === '/ideas') return 'ideas';
   return null;
 }
 
 type Props = { tier: Exclude<LayoutTier, 'compact'>; onCompose: () => void };
 
-/** Barra lateral do desktop: logo, Feed/Notificações/Perfil/Membros, Postar e eu no pé. */
+/** Barra lateral do desktop: logo, Feed/Notificações/Perfil/Membros/Ideias, Postar e eu no pé. */
 export function Sidebar({ tier, onCompose }: Props) {
   const t = useTheme();
   const router = useRouter();
