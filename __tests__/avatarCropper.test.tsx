@@ -98,4 +98,25 @@ describe('AvatarCropper', () => {
     await fireEvent.press(screen.getByLabelText('Cancelar'));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it('banner: retângulo 3:1, recorta a faixa do meio e salva 1500x500', async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <AvatarCropper uri="file://praia.jpg" shape="banner" onConfirm={onConfirm} onCancel={onCancel} />
+      </SafeAreaProvider>,
+    );
+    expect(screen.getByText('Ajustar banner')).toBeTruthy();
+    await fireEvent.press(await screen.findByLabelText('Usar foto'));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('file://praia.jpg#recortada'));
+    const crop = mockOps[0].arg as { originX: number; originY: number; width: number; height: number };
+    // foto 4000x3000: a largura inteira, um terço da altura, centralizado
+    expect(crop.width).toBe(4000);
+    expect(crop.width / crop.height).toBeCloseTo(3, 1);
+    expect(crop.originX).toBe(0);
+    expect(Math.abs(crop.originY - (3000 - crop.height) / 2)).toBeLessThanOrEqual(1);
+    expect(mockOps.slice(1)).toEqual([
+      { op: 'resize', arg: { width: 1500, height: 500 } },
+      { op: 'save', arg: { compress: 0.8, format: 'jpeg' } },
+    ]);
+  });
 });

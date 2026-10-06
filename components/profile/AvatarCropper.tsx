@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AVATAR_CROP,
+  BANNER_CROP,
   clampOffset,
   clampZoom,
   cropRect,
@@ -32,8 +33,10 @@ import { Button, Heading, IconButton, Text } from '../ui';
 type Props = {
   /** Foto escolhida; null = fechado. */
   uri: string | null;
+  /** circle = foto de perfil (sai quadrado 512); banner = retângulo 3:1 (sai 1500x500). */
+  shape?: 'circle' | 'banner';
   onCancel: () => void;
-  /** Recebe o uri do recorte (quadrado 512, JPEG). */
+  /** Recebe o uri do recorte (JPEG). */
   onConfirm: (uri: string) => void;
 };
 
@@ -47,17 +50,23 @@ function fingerDistance(touches: NativeTouchEvent[]): number {
 }
 
 /**
- * "Ajustar foto" da foto de perfil: arrasta pra enquadrar no círculo, zoom por pinça, roda do mouse ou
- * botões. Tela cheia no celular, janela no computador. O recorte sai quadrado; o círculo é o Avatar.
+ * "Ajustar foto" da foto de perfil (círculo) e do banner (retângulo 3:1): arrasta pra enquadrar, zoom por
+ * pinça, roda do mouse ou botões. Tela cheia no celular, janela no computador. A foto de perfil sai
+ * quadrada (o círculo é o Avatar); o banner sai no retângulo.
  */
-export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
+export function AvatarCropper({ uri, shape = 'circle', onCancel, onConfirm }: Props) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const full = useLayoutTier() === 'compact';
   const panelWidth = full ? windowWidth : Math.min(windowWidth - t.layout.gutter * 2, t.layout.maxDialogWidth);
   const stage = panelWidth - t.layout.gutter * 2;
-  const viewport = stage - t.spacing.xl * 2;
+  const banner = shape === 'banner';
+  const frameWidth = stage - t.spacing.xl * 2;
+  const viewport: Size = { width: frameWidth, height: banner ? frameWidth / t.layout.bannerAspect : frameWidth };
+  const stageHeight = banner ? viewport.height + t.spacing.xl * 2 : stage;
+  const output = banner ? BANNER_CROP.output : { width: AVATAR_CROP.output, height: AVATAR_CROP.output };
+  const quality = banner ? BANNER_CROP.quality : AVATAR_CROP.quality;
 
   const [image, setImage] = useState<Size | null>(null);
   const [failed, setFailed] = useState(false);
@@ -156,9 +165,9 @@ export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
       const rect = cropRect(image, viewport, zoom, offset);
       const cropped = await ImageManipulator.manipulate(uri)
         .crop(rect)
-        .resize({ width: AVATAR_CROP.output, height: AVATAR_CROP.output })
+        .resize(output)
         .renderAsync();
-      const saved = await cropped.saveAsync({ compress: AVATAR_CROP.quality, format: SaveFormat.JPEG });
+      const saved = await cropped.saveAsync({ compress: quality, format: SaveFormat.JPEG });
       onConfirm(saved.uri);
     } catch {
       setError('Não rolou recortar. Tenta de novo.');
@@ -168,12 +177,13 @@ export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
   }
 
   const scale = image ? scaleFor(image, viewport, zoom) : 0;
-  // anel escuro em volta do círculo: borda tão grossa que cobre o resto do palco (que corta o excesso)
+  // escurece em volta do quadro: borda tão grossa que cobre o resto do palco (que corta o excesso)
   const dim = stage;
+  const frameRadius = banner ? 0 : t.radii.pill;
   const body = (
     <View style={{ gap: t.spacing.lg }}>
       <View style={{ gap: t.spacing.xs }}>
-        <Heading level={2}>Ajustar foto</Heading>
+        <Heading level={2}>{banner ? 'Ajustar banner' : 'Ajustar foto'}</Heading>
         <Text variant="small" tone="muted">
           Arrasta pra enquadrar. Pra dar zoom, pinça, roda do mouse ou os botões.
         </Text>
@@ -190,7 +200,7 @@ export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
           {...(image ? responder.panHandlers : {})}
           style={{
             width: stage,
-            height: stage,
+            height: stageHeight,
             alignSelf: 'center',
             alignItems: 'center',
             justifyContent: 'center',
@@ -208,16 +218,16 @@ export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
                   width: image.width * scale,
                   height: image.height * scale,
                   left: stage / 2 + offset.x - (image.width * scale) / 2,
-                  top: stage / 2 + offset.y - (image.height * scale) / 2,
+                  top: stageHeight / 2 + offset.y - (image.height * scale) / 2,
                 }}
               />
               <View
                 pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  width: viewport + dim * 2,
-                  height: viewport + dim * 2,
-                  borderRadius: t.radii.pill,
+                  width: viewport.width + dim * 2,
+                  height: viewport.height + dim * 2,
+                  borderRadius: frameRadius,
                   borderWidth: dim,
                   borderColor: t.colors.overlay,
                 }}
@@ -226,9 +236,9 @@ export function AvatarCropper({ uri, onCancel, onConfirm }: Props) {
                 pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  width: viewport,
-                  height: viewport,
-                  borderRadius: t.radii.pill,
+                  width: viewport.width,
+                  height: viewport.height,
+                  borderRadius: frameRadius,
                   borderWidth: t.borders.hairline,
                   borderColor: t.colors.onOverlay,
                 }}

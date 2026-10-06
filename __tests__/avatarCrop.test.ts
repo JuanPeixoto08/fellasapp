@@ -1,4 +1,4 @@
-import { AVATAR_CROP, clampOffset, clampZoom, cropRect, pinchZoom, stepZoom } from '../lib/avatarCrop';
+import { AVATAR_CROP, BANNER_CROP, clampOffset, clampZoom, cropRect, pinchZoom, scaleFor, stepZoom } from '../lib/avatarCrop';
 
 const landscape = { width: 4000, height: 3000 };
 const portrait = { width: 1170, height: 2532 };
@@ -70,5 +70,36 @@ describe('cropRect', () => {
     expect(r.originX + r.width).toBeLessThanOrEqual(1001);
     expect(r.originY + r.height).toBeLessThanOrEqual(777);
     expect(r.width).toBe(r.height);
+  });
+});
+
+describe('banner (quadro 3:1)', () => {
+  const frame = { width: 300, height: 100 };
+  const photo = { width: 1200, height: 800 };
+
+  it('sai em 1500x500', () => {
+    expect(BANNER_CROP).toMatchObject({ output: { width: 1500, height: 500 }, quality: 0.8 });
+  });
+
+  it('a foto começa cobrindo o quadro inteiro (lado que sobra dá pra arrastar)', () => {
+    expect(scaleFor(photo, frame, 1)).toBe(0.25);
+    // 1200*0.25 = 300 de largura (não sobra), 800*0.25 = 200 de altura (sobra 100)
+    expect(clampOffset(photo, frame, 1, { x: 80, y: 80 })).toEqual({ x: 0, y: 50 });
+  });
+
+  it('sem mexer recorta a faixa do meio, na proporção do quadro', () => {
+    expect(cropRect(photo, frame, 1, { x: 0, y: 0 })).toEqual({ originX: 0, originY: 200, width: 1200, height: 400 });
+  });
+
+  it('arrastar pra baixo mostra a parte de cima', () => {
+    expect(cropRect(photo, frame, 1, { x: 0, y: 50 })).toEqual({ originX: 0, originY: 0, width: 1200, height: 400 });
+  });
+
+  it('foto em pé também cobre o quadro', () => {
+    const tall = { width: 900, height: 1600 };
+    const s = scaleFor(tall, frame, 1);
+    expect(tall.width * s).toBeGreaterThanOrEqual(frame.width);
+    expect(tall.height * s).toBeGreaterThanOrEqual(frame.height);
+    expect(cropRect(tall, frame, 1, { x: 0, y: 0 })).toEqual({ originX: 0, originY: 650, width: 900, height: 300 });
   });
 });

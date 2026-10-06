@@ -153,6 +153,8 @@ export const layout = {
   sheetHeightRatio: 0.75,
   /** Proporções (largura/altura) das fotos no post: 1 foto fica entre min e max; 2+ usam grid. */
   mediaAspect: { min: 3 / 4, max: 1.91, grid: 16 / 9 },
+  /** Banner do perfil (largura/altura), como no Twitter. */
+  bannerAspect: 3,
   gutter: spacing.lg,
   minTouch: 44,
 } as const;
