@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { PostCard } from '../../components/PostCard';
 import { stackHeader } from '../../components/profile/headerOptions';
-import { Divider, EmptyState, Screen, Text } from '../../components/ui';
+import { Button, Divider, EmptyState, Screen, Text } from '../../components/ui';
 import { countTagPosts } from '../../lib/api/tags';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { normalizeTag } from '../../lib/tags';
@@ -66,6 +66,18 @@ export default function TagScreen() {
           onRefresh={refresh}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            error && posts.length > 0 ? (
+              <View style={{ alignItems: 'center', padding: t.spacing.lg, gap: t.spacing.sm }}>
+                <Text tone="muted" align="center" accessibilityRole="alert">
+                  Não deu pra carregar mais posts.
+                </Text>
+                <Button variant="secondary" title="Tentar de novo" onPress={loadMore} />
+              </View>
+            ) : loading && posts.length > 0 && !refreshing ? (
+              <ActivityIndicator style={{ padding: t.spacing.xl }} color={t.colors.primary} accessibilityLabel="Carregando posts" />
+            ) : null
+          }
           ListEmptyComponent={
             loading ? (
               <ActivityIndicator style={{ padding: t.spacing.xl }} color={t.colors.primary} accessibilityLabel="Carregando posts" />

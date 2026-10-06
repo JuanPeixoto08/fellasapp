@@ -29,9 +29,10 @@ begin
 end;
 $$;
 
+-- em qualquer update (não só do texto): assim ninguém grava posts.tags direto pela API
 drop trigger if exists posts_set_tags on public.posts;
 create trigger posts_set_tags
-  before insert or update of body on public.posts
+  before insert or update on public.posts
   for each row execute function public.set_post_tags();
 
 -- posts que já existiam

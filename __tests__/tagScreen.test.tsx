@@ -85,6 +85,21 @@ describe('Página da tag', () => {
     expect(screen.getByText('Ninguém usou #artes ainda.')).toBeTruthy();
   });
 
+  it('rolando: falhou carregar mais com posts na tela → aviso e tentar de novo (igual ao feed)', async () => {
+    const more = list({ posts: [post], error: 'caiu' });
+    mockUsePostList.mockReturnValue(more);
+    await open();
+    expect(screen.getByText('Não deu pra carregar mais posts.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(more.loadMore).toHaveBeenCalled();
+  });
+
+  it('rolando: carregando mais mostra o indicador no pé', async () => {
+    mockUsePostList.mockReturnValue(list({ posts: [post], loading: true }));
+    await open();
+    expect(screen.getByLabelText('Carregando posts')).toBeTruthy();
+  });
+
   it('erro oferece tentar de novo', async () => {
     const failed = list({ error: 'caiu' });
     mockUsePostList.mockReturnValue(failed);
