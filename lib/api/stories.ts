@@ -114,7 +114,7 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
   const since = new Date(now.getTime() - STORY_TTL_MS).toISOString();
   const { data, error } = await supabase
     .from('stories')
-    .select('id, author_id, kind, media_id, duration_ms, created_at, author:profiles(id, username, display_name, avatar_url)')
+    .select('id, author_id, kind, media_id, duration_ms, created_at, author:profiles!stories_author_id_fkey(id, username, display_name, avatar_url)')
     .gt('created_at', since)
     .order('created_at', { ascending: true });
   if (error) throw error;

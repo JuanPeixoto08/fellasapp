@@ -168,6 +168,12 @@ describe('deleteStory', () => {
 });
 
 describe('listActiveStories', () => {
+  it('autor pela chave do story (story_views e story_reactions também ligam stories a perfis: sem isso o Supabase recusa)', async () => {
+    await listActiveStories(new Date('2026-10-04T12:00:00Z'));
+    const select = mockCalls.find((c) => c.table === 'stories' && c.op === 'select')?.args[0] as string;
+    expect(select).toContain('author:profiles!stories_author_id_fkey(');
+  });
+
   it('agrupa por autor (mais antigo primeiro), marca visto e minha reação; só últimas 24 h', async () => {
     const now = new Date('2026-10-04T12:00:00Z');
     mockResults['stories.select'] = {
