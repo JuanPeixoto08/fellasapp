@@ -3,7 +3,16 @@
  * estiver na tela (feed, post, notificações, coluna da direita). Quem escuta decide o que buscar de novo.
  * `resync` = a conexão voltou ou o app voltou para a frente: eventos podem ter passado, atualize tudo.
  */
-export const LIVE_TABLES = ['posts', 'likes', 'comments', 'post_reactions', 'comment_reactions', 'profiles'] as const;
+export const LIVE_TABLES = [
+  'posts',
+  'likes',
+  'comments',
+  'post_reactions',
+  'comment_reactions',
+  'profiles',
+  'ideas',
+  'idea_votes',
+] as const;
 export type LiveTable = (typeof LIVE_TABLES)[number];
 
 export type LiveChange = {
@@ -35,11 +44,12 @@ export function emitLive(event: LiveEvent): void {
 
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
-/** Quem fez a mudança: autor do post/comentário, dono da curtida/reação, o próprio perfil. */
+/** Quem fez a mudança: autor do post/comentário/ideia, dono da curtida/reação/voto, o próprio perfil. */
 export function actorOf(table: LiveTable, row: Record<string, unknown>): string | null {
   switch (table) {
     case 'posts':
     case 'comments':
+    case 'ideas':
       return str(row.author_id);
     case 'profiles':
       return str(row.id);
@@ -61,6 +71,8 @@ export function postIdOf(change: LiveChange): string | null {
 export function affectsNotifications(event: LiveEvent): boolean {
   if (event.kind === 'resync') return true;
   if (event.mine) return false;
+  // mural de ideias não gera notificação
+  if (event.table === 'ideas' || event.table === 'idea_votes') return false;
   if (event.table === 'profiles' || event.table === 'posts') return event.type === 'INSERT';
   return true;
 }

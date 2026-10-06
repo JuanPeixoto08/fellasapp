@@ -32,7 +32,7 @@ let mockSession: { session: { user: { id: string } } | null; profile: { is_membe
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => mockSession }));
 
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
-import { affectsNotifications, debounce, LIVE_TABLES, onLive, postIdOf, type LiveEvent } from '../lib/realtime';
+import { actorOf, affectsNotifications, debounce, LIVE_TABLES, onLive, postIdOf, type LiveEvent } from '../lib/realtime';
 
 const member = (id: string) => ({ session: { user: { id } }, profile: { is_member: true } });
 let appStateHandler: ((s: string) => void) | null = null;
@@ -144,5 +144,17 @@ describe('affectsNotifications', () => {
     expect(affectsNotifications(post(false))).toBe(true);
     expect(affectsNotifications(post(true))).toBe(false);
     expect(affectsNotifications({ kind: 'change', table: 'posts', type: 'DELETE', row: {}, mine: false })).toBe(false);
+  });
+
+  it('ideia e voto em ideia não viram notificação', () => {
+    expect(affectsNotifications({ kind: 'change', table: 'ideas', type: 'INSERT', row: {}, mine: false })).toBe(false);
+    expect(affectsNotifications({ kind: 'change', table: 'idea_votes', type: 'INSERT', row: {}, mine: false })).toBe(false);
+  });
+});
+
+describe('actorOf', () => {
+  it('ideia: o autor; voto em ideia: quem votou', () => {
+    expect(actorOf('ideas', { author_id: 'u1' })).toBe('u1');
+    expect(actorOf('idea_votes', { user_id: 'u2' })).toBe('u2');
   });
 });
