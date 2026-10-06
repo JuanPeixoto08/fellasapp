@@ -3,6 +3,7 @@
 #   CLOUDFLARE_API_TOKEN       token com Account · Cloudflare Pages · Edit
 #   CLOUDFLARE_ACCOUNT_ID      ID da conta Cloudflare
 #   EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY   mesmos valores do .env (entram no bundle)
+#   EXPO_PUBLIC_LASTFM_API_KEY   API key do Last.fm (aba Música; entra no bundle)
 name: Deploy web
 
 on:
@@ -38,6 +39,7 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_LASTFM_API_KEY: ${{ secrets.EXPO_PUBLIC_LASTFM_API_KEY }}
 
       - uses: cloudflare/wrangler-action@v3
         with:

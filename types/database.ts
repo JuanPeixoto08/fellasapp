@@ -111,6 +111,7 @@ export type Database = {
           birthday: string | null;
           is_member: boolean;
           badges: string[];
+          lastfm_user: string | null;
           is_admin: boolean;
           pinned_post_id: string | null;
           created_at: string;
@@ -128,6 +129,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           badges?: string[];
+          lastfm_user?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -145,6 +147,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           badges?: string[];
+          lastfm_user?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;

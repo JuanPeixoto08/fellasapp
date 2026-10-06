@@ -30,6 +30,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0016_post_tags.sql` | #tags em posts: `posts.tags` (gatilho tira do texto), `tag_suggestions` | página da tag e sugestões de # falham |
 | `0017_tag_list.sql` | tela Tags: `tag_suggestions` aceita até 200 | a lista de tags para em 20 |
 | `0018_profile_badges.sql` | selos do perfil (`profiles.badges`); @oliveira verificado | posts e comentários não carregam (o app busca `badges` do autor) |
+| `0019_lastfm_user.sql` | usuário do Last.fm no perfil (`profiles.lastfm_user`) | salvar perfil com Last.fm falha |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 
