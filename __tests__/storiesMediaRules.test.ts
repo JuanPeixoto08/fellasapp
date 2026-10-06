@@ -53,7 +53,7 @@ describe('regras dos stories (Cloudinary)', () => {
       'https://api.cloudinary.com/v1_1/c/resources/video/upload?prefix=stories%2F&max_results=500&next_cursor=abc%3D',
     );
     expect(deleteUrl('c', 'image', ['stories/a', 'stories/b'])).toBe(
-      'https://api.cloudinary.com/v1_1/c/resources/image/upload?public_ids%5B%5D=stories%2Fa&public_ids%5B%5D=stories%2Fb',
+      'https://api.cloudinary.com/v1_1/c/resources/image/upload?public_ids%5B%5D=stories%2Fa&public_ids%5B%5D=stories%2Fb&invalidate=true',
     );
     expect(basicAuth('k', 's')).toBe(`Basic ${btoa('k:s')}`);
   });

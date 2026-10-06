@@ -47,7 +47,7 @@ export function listUrl(cloud: string, type: ResourceType, cursor?: string): str
 
 export function deleteUrl(cloud: string, type: ResourceType, ids: string[]): string {
   const query = ids.map((id) => `public_ids%5B%5D=${encodeURIComponent(id)}`).join('&');
-  return `${API}/${cloud}/resources/${type}/upload?${query}`;
+  return `${API}/${cloud}/resources/${type}/upload?${query}&invalidate=true`;
 }
 
 export const basicAuth = (key: string, secret: string) => `Basic ${btoa(`${key}:${secret}`)}`;

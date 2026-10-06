@@ -79,7 +79,7 @@ describe('POST /delete', () => {
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'DELETE' });
     expect(fetch.mock.calls[0][1].headers).toMatchObject({ Authorization: 'Bearer tok', Prefer: 'return=representation' });
     expect(fetch.mock.calls[1][0]).toBe(
-      `https://api.cloudinary.com/v1_1/cloud/resources/video/upload?public_ids%5B%5D=${encodeURIComponent(MEDIA)}`,
+      `https://api.cloudinary.com/v1_1/cloud/resources/video/upload?public_ids%5B%5D=${encodeURIComponent(MEDIA)}&invalidate=true`,
     );
     expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'DELETE', headers: { Authorization: `Basic ${btoa('key:secret')}` } });
   });
@@ -129,6 +129,7 @@ describe('POST /cleanup', () => {
     expect(fetch.mock.calls[2][0]).toContain(`public_ids%5B%5D=${encodeURIComponent('stories/a')}`);
     expect(fetch.mock.calls[2][0]).not.toContain('stories%2Fb');
     expect(fetch.mock.calls[4][0]).toContain('/resources/video/upload?public_ids');
+    expect(fetch.mock.calls[2][0]).toContain('invalidate=true');
   });
 
   it('segredo errado, ausente ou vazio na função: 401 sem chamar o Cloudinary', async () => {
