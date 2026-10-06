@@ -24,6 +24,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0004_reactions_any_emoji.sql` | reação com qualquer emoji (troca a lista fixa de 6 por limite de tamanho) | reagir com emoji fora dos 6 da barra rápida falha |
 | `0005_post_images.sql` | até 4 fotos por post (coluna `images`, migra a foto atual de cada post) | postar com 2+ fotos falha (1 foto continua funcionando) |
 | `0012_invites.sql` | admin (`profiles.is_admin`, o @oliveira já sai admin) e link de convite de uso único (`invite_links`) | gerar link e abrir convite falham |
+| `0013_ideas.sql` | mural de ideias: `ideas`, `idea_votes` (+1/−1), `ideas_feed(sort)` e tempo real | a tela Ideias não carrega nem vota |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 

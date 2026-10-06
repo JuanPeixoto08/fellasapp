@@ -29,6 +29,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      ideas: {
+        Row: {
+          id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          author_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          author_id?: string;
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      idea_votes: {
+        Row: {
+          idea_id: string;
+          user_id: string;
+          value: number;
+          created_at: string;
+        };
+        Insert: {
+          idea_id: string;
+          user_id: string;
+          value: number;
+          created_at?: string;
+        };
+        Update: {
+          idea_id?: string;
+          user_id?: string;
+          value?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       invite_links: {
         Row: {
           token: string;
@@ -299,6 +341,17 @@ export type Database = {
       redeem_invite: {
         Args: { p_token: string; p_email: string };
         Returns: undefined;
+      };
+      ideas_feed: {
+        Args: { p_sort?: string };
+        Returns: {
+          id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+          score: number;
+          my_vote: number | null;
+        }[];
       };
       notifications_feed: {
         Args: { p_limit?: number };
