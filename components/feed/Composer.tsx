@@ -152,6 +152,8 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
           {grow.mirror}
           <TextInput
             ref={input}
+            // janela do computador: abre pronta para digitar
+            autoFocus={variant === 'dialog'}
             numberOfLines={1}
             accessibilityLabel="O que rolou?"
             placeholder="O que rolou, fella?"
@@ -265,12 +267,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
 
   const toolbar = (
     <View
+      testID="composer-toolbar"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: t.spacing.xs,
         paddingHorizontal: t.spacing.sm,
-        paddingVertical: variant === 'inline' ? t.spacing.xs : 0,
+        paddingVertical: variant === 'page' ? 0 : t.spacing.xs,
         borderTopWidth: variant === 'inline' ? 0 : t.borders.hairline,
         borderColor: t.colors.border,
         backgroundColor: t.colors.bg,
@@ -304,9 +307,8 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
           {MAX_BODY - body.length}
         </Text>
       ) : null}
-      {variant === 'inline' ? (
-        <Button title="Postar" loading={saving} disabled={!hasDraft} onPress={publish} />
-      ) : null}
+      {/* topo do feed e janela: "Postar" junto de foto e local; a página do celular o tem no topo */}
+      {variant === 'page' ? null : <Button title="Postar" loading={saving} disabled={!hasDraft} onPress={publish} />}
     </View>
   );
 
@@ -339,10 +341,12 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
 
   const header = (
     <View
+      testID="composer-header"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        // janela: só o ✕, à direita (o "Postar" fica embaixo)
+        justifyContent: variant === 'dialog' ? 'flex-end' : 'space-between',
         paddingHorizontal: variant === 'dialog' ? t.spacing.sm : t.layout.gutter,
         paddingVertical: t.spacing.sm,
       }}
@@ -352,15 +356,19 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       ) : (
         <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" onPress={cancel} disabled={saving} />
       )}
-      <Button title="Postar" loading={saving} disabled={!hasDraft} onPress={publish} />
+      {variant === 'page' ? <Button title="Postar" loading={saving} disabled={!hasDraft} onPress={publish} /> : null}
     </View>
   );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    // janela: a altura acompanha o conteúdo (a ComposeDialog põe o teto); página: tela inteira
+    <KeyboardAvoidingView
+      style={variant === 'dialog' ? { flexShrink: 1 } : { flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {header}
       <ScrollView
-        style={{ flex: 1 }}
+        style={variant === 'dialog' ? { flexGrow: 0, flexShrink: 1 } : { flex: 1 }}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ width: '100%', maxWidth: t.layout.maxContentWidth, alignSelf: 'center' }}
       >

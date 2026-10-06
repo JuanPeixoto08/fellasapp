@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { Composer } from '../components/feed/Composer';
 import { createPost } from '../lib/api/posts';
@@ -124,6 +125,23 @@ describe('Composer', () => {
     await waitFor(() => expect(createPostMock).toHaveBeenCalledWith({ body: 'bora', imageUris: [], location: null }));
     await waitFor(() => expect(onPosted).toHaveBeenCalled());
     expect(screen.queryByDisplayValue('bora')).toBeNull();
+  });
+
+  it('janela: só o ✕ em cima, à direita; "Postar" fica embaixo, junto de foto e local', async () => {
+    await render(<Composer variant="dialog" />);
+    const header = screen.getByTestId('composer-header');
+    expect(StyleSheet.flatten(header.props.style).justifyContent).toBe('flex-end');
+    expect(within(header).getByLabelText('Fechar')).toBeTruthy();
+    expect(screen.getAllByLabelText('Postar')).toHaveLength(1);
+    expect(within(screen.getByTestId('composer-toolbar')).getByLabelText('Postar')).toBeTruthy();
+  });
+
+  it('janela abre com o cursor no texto; no topo do feed, não', async () => {
+    const view = await render(<Composer variant="dialog" />);
+    expect(screen.getByLabelText('O que rolou?').props.autoFocus).toBe(true);
+    await view.unmount();
+    await render(<Composer variant="inline" />);
+    expect(screen.getByLabelText('O que rolou?').props.autoFocus).toBeFalsy();
   });
 
   it('dialog: fechar sem rascunho fecha direto; com rascunho pede confirmação', async () => {

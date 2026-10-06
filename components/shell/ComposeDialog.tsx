@@ -5,28 +5,34 @@ import { Composer } from '../feed/Composer';
 
 type Props = { visible: boolean; onClose: () => void };
 
-/** Janela do compositor (botão Postar da lateral), centralizada por cima de qualquer tela. */
+/**
+ * Janela do compositor (botão Postar da lateral), por cima de qualquer tela: compacta, presa perto do topo
+ * (não pula enquanto cresce) e crescendo com o texto e as fotos até `sheetHeightRatio` da tela.
+ */
 export function ComposeDialog({ visible, onClose }: Props) {
   const t = useTheme();
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View
+        testID="compose-backdrop"
         style={{
           flex: 1,
           backgroundColor: t.colors.overlay,
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
           padding: t.layout.gutter,
+          paddingTop: t.spacing.xxxl,
         }}
       >
         <View
+          testID="compose-dialog"
           accessibilityViewIsModal
           style={[
             {
               width: '100%',
               maxWidth: t.layout.centerWidth,
-              height: height * t.layout.sheetHeightRatio,
+              maxHeight: height * t.layout.sheetHeightRatio,
               backgroundColor: t.colors.bg,
               borderRadius: t.radii.lg,
               borderWidth: t.borders.hairline,
