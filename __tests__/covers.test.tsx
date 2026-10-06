@@ -1,24 +1,27 @@
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockCover = jest.fn();
+const mockArtistCover = jest.fn();
 jest.mock('../lib/lastfm/api', () => ({
   ...jest.requireActual('../lib/lastfm/api'),
   getTrackCover: (artist: string, track: string) => mockCover(artist, track),
+  getArtistCover: (artist: string) => mockArtistCover(artist),
 }));
 
 import { TopRow } from '../components/music/TopRow';
-import { clearTrackCovers, loadTrackCover, TRACK_COVER_CONCURRENCY } from '../lib/lastfm/trackCovers';
+import { clearCovers, COVER_CONCURRENCY, loadArtistCover, loadTrackCover } from '../lib/lastfm/covers';
 
 beforeEach(() => {
   mockCover.mockReset();
-  clearTrackCovers();
+  mockArtistCover.mockReset();
+  clearCovers();
 });
 
 describe('loadTrackCover', () => {
   it('no máximo 2 pedidos ao mesmo tempo', async () => {
     const pending: ((v: string | null) => void)[] = [];
     mockCover.mockImplementation(() => new Promise((r) => pending.push(r)));
-    expect(TRACK_COVER_CONCURRENCY).toBe(2);
+    expect(COVER_CONCURRENCY).toBe(2);
     const all = [loadTrackCover('A', '1'), loadTrackCover('A', '2'), loadTrackCover('A', '3')];
     await Promise.resolve();
     expect(mockCover).toHaveBeenCalledTimes(2);
@@ -61,5 +64,25 @@ describe('TopRow de música sem capa', () => {
       <TopRow kind="tracks" item={{ rank: 2, name: 'x', artist: 'y', image: 'https://x/t.png', url: '', plays: 1 }} onPress={() => {}} />,
     );
     expect(mockCover).not.toHaveBeenCalled();
+  });
+});
+
+describe('capa de artista', () => {
+  it('cache separado do de músicas (artista "Brat" ≠ música "Brat")', async () => {
+    mockCover.mockResolvedValue('https://x/musica.png');
+    mockArtistCover.mockResolvedValue('https://x/artista.png');
+    await expect(loadTrackCover('Charli xcx', 'Brat')).resolves.toBe('https://x/musica.png');
+    await expect(loadArtistCover('Brat')).resolves.toBe('https://x/artista.png');
+    await loadArtistCover('BRAT');
+    expect(mockArtistCover).toHaveBeenCalledTimes(1);
+  });
+
+  it('linha de artista sem foto busca a capa e mostra quando chega', async () => {
+    mockArtistCover.mockResolvedValue('https://x/racionais.png');
+    await render(
+      <TopRow kind="artists" item={{ rank: 3, name: "Racionais MC's", artist: null, image: null, url: '', plays: 41 }} onPress={() => {}} />,
+    );
+    expect(await screen.findByLabelText("Imagem de Racionais MC's")).toBeTruthy();
+    expect(mockArtistCover).toHaveBeenCalledWith("Racionais MC's");
   });
 });

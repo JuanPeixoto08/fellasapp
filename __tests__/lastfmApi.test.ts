@@ -1,4 +1,4 @@
-import { getNowPlaying, getRecentTracks, getTop, getTrackCover, getUserInfo, hasLastfmKey, LastfmError } from '../lib/lastfm/api';
+import { getArtistCover, getNowPlaying, getRecentTracks, getTop, getTrackCover, getUserInfo, hasLastfmKey, LastfmError } from '../lib/lastfm/api';
 
 const mockFetch = jest.fn();
 const ORIGINAL_KEY = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
@@ -52,6 +52,17 @@ describe('api do Last.fm', () => {
     mockFetch.mockReset();
     ok({ track: { name: 'x' } });
     await expect(getTrackCover('A', 'x')).resolves.toBeNull();
+  });
+
+  it('imagem de artista: capa do álbum mais ouvido dele (artist.gettopalbums, 1 só)', async () => {
+    ok({ topalbums: { album: { name: 'Nada Como um Dia', image: [{ '#text': 'https://x/34s/r.png' }, { '#text': 'https://x/300x300/r.png' }] } } });
+    await expect(getArtistCover("Racionais MC's")).resolves.toBe('https://x/300x300/r.png');
+    expect(query().get('method')).toBe('artist.gettopalbums');
+    expect(query().get('artist')).toBe("Racionais MC's");
+    expect(query().get('limit')).toBe('1');
+    mockFetch.mockReset();
+    ok({ topalbums: { album: [] } });
+    await expect(getArtistCover('Ninguém')).resolves.toBeNull();
   });
 
   it('tops: método por tipo e período', async () => {

@@ -84,6 +84,18 @@ export async function getTrackCover(artist: string, track: string): Promise<stri
   return pickImage(json?.track?.album?.image);
 }
 
+/**
+ * Imagem de artista: o Last.fm não fornece foto, então usa a capa do álbum mais ouvido dele.
+ */
+export async function getArtistCover(artist: string): Promise<string | null> {
+  const json = (await lastfmGet('artist.gettopalbums', { artist, limit: 1 })) as {
+    topalbums?: { album?: { image?: { '#text'?: string }[] } | { image?: { '#text'?: string }[] }[] };
+  };
+  const albums = json?.topalbums?.album;
+  const first = Array.isArray(albums) ? albums[0] : albums;
+  return pickImage(first?.image);
+}
+
 /** A música tocando agora (vem marcada no topo das recentes), ou null. */
 export async function getNowPlaying(user: string): Promise<LastfmTrack | null> {
   const page = mapRecentTracks(await lastfmGet('user.getrecenttracks', { user, limit: 1 }));
