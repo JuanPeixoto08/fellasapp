@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ReactButton, ReactionBar, ReactionPicker } from '../reactions';
-import { Avatar, ConfirmDialog, IconButton, Text } from '../ui';
+import { Avatar, ConfirmDialog, IconButton, NameWithBadge, Text } from '../ui';
 import { useTheme } from '../../lib/theme';
 import type { Comment } from '../../lib/api/posts';
 import { postTime } from '../../lib/format';
@@ -35,9 +35,7 @@ export function CommentItem({ comment, onReact, onDelete }: Props) {
       <View style={{ flex: 1, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
           <AuthorLink userId={comment.author.id} name={name} style={{ flexShrink: 1 }}>
-            <Text variant="small" bold numberOfLines={1}>
-              {name}
-            </Text>
+            <NameWithBadge name={name} badges={comment.author.badges} variant="small" bold />
           </AuthorLink>
           <View style={{ flex: 1 }} />
           {date ? (

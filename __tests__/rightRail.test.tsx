@@ -48,6 +48,12 @@ describe('RightRail', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/members');
   });
 
+  it('selo de verificado ao lado do nome de quem tem', async () => {
+    mockState.members = [{ ...member('me', 'Juan'), badges: ['verified'] }, member('b', 'Bia')];
+    await render(<RightRail />, { wrapper: Wrapper });
+    expect(screen.getAllByLabelText('Verificado')).toHaveLength(1);
+  });
+
   it('mostra próximos aniversários ou o convite quando ninguém preencheu', async () => {
     mockState.members = [member('a', 'Bia')];
     await render(<RightRail />, { wrapper: Wrapper });

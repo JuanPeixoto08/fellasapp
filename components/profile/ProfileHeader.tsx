@@ -4,7 +4,8 @@ import { Image, View } from 'react-native';
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
 import { useTheme } from '../../lib/theme';
-import { Avatar, Heading, Icon, Text, type IconName } from '../ui';
+import { Avatar, Heading, Icon, Text, VerifiedBadge, type IconName } from '../ui';
+import { hasBadge } from '../../lib/badges';
 
 type Props = {
   profile: Profile;
@@ -62,9 +63,12 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions }: Props)
           {actions ? <View style={{ flexDirection: 'row', gap: t.spacing.xs }}>{actions}</View> : null}
         </View>
         <View>
-          <Heading level={2} numberOfLines={2}>
-            {name}
-          </Heading>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}>
+            <Heading level={2} numberOfLines={2} style={{ flexShrink: 1 }}>
+              {name}
+            </Heading>
+            {hasBadge(profile.badges, 'verified') ? <VerifiedBadge size="md" /> : null}
+          </View>
           <Text variant="small" tone="muted" numberOfLines={1}>
             @{profile.username}
           </Text>

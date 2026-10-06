@@ -5,7 +5,7 @@ import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
 import { PostImages } from './feed/PostImages';
 import { ReactButton, ReactionBar, ReactionPicker } from './reactions';
-import { Avatar, ConfirmDialog, Icon, IconButton, Text } from './ui';
+import { Avatar, ConfirmDialog, Icon, IconButton, NameWithBadge, Text } from './ui';
 import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
@@ -90,9 +90,7 @@ export function PostCard({
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
           <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
-            <Text bold numberOfLines={1}>
-              {name}
-            </Text>
+            <NameWithBadge name={name} badges={post.author.badges} bold />
           </AuthorLink>
           <View style={{ flex: 1 }} />
           {date ? (

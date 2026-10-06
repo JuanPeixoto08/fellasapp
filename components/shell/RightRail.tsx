@@ -9,7 +9,7 @@ import { nextBirthdays } from '../../lib/birthdays';
 import { useTheme } from '../../lib/theme';
 import { useMembers } from '../../lib/useMembers';
 import { useToday } from '../../lib/useToday';
-import { Avatar, Button, Heading, Icon, interactiveStyle, Text } from '../ui';
+import { Avatar, Button, Heading, Icon, interactiveStyle, NameWithBadge, Text } from '../ui';
 
 const MAX_MEMBERS = 8;
 const MAX_BIRTHDAYS = 3;
@@ -75,9 +75,7 @@ export function RightRail() {
                 >
                   <Avatar name={name} uri={resolveUrl(m.avatar_url, avatars)} size={t.avatarSizes.sm} />
                   <View style={{ flex: 1 }}>
-                    <Text variant="small" bold numberOfLines={1}>
-                      {name}
-                    </Text>
+                    <NameWithBadge name={name} badges={m.badges} variant="small" bold />
                     <Text variant="caption" tone="muted" numberOfLines={1}>
                       @{m.username}
                     </Text>

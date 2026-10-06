@@ -18,6 +18,8 @@ export type Colors = {
   onBrand: string;
   /** Coração curtido: vermelho próprio, diferente do `danger`. */
   like: string;
+  /** Selo de verificado (mesmo vermelho do coração curtido). */
+  verified: string;
   danger: string;
   onDanger: string;
   success: string;
@@ -43,6 +45,7 @@ export const colors: Record<ColorScheme, Colors> = {
     brand: '#5B3FD9',
     onBrand: '#FFFFFF',
     like: '#C81E3A',
+    verified: '#C81E3A',
     danger: '#B3261E',
     onDanger: '#FFFFFF',
     success: '#2E7D4F',
@@ -64,6 +67,7 @@ export const colors: Record<ColorScheme, Colors> = {
     brand: '#B8A2FF',
     onBrand: '#121212',
     like: '#FF5A6E',
+    verified: '#FF5A6E',
     danger: '#FF8A80',
     onDanger: '#121212',
     success: '#7BD9A0',

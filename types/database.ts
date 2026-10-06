@@ -110,6 +110,7 @@ export type Database = {
           location: string | null;
           birthday: string | null;
           is_member: boolean;
+          badges: string[];
           is_admin: boolean;
           pinned_post_id: string | null;
           created_at: string;
@@ -126,6 +127,7 @@ export type Database = {
           location?: string | null;
           birthday?: string | null;
           is_member?: boolean;
+          badges?: string[];
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -142,6 +144,7 @@ export type Database = {
           location?: string | null;
           birthday?: string | null;
           is_member?: boolean;
+          badges?: string[];
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;

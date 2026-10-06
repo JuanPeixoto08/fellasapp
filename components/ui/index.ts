@@ -15,3 +15,5 @@ export { Screen, type ScreenProps } from './Screen';
 export { TextField, type TextFieldProps } from './TextField';
 export { Heading, Text, type HeadingProps, type TextProps } from './Text';
 export { useAutoGrow } from './useAutoGrow';
+export { NameWithBadge } from './NameWithBadge';
+export { VerifiedBadge } from './VerifiedBadge';

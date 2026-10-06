@@ -2,7 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import type { Profile } from '../../lib/api/profiles';
 import { useTheme } from '../../lib/theme';
-import { Avatar, interactiveStyle, Text } from '../ui';
+import { Avatar, interactiveStyle, NameWithBadge, Text } from '../ui';
 
 type Props = { member: Profile; avatarUri?: string | null; onPress: () => void };
 
@@ -25,9 +25,7 @@ export function MemberRow({ member, avatarUri, onPress }: Props) {
     >
       <Avatar name={name} uri={avatarUri} size={t.layout.minTouch} />
       <View style={{ flex: 1 }}>
-        <Text bold numberOfLines={1}>
-          {name}
-        </Text>
+        <NameWithBadge name={name} badges={member.badges} bold />
         <Text variant="small" tone="muted" numberOfLines={1}>
           @{member.username}
         </Text>

@@ -21,7 +21,7 @@ Neutros quentes de papel/tinta, nunca cinza puro. O acento é um neutro aquecido
 | danger | `#B3261E` | `#FF8A80` |
 | success | `#2E7D4F` | `#7BD9A0` |
 
-Accent aparece sempre **invertido** (preenchimento `accent` + texto `onAccent`): minha reação, emoji escolhido no seletor, grifo `<Text highlight>`. Sem amarelo em lugar nenhum. `like` só no coração curtido e no número dele; vermelho de erro continua `danger`. Avatares sem foto usam tons de papel/pastel com tinta.
+Accent aparece sempre **invertido** (preenchimento `accent` + texto `onAccent`): minha reação, emoji escolhido no seletor, grifo `<Text highlight>`. Sem amarelo em lugar nenhum. `like` só no coração curtido e no número dele; `verified` (mesmo vermelho) só no selo de verificado; vermelho de erro continua `danger`. Avatares sem foto usam tons de papel/pastel com tinta.
 
 ### Brand
 `brand` (violeta `#5B3FD9` claro / `#B8A2FF` escuro) é o tint ativo da tab bar e destaques de UI sobre papel, com contraste ≥ 4.5:1 no `bg`.
@@ -60,7 +60,7 @@ Sem caixa: nada de cartão com borda/sombra. O post fica direto no papel e as li
 Cabeçalho estilo Twitter (out/2026, substitui o compacto): banner 3:1 (`layout.bannerAspect`) de ponta a ponta no topo; sem banner, faixa lisa `surfaceSunken` do mesmo tamanho (o layout não pula). Avatar `xl` com anel `borders.selected` na cor `bg`, metade sobre a borda de baixo do banner; ações como IconButton à direita, na base do avatar (só no meu perfil). Nome (title) e @usuário logo abaixo. Status num chip neutro (`surfaceSunken` + texto). Sem cor por fella: a "cor de perfil" (paleta + seletor) saiu em out/2026 porque não encaixava no zine. Foto de perfil passa pelo "Ajustar foto" (`components/profile/AvatarCropper`): palco `viewerBg`, círculo com fio `onOverlay` e o resto escurecido com `overlay`, arrastar + zoom 1–4x (pinça, roda, botões − / +); tela cheia no celular, janela `maxDialogWidth` no computador; sai 512×512 JPEG. O banner usa a mesma tela com retângulo 3:1 ("Ajustar banner") e sai 1500×500 JPEG; em Editar perfil fica no topo, prévia com raio `md`, "Escolher/Trocar banner" e "Tirar banner". Números entre fios finos (sem bloco de cor). Abas Posts (cards iguais ao feed, um embaixo do outro) e Fotos (grade de 3, toque abre o post). Sem arco-íris na grade. Todos com estados disabled/erro/loading onde fizer sentido, `accessibilityRole` e labels.
 
 ## Ícones
-Ionicons (`@expo/vector-icons`) via `<Icon>` de `components/ui`, sempre na variante `-outline` fora da tab bar. Tamanhos por token `iconSizes`: sm 16 (junto de texto small) · md 20 · lg 24. Cor por `tone` (default/muted) ou `color` explícita. Ícone é decorativo: o rótulo acessível fica no controle. Sem emoji/glifos como ícone.
+Ionicons (`@expo/vector-icons`) via `<Icon>` de `components/ui`, sempre na variante `-outline` fora da tab bar. Exceção: o selo de verificado (`VerifiedBadge`, `checkmark-circle` cheio em `verified`, ao lado do nome via `NameWithBadge`) é marca, não controle. Selos vêm de `profiles.badges` (só o banco dá). Tamanhos por token `iconSizes`: sm 16 (junto de texto small) · md 20 · lg 24. Cor por `tone` (default/muted) ou `color` explícita. Ícone é decorativo: o rótulo acessível fica no controle. Sem emoji/glifos como ícone.
 
 ## Bordas
 Token `borders`: `hairline` 1 (contornos de chip, cartão, divisória) · `selected` 3 (opção escolhida).

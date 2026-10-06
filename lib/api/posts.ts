@@ -15,10 +15,10 @@ export const PAGE_SIZE = 10;
 export const MAX_IMAGES = 4;
 
 /** `avatar_url` já vem como URL assinada (pronta para exibir) ou null. */
-export type Author = Pick<
-  Tables<'profiles'>,
-  'id' | 'username' | 'display_name' | 'avatar_url'
->;
+export type Author = Pick<Tables<'profiles'>, 'id' | 'username' | 'display_name' | 'avatar_url'> & {
+  /** Selos (ex.: verificado); falta em dados antigos/de teste. */
+  badges?: string[];
+};
 
 export type FeedPost = {
   id: string;
@@ -53,7 +53,7 @@ type PostRow = Tables<'posts'> & {
   comments: { count: number }[] | null;
 };
 
-const AUTHOR_COLUMNS = 'id, username, display_name, avatar_url';
+const AUTHOR_COLUMNS = 'id, username, display_name, avatar_url, badges';
 const POST_SELECT = `*, author:profiles!posts_author_id_fkey(${AUTHOR_COLUMNS}), likes(count), comments(count)`;
 
 const unknownAuthor = (id: string): Author => ({
