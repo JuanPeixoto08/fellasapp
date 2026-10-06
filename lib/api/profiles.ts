@@ -32,6 +32,13 @@ export async function getProfile(id: string): Promise<Profile> {
   return data;
 }
 
+/** Perfil pelo @ (o endereço `/@usuario`); null se ninguém usa esse @. */
+export async function getProfileByUsername(username: string): Promise<Profile | null> {
+  const { data, error } = await supabase.from('profiles').select('*').eq('username', username).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 /** Fixa um post meu no topo do perfil (um só; fixar outro troca). null desafixa. */
 export async function setPinnedPost(postId: string | null): Promise<void> {
   const { error } = await supabase.rpc('set_pinned_post', { p_post_id: postId });

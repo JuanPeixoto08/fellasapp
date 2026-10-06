@@ -13,6 +13,7 @@ import { setUnreadNotifications } from '../lib/notificationsStore';
 import { openStories } from '../lib/storyViewerStore';
 import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../lib/realtime';
 import { useTheme } from '../lib/theme';
+import { profilePath } from '../lib/openProfile';
 
 export default function NotificationsScreen() {
   const t = useTheme();
@@ -81,7 +82,7 @@ export default function NotificationsScreen() {
       return;
     }
     if (n.postId) router.push(`/post/${n.postId}`);
-    else if (n.actors[0]) router.push(`/user/${n.actors[0].id}`);
+    else if (n.actors[0]) router.push(n.actors[0].username ? profilePath(n.actors[0].username) : `/user/${n.actors[0].id}`);
   };
 
   let body;

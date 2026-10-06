@@ -89,7 +89,7 @@ export function PostCard({
         }}
       >
         {/* sem esticar até o fim da linha: abaixo da foto já é o post */}
-        <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ alignSelf: 'flex-start' }}>
+        <AuthorLink username={post.author.username} name={name} enabled={linkAuthor} style={{ alignSelf: 'flex-start' }}>
           <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
         </AuthorLink>
         <View style={{ flex: 1, gap: t.spacing.sm }}>
@@ -104,7 +104,7 @@ export function PostCard({
           {/* nome e local juntos, na altura do avatar (sem o espaço da coluna entre eles) */}
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
-              <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
+              <AuthorLink username={post.author.username} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
                 <NameWithBadge name={name} badges={post.author.badges} bold />
               </AuthorLink>
               <View style={{ flex: 1 }} />

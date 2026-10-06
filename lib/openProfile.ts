@@ -1,6 +1,9 @@
 import { router } from 'expo-router';
 
-/** Abre o perfil de um fella. O meu cai na aba Perfil (app/user/[id] redireciona). */
-export function openProfile(userId: string): void {
-  router.push(`/user/${userId}`);
+/** Endereço do perfil pelo @ (`/@juan`). O meu também: a tela manda para a aba Perfil. */
+export const profilePath = (username: string): `/@${string}` => `/@${username}`;
+
+/** Abre o perfil de um fella pelo @. */
+export function openProfile(username: string): void {
+  router.push(profilePath(username));
 }

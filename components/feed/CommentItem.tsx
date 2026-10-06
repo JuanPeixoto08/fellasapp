@@ -29,12 +29,12 @@ export function CommentItem({ comment, onReact, onDelete }: Props) {
   const date = postTime(comment.createdAt);
   return (
     <View style={{ flexDirection: 'row', gap: t.spacing.md, paddingHorizontal: t.layout.gutter, paddingTop: t.spacing.sm }}>
-      <AuthorLink userId={comment.author.id} name={name}>
+      <AuthorLink username={comment.author.username} name={name}>
         <Avatar name={name} uri={comment.author.avatar_url} size={t.avatarSizes.sm} />
       </AuthorLink>
       <View style={{ flex: 1, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
-          <AuthorLink userId={comment.author.id} name={name} style={{ flexShrink: 1 }}>
+          <AuthorLink username={comment.author.username} name={name} style={{ flexShrink: 1 }}>
             <NameWithBadge name={name} badges={comment.author.badges} variant="small" bold />
           </AuthorLink>
           <View style={{ flex: 1 }} />

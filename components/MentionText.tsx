@@ -4,6 +4,7 @@ import { useMembersByUsername } from '../lib/memberDirectory';
 import { splitMentions } from '../lib/mentions';
 import { useTheme } from '../lib/theme';
 import { Text, type TextProps } from './ui';
+import { profilePath } from '../lib/openProfile';
 
 type Props = Omit<TextProps, 'children'> & {
   text: string;
@@ -26,7 +27,7 @@ export function MentionText({ text, tags = false, ...rest }: Props) {
             accessibilityRole="link"
             accessibilityLabel={`Ver perfil de ${part.member.name}`}
             suppressHighlighting
-            onPress={() => router.push(`/user/${part.member!.id}`)}
+            onPress={() => router.push(profilePath(part.member!.username))}
             style={{ color: t.colors.brand }}
           >
             {part.text}

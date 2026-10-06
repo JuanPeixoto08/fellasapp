@@ -36,7 +36,7 @@ jest.mock('../lib/storyViewerStore', () => ({ openStories: (...a: unknown[]) => 
 import NotificationsScreen from '../app/notifications';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
-const ana = { id: 'u2', name: 'Ana', avatarUrl: null };
+const ana = { id: 'u2', username: 'ana', name: 'Ana', avatarUrl: null };
 const item = (over: Partial<AppNotification>): AppNotification => ({
   key: over.kind ?? 'like',
   kind: 'like',
@@ -155,7 +155,7 @@ describe('Tela de notificações', () => {
     await fireEvent.press(await screen.findByLabelText(/Ana curtiu seu post/));
     expect(mockPush).toHaveBeenCalledWith('/post/p1');
     await fireEvent.press(screen.getByLabelText(/Hoje é aniversário de Ana/));
-    expect(mockPush).toHaveBeenCalledWith('/user/u2');
+    expect(mockPush).toHaveBeenCalledWith('/@ana');
   });
 
   it('aniversário não mostra "há 15 h" (o texto já diz hoje)', async () => {

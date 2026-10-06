@@ -41,7 +41,7 @@ export async function fetchNotifications(): Promise<AppNotification[]> {
   const byId = new Map<string, NotificationPerson>(
     personRows.map((p) => [
       p.id,
-      { id: p.id, name: p.display_name || p.username, avatarUrl: resolveUrl(p.avatar_url, signed) },
+      { id: p.id, username: p.username, name: p.display_name || p.username, avatarUrl: resolveUrl(p.avatar_url, signed) },
     ]),
   );
 

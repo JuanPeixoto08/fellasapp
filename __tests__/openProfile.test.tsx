@@ -2,12 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 const mockPush = jest.fn();
-let mockId = 'u2';
+let mockParams: Record<string, string> = { id: 'u2' };
 jest.mock('expo-router', () => {
   const { Text: RNText } = require('react-native');
   return {
     router: { push: (href: string) => mockPush(href) },
-    useLocalSearchParams: () => ({ id: mockId }),
+    useLocalSearchParams: () => mockParams,
     Stack: { Screen: () => null },
     Redirect: ({ href }: { href: string }) => <RNText>{`redirect:${href}`}</RNText>,
   };
@@ -16,11 +16,18 @@ jest.mock('../lib/supabase', () => ({ supabase: {} }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
 jest.mock('../components/ProfileView', () => {
   const { Text: RNText } = require('react-native');
-  return { __esModule: true, default: () => <RNText>perfil</RNText> };
+  return { __esModule: true, default: ({ userId }: { userId: string }) => <RNText>{`perfil:${userId}`}</RNText> };
 });
+const mockGetProfile = jest.fn();
+const mockByUsername = jest.fn();
+jest.mock('../lib/api/profiles', () => ({
+  getProfile: (id: string) => mockGetProfile(id),
+  getProfileByUsername: (u: string) => mockByUsername(u),
+}));
 
 import { PostCard } from '../components/PostCard';
 import { CommentItem } from '../components/feed/CommentItem';
+import HandleScreen from '../app/[handle]';
 import UserProfileScreen from '../app/user/[id]';
 import type { Comment, FeedPost } from '../lib/api/posts';
 
@@ -42,7 +49,9 @@ const comment: Comment = { id: 'c1', body: 'boa', createdAt: '2026-01-01T00:00:0
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockId = 'u2';
+  mockParams = { id: 'u2' };
+  mockGetProfile.mockResolvedValue({ id: 'u2', username: 'bia' });
+  mockByUsername.mockResolvedValue({ id: 'u2', username: 'bia' });
 });
 
 describe('foto e nome do autor abrem o perfil', () => {
@@ -53,7 +62,7 @@ describe('foto e nome do autor abrem o perfil', () => {
     await fireEvent.press(links[0]);
     await fireEvent.press(links[1]);
     expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockPush).toHaveBeenCalledWith('/user/u2');
+    expect(mockPush).toHaveBeenCalledWith('/@bia');
   });
 
   it('no post: o resto da linha abre o post, não o perfil', async () => {
@@ -81,18 +90,57 @@ describe('foto e nome do autor abrem o perfil', () => {
     const links = screen.getAllByRole('link', { name: 'Ver perfil de Bia' });
     expect(links).toHaveLength(2);
     await fireEvent.press(links[1]);
-    expect(mockPush).toHaveBeenCalledWith('/user/u2');
+    expect(mockPush).toHaveBeenCalledWith('/@bia');
   });
 });
 
-describe('/user/<id>', () => {
-  it('de outra pessoa mostra o perfil', async () => {
-    await render(<UserProfileScreen />);
-    expect(screen.getByText('perfil')).toBeTruthy();
+describe('/@usuario', () => {
+  it('abre o perfil pelo @ (maiúscula no link também)', async () => {
+    mockParams = { handle: '@Bia' };
+    await render(<HandleScreen />);
+    expect(await screen.findByText('perfil:u2')).toBeTruthy();
+    expect(mockByUsername).toHaveBeenCalledWith('bia');
   });
 
   it('o meu vai pra aba Perfil', async () => {
-    mockId = 'me';
+    mockParams = { handle: '@eu' };
+    mockByUsername.mockResolvedValue({ id: 'me', username: 'eu' });
+    await render(<HandleScreen />);
+    expect(await screen.findByText('redirect:/profile')).toBeTruthy();
+  });
+
+  it('@ que não existe (ou trocado): avisa', async () => {
+    mockParams = { handle: '@sumiu' };
+    mockByUsername.mockResolvedValue(null);
+    await render(<HandleScreen />);
+    expect(await screen.findByText('Esse perfil não existe')).toBeTruthy();
+  });
+
+  it('endereço sem @ não é perfil', async () => {
+    mockParams = { handle: 'qualquercoisa' };
+    await render(<HandleScreen />);
+    expect(await screen.findByText('Essa página não existe')).toBeTruthy();
+    expect(mockByUsername).not.toHaveBeenCalled();
+  });
+
+  it('falhou carregar: deixa tentar de novo', async () => {
+    mockParams = { handle: '@bia' };
+    mockByUsername.mockRejectedValueOnce(new Error('rede'));
+    await render(<HandleScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('perfil:u2')).toBeTruthy();
+  });
+});
+
+describe('/user/<id> (links antigos)', () => {
+  it('de outra pessoa: vai para o @ dela', async () => {
+    await render(<UserProfileScreen />);
+    expect(await screen.findByText('redirect:/@bia')).toBeTruthy();
+    expect(mockGetProfile).toHaveBeenCalledWith('u2');
+  });
+
+  it('o meu vai pra aba Perfil', async () => {
+    mockParams = { id: 'me' };
     await render(<UserProfileScreen />);
     expect(screen.getByText('redirect:/profile')).toBeTruthy();
   });

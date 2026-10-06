@@ -26,7 +26,7 @@ export function isNotificationKind(kind: string): kind is NotificationKind {
   return KINDS.has(kind);
 }
 
-export type NotificationPerson = { id: string; name: string; avatarUrl: string | null };
+export type NotificationPerson = { id: string; name: string; avatarUrl: string | null; username?: string };
 
 /** Uma linha da tela de notificações (já com pessoas e miniatura resolvidas). */
 export type AppNotification = {

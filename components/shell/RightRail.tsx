@@ -10,6 +10,7 @@ import { useTheme } from '../../lib/theme';
 import { useMembers } from '../../lib/useMembers';
 import { useToday } from '../../lib/useToday';
 import { Avatar, Button, Heading, Icon, interactiveStyle, NameWithBadge, Text } from '../ui';
+import { profilePath } from '../../lib/openProfile';
 
 const MAX_MEMBERS = 4;
 const MAX_BIRTHDAYS = 4;
@@ -26,7 +27,7 @@ export function RightRail() {
   const allBirthdays = useMemo(() => nextBirthdays(members, today, Infinity), [members, today]);
   const [allShown, setAllShown] = useState(false);
   const birthdays = allShown ? allBirthdays : allBirthdays.slice(0, MAX_BIRTHDAYS);
-  const open = (id: string) => router.push(id === myId ? '/profile' : `/user/${id}`);
+  const open = (m: { id: string; username: string }) => router.push(m.id === myId ? '/profile' : profilePath(m.username));
 
   const row = (state: Parameters<typeof interactiveStyle>[1]) => ({
     flexDirection: 'row' as const,
@@ -70,7 +71,7 @@ export function RightRail() {
                   key={m.id}
                   accessibilityRole="link"
                   accessibilityLabel={`Ver perfil de ${name}`}
-                  onPress={() => open(m.id)}
+                  onPress={() => open(m)}
                   style={row}
                 >
                   <Avatar name={name} uri={resolveUrl(m.avatar_url, avatars)} size={t.avatarSizes.sm} />
@@ -112,7 +113,7 @@ export function RightRail() {
                   key={m.id}
                   accessibilityRole="link"
                   accessibilityLabel={`Aniversário de ${name}: ${label}`}
-                  onPress={() => open(m.id)}
+                  onPress={() => open(m)}
                   style={row}
                 >
                   <Icon name="gift-outline" size="sm" tone="muted" />

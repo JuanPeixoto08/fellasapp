@@ -8,6 +8,7 @@ import { Divider, EmptyState, Screen, Text } from '../components/ui';
 import { resolveUrl } from '../lib/api/storage';
 import { useTheme } from '../lib/theme';
 import { useMembers } from '../lib/useMembers';
+import { profilePath } from '../lib/openProfile';
 
 export default function MembersScreen() {
   const t = useTheme();
@@ -46,7 +47,7 @@ export default function MembersScreen() {
           <MemberRow
             member={item}
             avatarUri={resolveUrl(item.avatar_url, avatars)}
-            onPress={() => router.push(`/user/${item.id}`)}
+            onPress={() => router.push(profilePath(item.username))}
           />
         )}
       />

@@ -33,7 +33,7 @@ describe('MentionText', () => {
     await render(<MentionText text="@ana parabéns! cc @fulano" />);
     expect(screen.getByText('@fulano', { exact: false })).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Ver perfil de Ana'));
-    expect(mockPush).toHaveBeenCalledWith('/user/u1');
+    expect(mockPush).toHaveBeenCalledWith('/@ana');
   });
 
   it('com tags, #tag vira link para a página da tag (minúsculas, codificada)', async () => {

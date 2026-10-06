@@ -43,7 +43,7 @@ describe('RightRail', () => {
     await fireEvent.press(screen.getByLabelText('Ver perfil de Juan'));
     expect(mockPush).toHaveBeenLastCalledWith('/profile');
     await fireEvent.press(screen.getByLabelText('Ver perfil de Fella0'));
-    expect(mockPush).toHaveBeenLastCalledWith('/user/u0');
+    expect(mockPush).toHaveBeenLastCalledWith('/@fella0');
     await fireEvent.press(screen.getByLabelText('Ver todos os membros'));
     expect(mockPush).toHaveBeenLastCalledWith('/members');
   });
