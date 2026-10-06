@@ -164,6 +164,10 @@ export type Database = {
           /** Caminhos das fotos (até 4), na ordem; vazio em posts sem foto ou anteriores à 0005. */
           images: string[];
           tags: string[];
+          /** Local escrito por quem postou (até 60), ou null. */
+          location: string | null;
+          /** Chave do local (minúsculas, sem acento); o gatilho preenche. */
+          place_key: string | null;
           created_at: string;
         };
         Insert: {
@@ -173,6 +177,8 @@ export type Database = {
           image_url?: string | null;
           images?: string[];
           tags?: string[];
+          location?: string | null;
+          place_key?: string | null;
           created_at?: string;
         };
         Update: {
@@ -182,6 +188,8 @@ export type Database = {
           image_url?: string | null;
           images?: string[];
           tags?: string[];
+          location?: string | null;
+          place_key?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -364,6 +372,10 @@ export type Database = {
       tag_suggestions: {
         Args: { p_prefix: string; p_limit?: number };
         Returns: { tag: string; posts: number }[];
+      };
+      place_suggestions: {
+        Args: { p_prefix: string; p_limit?: number };
+        Returns: { key: string; name: string; posts: number }[];
       };
       ideas_feed: {
         Args: { p_sort?: string };

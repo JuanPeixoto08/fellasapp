@@ -31,6 +31,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0017_tag_list.sql` | tela Tags: `tag_suggestions` aceita até 200 | a lista de tags para em 20 |
 | `0018_profile_badges.sql` | selos do perfil (`profiles.badges`); @oliveira verificado | posts e comentários não carregam (o app busca `badges` do autor) |
 | `0019_lastfm_user.sql` | usuário do Last.fm no perfil (`profiles.lastfm_user`) | salvar perfil com Last.fm falha |
+| `0020_post_location.sql` | local nos posts: `posts.location` + `place_key` (gatilho), `place_suggestions` | postar com local, sugestões de local e página do local falham (post sem local funciona) |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 
