@@ -121,6 +121,24 @@ describe('Editar perfil: foto com recorte', () => {
     expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: 'file://eu.jpg#recortada' }));
   });
 
+  it('GIF pula o "Ajustar foto" e sobe como está (senão perde a animação)', async () => {
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'blob:gif', mimeType: 'image/gif', fileSize: 1000 }] });
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Escolher foto'));
+    await waitFor(() => expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled());
+    expect(screen.queryByTestId('cropper-stub')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: 'blob:gif' }));
+  });
+
+  it('GIF grande demais: avisa e não troca a foto', async () => {
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'blob:gif', mimeType: 'image/gif', fileSize: 6 * 1024 * 1024 }] });
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Escolher foto'));
+    expect(await screen.findByText('Esse GIF passa de 5 MB. Escolhe um menor.')).toBeTruthy();
+    expect(screen.queryByTestId('cropper-stub')).toBeNull();
+  });
+
   it('cancelar o ajuste não troca a foto', async () => {
     await renderScreen();
     await fireEvent.press(screen.getByLabelText('Escolher foto'));

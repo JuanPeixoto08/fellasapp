@@ -182,6 +182,15 @@ describe('updateMyProfile', () => {
     expect(mockUpdate.mock.calls[0][0].avatar_url).toBe(mockUpload.mock.calls[0][0]);
   });
 
+  it('GIF na foto de perfil sobe como .gif (com o tipo certo, para animar)', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      blob: () => Promise.resolve({ type: 'image/gif' }),
+    });
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'blob:gif' });
+    expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/avatar-\d+\.gif$/);
+    expect(mockUpload.mock.calls[0][2]).toMatchObject({ contentType: 'image/gif' });
+  });
+
   it('faz upload do banner e salva o caminho', async () => {
     (globalThis as any).fetch = jest.fn().mockResolvedValue({
       blob: () => Promise.resolve({ type: 'image/jpeg' }),

@@ -106,7 +106,7 @@ const emptyToNull = (v: string | null): string | null => (v?.trim() ? v.trim() :
 /** Sobe a foto num caminho novo a cada troca (o link assinado em cache não mostra a antiga). */
 async function uploadProfileImage(userId: string, kind: 'avatar' | 'banner', uri: string): Promise<string> {
   const blob = await (await fetch(uri)).blob();
-  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
   const path = `${userId}/${kind}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg' });
   if (error) throw error;
