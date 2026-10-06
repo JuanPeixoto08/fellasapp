@@ -1,4 +1,5 @@
 const mockFrom = jest.fn();
+const mockGetSession = jest.fn(async () => ({ data: { session: { access_token: 'tok' } } }));
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
 let mockResults: Record<string, unknown> = {};
 jest.mock('../lib/supabase', () => {
@@ -19,7 +20,7 @@ jest.mock('../lib/supabase', () => {
     supabase: {
       auth: {
         getUser: async () => ({ data: { user: { id: 'me' } }, error: null }),
-        getSession: async () => ({ data: { session: { access_token: 'tok' } } }),
+        getSession: () => mockGetSession(),
       },
       from: (t: string) => {
         mockFrom(t);
@@ -118,7 +119,25 @@ describe('uploadStoryMedia', () => {
       .mockResolvedValueOnce(ok(SIGNED))
       .mockResolvedValueOnce(ok({ public_id: 'p' }));
     globalThis.fetch = fetchMock as never;
+    mockGetSession
+      .mockResolvedValueOnce({ data: { session: { access_token: 'tok' } } })
+      .mockResolvedValueOnce({ data: { session: { access_token: 'tok2' } } });
     await expect(uploadStoryMedia('file://a.jpg', 'photo')).resolves.toEqual({ mediaId: 'p', durationMs: 5000 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer tok2');
+  });
+
+  it('duas assinaturas vencidas seguidas: desiste (4 chamadas, sem terceira tentativa)', async () => {
+    const stale = fail(401, { error: { message: 'Stale request - reported time is 2026-10-06 which is more than 1 hour ago' } });
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(stale)
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(stale);
+    globalThis.fetch = fetchMock as never;
+    await expect(uploadStoryMedia('file://a.jpg', 'photo')).rejects.toThrow('Não rolou enviar. Tenta de novo.');
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 

@@ -69,8 +69,9 @@ async function filePart(uri: string, kind: StoryKind): Promise<Blob> {
  * Devolve o nome do arquivo e a duração (vídeo: a que o Cloudinary mediu, até 15 s).
  */
 export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ mediaId: string; durationMs: number }> {
-  const token = await sessionToken();
   for (let attempt = 0; ; attempt++) {
+    // dentro do laço: na nova tentativa o login pode ter sido renovado (o token dura 1 h, como a assinatura)
+    const token = await sessionToken();
     const signed = await signUpload(token, kind);
     const form = new FormData();
     for (const [k, v] of Object.entries(signed.fields)) form.append(k, v);
