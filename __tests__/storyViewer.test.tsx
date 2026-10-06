@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -244,6 +244,13 @@ describe('StoryViewer: pausar e computador', () => {
     const backdrop = screen.getByTestId('story-backdrop');
     expect(backdrop.props.source).toEqual({ uri: 'https://w/m/a1' });
     expect(backdrop.props.blurRadius).toBeGreaterThan(0);
+  });
+
+  it('vídeo fica numa camada própria, por cima do fundo desfocado (na web o <video> sem posição ficava atrás)', async () => {
+    await open([g('ana', s('v1', 'video'))], 'ana');
+    const layer = screen.getByTestId('story-video-layer');
+    expect(within(layer).getByTestId('story-video')).toBeTruthy();
+    expect(StyleSheet.flatten(layer.props.style)).toMatchObject({ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 });
   });
 
   it('computador: setas ‹ › ao lado do story (sem "anterior" no primeiro de todos)', async () => {

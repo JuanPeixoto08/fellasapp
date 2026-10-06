@@ -180,15 +180,18 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
         </>
       ) : null}
       {story.kind === 'video' ? (
-        <StoryVideo
-          key={story.id}
-          uri={story.mediaUrl}
-          fallbackUri={story.originalUrl}
-          paused={halted}
-          muted={muted}
-          onReady={() => setReadyId(story.id)}
-          onBlocked={() => setMuted(true)}
-        />
+        // camada própria: na web o <video> não tem posição e ficava atrás do fundo desfocado
+        <View testID="story-video-layer" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
+          <StoryVideo
+            key={story.id}
+            uri={story.mediaUrl}
+            fallbackUri={story.originalUrl}
+            paused={halted}
+            muted={muted}
+            onReady={() => setReadyId(story.id)}
+            onBlocked={() => setMuted(true)}
+          />
+        </View>
       ) : (
         <Image
           testID="story-photo"
