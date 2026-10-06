@@ -27,6 +27,8 @@ export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked
   ready.current = onReady;
   const blocked = useRef(onBlocked);
   blocked.current = onBlocked;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // a versão reduzida pode ainda não estar pronta: tenta o original uma vez antes de desistir
   const fellBack = useRef(false);
@@ -34,7 +36,12 @@ export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked
     const onStatus = (status: string) => {
       if (status === 'error' && fallbackUri && !fellBack.current) {
         fellBack.current = true;
-        void player.replaceAsync(fallbackUri);
+        player
+          .replaceAsync(fallbackUri)
+          .then(() => {
+            if (!pausedRef.current) player.play();
+          })
+          .catch(() => ready.current());
         return;
       }
       if (status === 'readyToPlay' || status === 'error') ready.current();

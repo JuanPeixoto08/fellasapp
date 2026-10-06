@@ -32,8 +32,11 @@ describe('StoryVideo', () => {
   it('reduzida falhou: troca para o original uma vez e só então libera o relógio', async () => {
     const onReady = jest.fn();
     await render(<StoryVideo uri="https://r/red" fallbackUri="https://r/orig" paused={false} muted={false} onReady={onReady} onBlocked={() => {}} />);
+    mockPlayer.play.mockClear();
     await emit('error');
+    await act(async () => {});
     expect(mockPlayer.replaceAsync).toHaveBeenCalledWith('https://r/orig');
+    expect(mockPlayer.play).toHaveBeenCalled();
     expect(onReady).not.toHaveBeenCalled();
     await emit('readyToPlay');
     expect(onReady).toHaveBeenCalled();
@@ -54,5 +57,23 @@ describe('StoryVideo', () => {
     await emit('error');
     expect(mockPlayer.replaceAsync).not.toHaveBeenCalled();
     expect(onReady).toHaveBeenCalled();
+  });
+
+  it('troca rejeitada: libera o relógio', async () => {
+    mockPlayer.replaceAsync.mockRejectedValueOnce(new Error('x'));
+    const onReady = jest.fn();
+    await render(<StoryVideo uri="https://r/red" fallbackUri="https://r/orig" paused={false} muted={false} onReady={onReady} onBlocked={() => {}} />);
+    await emit('error');
+    await act(async () => {});
+    expect(onReady).toHaveBeenCalled();
+  });
+
+  it('pausado: a troca não manda tocar', async () => {
+    await render(<StoryVideo uri="https://r/red" fallbackUri="https://r/orig" paused muted={false} onReady={() => {}} onBlocked={() => {}} />);
+    mockPlayer.play.mockClear();
+    await emit('error');
+    await act(async () => {});
+    expect(mockPlayer.replaceAsync).toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
   });
 });
