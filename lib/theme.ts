@@ -166,6 +166,8 @@ export const layout = {
   storyBackdropBlur: 24,
   gutter: spacing.lg,
   minTouch: 44,
+  /** iPhone (iOS 26), app da tela inicial: o sistema desfoca o topo; o app desce isto sob uma faixa lisa. */
+  iosEdgeBlur: 40,
 } as const;
 
 /** Durações em ms. */
