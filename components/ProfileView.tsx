@@ -12,6 +12,7 @@ import { friendlyError } from '../lib/errors';
 import { onPostDeleted } from '../lib/postEvents';
 import { useTheme } from '../lib/theme';
 import { removePost, usePostList } from '../lib/usePostList';
+import { MusicTab } from './music/MusicTab';
 import { PostCard } from './PostCard';
 import { useContentWidth } from './shell/ShellContext';
 import { PostTile } from './profile/PostTile';
@@ -29,7 +30,7 @@ type Props = {
   onLoaded?: (profile: Profile) => void;
 };
 
-export type ProfileTab = 'posts' | 'photos';
+export type ProfileTab = 'posts' | 'photos' | 'music';
 
 /** O que a apresentação precisa de uma lista de posts (o `usePostList` entrega isso). */
 export type PostListView = {
@@ -115,6 +116,11 @@ export default function ProfileView({ userId, actions, header, onLoaded }: Props
     }
   };
 
+  // tirou o Last.fm (ou o perfil chegou sem): a aba Música some, volta para Posts
+  useEffect(() => {
+    if (tab === 'music' && profile && !profile.lastfm_user) setTab('posts');
+  }, [tab, profile]);
+
   const frame = { flex: 1, backgroundColor: t.colors.bg } as const;
 
   if (loading) {
@@ -165,6 +171,7 @@ export default function ProfileView({ userId, actions, header, onLoaded }: Props
       onOpenPost={(p) => router.push(`/post/${p.id}`)}
       onNewPost={() => router.navigate('/new')}
       onDelete={isMe ? (p) => removePost(p.id) : undefined}
+      lastfmUser={profile.lastfm_user}
       pinnedId={pinnedId}
       onTogglePin={isMe ? (p) => void togglePin(p) : undefined}
       pinError={pinError}
@@ -187,6 +194,8 @@ type ContentProps = {
   onOpenPost: (post: FeedPost) => void;
   onNewPost?: () => void;
   onDelete?: (post: FeedPost) => Promise<void>;
+  /** Usuário do Last.fm: aba Música e "ouvindo agora". */
+  lastfmUser?: string | null;
   /** Post fixado no topo da aba Posts. */
   pinnedId?: string | null;
   /** Só no meu perfil: alfinete nos posts. */
@@ -209,6 +218,7 @@ export function ProfileContent({
   onOpenPost,
   onNewPost,
   onDelete,
+  lastfmUser,
   pinnedId,
   onTogglePin,
   pinError,
@@ -257,6 +267,45 @@ export function ProfileContent({
     );
   })();
 
+  const top = (
+    <View style={{ gap: t.spacing.lg, marginBottom: photosTab ? t.spacing.sm : 0 }}>
+      <ProfileHeader
+        profile={profile}
+        avatarUri={avatarUri}
+        bannerUri={bannerUri}
+        actions={actions}
+        onOpenMusic={lastfmUser ? () => onTabChange('music') : undefined}
+      />
+      {stats ? (
+        <View style={{ paddingHorizontal: t.layout.gutter }}>
+          <ProfileStats stats={stats} />
+        </View>
+      ) : null}
+      <Tabs
+        items={[
+          { key: 'posts', label: 'Posts' },
+          { key: 'photos', label: 'Fotos' },
+          ...(lastfmUser ? [{ key: 'music' as const, label: 'Música' }] : []),
+        ]}
+        value={tab}
+        onChange={onTabChange}
+      />
+      {pinError ? (
+        <Text variant="small" tone="danger" accessibilityRole="alert" style={{ paddingHorizontal: t.layout.gutter }}>
+          {pinError}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  if (tab === 'music' && lastfmUser) {
+    return (
+      <SafeAreaView edges={header ? ['left', 'right'] : ['top', 'left', 'right']} style={{ flex: 1, backgroundColor: t.colors.bg }}>
+        <MusicTab user={lastfmUser} top={top} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={header ? ['left', 'right'] : ['top', 'left', 'right']} style={{ flex: 1, backgroundColor: t.colors.bg }}>
       <FlatList
@@ -273,29 +322,7 @@ export function ProfileContent({
           paddingBottom: t.spacing.xxl + insets.bottom,
           gap: photosTab ? t.spacing.xs : 0,
         }}
-        ListHeaderComponent={
-          <View style={{ gap: t.spacing.lg, marginBottom: photosTab ? t.spacing.sm : 0 }}>
-            <ProfileHeader profile={profile} avatarUri={avatarUri} bannerUri={bannerUri} actions={actions} />
-            {stats ? (
-              <View style={{ paddingHorizontal: t.layout.gutter }}>
-                <ProfileStats stats={stats} />
-              </View>
-            ) : null}
-            <Tabs
-              items={[
-                { key: 'posts', label: 'Posts' },
-                { key: 'photos', label: 'Fotos' },
-              ]}
-              value={tab}
-              onChange={onTabChange}
-            />
-            {pinError ? (
-              <Text variant="small" tone="danger" accessibilityRole="alert" style={{ paddingHorizontal: t.layout.gutter }}>
-                {pinError}
-              </Text>
-            ) : null}
-          </View>
-        }
+        ListHeaderComponent={top}
         renderItem={({ item }) =>
           photosTab ? (
             <PostTile post={item} size={tile} onPress={onOpenPost} />

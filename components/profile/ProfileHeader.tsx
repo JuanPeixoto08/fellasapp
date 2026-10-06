@@ -6,6 +6,7 @@ import { memberSince } from '../../lib/format';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Heading, Icon, Text, VerifiedBadge, type IconName } from '../ui';
 import { hasBadge } from '../../lib/badges';
+import { NowPlayingLine } from '../music/NowPlayingLine';
 
 type Props = {
   profile: Profile;
@@ -14,6 +15,8 @@ type Props = {
   bannerUri?: string | null;
   /** Botões de ícone à direita, logo abaixo do banner (só no meu perfil). */
   actions?: ReactNode;
+  /** Abre a aba Música (toque no "ouvindo agora"); sem isso a linha não aparece. */
+  onOpenMusic?: () => void;
 };
 
 /** Dia e mês (DD/MM) do aniversário; o ano não é exibido. */
@@ -27,7 +30,7 @@ function birthdayDayMonth(iso: string | null | undefined): string | null {
  * na borda de baixo do banner e ações à direita; nome, status como chip neutro, bio e info logo abaixo.
  * Ocupa a largura toda (o banner encosta nas bordas); o resto tem o gutter da tela.
  */
-export function ProfileHeader({ profile, avatarUri, bannerUri, actions }: Props) {
+export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMusic }: Props) {
   const t = useTheme();
   const name = profile.display_name || profile.username;
   const birthday = birthdayDayMonth(profile.birthday);
@@ -73,6 +76,7 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions }: Props)
             @{profile.username}
           </Text>
         </View>
+        {profile.lastfm_user && onOpenMusic ? <NowPlayingLine user={profile.lastfm_user} onPress={onOpenMusic} /> : null}
         {profile.status ? (
           <View
             testID="profile-status"

@@ -26,6 +26,21 @@ jest.mock('../lib/usePostList', () => ({
   removePost: jest.fn(),
 }));
 
+jest.mock('../components/music/MusicTab', () => {
+  const { Text } = require('react-native');
+  return { MusicTab: ({ user, top }: { user: string; top: unknown }) => <>{top}<Text>{`aba música de ${user}`}</Text></> };
+});
+jest.mock('../components/music/NowPlayingLine', () => {
+  const { Pressable, Text } = require('react-native');
+  return {
+    NowPlayingLine: ({ user, onPress }: { user: string; onPress: () => void }) => (
+      <Pressable accessibilityLabel={`ouvindo agora de ${user}`} onPress={onPress}>
+        <Text>tocando</Text>
+      </Pressable>
+    ),
+  };
+});
+
 const mockUpdate = jest.fn();
 const mockRpc = jest.fn();
 const mockUpload = jest.fn();
@@ -333,6 +348,26 @@ describe('ProfileView', () => {
     await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('set_pinned_post', { p_post_id: 'p1' }));
     await waitFor(() => expect(mockUsePostList).toHaveBeenCalledWith({ authorId: 'u1', pinnedId: 'p1' }));
     expect(await screen.findByText('Fixado')).toBeTruthy();
+  });
+
+  it('com Last.fm: aba Música e ouvindo agora; tocar no ouvindo agora abre a aba', async () => {
+    (profileRow as Record<string, unknown>).lastfm_user = 'juanfm';
+    try {
+      await renderProfile();
+      expect(await screen.findByRole('tab', { name: 'Música' })).toBeTruthy();
+      await fireEvent.press(screen.getByLabelText('ouvindo agora de juanfm'));
+      expect(await screen.findByText('aba música de juanfm')).toBeTruthy();
+      expect(screen.getByText('@ana_01')).toBeTruthy();
+    } finally {
+      delete (profileRow as Record<string, unknown>).lastfm_user;
+    }
+  });
+
+  it('sem Last.fm: sem aba Música nem ouvindo agora', async () => {
+    await renderProfile();
+    await screen.findByText('@ana_01');
+    expect(screen.queryByRole('tab', { name: 'Música' })).toBeNull();
+    expect(screen.queryByLabelText(/ouvindo agora/)).toBeNull();
   });
 
   it('no perfil de outro fella não tem alfinete', async () => {
