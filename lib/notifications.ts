@@ -6,7 +6,8 @@ export type NotificationKind =
   | 'thread_reply'
   | 'birthday'
   | 'new_member'
-  | 'mention';
+  | 'mention'
+  | 'story_reaction';
 
 const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'like',
@@ -17,6 +18,7 @@ const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'birthday',
   'new_member',
   'mention',
+  'story_reaction',
 ]);
 
 /** Tipo que este app sabe mostrar (uma migração mais nova pode trazer outros). */
@@ -32,6 +34,8 @@ export type AppNotification = {
   kind: NotificationKind;
   postId: string | null;
   commentId: string | null;
+  /** Story da reação (`story_reaction`). */
+  storyId: string | null;
   /** Até 3 pessoas, a mais recente primeiro. */
   actors: NotificationPerson[];
   /** Total de pessoas no grupo (curtidas/reações agrupadas). */
@@ -87,6 +91,8 @@ export function describeNotification(n: AppNotification): TextPart[] {
       return [{ text: 'Hoje é aniversário de ' }, ...who];
     case 'new_member':
       return [...who, { text: ' entrou no fellas' }];
+    case 'story_reaction':
+      return [...who, { text: `${plural ? ' reagiram' : ' reagiu'} ${emojis} ao seu story` }];
     case 'mention':
       return [...who, { text: ` te marcou num ${n.commentId ? 'comentário' : 'post'}: “${snippet(n.body)}”` }];
   }

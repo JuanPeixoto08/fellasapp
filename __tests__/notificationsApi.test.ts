@@ -88,6 +88,12 @@ describe('fetchNotifications', () => {
     expect(list.map((n) => n.kind)).toEqual(['mention', 'like']);
   });
 
+  it('reação em story traz o storyId, sem miniatura', async () => {
+    mockRpc.mockResolvedValue({ data: [row({ kind: 'story_reaction', post_id: null, story_id: 's1', emojis: ['😂'] })], error: null });
+    const [only] = await fetchNotifications();
+    expect(only).toMatchObject({ kind: 'story_reaction', storyId: 's1', thumbUrl: null, emojis: ['😂'] });
+  });
+
   it('lista vazia não busca perfis nem posts', async () => {
     mockRpc.mockResolvedValue({ data: [], error: null });
     expect(await fetchNotifications()).toEqual([]);

@@ -20,6 +20,8 @@ type Props = {
   emojis?: readonly string[];
   /** Botão de reagir: a barra (e o painel de mais emojis no computador) abre presa a ele. */
   anchorRef?: RefObject<Measurable | View | null>;
+  /** false: sem o "+" (dentro de outro modal, como o story, o painel completo não abre no iPhone). */
+  allowMore?: boolean;
 };
 
 /**
@@ -34,6 +36,7 @@ export function ReactionPicker({
   onClose,
   emojis = DEFAULT_REACTION_EMOJIS,
   anchorRef,
+  allowMore = true,
 }: Props) {
   const t = useTheme();
   const viewport = useWindowDimensions();
@@ -90,7 +93,7 @@ export function ReactionPicker({
   }, [visible, anim, t.motion.base]);
 
   // tamanho da pílula: os rápidos + o "+", cada um com alvo de 44
-  const slots = quick.length + 1;
+  const slots = quick.length + (allowMore ? 1 : 0);
   const size = {
     width: slots * t.layout.minTouch + (slots - 1) * t.spacing.xs + t.spacing.xs * 2,
     height: t.layout.minTouch + t.spacing.xs * 2,
@@ -153,7 +156,9 @@ export function ReactionPicker({
                 </Pressable>
               );
             })}
-            <IconButton icon="add" accessibilityLabel="Mais emojis" variant="ghost" tone="muted" onPress={openFull} />
+            {allowMore ? (
+              <IconButton icon="add" accessibilityLabel="Mais emojis" variant="ghost" tone="muted" onPress={openFull} />
+            ) : null}
           </Animated.View>
         </View>
       </Modal>

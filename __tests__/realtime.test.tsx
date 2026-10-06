@@ -150,11 +150,20 @@ describe('affectsNotifications', () => {
     expect(affectsNotifications({ kind: 'change', table: 'ideas', type: 'INSERT', row: {}, mine: false })).toBe(false);
     expect(affectsNotifications({ kind: 'change', table: 'idea_votes', type: 'INSERT', row: {}, mine: false })).toBe(false);
   });
+
+  it('story novo não é notificação; reação de outra pessoa no story é', () => {
+    expect(affectsNotifications({ kind: 'change', table: 'stories', type: 'INSERT', row: {}, mine: false })).toBe(false);
+    expect(affectsNotifications({ kind: 'change', table: 'story_reactions', type: 'INSERT', row: {}, mine: false })).toBe(true);
+  });
 });
 
 describe('actorOf', () => {
   it('ideia: o autor; voto em ideia: quem votou', () => {
     expect(actorOf('ideas', { author_id: 'u1' })).toBe('u1');
     expect(actorOf('idea_votes', { user_id: 'u2' })).toBe('u2');
+  });
+
+  it('story: o autor', () => {
+    expect(actorOf('stories', { author_id: 'u3' })).toBe('u3');
   });
 });

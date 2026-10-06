@@ -6,6 +6,7 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), navigate:
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
 jest.mock('../lib/layout', () => ({ ...jest.requireActual('../lib/layout'), useLayoutTier: () => 'expanded' }));
+jest.mock('../components/stories/StoriesBar', () => ({ StoriesBar: () => null }));
 jest.mock('../components/feed/Composer', () => {
   const { Text } = require('react-native');
   return { Composer: () => <Text>compositor</Text> };

@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, View } from 'react-native';
 import { Composer } from '../../components/feed/Composer';
 import { NewPostsPill } from '../../components/feed/NewPostsPill';
 import { IdeasButton } from '../../components/ideas/IdeasButton';
+import { StoriesBar } from '../../components/stories/StoriesBar';
 import { NotificationsBell } from '../../components/notifications/NotificationsBell';
 import { TagsButton } from '../../components/tags/TagsButton';
 import { PostCard } from '../../components/PostCard';
@@ -66,10 +67,15 @@ export default function FeedScreen() {
                     <NotificationsBell />
                   </View>
                 </View>
+                <View style={{ marginHorizontal: -t.layout.gutter }}>
+                  <StoriesBar />
+                </View>
               </View>
             ) : (
               // desktop: o logo está na lateral; a coluna começa pelo compositor
               <View style={{ borderBottomWidth: t.borders.hairline, borderColor: t.colors.border }}>
+                <StoriesBar />
+                <Divider />
                 <Composer variant="inline" />
               </View>
             )}

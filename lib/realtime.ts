@@ -12,6 +12,8 @@ export const LIVE_TABLES = [
   'profiles',
   'ideas',
   'idea_votes',
+  'stories',
+  'story_reactions',
 ] as const;
 export type LiveTable = (typeof LIVE_TABLES)[number];
 
@@ -44,12 +46,13 @@ export function emitLive(event: LiveEvent): void {
 
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
-/** Quem fez a mudança: autor do post/comentário/ideia, dono da curtida/reação/voto, o próprio perfil. */
+/** Quem fez a mudança: autor do post/comentário/ideia/story, dono da curtida/reação/voto, o próprio perfil. */
 export function actorOf(table: LiveTable, row: Record<string, unknown>): string | null {
   switch (table) {
     case 'posts':
     case 'comments':
     case 'ideas':
+    case 'stories':
       return str(row.author_id);
     case 'profiles':
       return str(row.id);
@@ -73,6 +76,7 @@ export function affectsNotifications(event: LiveEvent): boolean {
   if (event.mine) return false;
   // mural de ideias não gera notificação
   if (event.table === 'ideas' || event.table === 'idea_votes') return false;
+  if (event.table === 'stories') return false; // story novo aparece na faixa, não vira notificação
   if (event.table === 'profiles' || event.table === 'posts') return event.type === 'INSERT';
   return true;
 }

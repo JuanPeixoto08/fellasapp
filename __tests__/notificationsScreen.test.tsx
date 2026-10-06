@@ -28,6 +28,11 @@ jest.mock('../lib/api/notifications', () => ({
 const mockSetUnread = jest.fn();
 jest.mock('../lib/notificationsStore', () => ({ setUnreadNotifications: (n: number) => mockSetUnread(n) }));
 
+const mockListStories = jest.fn();
+const mockOpenStories = jest.fn();
+jest.mock('../lib/api/stories', () => ({ listActiveStories: () => mockListStories() }));
+jest.mock('../lib/storyViewerStore', () => ({ openStories: (...a: unknown[]) => mockOpenStories(...a) }));
+
 import NotificationsScreen from '../app/notifications';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
@@ -37,6 +42,7 @@ const item = (over: Partial<AppNotification>): AppNotification => ({
   kind: 'like',
   postId: 'p1',
   commentId: null,
+  storyId: null,
   actors: [ana],
   actorCount: 1,
   emojis: [],
@@ -157,6 +163,16 @@ describe('Tela de notificações', () => {
     await open();
     expect(await screen.findByLabelText('Hoje é aniversário de Ana')).toBeTruthy();
     expect(screen.queryByText(/^há /)).toBeNull();
+  });
+
+  it('reação no meu story: toque abre o story', async () => {
+    const groups = [{ author: { id: 'me' }, stories: [{ id: 's1' }] }];
+    mockListStories.mockResolvedValue(groups);
+    mockFetch.mockResolvedValue([item({ kind: 'story_reaction', postId: null, storyId: 's1', emojis: ['😂'] })]);
+    await open();
+    await fireEvent.press(await screen.findByLabelText(/Ana reagiu 😂 ao seu story/));
+    await waitFor(() => expect(mockOpenStories).toHaveBeenCalledWith(groups, 'me', 's1'));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('lista vazia convida', async () => {
