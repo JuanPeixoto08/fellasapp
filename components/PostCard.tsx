@@ -5,7 +5,7 @@ import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
 import { PostImages } from './feed/PostImages';
 import { ReactButton, ReactionBar, ReactionPicker } from './reactions';
-import { Avatar, ConfirmDialog, IconButton, Text } from './ui';
+import { Avatar, ConfirmDialog, Icon, IconButton, Text } from './ui';
 import { useTheme } from '../lib/theme';
 import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
@@ -24,13 +24,27 @@ type Props = {
   onDelete?: (post: FeedPost) => Promise<void>;
   /** Foto e nome abrem o perfil do autor (padrão). Desligado no perfil da própria pessoa. */
   linkAuthor?: boolean;
+  /** Post fixado no topo do perfil: etiqueta "Fixado". */
+  pinned?: boolean;
+  /** Só no meu perfil: alfinete para fixar/desafixar. */
+  onTogglePin?: (post: FeedPost) => void;
 };
 
 /**
  * Post sem caixa, direto no papel (as listas separam com fio): avatar numa coluna, conteúdo na outra.
  * Ações discretas embaixo (curtir, comentar) e a carinha de reagir isolada à direita.
  */
-export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, onDelete, linkAuthor = true }: Props) {
+export function PostCard({
+  post,
+  onToggleLike,
+  onPress,
+  onPressImage,
+  onReact,
+  onDelete,
+  linkAuthor = true,
+  pinned = false,
+  onTogglePin,
+}: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
   // a barra de reações abre presa a este botão
@@ -66,6 +80,14 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
         <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
       </AuthorLink>
       <View style={{ flex: 1, gap: t.spacing.sm }}>
+        {pinned ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}>
+            <Icon name="pin-outline" size="sm" tone="muted" />
+            <Text variant="caption" tone="muted" bold>
+              Fixado
+            </Text>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
           <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
             <Text bold numberOfLines={1}>
@@ -77,6 +99,18 @@ export function PostCard({ post, onToggleLike, onPress, onPressImage, onReact, o
             <Text variant="caption" tone="muted">
               {date}
             </Text>
+          ) : null}
+          {onTogglePin ? (
+            <View style={{ marginVertical: -t.spacing.md, marginRight: onDelete ? -t.spacing.md : 0 }}>
+              <IconButton
+                icon="pin-outline"
+                accessibilityLabel={pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
+                variant="ghost"
+                tone={pinned ? 'default' : 'muted'}
+                size="sm"
+                onPress={() => onTogglePin(post)}
+              />
+            </View>
           ) : null}
           {onDelete ? (
             // a lixeira mantém 44pt de toque sem esticar a linha do nome

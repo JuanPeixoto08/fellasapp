@@ -22,6 +22,8 @@ function without(set: ReadonlySet<string>, ids: string[]): ReadonlySet<string> {
 type Options = FeedFilter & {
   /** Só começa a buscar quando true (ex.: aba que ainda não foi aberta). */
   enabled?: boolean;
+  /** Post fixado (perfil): vem primeiro e não se repete quando a página dele chega. */
+  pinnedId?: string | null;
 };
 
 /**
@@ -30,7 +32,7 @@ type Options = FeedFilter & {
  * pessoas atualizam o post na hora; post novo de outra pessoa só conta em `newPosts` (a lista não pula
  * enquanto a pessoa lê) até ela pedir com `showNewPosts`.
  */
-export function usePostList({ authorId, photosOnly, enabled = true }: Options = {}) {
+export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: Options = {}) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,8 +90,13 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
       setLoading(true);
       setError(null);
       try {
-        const page = await listFeed({ cursor: reset ? null : from, authorId, photosOnly });
-        setPosts((prev) => (reset ? page.posts : [...prev, ...page.posts]));
+        const [page, pinned] = await Promise.all([
+          listFeed({ cursor: reset ? null : from, authorId, photosOnly }),
+          // fixado apagado ou fora do ar: a lista segue sem ele
+          reset && pinnedId ? getPost(pinnedId).catch(() => null) : Promise.resolve(null),
+        ]);
+        const rest = pinnedId ? page.posts.filter((p) => p.id !== pinnedId) : page.posts;
+        setPosts((prev) => (reset ? (pinned ? [pinned, ...rest] : rest) : [...prev, ...rest]));
         // recarregou do topo: o que era novo já está na lista
         if (reset) setNewIds((prev) => without(prev, page.posts.map((p) => p.id)));
         setCursor(page.nextCursor);
@@ -102,7 +109,7 @@ export function usePostList({ authorId, photosOnly, enabled = true }: Options = 
         setLoaded(true);
       }
     },
-    [authorId, photosOnly],
+    [authorId, photosOnly, pinnedId],
   );
 
   useEffect(() => {

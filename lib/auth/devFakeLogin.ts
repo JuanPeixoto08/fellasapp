@@ -35,6 +35,7 @@ export const fakeProfile: Profile = {
   birthday: null,
   is_member: true,
   is_admin: false,
+  pinned_post_id: null,
   created_at: new Date(0).toISOString(),
   notifications_seen_at: new Date(0).toISOString(),
 };

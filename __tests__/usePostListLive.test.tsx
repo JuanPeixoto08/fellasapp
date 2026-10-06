@@ -167,3 +167,22 @@ describe('usePostList ao vivo', () => {
     expect(result.current.posts[0].likeCount).toBe(5);
   });
 });
+
+describe('usePostList com post fixado', () => {
+  it('fixado vem primeiro e não repete quando a página dele chega', async () => {
+    mockListFeed.mockResolvedValue({ posts: [post('p1'), post('p2')], nextCursor: 'c1' });
+    mockGetPost.mockResolvedValue(post('p9'));
+    const { result } = await feed({ authorId: 'ana', pinnedId: 'p9' });
+    expect(result.current.posts.map((p) => p.id)).toEqual(['p9', 'p1', 'p2']);
+    mockListFeed.mockResolvedValue({ posts: [post('p9'), post('p3')], nextCursor: null });
+    await act(async () => result.current.loadMore());
+    await waitFor(() => expect(result.current.posts.map((p) => p.id)).toEqual(['p9', 'p1', 'p2', 'p3']));
+  });
+
+  it('fixado que não carrega (apagado) não derruba a lista', async () => {
+    mockGetPost.mockRejectedValue(new Error('não achou'));
+    const { result } = await feed({ authorId: 'ana', pinnedId: 'p9' });
+    expect(result.current.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(result.current.error).toBeNull();
+  });
+});

@@ -32,6 +32,12 @@ export async function getProfile(id: string): Promise<Profile> {
   return data;
 }
 
+/** Fixa um post meu no topo do perfil (um só; fixar outro troca). null desafixa. */
+export async function setPinnedPost(postId: string | null): Promise<void> {
+  const { error } = await supabase.rpc('set_pinned_post', { p_post_id: postId });
+  if (error) throw error;
+}
+
 export async function listMembers(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')

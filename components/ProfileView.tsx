@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { FeedPost } from '../lib/api/posts';
-import { getProfile, type Profile } from '../lib/api/profiles';
+import { getProfile, setPinnedPost, type Profile } from '../lib/api/profiles';
 import { getProfileStats, type ProfileStats as Stats } from '../lib/api/profileStats';
 import { resolveUrl, signPaths } from '../lib/api/storage';
 import { useSession } from '../lib/auth/SessionProvider';
@@ -55,7 +55,9 @@ export default function ProfileView({ userId, actions, header }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<ProfileTab>('posts');
-  const posts = usePostList({ authorId: userId });
+  const [pinError, setPinError] = useState<string | null>(null);
+  const pinnedId = profile?.pinned_post_id ?? undefined;
+  const posts = usePostList({ authorId: userId, pinnedId });
   const photos = usePostList({ authorId: userId, photosOnly: true, enabled: tab === 'photos' });
 
   const load = useCallback(async () => {
@@ -95,6 +97,18 @@ export default function ProfileView({ userId, actions, header }: Props) {
       }),
     [userId],
   );
+
+  // um fixado por pessoa: fixar outro troca; tocar no fixado desafixa
+  const togglePin = async (post: FeedPost) => {
+    const next = profile?.pinned_post_id === post.id ? null : post.id;
+    setPinError(null);
+    try {
+      await setPinnedPost(next);
+      setProfile((cur) => (cur ? { ...cur, pinned_post_id: next } : cur));
+    } catch (e) {
+      setPinError(friendlyError(e, 'Não deu pra fixar. Tenta de novo.'));
+    }
+  };
 
   const frame = { flex: 1, backgroundColor: t.colors.bg } as const;
 
@@ -145,6 +159,9 @@ export default function ProfileView({ userId, actions, header }: Props) {
       onOpenPost={(p) => router.push(`/post/${p.id}`)}
       onNewPost={() => router.navigate('/new')}
       onDelete={isMe ? (p) => removePost(p.id) : undefined}
+      pinnedId={pinnedId}
+      onTogglePin={isMe ? (p) => void togglePin(p) : undefined}
+      pinError={pinError}
     />
   );
 }
@@ -163,6 +180,11 @@ type ContentProps = {
   onOpenPost: (post: FeedPost) => void;
   onNewPost?: () => void;
   onDelete?: (post: FeedPost) => Promise<void>;
+  /** Post fixado no topo da aba Posts. */
+  pinnedId?: string | null;
+  /** Só no meu perfil: alfinete nos posts. */
+  onTogglePin?: (post: FeedPost) => void;
+  pinError?: string | null;
 };
 
 /** Apresentação do perfil (sem busca de dados): cabeçalho, números, abas Posts/Fotos e a lista. */
@@ -179,6 +201,9 @@ export function ProfileContent({
   onOpenPost,
   onNewPost,
   onDelete,
+  pinnedId,
+  onTogglePin,
+  pinError,
 }: ContentProps) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -254,6 +279,11 @@ export function ProfileContent({
               value={tab}
               onChange={onTabChange}
             />
+            {pinError ? (
+              <Text variant="small" tone="danger" accessibilityRole="alert" style={{ paddingHorizontal: t.layout.gutter }}>
+                {pinError}
+              </Text>
+            ) : null}
           </View>
         }
         renderItem={({ item }) =>
@@ -267,6 +297,8 @@ export function ProfileContent({
               onPress={onOpenPost}
               onDelete={onDelete}
               linkAuthor={false}
+              pinned={item.id === pinnedId}
+              onTogglePin={onTogglePin}
             />
           )
         }

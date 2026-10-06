@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ jest.mock('../lib/usePostList', () => ({
 }));
 
 const mockUpdate = jest.fn();
+const mockRpc = jest.fn();
 const mockUpload = jest.fn();
 const mockEqUpdate = jest.fn();
 
@@ -70,6 +71,10 @@ jest.mock('../lib/supabase', () => {
   };
   return {
     supabase: {
+      rpc: (...a: unknown[]) => {
+        mockRpc(...a);
+        return Promise.resolve({ data: null, error: null });
+      },
       from: (t: string) => query(t),
       auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }) },
       storage: {
@@ -271,6 +276,23 @@ describe('ProfileView', () => {
   it('só no meu perfil os posts têm lixeira', async () => {
     await renderProfile();
     expect(await screen.findAllByLabelText('Apagar post')).toHaveLength(2);
+  });
+
+  it('no meu perfil dá pra fixar um post: vai pra lista como fixado', async () => {
+    await renderProfile();
+    const pins = await screen.findAllByLabelText('Fixar no perfil');
+    expect(pins).toHaveLength(2);
+    await fireEvent.press(pins[0]);
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('set_pinned_post', { p_post_id: 'p1' }));
+    await waitFor(() => expect(mockUsePostList).toHaveBeenCalledWith({ authorId: 'u1', pinnedId: 'p1' }));
+    expect(await screen.findByText('Fixado')).toBeTruthy();
+  });
+
+  it('no perfil de outro fella não tem alfinete', async () => {
+    mockMe = 'u9';
+    await renderProfile();
+    await screen.findByText('@ana_01');
+    expect(screen.queryByLabelText('Fixar no perfil')).toBeNull();
   });
 
   it('no perfil de outro fella não tem lixeira', async () => {

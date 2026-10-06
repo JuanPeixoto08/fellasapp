@@ -110,6 +110,7 @@ export type Database = {
           birthday: string | null;
           is_member: boolean;
           is_admin: boolean;
+          pinned_post_id: string | null;
           created_at: string;
           notifications_seen_at: string;
         };
@@ -124,6 +125,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           is_admin?: boolean;
+          pinned_post_id?: string | null;
           created_at?: string;
           notifications_seen_at?: string;
         };
@@ -138,6 +140,7 @@ export type Database = {
           birthday?: string | null;
           is_member?: boolean;
           is_admin?: boolean;
+          pinned_post_id?: string | null;
           created_at?: string;
           notifications_seen_at?: string;
         };
@@ -340,6 +343,10 @@ export type Database = {
       };
       redeem_invite: {
         Args: { p_token: string; p_email: string };
+        Returns: undefined;
+      };
+      set_pinned_post: {
+        Args: { p_post_id: string | null };
         Returns: undefined;
       };
       ideas_feed: {

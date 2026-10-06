@@ -113,3 +113,26 @@ describe('PostCard reactions', () => {
     expect(onReact).toHaveBeenLastCalledWith(mine, null);
   });
 });
+
+describe('PostCard fixado', () => {
+  it('mostra "Fixado" e o alfinete vira desafixar', async () => {
+    const onTogglePin = jest.fn();
+    await render(<PostCard post={post} pinned onTogglePin={onTogglePin} />);
+    expect(screen.getByText('Fixado')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Desafixar do perfil'));
+    expect(onTogglePin).toHaveBeenCalledWith(post);
+  });
+
+  it('sem fixar: alfinete só com onTogglePin, sem etiqueta', async () => {
+    await render(<PostCard post={post} onTogglePin={() => {}} />);
+    expect(screen.queryByText('Fixado')).toBeNull();
+    expect(screen.getByLabelText('Fixar no perfil')).toBeTruthy();
+  });
+
+  it('sem onTogglePin não tem alfinete (perfil dos outros, feed)', async () => {
+    await render(<PostCard post={post} pinned />);
+    expect(screen.getByText('Fixado')).toBeTruthy();
+    expect(screen.queryByLabelText('Fixar no perfil')).toBeNull();
+    expect(screen.queryByLabelText('Desafixar do perfil')).toBeNull();
+  });
+});
