@@ -54,6 +54,7 @@ export default function RootLayout() {
             <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
             <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
             <Stack.Screen name="tag/[name]" options={{ headerShown: true, title: 'Tag' }} />
+            <Stack.Screen name="place/[key]" options={{ headerShown: true, title: 'Local' }} />
             <Stack.Screen name="tags" options={{ headerShown: true, title: 'Tags' }} />
             <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
             <Stack.Screen name="invites" options={{ headerShown: true, title: 'Convidar' }} />
