@@ -13,6 +13,8 @@ import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { MentionSuggestions } from '../MentionSuggestions';
 import { TagSuggestions } from '../TagSuggestions';
+import { PlaceChip } from '../places/PlaceChip';
+import { PlaceField } from '../places/PlaceField';
 import { useContentWidth } from '../shell/ShellContext';
 import { Avatar, Button, ConfirmDialog, Icon, IconButton, Text, useAutoGrow } from '../ui';
 
@@ -39,10 +41,12 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const t = useTheme();
   const me = useMyAvatar();
   const contentWidth = useContentWidth();
-  const { body, imageUris } = useDraft();
+  const { body, imageUris, location } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  // campo do local aberto (abaixo do texto); fechado, o local escolhido aparece como chip
+  const [placeOpen, setPlaceOpen] = useState(false);
   const input = useRef<TextInput>(null);
   const grow = useAutoGrow({
     value: body,
@@ -59,6 +63,8 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
 
   const room = MAX_IMAGES - imageUris.length;
   const hasDraft = body.trim().length > 0 || imageUris.length > 0;
+  // local sozinho não dá post, mas é rascunho: descartar pergunta antes
+  const hasAnything = hasDraft || !!location;
   // coluna de conteúdo - margens - avatar - espaço entre avatar e conteúdo
   const column = contentWidth - t.layout.gutter * 2 - t.avatarSizes.md - t.spacing.md;
   const thumb = Math.floor((column - t.spacing.sm * (MAX_IMAGES - 1)) / MAX_IMAGES);
@@ -96,9 +102,10 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await createPost({ body, imageUris });
+      await createPost({ body, imageUris, location });
       emitPostCreated();
       clearDraft();
+      setPlaceOpen(false);
       onPosted?.();
     } catch (e) {
       setError(friendlyError(e, 'Não rolou postar. Tenta de novo.'));
@@ -107,7 +114,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     }
   };
 
-  const cancel = () => (hasDraft ? setDiscarding(true) : onCancel?.());
+  const cancel = () => (hasAnything ? setDiscarding(true) : onCancel?.());
 
   const editor = (
     <View
@@ -175,6 +182,16 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             Uma frase, até {MAX_IMAGES} fotos, ou os dois. Só os fellas veem.
           </Text>
         ) : null}
+        {placeOpen ? (
+          <PlaceField
+            initial={location ?? ''}
+            disabled={saving}
+            onDone={(next) => {
+              setDraft((d) => ({ ...d, location: next }));
+              setPlaceOpen(false);
+            }}
+          />
+        ) : null}
         {imageUris.length > 0 ? (
           <View style={{ flexDirection: 'row', gap: t.spacing.sm }}>
             {imageUris.map((uri, i) => (
@@ -216,6 +233,14 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             ))}
           </View>
         ) : null}
+        {location && !placeOpen ? (
+          <PlaceChip
+            location={location}
+            disabled={saving}
+            onEdit={() => setPlaceOpen(true)}
+            onRemove={() => setDraft((d) => ({ ...d, location: null }))}
+          />
+        ) : null}
         {error ? (
           <Text variant="small" tone="danger" accessibilityRole="alert">
             {error}
@@ -248,6 +273,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       <Text variant="small" tone="muted">
         {imageUris.length}/{MAX_IMAGES} fotos
       </Text>
+      <IconButton
+        icon="location-outline"
+        accessibilityLabel={location ? 'Trocar local' : 'Adicionar local'}
+        variant="ghost"
+        onPress={() => setPlaceOpen(true)}
+        disabled={saving}
+      />
       <View style={{ flex: 1 }} />
       {body.length >= COUNTER_FROM ? (
         <Text
@@ -274,6 +306,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       cancelLabel="Continuar escrevendo"
       onConfirm={() => {
         clearDraft();
+        setPlaceOpen(false);
         setError(null);
         setDiscarding(false);
         onCancel?.();
@@ -302,7 +335,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       }}
     >
       {variant === 'page' ? (
-        <Button title="Cancelar" variant="ghost" disabled={!hasDraft || saving} onPress={cancel} />
+        <Button title="Cancelar" variant="ghost" disabled={!hasAnything || saving} onPress={cancel} />
       ) : (
         <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" onPress={cancel} disabled={saving} />
       )}

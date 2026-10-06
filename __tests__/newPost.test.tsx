@@ -76,7 +76,7 @@ describe('Novo post (compositor)', () => {
     await screen.findByText('2/4 fotos');
     await fireEvent.press(screen.getByLabelText('Postar'));
     await waitFor(() =>
-      expect(createPostMock).toHaveBeenCalledWith({ body: 'praia!!', imageUris: ['file://foto-0.jpg', 'file://foto-1.jpg'] }),
+      expect(createPostMock).toHaveBeenCalledWith({ body: 'praia!!', imageUris: ['file://foto-0.jpg', 'file://foto-1.jpg'], location: null }),
     );
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/feed'));
   });

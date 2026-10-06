@@ -1,8 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
-export type Draft = { body: string; imageUris: string[] };
+export type Draft = { body: string; imageUris: string[]; location: string | null };
 
-const EMPTY: Draft = { body: '', imageUris: [] };
+const EMPTY: Draft = { body: '', imageUris: [], location: null };
 let draft: Draft = EMPTY;
 const listeners = new Set<() => void>();
 
@@ -14,7 +14,7 @@ function subscribe(listener: () => void) {
 }
 
 /**
- * Rascunho único do post: página /new, topo do feed e janela mostram o mesmo texto e fotos, então
+ * Rascunho único do post: página /new, topo do feed e janela mostram o mesmo texto, fotos e local, então
  * redimensionar a janela (que troca o formato) não perde nada.
  */
 export function useDraft(): Draft {

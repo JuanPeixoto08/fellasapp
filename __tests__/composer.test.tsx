@@ -10,15 +10,70 @@ jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan', uri
 jest.mock('../lib/api/posts', () => ({ MAX_IMAGES: 4, createPost: jest.fn().mockResolvedValue({ id: 'n' }) }));
 const mockSuggestTags = jest.fn();
 jest.mock('../lib/api/tags', () => ({ suggestTags: (q: string) => mockSuggestTags(q) }));
+const mockSuggestPlaces = jest.fn();
+jest.mock('../lib/api/places', () => ({ suggestPlaces: (q: string) => mockSuggestPlaces(q) }));
 
 const createPostMock = createPost as jest.Mock;
 
 beforeEach(() => {
   clearDraft();
   createPostMock.mockClear();
+  mockSuggestPlaces.mockReset();
+  mockSuggestPlaces.mockResolvedValue([]);
 });
 
 describe('Composer', () => {
+  it('local: escolher uma sugestão vira chip e vai junto no post', async () => {
+    mockSuggestPlaces.mockResolvedValue([{ key: 'bar do ze', name: 'Bar do Zé', posts: 12 }]);
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), 'bar');
+    await fireEvent.press(await screen.findByLabelText('Usar Bar do Zé'));
+    expect(screen.queryByLabelText('Local')).toBeNull();
+    expect(screen.getByLabelText('Trocar local (Bar do Zé)')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'bora');
+    await fireEvent.press(screen.getByLabelText('Postar'));
+    await waitFor(() =>
+      expect(createPostMock).toHaveBeenCalledWith({ body: 'bora', imageUris: [], location: 'Bar do Zé' }),
+    );
+    await waitFor(() => expect(screen.queryByLabelText('Trocar local (Bar do Zé)')).toBeNull());
+  });
+
+  it('local: Enter usa o digitado (limpo); tocar no chip edita; ✕ tira', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), '  casa do   Pedro ');
+    await fireEvent(screen.getByLabelText('Local'), 'submitEditing');
+    await fireEvent.press(screen.getByLabelText('Trocar local (casa do Pedro)'));
+    expect(screen.getByDisplayValue('casa do Pedro')).toBeTruthy();
+    await fireEvent(screen.getByLabelText('Local'), 'submitEditing');
+    await fireEvent.press(screen.getByLabelText('Tirar local'));
+    expect(screen.queryByLabelText(/^Trocar local \(/)).toBeNull();
+    expect(screen.getByLabelText('Adicionar local')).toBeTruthy();
+  });
+
+  it('local: ✕ do campo fecha sem local', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), 'praia');
+    await fireEvent.press(screen.getByLabelText('Fechar local'));
+    expect(screen.queryByLabelText('Local')).toBeNull();
+    expect(screen.queryByLabelText(/^Trocar local \(/)).toBeNull();
+  });
+
+  it('local sozinho não posta, mas conta como rascunho para descartar', async () => {
+    const onCancel = jest.fn();
+    await render(<Composer variant="dialog" onCancel={onCancel} />);
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), 'Bar');
+    await fireEvent(screen.getByLabelText('Local'), 'submitEditing');
+    await fireEvent.press(screen.getByLabelText('Postar'));
+    expect(createPostMock).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByLabelText('Fechar'));
+    expect(screen.getByText('Descartar o rascunho?')).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('@: sugere fellas enquanto digita e escolher completa o usuário', async () => {
     setMemberDirectory([
       { id: 'u1', username: 'ana', name: 'Ana', avatarUrl: null },
@@ -47,7 +102,7 @@ describe('Composer', () => {
     expect(screen.queryByText('Cancelar')).toBeNull();
     await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'bora');
     await fireEvent.press(screen.getByLabelText('Postar'));
-    await waitFor(() => expect(createPostMock).toHaveBeenCalledWith({ body: 'bora', imageUris: [] }));
+    await waitFor(() => expect(createPostMock).toHaveBeenCalledWith({ body: 'bora', imageUris: [], location: null }));
     await waitFor(() => expect(onPosted).toHaveBeenCalled());
     expect(screen.queryByDisplayValue('bora')).toBeNull();
   });
