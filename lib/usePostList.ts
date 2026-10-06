@@ -5,6 +5,7 @@ import { setPostReaction } from './api/reactions';
 import { emitPostDeleted, onCommentCountChanged, onPostCreated, onPostDeleted } from './postEvents';
 import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveChange } from './realtime';
 import { withLike, withReaction } from './reactionState';
+import { extractTags } from './tags';
 
 /** Apaga o post e avisa todas as listas abertas. Erro sobe para quem chamou (o diálogo mostra). */
 export async function removePost(postId: string): Promise<void> {
@@ -32,7 +33,7 @@ type Options = FeedFilter & {
  * pessoas atualizam o post na hora; post novo de outra pessoa só conta em `newPosts` (a lista não pula
  * enquanto a pessoa lê) até ela pedir com `showNewPosts`.
  */
-export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: Options = {}) {
+export function usePostList({ authorId, photosOnly, enabled = true, pinnedId, tag }: Options = {}) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +102,7 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
       setError(null);
       try {
         const [page, pinned] = await Promise.all([
-          listFeed({ cursor: reset ? null : from, authorId, photosOnly }),
+          listFeed({ cursor: reset ? null : from, authorId, photosOnly, tag }),
           // fixado apagado ou fora do ar: a lista segue sem ele
           reset && pinnedId ? getPost(pinnedId).catch(() => null) : Promise.resolve(null),
         ]);
@@ -123,7 +124,7 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
         }
       }
     },
-    [authorId, photosOnly, pinnedId],
+    [authorId, photosOnly, pinnedId, tag],
   );
   loadRef.current = load;
 
@@ -164,6 +165,7 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
     }, LIVE_DEBOUNCE_MS);
     const belongsHere = (row: Record<string, unknown>) =>
       (!authorId || row.author_id === authorId) &&
+      (!tag || extractTags(String(row.body ?? '')).includes(tag)) &&
       (!photosOnly || !!row.image_url || (Array.isArray(row.images) && row.images.length > 0));
     const onChange = (c: LiveChange) => {
       if (c.table === 'posts' && c.type === 'INSERT') {
@@ -185,7 +187,7 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
       flush();
     };
     const resync = () => {
-      listFeed({ cursor: null, authorId, photosOnly })
+      listFeed({ cursor: null, authorId, photosOnly, tag })
         .then((page) => {
           const shown = new Set(postsRef.current.map((p) => p.id));
           setNewIds(new Set(page.posts.filter((p) => !shown.has(p.id)).map((p) => p.id)));
@@ -205,7 +207,7 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
       flush.cancel();
       off();
     };
-  }, [enabled, loaded, authorId, photosOnly, refetch]);
+  }, [enabled, loaded, authorId, photosOnly, tag, refetch]);
 
   const refresh = () => {
     setRefreshing(true);

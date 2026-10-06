@@ -35,6 +35,19 @@ describe('MentionText', () => {
     await fireEvent.press(screen.getByLabelText('Ver perfil de Ana'));
     expect(mockPush).toHaveBeenCalledWith('/user/u1');
   });
+
+  it('com tags, #tag vira link para a página da tag (minúsculas, codificada)', async () => {
+    await render(<MentionText text="olha #Ação e #arte" tags />);
+    await fireEvent.press(screen.getByLabelText('Ver posts com #ação'));
+    expect(mockPush).toHaveBeenCalledWith(`/tag/${encodeURIComponent('ação')}`);
+    await fireEvent.press(screen.getByLabelText('Ver posts com #arte'));
+    expect(mockPush).toHaveBeenCalledWith('/tag/arte');
+  });
+
+  it('sem tags (comentário) a # não é link', async () => {
+    await render(<MentionText text="olha #arte" />);
+    expect(screen.queryByLabelText('Ver posts com #arte')).toBeNull();
+  });
 });
 
 describe('MentionSuggestions', () => {

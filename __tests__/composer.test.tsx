@@ -8,6 +8,8 @@ import { setMemberDirectory } from '../lib/memberDirectory';
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan', uri: null }) }));
 jest.mock('../lib/api/posts', () => ({ MAX_IMAGES: 4, createPost: jest.fn().mockResolvedValue({ id: 'n' }) }));
+const mockSuggestTags = jest.fn();
+jest.mock('../lib/api/tags', () => ({ suggestTags: (q: string) => mockSuggestTags(q) }));
 
 const createPostMock = createPost as jest.Mock;
 
@@ -28,6 +30,15 @@ describe('Composer', () => {
     await fireEvent.press(screen.getByLabelText('Marcar Ana (@ana)'));
     expect(screen.getByDisplayValue('parabéns @ana ')).toBeTruthy();
     expect(screen.queryByLabelText('Marcar Ana (@ana)')).toBeNull();
+  });
+
+  it('#: sugere tags enquanto digita e escolher completa a tag', async () => {
+    mockSuggestTags.mockResolvedValue([{ tag: 'artes_avantajadas', posts: 3 }]);
+    await render(<Composer variant="inline" />);
+    await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'olha #ar');
+    await fireEvent.press(await screen.findByLabelText('Usar #artes_avantajadas'));
+    expect(screen.getByDisplayValue('olha #artes_avantajadas ')).toBeTruthy();
+    expect(mockSuggestTags).toHaveBeenCalledWith('ar');
   });
 
   it('inline: sem Cancelar, posta e limpa sem navegar', async () => {

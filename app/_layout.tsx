@@ -53,6 +53,7 @@ export default function RootLayout() {
             <Stack.Screen name="set-password" />
             <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
             <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
+            <Stack.Screen name="tag/[name]" options={{ headerShown: true, title: 'Tag' }} />
             <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
             <Stack.Screen name="invites" options={{ headerShown: true, title: 'Convidar' }} />
             <Stack.Screen name="ideas" options={{ headerShown: true, title: 'Ideias' }} />

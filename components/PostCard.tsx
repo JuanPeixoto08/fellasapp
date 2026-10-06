@@ -133,7 +133,7 @@ export function PostCard({
             accessibilityRole="button"
             accessibilityLabel={`Abrir post de ${name}`}
           >
-            <MentionText text={post.body} />
+            <MentionText text={post.body} tags />
           </Pressable>
         ) : null}
         <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={pressImage} />
