@@ -158,6 +158,7 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
             <StoryVideo
               key={story.id}
               uri={story.mediaUrl}
+              fallbackUri={story.originalUrl}
               paused={paused || viewersOpen || confirming || picking}
               muted={muted}
               onReady={() => setReadyId(story.id)}

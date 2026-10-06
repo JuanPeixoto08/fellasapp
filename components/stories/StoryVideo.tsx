@@ -7,6 +7,8 @@ const AUTOPLAY_CHECK_MS = 700;
 
 type Props = {
   uri: string;
+  /** Toca este se o `uri` falhar (versão reduzida do Cloudinary ainda processando). */
+  fallbackUri?: string;
   paused: boolean;
   muted: boolean;
   /** O vídeo carregou (ou falhou): o relógio do story pode andar. */
@@ -16,7 +18,7 @@ type Props = {
 };
 
 /** Vídeo do story: toca uma vez, sem controles, dentro da tela (playsInline); pausa junto com o story. */
-export function StoryVideo({ uri, paused, muted, onReady, onBlocked }: Props) {
+export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked }: Props) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     p.play();
@@ -26,13 +28,21 @@ export function StoryVideo({ uri, paused, muted, onReady, onBlocked }: Props) {
   const blocked = useRef(onBlocked);
   blocked.current = onBlocked;
 
+  // a versão reduzida pode ainda não estar pronta: tenta o original uma vez antes de desistir
+  const fellBack = useRef(false);
   useEffect(() => {
-    if (player.status === 'readyToPlay' || player.status === 'error') ready.current();
-    const sub = player.addListener('statusChange', ({ status }) => {
+    const onStatus = (status: string) => {
+      if (status === 'error' && fallbackUri && !fellBack.current) {
+        fellBack.current = true;
+        void player.replaceAsync(fallbackUri);
+        return;
+      }
       if (status === 'readyToPlay' || status === 'error') ready.current();
-    });
+    };
+    onStatus(player.status);
+    const sub = player.addListener('statusChange', ({ status }) => onStatus(status));
     return () => sub.remove();
-  }, [player]);
+  }, [player, fallbackUri]);
 
   useEffect(() => {
     player.muted = muted;
