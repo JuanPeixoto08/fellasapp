@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { deletePost, getPost, listFeed, toggleLike, type FeedFilter, type FeedPost } from './api/posts';
 import { setPostReaction } from './api/reactions';
-import { emitPostDeleted, onPostCreated, onPostDeleted } from './postEvents';
+import { emitPostDeleted, onCommentCountChanged, onPostCreated, onPostDeleted } from './postEvents';
 import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveChange } from './realtime';
 import { withLike, withReaction } from './reactionState';
 
@@ -117,6 +117,17 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
   }, [enabled, load]);
 
   useEffect(() => onPostDeleted((id) => setPosts((prev) => prev.filter((p) => p.id !== id))), []);
+
+  // comentário meu (o tempo real ignora o que eu fiz): o número do post acompanha
+  useEffect(
+    () =>
+      onCommentCountChanged((id, delta) =>
+        setPosts((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, commentCount: Math.max(0, p.commentCount + delta) } : p)),
+        ),
+      ),
+    [],
+  );
 
   // post novo: recarrega do topo (só listas que já carregaram alguma vez)
   useEffect(

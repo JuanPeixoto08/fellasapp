@@ -2,6 +2,7 @@ type Listener = (postId: string) => void;
 
 const deleted = new Set<Listener>();
 const created = new Set<() => void>();
+const commentCounts = new Set<(postId: string, delta: number) => void>();
 
 /** Avisa as listas abertas (feed, perfil) que um post foi apagado, para tirarem ele da tela. */
 export function emitPostDeleted(postId: string): void {
@@ -24,5 +25,17 @@ export function onPostCreated(listener: () => void): () => void {
   created.add(listener);
   return () => {
     created.delete(listener);
+  };
+}
+
+/** Comentei (+1) ou apaguei comentário (−1) na tela do post: as listas abertas acertam o número. */
+export function emitCommentCountChanged(postId: string, delta: number): void {
+  for (const listener of commentCounts) listener(postId, delta);
+}
+
+export function onCommentCountChanged(listener: (postId: string, delta: number) => void): () => void {
+  commentCounts.add(listener);
+  return () => {
+    commentCounts.delete(listener);
   };
 }

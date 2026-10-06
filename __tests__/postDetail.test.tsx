@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import PostDetailScreen from '../app/post/[id]';
 import { addComment, deleteComment, deletePost, getPost, listComments, toggleLike } from '../lib/api/posts';
 import { setCommentReaction, setPostReaction } from '../lib/api/reactions';
+import { onCommentCountChanged } from '../lib/postEvents';
 import { emitLive, LIVE_DEBOUNCE_MS, type LiveChange } from '../lib/realtime';
 import { setMemberDirectory } from '../lib/memberDirectory';
 
@@ -159,6 +160,24 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(listCommentsMock).toHaveBeenCalledTimes(2));
     expect(getPostMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByDisplayValue('kkkk')).toBeNull();
+  });
+
+  it('comentar e apagar comentário avisam as listas (feed, perfil) do novo número', async () => {
+    const counts: [string, number][] = [];
+    const off = onCommentCountChanged((postId, delta) => counts.push([postId, delta]));
+    try {
+      mockMe = 'u2';
+      addCommentMock.mockResolvedValueOnce({ id: 'c2' });
+      await renderLoaded();
+      await fireEvent.changeText(screen.getByLabelText('Comentar'), 'kkkk');
+      await fireEvent.press(screen.getByLabelText('Enviar'));
+      await waitFor(() => expect(counts).toEqual([['p1', 1]]));
+      await fireEvent.press(screen.getAllByLabelText('Apagar comentário')[0]);
+      await fireEvent.press(screen.getByLabelText('Apagar'));
+      await waitFor(() => expect(counts).toEqual([['p1', 1], ['p1', -1]]));
+    } finally {
+      off();
+    }
   });
 
   it('shows a retry state when the post fails to load', async () => {

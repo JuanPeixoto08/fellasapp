@@ -26,6 +26,7 @@ import { withLike, withReaction } from '../../lib/reactionState';
 import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveEvent } from '../../lib/realtime';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
+import { emitCommentCountChanged } from '../../lib/postEvents';
 import { removePost } from '../../lib/usePostList';
 
 export default function PostDetailScreen() {
@@ -165,6 +166,7 @@ export default function PostDetailScreen() {
       await deleteComment(c.id);
       setComments((prev) => prev.filter((x) => x.id !== c.id));
       setPost((cur) => (cur ? { ...cur, commentCount: Math.max(0, cur.commentCount - 1) } : cur));
+      emitCommentCountChanged(id, -1);
     });
   };
 
@@ -176,6 +178,7 @@ export default function PostDetailScreen() {
       await addComment(id, text);
       setText('');
       setPost((cur) => (cur ? { ...cur, commentCount: cur.commentCount + 1 } : cur));
+      emitCommentCountChanged(id, 1);
       // só os comentários: o post já está na tela e não precisa ser buscado (nem assinado) de novo
       setComments(await listComments(id).catch(() => comments));
     } catch (e) {

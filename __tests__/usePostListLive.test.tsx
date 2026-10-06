@@ -12,6 +12,7 @@ jest.mock('../lib/api/posts', () => ({
 }));
 jest.mock('../lib/api/reactions', () => ({ setPostReaction: jest.fn() }));
 
+import { emitCommentCountChanged } from '../lib/postEvents';
 import { emitLive, LIVE_DEBOUNCE_MS, type LiveChange } from '../lib/realtime';
 import { usePostList } from '../lib/usePostList';
 
@@ -184,5 +185,19 @@ describe('usePostList com post fixado', () => {
     const { result } = await feed({ authorId: 'ana', pinnedId: 'p9' });
     expect(result.current.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe('usePostList: contador de comentários', () => {
+  it('comentei ou apaguei comentário noutra tela: o número do post acompanha', async () => {
+    const { result } = await feed();
+    await act(async () => emitCommentCountChanged('p1', 1));
+    expect(result.current.posts.find((p) => p.id === 'p1')?.commentCount).toBe(1);
+    await act(async () => {
+      emitCommentCountChanged('p1', -1);
+      emitCommentCountChanged('p1', -1);
+    });
+    expect(result.current.posts.find((p) => p.id === 'p1')?.commentCount).toBe(0);
+    expect(result.current.posts.find((p) => p.id === 'p2')?.commentCount).toBe(0);
   });
 });
