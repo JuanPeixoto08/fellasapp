@@ -19,7 +19,6 @@
       "output": "single",
       "name": "fellasapp",
       "shortName": "fellasapp",
-      "lang": "pt-BR",
       "display": "standalone"
     },
     "plugins": [
