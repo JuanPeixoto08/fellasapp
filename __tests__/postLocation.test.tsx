@@ -36,6 +36,13 @@ describe('local no post', () => {
     expect(mockPush).toHaveBeenCalledWith('/place/bar%20do%20ze?name=Bar%20do%20Z%C3%A9');
   });
 
+  it('o alvo de toque do local cresce para baixo, não por cima do nome do autor', async () => {
+    await render(<PostCard post={post} />);
+    const slop = screen.getByLabelText('Ver posts em Bar do Zé').props.hitSlop;
+    expect(slop?.top ?? 0).toBe(0);
+    expect(slop.bottom).toBeGreaterThan(0);
+  });
+
   it('sem local não tem a linha', async () => {
     await render(<PostCard post={{ ...post, location: null, placeKey: null }} />);
     expect(screen.queryByLabelText(/Ver posts em/)).toBeNull();

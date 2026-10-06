@@ -10,12 +10,14 @@ type Props = {
   /** Local já escolhido (editar) ou '' (novo). */
   initial: string;
   disabled?: boolean;
+  /** O texto enquanto a pessoa digita (o compositor posta com ele se ela tocar Postar sem confirmar). */
+  onChange?: (text: string) => void;
   /** Confirmou (sugestão, "Usar…" ou Enter): o local limpo, ou null (vazio ou ✕). */
   onDone: (location: string | null) => void;
 };
 
 /** Campo do local no compositor: ícone, texto e fechar, com as sugestões embaixo. */
-export function PlaceField({ initial, disabled, onDone }: Props) {
+export function PlaceField({ initial, disabled, onChange, onDone }: Props) {
   const t = useTheme();
   const [text, setText] = useState(initial);
   return (
@@ -40,7 +42,10 @@ export function PlaceField({ initial, disabled, onDone }: Props) {
           placeholderTextColor={t.colors.textMuted}
           selectionColor={t.colors.primary}
           value={text}
-          onChangeText={setText}
+          onChangeText={(next) => {
+            setText(next);
+            onChange?.(next);
+          }}
           maxLength={PLACE_MAX}
           editable={!disabled}
           returnKeyType="done"

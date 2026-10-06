@@ -7,6 +7,7 @@ import { clearDraft, setDraft, useDraft } from '../../lib/composerDraft';
 import { friendlyError } from '../../lib/errors';
 import { activeMention, insertMention } from '../../lib/mentions';
 import { activeTag, insertTag } from '../../lib/tags';
+import { cleanPlace } from '../../lib/places';
 import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { emitPostCreated } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
@@ -47,6 +48,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const [discarding, setDiscarding] = useState(false);
   // campo do local aberto (abaixo do texto); fechado, o local escolhido aparece como chip
   const [placeOpen, setPlaceOpen] = useState(false);
+  // o que está no campo aberto: tocar Postar sem confirmar ainda leva o local
+  const [placeText, setPlaceText] = useState('');
+  const openPlace = () => {
+    setPlaceText(location ?? '');
+    setPlaceOpen(true);
+  };
+  const placeToPost = placeOpen ? cleanPlace(placeText) : location;
   const input = useRef<TextInput>(null);
   const grow = useAutoGrow({
     value: body,
@@ -64,7 +72,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const room = MAX_IMAGES - imageUris.length;
   const hasDraft = body.trim().length > 0 || imageUris.length > 0;
   // local sozinho não dá post, mas é rascunho: descartar pergunta antes
-  const hasAnything = hasDraft || !!location;
+  const hasAnything = hasDraft || !!location || !!placeToPost;
   // coluna de conteúdo - margens - avatar - espaço entre avatar e conteúdo
   const column = contentWidth - t.layout.gutter * 2 - t.avatarSizes.md - t.spacing.md;
   const thumb = Math.floor((column - t.spacing.sm * (MAX_IMAGES - 1)) / MAX_IMAGES);
@@ -102,7 +110,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await createPost({ body, imageUris, location });
+      await createPost({ body, imageUris, location: placeToPost });
       emitPostCreated();
       clearDraft();
       setPlaceOpen(false);
@@ -186,6 +194,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
           <PlaceField
             initial={location ?? ''}
             disabled={saving}
+            onChange={setPlaceText}
             onDone={(next) => {
               setDraft((d) => ({ ...d, location: next }));
               setPlaceOpen(false);
@@ -237,7 +246,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
           <PlaceChip
             location={location}
             disabled={saving}
-            onEdit={() => setPlaceOpen(true)}
+            onEdit={openPlace}
             onRemove={() => setDraft((d) => ({ ...d, location: null }))}
           />
         ) : null}
@@ -277,7 +286,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         icon="location-outline"
         accessibilityLabel={location ? 'Trocar local' : 'Adicionar local'}
         variant="ghost"
-        onPress={() => setPlaceOpen(true)}
+        onPress={openPlace}
         disabled={saving}
       />
       <View style={{ flex: 1 }} />

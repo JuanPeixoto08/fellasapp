@@ -52,6 +52,25 @@ describe('Composer', () => {
     expect(screen.getByLabelText('Adicionar local')).toBeTruthy();
   });
 
+  it('local: digitado e não confirmado vai junto ao tocar Postar', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'bora');
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), ' Bar do Zé ');
+    await fireEvent.press(screen.getByLabelText('Postar'));
+    await waitFor(() =>
+      expect(createPostMock).toHaveBeenCalledWith({ body: 'bora', imageUris: [], location: 'Bar do Zé' }),
+    );
+  });
+
+  it('local: só o campo digitado já conta como rascunho (Cancelar da página pergunta)', async () => {
+    await render(<Composer variant="page" onCancel={() => {}} />);
+    await fireEvent.press(screen.getByLabelText('Adicionar local'));
+    await fireEvent.changeText(screen.getByLabelText('Local'), 'praia');
+    await fireEvent.press(screen.getByText('Cancelar'));
+    expect(screen.getByText('Descartar o rascunho?')).toBeTruthy();
+  });
+
   it('local: ✕ do campo fecha sem local', async () => {
     await render(<Composer variant="inline" />);
     await fireEvent.press(screen.getByLabelText('Adicionar local'));

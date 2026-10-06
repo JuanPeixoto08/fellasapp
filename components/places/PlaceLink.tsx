@@ -30,14 +30,15 @@ export function PlaceLink({ location, placeKey, enabled = true }: Props) {
     </>
   );
   if (!enabled || !placeKey) return <View style={row}>{content}</View>;
-  // a linha é baixa: o hitSlop completa o alvo de toque de 44
-  const slop = (t.layout.minTouch - t.typography.caption.lineHeight) / 2;
+  // a linha é baixa: o hitSlop completa o alvo de toque de 44 só para baixo (para cima ficaria por cima
+  // do nome do autor, e no celular quem vem depois na árvore ganha o toque)
+  const slop = t.layout.minTouch - t.typography.caption.lineHeight;
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`Ver posts em ${location}`}
       onPress={() => router.push(`/place/${encodeURIComponent(placeKey)}?name=${encodeURIComponent(location)}`)}
-      hitSlop={{ top: slop, bottom: slop, left: t.spacing.xs, right: t.spacing.xs }}
+      hitSlop={{ top: 0, bottom: slop, left: t.spacing.xs, right: t.spacing.xs }}
       // como o AuthorLink: o hover surfaceSunken sumiria sobre a linha do post, que já acende
       style={({ pressed }) => [row, { cursor: 'pointer' as const, opacity: pressed ? 0.7 : 1 }]}
     >
