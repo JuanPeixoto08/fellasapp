@@ -160,7 +160,12 @@ export function StoryComposer({ visible, onClose }: Props) {
   };
 
   const onOverlay = { color: t.colors.onOverlay };
-  const choose = <Button title="Escolher foto ou vídeo" variant="secondary" onPress={() => void pick()} loading={opening} />;
+  // Button usa alignSelf flex-start; o wrapper centraliza na coluna
+  const choose = (
+    <View style={{ alignSelf: 'center' }}>
+      <Button title="Escolher foto ou vídeo" variant="secondary" onPress={() => void pick()} loading={opening} />
+    </View>
+  );
 
   let middle;
   if (problem) {
