@@ -83,9 +83,19 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
     }
   };
 
+  /**
+   * Recarga do topo pedida com a lista ocupada (ex.: o perfil descobriu o post fixado no meio da primeira
+   * carga): roda assim que a atual terminar, com os dados mais novos, em vez de se perder.
+   */
+  const pendingReset = useRef(false);
+  const loadRef = useRef<(reset: boolean, from: string | null) => Promise<void>>(async () => {});
+
   const load = useCallback(
     async (reset: boolean, from: string | null) => {
-      if (busy.current) return;
+      if (busy.current) {
+        if (reset) pendingReset.current = true;
+        return;
+      }
       busy.current = true;
       setLoading(true);
       setError(null);
@@ -107,10 +117,15 @@ export function usePostList({ authorId, photosOnly, enabled = true, pinnedId }: 
         setLoading(false);
         setRefreshing(false);
         setLoaded(true);
+        if (pendingReset.current) {
+          pendingReset.current = false;
+          void loadRef.current(true, null);
+        }
       }
     },
     [authorId, photosOnly, pinnedId],
   );
+  loadRef.current = load;
 
   useEffect(() => {
     if (enabled) load(true, null);

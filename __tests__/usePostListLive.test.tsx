@@ -201,3 +201,19 @@ describe('usePostList: contador de comentários', () => {
     expect(result.current.posts.find((p) => p.id === 'p2')?.commentCount).toBe(0);
   });
 });
+
+describe('usePostList: fixado que chega no meio da primeira carga', () => {
+  it('a recarga com o fixado não se perde (perfil carrega os posts antes de saber o fixado)', async () => {
+    let firstPage: (v: unknown) => void = () => {};
+    mockListFeed.mockImplementationOnce(() => new Promise((r) => (firstPage = r)));
+    mockListFeed.mockResolvedValue({ posts: [post('p1'), post('p9')], nextCursor: null });
+    mockGetPost.mockResolvedValue(post('p9'));
+    const view = await renderHook(({ pinnedId }: { pinnedId?: string }) => usePostList({ authorId: 'ana', pinnedId }), {
+      initialProps: { pinnedId: undefined as string | undefined },
+    });
+    // o perfil chegou com o fixado enquanto a primeira página ainda vinha
+    await view.rerender({ pinnedId: 'p9' });
+    await act(async () => firstPage({ posts: [post('p1'), post('p9')], nextCursor: null }));
+    await waitFor(() => expect(view.result.current.posts.map((p) => p.id)).toEqual(['p9', 'p1']));
+  });
+});
