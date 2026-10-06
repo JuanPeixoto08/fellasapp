@@ -10,10 +10,23 @@ jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('../components/profile/AvatarCropper', () => {
   const { Pressable, View } = require('react-native');
   return {
-    AvatarCropper: ({ uri, onCancel, onConfirm }: { uri: string | null; onCancel: () => void; onConfirm: (u: string) => void }) =>
+    AvatarCropper: ({
+      uri,
+      shape,
+      onCancel,
+      onConfirm,
+    }: {
+      uri: string | null;
+      shape?: string;
+      onCancel: () => void;
+      onConfirm: (u: string) => void;
+    }) =>
       uri ? (
         <View testID="cropper-stub">
-          <Pressable accessibilityLabel="Usar recorte de teste" onPress={() => onConfirm(uri + '#recortada')} />
+          <Pressable
+            accessibilityLabel={shape === 'banner' ? 'Usar recorte do banner' : 'Usar recorte de teste'}
+            onPress={() => onConfirm(uri + '#recortada')}
+          />
           <Pressable accessibilityLabel="Cancelar recorte de teste" onPress={onCancel} />
         </View>
       ) : null,
@@ -138,5 +151,44 @@ describe('Editar perfil: foto atual', () => {
     await renderScreen();
     await fireEvent.press(screen.getByLabelText('Salvar'));
     expect(mockRefreshProfile).toHaveBeenCalled();
+  });
+});
+
+describe('Editar perfil: banner', () => {
+  const ImagePicker = jest.requireMock('expo-image-picker') as { launchImageLibraryAsync: jest.Mock };
+  const withBanner = { id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null, banner_url: 'u1/banner-1.jpg' };
+
+  beforeEach(() => (updateMyProfile as jest.Mock).mockClear());
+
+  it('escolher → ajustar no retângulo → aparece na prévia → salvar manda o banner', async () => {
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://praia.jpg' }] });
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Escolher banner'));
+    await fireEvent.press(await screen.findByLabelText('Usar recorte do banner'));
+    expect(screen.getByLabelText('Seu banner').props.source).toEqual({ uri: 'file://praia.jpg#recortada' });
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ bannerUri: 'file://praia.jpg#recortada', removeBanner: false }),
+    );
+  });
+
+  it('mostra o banner salvo; tirar some da prévia e salva sem banner', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce(withBanner);
+    await renderScreen();
+    expect((await screen.findByLabelText('Seu banner')).props.source).toEqual({ uri: 'https://signed/u1/banner-1.jpg' });
+    expect(screen.getByText('Trocar banner')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Tirar banner'));
+    expect(screen.queryByLabelText('Seu banner')).toBeNull();
+    expect(screen.queryByLabelText('Tirar banner')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ bannerUri: undefined, removeBanner: true }));
+  });
+
+  it('salvar sem mexer no banner não manda nem tira', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce(withBanner);
+    await renderScreen();
+    await screen.findByLabelText('Seu banner');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ bannerUri: undefined, removeBanner: false }));
   });
 });

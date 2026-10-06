@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarCropper } from '../../components/profile/AvatarCropper';
@@ -40,8 +40,12 @@ export default function EditProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   /** Foto que já está salva: só para mostrar (salvar sem trocar não reenvia). */
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
-  /** Foto escolhida esperando o "Ajustar foto". */
-  const [cropUri, setCropUri] = useState<string | null>(null);
+  /** Banner novo (já recortado), o salvo (só para mostrar) e se a pessoa mandou tirar. */
+  const [bannerUri, setBannerUri] = useState<string | undefined>();
+  const [currentBanner, setCurrentBanner] = useState<string | null>(null);
+  const [removeBanner, setRemoveBanner] = useState(false);
+  /** Foto escolhida esperando o "Ajustar foto" (círculo da foto de perfil ou retângulo do banner). */
+  const [crop, setCrop] = useState<{ uri: string; shape: 'circle' | 'banner' } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
@@ -56,21 +60,24 @@ export default function EditProfileScreen() {
         setDisplayName(p.display_name ?? '');
         setUsername(p.username);
         setBio(p.bio ?? '');
-        // a foto é extra: se a assinatura falhar, a tela continua com a letra
-        signPaths([p.avatar_url])
-          .then((signed) => setCurrentAvatar(resolveUrl(p.avatar_url, signed)))
+        // foto e banner são extras: se a assinatura falhar, a tela continua com a letra e a faixa lisa
+        signPaths([p.avatar_url, p.banner_url])
+          .then((signed) => {
+            setCurrentAvatar(resolveUrl(p.avatar_url, signed));
+            setCurrentBanner(resolveUrl(p.banner_url, signed));
+          })
           .catch(() => {});
       })
       .catch((e) => setError(friendlyError(e, 'Não deu pra carregar seu perfil. Volta e tenta de novo.')));
   }, []);
 
-  async function pickAvatar() {
+  async function pick(shape: 'circle' | 'banner') {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      // sem recorte do sistema e sem compressão: o AvatarCropper enquadra e salva 512 em JPEG
+      // sem recorte do sistema e sem compressão: o AvatarCropper enquadra (círculo ou banner) e salva em JPEG
       quality: 1,
     });
-    if (!res.canceled) setCropUri(res.assets[0].uri);
+    if (!res.canceled) setCrop({ uri: res.assets[0].uri, shape });
   }
 
   async function save() {
@@ -88,6 +95,8 @@ export default function EditProfileScreen() {
         username,
         bio,
         avatarUri,
+        bannerUri,
+        removeBanner,
         status,
         location,
         birthday: parsedBirthday,
@@ -103,24 +112,65 @@ export default function EditProfileScreen() {
     }
   }
 
+  const shownBanner = removeBanner ? null : (bannerUri ?? currentBanner);
+  const bannerBox = {
+    width: '100%' as const,
+    aspectRatio: t.layout.bannerAspect,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surfaceSunken,
+  };
+
   return (
     <>
       <Stack.Screen options={stackHeader(t, 'Editar perfil')} />
       <AvatarCropper
-        uri={cropUri}
-        onCancel={() => setCropUri(null)}
+        uri={crop?.uri ?? null}
+        shape={crop?.shape}
+        onCancel={() => setCrop(null)}
         onConfirm={(uri) => {
-          setAvatarUri(uri);
-          setCropUri(null);
+          if (crop?.shape === 'banner') {
+            setBannerUri(uri);
+            setRemoveBanner(false);
+          } else {
+            setAvatarUri(uri);
+          }
+          setCrop(null);
         }}
       />
       <Screen scroll header style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
+        <View style={{ gap: t.spacing.sm }}>
+          <Text variant="small" bold>
+            Banner
+          </Text>
+          {shownBanner ? (
+            <Image accessibilityLabel="Seu banner" source={{ uri: shownBanner }} style={bannerBox} />
+          ) : (
+            <View style={bannerBox} />
+          )}
+          <View style={{ flexDirection: 'row', gap: t.spacing.sm }}>
+            <Button
+              title={shownBanner ? 'Trocar banner' : 'Escolher banner'}
+              variant="secondary"
+              onPress={() => void pick('banner')}
+            />
+            {shownBanner ? (
+              <Button
+                title="Tirar banner"
+                variant="ghost"
+                onPress={() => {
+                  setBannerUri(undefined);
+                  setRemoveBanner(true);
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
         <View style={{ alignItems: 'center', gap: t.spacing.md }}>
           <Avatar name={displayName || username || '?'} uri={avatarUri ?? currentAvatar} size={t.avatarSizes.xl} />
           <Button
             title={avatarUri || currentAvatar ? 'Trocar foto' : 'Escolher foto'}
             variant="secondary"
-            onPress={pickAvatar}
+            onPress={() => void pick('circle')}
           />
         </View>
         <TextField
