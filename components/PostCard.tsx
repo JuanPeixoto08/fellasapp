@@ -61,90 +61,101 @@ export function PostCard({
       : undefined;
 
   return (
-    <View
-      testID="post-row"
-      // hover só na web: no RN 0.86 o toque também dispara pointerenter/leave e a linha piscaria no celular
-      {...(Platform.OS === 'web'
-        ? { onPointerEnter: () => setHovered(true), onPointerLeave: () => setHovered(false) }
-        : null)}
-      style={{
-        flexDirection: 'row',
-        gap: t.spacing.md,
-        paddingHorizontal: t.layout.gutter,
-        paddingTop: t.spacing.md,
-        paddingBottom: t.spacing.xs,
-        backgroundColor: hovered ? t.colors.surfaceSunken : 'transparent',
-      }}
-    >
-      <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor}>
-        <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
-      </AuthorLink>
-      <View style={{ flex: 1, gap: t.spacing.sm }}>
-        {pinned ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}>
-            <Icon name="pin-outline" size="sm" tone="muted" />
-            <Text variant="caption" tone="muted" bold>
-              Fixado
-            </Text>
-          </View>
-        ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
-          <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
-            <NameWithBadge name={name} badges={post.author.badges} bold />
-          </AuthorLink>
-          <View style={{ flex: 1 }} />
-          {date ? (
-            <Text variant="caption" tone="muted">
-              {date}
-            </Text>
-          ) : null}
-          {onTogglePin ? (
-            <View style={{ marginVertical: -t.spacing.md, marginRight: onDelete ? -t.spacing.md : 0 }}>
-              <IconButton
-                icon="pin-outline"
-                accessibilityLabel={pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
-                variant="ghost"
-                tone={pinned ? 'default' : 'muted'}
-                size="sm"
-                onPress={() => onTogglePin(post)}
-              />
+    <>
+      {/* A linha toda abre o post (vão ao lado do nome, abaixo da foto, entre as ações); só foto e nome abrem o perfil.
+        Não acessível como um bloco: o leitor de tela segue pelos itens de dentro, e o texto já é o botão "Abrir post". */}
+      <Pressable
+        testID="post-row"
+        onPress={onPress ? () => onPress(post) : undefined}
+        disabled={!onPress}
+        accessible={false}
+        focusable={false}
+        // hover só na web: no RN 0.86 o toque também dispara pointerenter/leave e a linha piscaria no celular
+        {...(Platform.OS === 'web'
+          ? { onPointerEnter: () => setHovered(true), onPointerLeave: () => setHovered(false) }
+          : null)}
+        style={{
+          flexDirection: 'row',
+          gap: t.spacing.md,
+          paddingHorizontal: t.layout.gutter,
+          paddingTop: t.spacing.md,
+          paddingBottom: t.spacing.xs,
+          backgroundColor: hovered ? t.colors.surfaceSunken : 'transparent',
+          ...(onPress ? { cursor: 'pointer' as const } : null),
+        }}
+      >
+        {/* sem esticar até o fim da linha: abaixo da foto já é o post */}
+        <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ alignSelf: 'flex-start' }}>
+          <Avatar name={name} uri={post.author.avatar_url} size={t.avatarSizes.md} />
+        </AuthorLink>
+        <View style={{ flex: 1, gap: t.spacing.sm }}>
+          {pinned ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}>
+              <Icon name="pin-outline" size="sm" tone="muted" />
+              <Text variant="caption" tone="muted" bold>
+                Fixado
+              </Text>
             </View>
           ) : null}
-          {onDelete ? (
-            // a lixeira mantém 44pt de toque sem esticar a linha do nome
-            <View style={{ marginVertical: -t.spacing.md, marginRight: -t.spacing.md }}>
-              <IconButton
-                icon="trash-outline"
-                accessibilityLabel="Apagar post"
-                variant="ghost"
-                tone="muted"
-                size="sm"
-                onPress={() => setConfirming(true)}
-              />
-            </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
+            <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
+              <NameWithBadge name={name} badges={post.author.badges} bold />
+            </AuthorLink>
+            <View style={{ flex: 1 }} />
+            {date ? (
+              <Text variant="caption" tone="muted">
+                {date}
+              </Text>
+            ) : null}
+            {onTogglePin ? (
+              <View style={{ marginVertical: -t.spacing.md, marginRight: onDelete ? -t.spacing.md : 0 }}>
+                <IconButton
+                  icon="pin-outline"
+                  accessibilityLabel={pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
+                  variant="ghost"
+                  tone={pinned ? 'default' : 'muted'}
+                  size="sm"
+                  onPress={() => onTogglePin(post)}
+                />
+              </View>
+            ) : null}
+            {onDelete ? (
+              // a lixeira mantém 44pt de toque sem esticar a linha do nome
+              <View style={{ marginVertical: -t.spacing.md, marginRight: -t.spacing.md }}>
+                <IconButton
+                  icon="trash-outline"
+                  accessibilityLabel="Apagar post"
+                  variant="ghost"
+                  tone="muted"
+                  size="sm"
+                  onPress={() => setConfirming(true)}
+                />
+              </View>
+            ) : null}
+          </View>
+          {post.body ? (
+            <Pressable
+              onPress={onPress ? () => onPress(post) : undefined}
+              onLongPress={() => setPicking(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir post de ${name}`}
+            >
+              <MentionText text={post.body} tags />
+            </Pressable>
           ) : null}
-        </View>
-        {post.body ? (
-          <Pressable
-            onPress={onPress ? () => onPress(post) : undefined}
-            onLongPress={() => setPicking(true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Abrir post de ${name}`}
-          >
-            <MentionText text={post.body} tags />
-          </Pressable>
-        ) : null}
-        <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={pressImage} />
-        <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>
-          <LikeButton liked={post.likedByMe} count={post.likeCount} onPress={() => onToggleLike?.(post)} />
-          <CommentButton count={post.commentCount} onPress={() => onPress?.(post)} />
-          <View style={{ flex: 1 }} />
-          <View style={{ marginRight: -t.spacing.sm }}>
-            <ReactButton myReaction={post.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
+          <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={pressImage} />
+          <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>
+            <LikeButton liked={post.likedByMe} count={post.likeCount} onPress={() => onToggleLike?.(post)} />
+            <CommentButton count={post.commentCount} onPress={() => onPress?.(post)} />
+            <View style={{ flex: 1 }} />
+            <View style={{ marginRight: -t.spacing.sm }}>
+              <ReactButton myReaction={post.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
+            </View>
           </View>
         </View>
-      </View>
+      </Pressable>
+      {/* fora da linha tocável: na web o toque num modal sobe pela árvore e abriria o post */}
       <ReactionPicker
         anchorRef={reactAnchor}
         visible={picking}
@@ -169,6 +180,6 @@ export function PostCard({
           onClose={() => setConfirming(false)}
         />
       ) : null}
-    </View>
+    </>
   );
 }

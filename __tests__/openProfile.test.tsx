@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 const mockPush = jest.fn();
 let mockId = 'u2';
@@ -53,6 +54,20 @@ describe('foto e nome do autor abrem o perfil', () => {
     await fireEvent.press(links[1]);
     expect(mockPush).toHaveBeenCalledTimes(2);
     expect(mockPush).toHaveBeenCalledWith('/user/u2');
+  });
+
+  it('no post: o resto da linha abre o post, não o perfil', async () => {
+    const onPress = jest.fn();
+    await render(<PostCard post={post} onPress={onPress} />);
+    await fireEvent.press(screen.getByTestId('post-row'));
+    expect(onPress).toHaveBeenCalledWith(post);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('no post: a foto não estica até o fim da linha (abaixo dela já é o post)', async () => {
+    await render(<PostCard post={post} />);
+    const [photo] = screen.getAllByRole('link', { name: 'Ver perfil de Bia' });
+    expect(StyleSheet.flatten(photo.props.style)).toMatchObject({ alignSelf: 'flex-start' });
   });
 
   it('no perfil da própria pessoa o post não vira link (não empilha o mesmo perfil)', async () => {
