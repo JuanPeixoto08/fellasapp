@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createIdea, deleteIdea, fetchIdeas, ideaErrorMessage, voteIdea } from './api/ideas';
 import { applyVote, type Idea, type IdeaSort } from './ideas';
+import { useMemberDirectory } from './memberDirectory';
 import { debounce, LIVE_DEBOUNCE_MS, onLive } from './realtime';
 
 /**
@@ -23,23 +24,41 @@ export function useIdeas(userId: string | undefined) {
   const requestId = useRef(0);
   /** Ideias com voto indo pro servidor: toques nelas esperam a resposta. */
   const pending = useRef(new Set<string>());
+  /** Tem carregamento normal esperando (carregando na tela): quem terminar por último responde por ele. */
+  const showing = useRef(false);
+  /** Chegou lista do banco com voto meu ainda indo: confere de novo quando os votos terminarem. */
+  const stale = useRef(false);
 
   /** `silent`: atualização ao vivo/depois de mandar, sem piscar o carregando nem trocar a lista por erro. */
   const load = useCallback((silent: boolean) => {
     const id = ++requestId.current;
     if (!silent) {
+      showing.current = true;
       setLoading(true);
       setError(null);
     }
     fetchIdeas(sortRef.current)
       .then((list) => {
-        if (id === requestId.current) setIdeas(list);
+        if (id !== requestId.current) return;
+        if (pending.current.size > 0) {
+          // a busca pode ter sido feita antes do meu voto chegar no banco: o voto da tela vale
+          stale.current = true;
+          const local = new Map(ideasRef.current.filter((i) => pending.current.has(i.id)).map((i) => [i.id, i]));
+          list = list.map((i) => {
+            const mine = local.get(i.id);
+            return mine ? { ...i, score: mine.score, myVote: mine.myVote } : i;
+          });
+        }
+        setIdeas(list);
       })
       .catch((e) => {
-        if (id === requestId.current && !silent) setError(ideaErrorMessage(e, 'load'));
+        if (id === requestId.current && showing.current) setError(ideaErrorMessage(e, 'load'));
       })
       .finally(() => {
-        if (id === requestId.current && !silent) setLoading(false);
+        if (id === requestId.current && showing.current) {
+          showing.current = false;
+          setLoading(false);
+        }
       });
   }, []);
 
@@ -78,9 +97,15 @@ export function useIdeas(userId: string | undefined) {
           patch({ score: before.score, myVote: before.myVote });
           setVoteError(ideaErrorMessage(e, 'vote'));
         })
-        .finally(() => pending.current.delete(ideaId));
+        .finally(() => {
+          pending.current.delete(ideaId);
+          if (pending.current.size === 0 && stale.current) {
+            stale.current = false;
+            load(true);
+          }
+        });
     },
-    [userId],
+    [userId, load],
   );
 
   const create = useCallback(
@@ -97,5 +122,15 @@ export function useIdeas(userId: string | undefined) {
     setIdeas((list) => list.filter((i) => i.id !== ideaId));
   }, []);
 
-  return { sort, setSort, ideas, loading, error, voteError, reload, vote, create, remove };
+  // nome e foto do autor na hora de mostrar: o diretório de membros pode chegar depois das ideias
+  const directory = useMemberDirectory();
+  const shown = useMemo(() => {
+    const byId = new Map(directory.map((m) => [m.id, m]));
+    return ideas.map((i) => {
+      const m = byId.get(i.author.id);
+      return m ? { ...i, author: { id: m.id, name: m.name, avatarUrl: m.avatarUrl } } : i;
+    });
+  }, [ideas, directory]);
+
+  return { sort, setSort, ideas: shown, loading, error, voteError, reload, vote, create, remove };
 }
