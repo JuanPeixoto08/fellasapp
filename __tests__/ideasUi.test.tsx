@@ -1,5 +1,9 @@
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { IdeasButton } from '../components/ideas/IdeasButton';
 import { IdeaRow } from '../components/ideas/IdeaRow';
 import { VoteColumn } from '../components/ideas/VoteColumn';
 import type { Idea } from '../lib/ideas';
@@ -49,5 +53,13 @@ describe('IdeaRow', () => {
   it('sem lixeira quando não pode apagar', async () => {
     await render(<IdeaRow idea={idea} canDelete={false} onVote={() => {}} onDelete={() => {}} />);
     expect(screen.queryByRole('button', { name: 'Apagar ideia' })).toBeNull();
+  });
+});
+
+describe('IdeasButton', () => {
+  it('abre o mural', async () => {
+    await render(<IdeasButton />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Ideias' }));
+    expect(mockPush).toHaveBeenCalledWith('/ideas');
   });
 });
