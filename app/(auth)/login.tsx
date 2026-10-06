@@ -1,31 +1,21 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { OtpCodeForm } from '../../components/auth/OtpCodeForm';
 import { Button, Heading, Logo, Screen, Text, TextField } from '../../components/ui';
 import { authErrorMessage, sendOtp, signInWithPassword, verifyOtp } from '../../lib/api/auth';
 import { clearPasswordReset, markPasswordReset } from '../../lib/auth/passwordReset';
 import { useTheme } from '../../lib/theme';
 
-/** password: email + senha (padrão) · email: pedir código · code: digitar o código. */
+/**
+ * password: email + senha (padrão) · email: pedir código do "esqueci a senha" · code: digitar o código.
+ * Conta nova não nasce aqui: só pelo link de convite (app/(auth)/convite).
+ */
 type Step = 'password' | 'email' | 'code';
-/** Por que o código foi pedido: primeiro acesso (pode criar conta) ou "esqueci a senha". */
-type Purpose = 'first' | 'forgot';
-
-const COPY: Record<Purpose, { title: string; text: string }> = {
-  first: {
-    title: 'Primeiro acesso',
-    text: 'Põe seu email e a gente manda um código de 6 dígitos. Depois você cria sua senha.',
-  },
-  forgot: {
-    title: 'Esqueceu a senha?',
-    text: 'A gente manda um código de 6 dígitos pro seu email e você cria uma senha nova.',
-  },
-};
 
 export default function LoginScreen() {
   const t = useTheme();
   const [step, setStep] = useState<Step>('password');
-  const [purpose, setPurpose] = useState<Purpose>('first');
   const [email, setEmail] = useState('');
   const [password, setPasswordText] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -56,8 +46,7 @@ export default function LoginScreen() {
     });
   }
 
-  function openCodeFlow(next: Purpose) {
-    setPurpose(next);
+  function openCodeFlow() {
     setStep('email');
     setCode('');
     setError(null);
@@ -67,7 +56,7 @@ export default function LoginScreen() {
     const trimmed = normalizedEmail();
     if (!trimmed.includes('@')) return setError('Informe um email válido.');
     return run(async () => {
-      await sendOtp(trimmed, { createUser: purpose === 'first' });
+      await sendOtp(trimmed, { createUser: false });
       setEmail(trimmed);
       setStep('code');
     });
@@ -77,7 +66,7 @@ export default function LoginScreen() {
     if (!/^\d{6}$/.test(code)) return setError('O código tem 6 dígitos.');
     return run(async () => {
       // marca antes da sessão chegar: o guard já manda direto para "Senha nova"
-      if (purpose === 'forgot') markPasswordReset();
+      markPasswordReset();
       try {
         await verifyOtp(email, code);
       } catch (e) {
@@ -94,7 +83,7 @@ export default function LoginScreen() {
     setError(null);
   }
 
-  const title = step === 'password' ? 'Só entra quem foi chamado.' : step === 'email' ? COPY[purpose].title : 'Olha o seu email.';
+  const title = step === 'password' ? 'Só entra quem foi chamado.' : step === 'email' ? 'Esqueceu a senha?' : 'Olha o seu email.';
 
   return (
     <Screen scroll style={{ paddingTop: t.spacing.xxxl, gap: t.spacing.xl }}>
@@ -105,7 +94,7 @@ export default function LoginScreen() {
           {step === 'password' ? (
             'Entra com seu email e sua senha.'
           ) : step === 'email' ? (
-            COPY[purpose].text
+            'A gente manda um código de 6 dígitos pro seu email e você cria uma senha nova.'
           ) : (
             <>
               Mandamos um código de 6 dígitos para{' '}
@@ -155,9 +144,11 @@ export default function LoginScreen() {
           </View>
           <Button title="Entrar" onPress={onSignIn} loading={busy} fullWidth />
           <View style={{ gap: t.spacing.xs }}>
-            <Button title="Primeiro acesso? Receber código" variant="ghost" onPress={() => openCodeFlow('first')} disabled={busy} fullWidth />
-            <Button title="Esqueci a senha" variant="ghost" onPress={() => openCodeFlow('forgot')} disabled={busy} fullWidth />
+            <Button title="Esqueci a senha" variant="ghost" onPress={openCodeFlow} disabled={busy} fullWidth />
           </View>
+          <Text variant="small" tone="muted" align="center">
+            Ainda não tem conta? Pede um link de convite pra quem te chamou.
+          </Text>
         </View>
       ) : step === 'email' ? (
         <View style={{ gap: t.spacing.lg }}>
@@ -175,30 +166,20 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             onSubmitEditing={onSendCode}
             error={error ?? undefined}
-            help="Só funciona com o email que o grupo liberou."
+            help="O email da sua conta."
           />
           <Button title="Enviar código" onPress={onSendCode} loading={busy} fullWidth />
           <Button title="Voltar pro login" variant="ghost" onPress={backToPassword} disabled={busy} fullWidth />
         </View>
       ) : (
-        <View style={{ gap: t.spacing.lg }}>
-          <TextField
-            label="Código de 6 dígitos"
-            placeholder="000000"
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-            maxLength={6}
-            editable={!busy}
-            value={code}
-            onChangeText={(c) => setCode(c.replace(/\D/g, ''))}
-            onSubmitEditing={onVerify}
-            error={error ?? undefined}
-            help="Não chegou? Olha o spam ou volta e manda de novo."
-          />
-          <Button title="Entrar" onPress={onVerify} loading={busy} fullWidth />
-          <Button title="Voltar e usar outro email" variant="ghost" onPress={() => openCodeFlow(purpose)} disabled={busy} fullWidth />
-        </View>
+        <OtpCodeForm
+          code={code}
+          onChangeCode={setCode}
+          onVerify={onVerify}
+          busy={busy}
+          error={error}
+          secondary={{ title: 'Voltar e usar outro email', onPress: openCodeFlow }}
+        />
       )}
     </Screen>
   );

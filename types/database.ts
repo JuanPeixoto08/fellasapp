@@ -29,6 +29,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      invite_links: {
+        Row: {
+          token: string;
+          created_by: string | null;
+          created_at: string;
+          expires_at: string;
+          used_at: string | null;
+          used_email: string | null;
+        };
+        Insert: {
+          token: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_email?: string | null;
+        };
+        Update: {
+          token?: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_email?: string | null;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -40,6 +67,7 @@ export type Database = {
           location: string | null;
           birthday: string | null;
           is_member: boolean;
+          is_admin: boolean;
           created_at: string;
           notifications_seen_at: string;
         };
@@ -53,6 +81,7 @@ export type Database = {
           location?: string | null;
           birthday?: string | null;
           is_member?: boolean;
+          is_admin?: boolean;
           created_at?: string;
           notifications_seen_at?: string;
         };
@@ -66,6 +95,7 @@ export type Database = {
           location?: string | null;
           birthday?: string | null;
           is_member?: boolean;
+          is_admin?: boolean;
           created_at?: string;
           notifications_seen_at?: string;
         };
@@ -257,6 +287,18 @@ export type Database = {
       is_member: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      create_invite_link: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      redeem_invite: {
+        Args: { p_token: string; p_email: string };
+        Returns: undefined;
       };
       notifications_feed: {
         Args: { p_limit?: number };

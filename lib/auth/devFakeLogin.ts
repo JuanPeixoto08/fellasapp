@@ -34,6 +34,7 @@ export const fakeProfile: Profile = {
   location: null,
   birthday: null,
   is_member: true,
+  is_admin: false,
   created_at: new Date(0).toISOString(),
   notifications_seen_at: new Date(0).toISOString(),
 };

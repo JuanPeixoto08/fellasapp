@@ -23,12 +23,14 @@ cada uma no SQL editor; todas são idempotentes):
 | `0003_reactions.sql` | tabelas `post_reactions` e `comment_reactions` + RLS | o feed e os posts não carregam (o app busca as reações junto) |
 | `0004_reactions_any_emoji.sql` | reação com qualquer emoji (troca a lista fixa de 6 por limite de tamanho) | reagir com emoji fora dos 6 da barra rápida falha |
 | `0005_post_images.sql` | até 4 fotos por post (coluna `images`, migra a foto atual de cada post) | postar com 2+ fotos falha (1 foto continua funcionando) |
+| `0012_invites.sql` | admin (`profiles.is_admin`, o @oliveira já sai admin) e link de convite de uso único (`invite_links`) | gerar link e abrir convite falham |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 
 ## Modelo de acesso
 
-- `allowed_emails`: lista de convidados. Só membros leem; escrita só via SQL editor / service role.
+- `allowed_emails`: lista de convidados. Só membros leem; escrita via link de convite (`redeem_invite`), SQL editor ou service role.
+- `invite_links`: links de convite (uso único, 7 dias). Só admin lê; escrita só por `create_invite_link()` (admin) e `redeem_invite()` (quem abriu o link, sem login).
 - Ao se cadastrar, o trigger cria o `profile` com `is_member = true` se o email estiver em `allowed_emails`; caso contrário `false` (o app deve mostrar "sem convite").
 - Se o convite for adicionado depois do cadastro, o profile existente é promovido automaticamente.
 - Só membros leem/escrevem posts, likes, comentários e profiles; cada um só edita/apaga o que é seu. Não-membros só enxergam o próprio profile.
@@ -37,13 +39,20 @@ Em Auth > Providers, habilite Email (OTP / magic link).
 
 ## Convidar um amigo
 
-No SQL editor (email em minúsculas):
+Pelo app: o admin abre o próprio perfil, toca no ícone de convidar (pessoa com +) e em **Gerar link de
+convite**. O link (`https://fellasapp.pages.dev/convite/<token>`) vale para **uma pessoa só, por 7 dias**.
+Quem abre põe o email; nessa hora o email entra em `allowed_emails` e o link fica preso a ele. Depois a
+pessoa recebe o código, entra e cai direto em "Crie sua senha". Email errado: gere outro link.
+
+Admin é `profiles.is_admin`, que o app não consegue editar. Para conferir ou trocar, no SQL editor:
 ```sql
-insert into public.allowed_emails (email)
-values ('amigo@email.com')
-on conflict do nothing;
+select username, is_admin from public.profiles where is_admin;
+update public.profiles set is_admin = true where username = 'outro_fella';
 ```
-O amigo então entra no app com esse email.
+
+Conta nova só nasce pelo link: o login não tem mais "Primeiro acesso" (só "Esqueci a senha", que não
+cria conta). Email liberado direto no SQL editor também precisa de um link para criar a conta; nesse caso
+o link não é gasto, porque o email já estava na lista.
 
 ## Tipos
 

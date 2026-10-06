@@ -10,9 +10,12 @@ import { RightRail } from './RightRail';
 import { ShellContext } from './ShellContext';
 import { Sidebar } from './Sidebar';
 
-/** A moldura só existe para membro logado, fora do login e do "sem convite". */
+/** Telas que ficam sem as colunas dos lados, só com o conteúdo no meio. */
+const UNFRAMED = ['(auth)', 'not-invited', 'set-password', 'invites'];
+
+/** A moldura só existe para membro logado, fora do login, do "sem convite" e do Convidar. */
 export function shellVisible(s: { loading: boolean; hasSession: boolean; isMember: boolean; first: string | undefined }) {
-  return !s.loading && s.hasSession && s.isMember && s.first !== '(auth)' && s.first !== 'not-invited' && s.first !== 'set-password';
+  return !s.loading && s.hasSession && s.isMember && !UNFRAMED.includes(s.first ?? '');
 }
 
 /**
