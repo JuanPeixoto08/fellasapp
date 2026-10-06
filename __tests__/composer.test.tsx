@@ -130,8 +130,12 @@ describe('Composer', () => {
   it('janela: só o ✕ em cima, à direita; "Postar" fica embaixo, junto de foto e local', async () => {
     await render(<Composer variant="dialog" />);
     const header = screen.getByTestId('composer-header');
-    expect(StyleSheet.flatten(header.props.style).justifyContent).toBe('flex-end');
+    // sem linha só para o ✕: ele fica solto no canto e o texto começa no topo, sem passar por baixo dele
+    expect(StyleSheet.flatten(header.props.style)).toMatchObject({ position: 'absolute', top: expect.any(Number), right: expect.any(Number) });
+    expect(StyleSheet.flatten(screen.getByTestId('composer-editor').props.style).paddingRight).toBeGreaterThanOrEqual(44);
     expect(within(header).getByLabelText('Fechar')).toBeTruthy();
+    // o ✕ da janela usa o ícone grande do tema (24)
+    expect(JSON.stringify(header.toJSON ? header.toJSON() : screen.toJSON())).toMatch(/"fontSize":24/);
     expect(screen.getAllByLabelText('Postar')).toHaveLength(1);
     expect(within(screen.getByTestId('composer-toolbar')).getByLabelText('Postar')).toBeTruthy();
   });

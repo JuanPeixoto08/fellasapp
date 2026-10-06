@@ -127,11 +127,14 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
 
   const editor = (
     <View
+      testID="composer-editor"
       style={{
         flexDirection: 'row',
         gap: t.spacing.md,
         paddingHorizontal: t.layout.gutter,
         paddingVertical: t.spacing.md,
+        // janela: o texto não passa por baixo do ✕ solto no canto
+        ...(variant === 'dialog' ? { paddingRight: t.layout.minTouch + t.spacing.sm } : null),
       }}
     >
       <Avatar name={me.name} uri={me.uri} size={t.avatarSizes.md} />
@@ -342,19 +345,24 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const header = (
     <View
       testID="composer-header"
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        // janela: só o ✕, à direita (o "Postar" fica embaixo)
-        justifyContent: variant === 'dialog' ? 'flex-end' : 'space-between',
-        paddingHorizontal: variant === 'dialog' ? t.spacing.sm : t.layout.gutter,
-        paddingVertical: t.spacing.sm,
-      }}
+      style={
+        variant === 'dialog'
+          ? // janela: só o ✕, solto no canto (sem linha própria; o "Postar" fica embaixo). zIndex: na web o
+            // texto vem depois e, posicionado, seria pintado por cima
+            { position: 'absolute', top: t.spacing.xs, right: t.spacing.xs, zIndex: 1 }
+          : {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: t.layout.gutter,
+              paddingVertical: t.spacing.sm,
+            }
+      }
     >
       {variant === 'page' ? (
         <Button title="Cancelar" variant="ghost" disabled={!hasAnything || saving} onPress={cancel} />
       ) : (
-        <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" onPress={cancel} disabled={saving} />
+        <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" size="lg" onPress={cancel} disabled={saving} />
       )}
       {variant === 'page' ? <Button title="Postar" loading={saving} disabled={!hasDraft} onPress={publish} /> : null}
     </View>
