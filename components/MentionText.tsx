@@ -5,15 +5,19 @@ import { splitMentions } from '../lib/mentions';
 import { useTheme } from '../lib/theme';
 import { Text, type TextProps } from './ui';
 
-type Props = Omit<TextProps, 'children'> & { text: string };
+type Props = Omit<TextProps, 'children'> & {
+  text: string;
+  /** #tag vira link para a página da tag (só em posts). */
+  tags?: boolean;
+};
 
-/** Texto de post/comentário com @usuario de fella destacado (cor `brand`, negrito) e levando ao perfil. */
-export function MentionText({ text, ...rest }: Props) {
+/** Texto de post/comentário com @usuario de fella (e, em posts, #tag) destacado em `brand` e tocável. */
+export function MentionText({ text, tags = false, ...rest }: Props) {
   const t = useTheme();
   const byUsername = useMembersByUsername();
   return (
     <Text {...rest}>
-      {splitMentions(text, byUsername).map((part, i) =>
+      {splitMentions(text, byUsername, { tags }).map((part, i) =>
         part.member ? (
           <Text
             key={i}
@@ -23,6 +27,19 @@ export function MentionText({ text, ...rest }: Props) {
             accessibilityLabel={`Ver perfil de ${part.member.name}`}
             suppressHighlighting
             onPress={() => router.push(`/user/${part.member!.id}`)}
+            style={{ color: t.colors.brand }}
+          >
+            {part.text}
+          </Text>
+        ) : part.tag ? (
+          <Text
+            key={i}
+            {...rest}
+            bold
+            accessibilityRole="link"
+            accessibilityLabel={`Ver posts com #${part.tag}`}
+            suppressHighlighting
+            onPress={() => router.push(`/tag/${encodeURIComponent(part.tag!)}`)}
             style={{ color: t.colors.brand }}
           >
             {part.text}

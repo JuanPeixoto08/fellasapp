@@ -54,3 +54,21 @@ describe('splitMentions', () => {
     expect(splitMentions('', byUsername)).toEqual([]);
   });
 });
+
+describe('splitMentions com tags', () => {
+  const byUsername = new Map([['ana', { id: 'u1' }]]);
+
+  it('@ e # no mesmo texto', () => {
+    expect(splitMentions('oi @ana olha #Arte!', byUsername, { tags: true })).toEqual([
+      { text: 'oi ' },
+      { text: '@ana', member: { id: 'u1' } },
+      { text: ' olha ' },
+      { text: '#Arte', tag: 'arte' },
+      { text: '!' },
+    ]);
+  });
+
+  it('sem { tags: true } a # fica texto', () => {
+    expect(splitMentions('olha #arte', byUsername)).toEqual([{ text: 'olha #arte' }]);
+  });
+});

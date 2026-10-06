@@ -1,3 +1,5 @@
+import { normalizeTag, TAG_RE } from './tags';
+
 /** Um fella que pode ser marcado com @usuario. */
 export type MentionMember = { id: string; username: string; name: string; avatarUrl: string | null };
 
@@ -43,24 +45,39 @@ export function insertMention(text: string, active: ActiveMention, username: str
   return `${text.slice(0, active.start)}@${username}${rest.startsWith(' ') ? '' : ' '}${rest}`;
 }
 
-export type MentionPart<M> = { text: string; member?: M };
+export type MentionPart<M> = { text: string; member?: M; tag?: string };
 
-/** Divide o texto em pedaços; @usuario de quem existe vira menção (o resto fica texto comum). */
-export function splitMentions<M>(text: string, byUsername: Map<string, M>): MentionPart<M>[] {
-  const parts: MentionPart<M>[] = [];
-  let last = 0;
-  let plain = '';
+/**
+ * Divide o texto em pedaços; @usuario de quem existe vira menção e, com `tags`, #tag vira tag
+ * (o resto fica texto comum).
+ */
+export function splitMentions<M>(
+  text: string,
+  byUsername: Map<string, M>,
+  { tags = false }: { tags?: boolean } = {},
+): MentionPart<M>[] {
+  const hits: { at: number; length: number; part: MentionPart<M> }[] = [];
   for (const match of text.matchAll(MENTION)) {
     const member = byUsername.get(match[2].toLowerCase());
     if (!member) continue;
     const at = (match.index ?? 0) + match[1].length;
-    plain += text.slice(last, at);
-    if (plain) parts.push({ text: plain });
-    plain = '';
-    parts.push({ text: `@${match[2]}`, member });
-    last = at + 1 + match[2].length;
+    hits.push({ at, length: 1 + match[2].length, part: { text: `@${match[2]}`, member } });
   }
-  plain += text.slice(last);
-  if (plain) parts.push({ text: plain });
+  if (tags) {
+    for (const match of text.matchAll(TAG_RE)) {
+      const at = (match.index ?? 0) + match[1].length;
+      hits.push({ at, length: 1 + match[2].length, part: { text: `#${match[2]}`, tag: normalizeTag(match[2]) } });
+    }
+  }
+  hits.sort((a, b) => a.at - b.at);
+  const parts: MentionPart<M>[] = [];
+  let last = 0;
+  for (const hit of hits) {
+    if (hit.at < last) continue;
+    if (hit.at > last) parts.push({ text: text.slice(last, hit.at) });
+    parts.push(hit.part);
+    last = hit.at + hit.length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
   return parts;
 }
