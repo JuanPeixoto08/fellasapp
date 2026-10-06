@@ -31,7 +31,8 @@ comentários; GPS, mapa ou busca em serviço de lugares; notificação por local
 - Fica na metade de baixo da altura do avatar `md` (a linha do nome já tem `minHeight` de meio avatar): nome e
   local alinham com a foto.
 - Tocável (papel `link`, rótulo "Ver posts em <local>") → `/place/<placeKey>`. Alvo de toque de 44 via
-  `hitSlop`, sem aumentar a linha. Na web, hover com `interactiveStyle` como os outros clicáveis.
+  `hitSlop`, sem aumentar a linha. Cursor de mão e opacidade ao tocar, como o `AuthorLink` (o hover
+  `surfaceSunken` sumiria sobre a linha do post, que já acende).
 - Sem local, a linha não existe e o post fica como hoje.
 - Na própria página do local, o link fica desligado (como `linkAuthor` no perfil da pessoa).
 
@@ -67,10 +68,11 @@ comentários; GPS, mapa ou busca em serviço de lugares; notificação por local
 
 Migration `supabase/migrations/0020_post_location.sql`, idempotente:
 
-- `create extension if not exists unaccent with schema extensions;`
-- `public.place_key(text) returns text`, `immutable`: `lower` + sem acento
-  (`extensions.unaccent('extensions.unaccent'::regdictionary, …)`, forma de 2 argumentos para não depender do
-  `search_path`) + espaços das pontas tirados e espaços repetidos viram um. Vazio → `null`.
+- `public.clean_place(text)`: espaços das pontas tirados e espaços repetidos viram um; vazio → `null`.
+- `public.place_key(text) returns text`, `immutable`: `clean_place` + `lower` + sem acento por `translate`
+  com uma tabela fixa de letras acentuadas (a mesma de `lib/places.ts`, conferida por teste). Sem a extensão
+  `unaccent`: não depende de `search_path` nem de onde a extensão foi instalada, e app e banco usam a mesma
+  tabela.
 - `posts.location text null` com check `char_length(location) between 1 and 60`.
 - `posts.place_key text null` + índice `posts_place_key_idx`.
 - Gatilho `posts_set_place_key` (before insert or update, em qualquer update, como o das tags): limpa
@@ -88,8 +90,9 @@ Migration `supabase/migrations/0020_post_location.sql`, idempotente:
 - `lib/places.ts`:
   - `PLACE_MAX = 60`.
   - `cleanPlace(raw): string | null`: pontas, espaços repetidos, vazio → `null` (igual ao gatilho).
-  - `placeKey(raw): string`: mesma regra do banco (`NFD` + tira marcas, minúsculas, espaços) — só para o
-    compositor saber se o digitado já é uma sugestão (decide a linha "Usar…").
+  - `placeKey(raw): string`: mesma regra do banco (mesma tabela de acentos, minúsculas, espaços) — para o
+    compositor saber se o digitado já é uma sugestão (decide a linha "Usar…") e para a página do local
+    aceitar a chave digitada na mão.
 - `lib/api/places.ts`: `suggestPlaces(prefix, limit = 5)` (rpc `place_suggestions`) e
   `countPlacePosts(key)`.
 - `lib/api/posts.ts`:
@@ -99,9 +102,12 @@ Migration `supabase/migrations/0020_post_location.sql`, idempotente:
   - `FeedFilter` ganha `place?: string` → `.eq('place_key', place)`.
 - `lib/usePostList.ts`: opção `place`, repassada ao `listFeed`; ao vivo, `belongsHere` confere
   `row.place_key === place`.
-- `components/PlaceSuggestions.tsx`: como `TagSuggestions` (espera 200 ms antes de perguntar; erro = sem
-  sugestões) + a linha "Usar…".
+- `components/places/`: `PlaceSuggestions` (como `TagSuggestions`: espera 200 ms antes de perguntar; erro =
+  sem sugestões; + a linha "Usar…"), `PlaceField` (campo + sugestões), `PlaceChip` (chip do compositor) e
+  `PlaceLink` (linha do post).
 - `components/PostCard.tsx`: linha do local (seção 1); prop `linkPlace` (padrão `true`).
+- `createPost` só manda a coluna `location` quando há local (como `images`): post sem local continua
+  funcionando mesmo antes da migration.
 - Tudo com tokens de `lib/theme.ts` e primitivos de `components/ui`; nada de valor solto.
 
 ## 4. Erros e bordas
