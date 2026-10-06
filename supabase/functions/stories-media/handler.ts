@@ -77,14 +77,14 @@ const restHeaders = (env: Env, token: string, extra: Record<string, string> = {}
   ...extra,
 });
 
-async function isMember(env: Env, token: string, deps: Deps): Promise<boolean | 'unauthorized'> {
+async function isMember(env: Env, token: string, deps: Deps): Promise<boolean | 'unauthorized' | 'failed'> {
   const res = await deps.fetch(`${env.SUPABASE_URL}/rest/v1/rpc/is_member`, {
     method: 'POST',
     headers: restHeaders(env, token),
     body: '{}',
   });
   if (res.status === 401) return 'unauthorized';
-  if (!res.ok) return false;
+  if (!res.ok) return 'failed';
   return (await res.json()) === true;
 }
 
@@ -93,6 +93,7 @@ async function sign(req: Request, env: Env, deps: Deps): Promise<Response> {
   if (!token) return reply(req, 401, { error: 'sem login' });
   const member = await isMember(env, token, deps);
   if (member === 'unauthorized') return reply(req, 401, { error: 'login inválido' });
+  if (member === 'failed') return reply(req, 502, { error: 'is_member falhou' });
   if (!member) return reply(req, 403, { error: 'só membros' });
   const { kind } = await body(req);
   if (kind !== 'photo' && kind !== 'video') return reply(req, 400, { error: 'kind inválido' });

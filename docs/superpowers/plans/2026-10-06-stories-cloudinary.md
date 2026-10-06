@@ -1369,5 +1369,7 @@ npx supabase db query --linked "select vault.create_secret('$CRON', 'stories_cro
 4. `npx supabase db query --linked -f supabase/migrations/0021_stories.sql`
 5. Fumaça: `curl -s -o /dev/null -w "%{http_code}" -X POST https://xygtrrdliqhwibxalvap.supabase.co/functions/v1/stories-media/sign` → `401`; e
    `npx supabase db query --linked "select jobname, schedule from cron.job where jobname like 'fellas-stories%'"` → os dois jobs.
+   Limpeza sem JWT: `curl -s -X POST https://xygtrrdliqhwibxalvap.supabase.co/functions/v1/stories-media/cleanup` deve devolver o corpo da própria função, `{"error":"segredo"}` (status 401). Um 401 do gateway sem esse corpo significa que o deploy perdeu `--no-verify-jwt`. Depois da primeira execução, no minuto :17:
+   `npx supabase db query --linked "select status_code, content from net._http_response order by id desc limit 1"` → `200`.
 
 - [ ] **Step 7: Integrar** — superpowers:finishing-a-development-branch (fluxo do projeto: merge local na `main` + push, **depois** do Step 6). Depois de publicado, conferência real com o Juan (postar foto e vídeo, assistir de outra conta, reagir, apagar um) e, no dia seguinte, conferir que sumiu do Cloudinary (painel Media Library, pasta `stories`) e do banco. Com tudo na `main`, oferecer apagar a branch `feat/stories`.

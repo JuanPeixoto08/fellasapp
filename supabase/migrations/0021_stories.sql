@@ -102,7 +102,8 @@ select cron.schedule('fellas-stories-arquivos', '17 * * * *', $$
       'Content-Type', 'application/json',
       'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'stories_cron_secret')
     ),
-    body := '{}'::jsonb
+    body := '{}'::jsonb,
+    timeout_milliseconds := 30000
   );
 $$);
 

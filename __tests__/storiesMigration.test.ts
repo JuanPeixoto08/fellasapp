@@ -22,6 +22,10 @@ describe('0021_stories.sql', () => {
     expect(sql).toMatch(/create extension if not exists pg_net/);
   });
 
+  it('a chamada da limpeza espera até 30 s (o padrão do pg_net é ~5 s)', () => {
+    expect(sql).toContain('timeout_milliseconds := 30000');
+  });
+
   it('o segredo do cron vem do Vault, nunca escrito na migração', () => {
     expect(sql).toContain("from vault.decrypted_secrets where name = 'stories_cron_secret'");
     expect(sql).not.toMatch(/x-cron-secret',\s*'[^']/);

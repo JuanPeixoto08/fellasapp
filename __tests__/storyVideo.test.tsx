@@ -76,4 +76,39 @@ describe('StoryVideo', () => {
     expect(mockPlayer.replaceAsync).toHaveBeenCalled();
     expect(mockPlayer.play).not.toHaveBeenCalled();
   });
+
+  describe('vídeo que demora sem dar erro', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+    const mount = (props: object = { fallbackUri: 'https://r/orig' }) =>
+      render(<StoryVideo uri="https://r/red" paused={false} muted={false} onReady={() => {}} onBlocked={() => {}} {...props} />);
+
+    it('sem status por 4 s: troca para o original uma vez', async () => {
+      await mount();
+      await act(async () => { jest.advanceTimersByTime(4100); });
+      expect(mockPlayer.replaceAsync).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.replaceAsync).toHaveBeenCalledWith('https://r/orig');
+    });
+
+    it('readyToPlay antes de 4 s: não troca', async () => {
+      await mount();
+      await emit('readyToPlay');
+      await act(async () => { jest.advanceTimersByTime(5000); });
+      expect(mockPlayer.replaceAsync).not.toHaveBeenCalled();
+    });
+
+    it('erro com 1 s troca; passar de 4 s não troca de novo', async () => {
+      await mount();
+      await act(async () => { jest.advanceTimersByTime(1000); });
+      await emit('error');
+      await act(async () => { jest.advanceTimersByTime(5000); });
+      expect(mockPlayer.replaceAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('sem fallbackUri: não troca', async () => {
+      await mount({});
+      await act(async () => { jest.advanceTimersByTime(5000); });
+      expect(mockPlayer.replaceAsync).not.toHaveBeenCalled();
+    });
+  });
 });

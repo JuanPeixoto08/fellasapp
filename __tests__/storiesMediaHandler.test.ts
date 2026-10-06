@@ -63,6 +63,13 @@ describe('POST /sign', () => {
     const yes = jest.fn(async () => json(true));
     expect((await handle(post('sign', { kind: 'gif' }, { Authorization: 'Bearer t' }), env, deps(yes))).status).toBe(400);
   });
+
+  it('is_member com erro 5xx do Supabase: 502, não 403', async () => {
+    const down = jest.fn(async () => json({}, 500));
+    const res = await handle(post('sign', { kind: 'photo' }, { Authorization: 'Bearer t' }), env, deps(down));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'is_member falhou' });
+  });
 });
 
 describe('POST /delete', () => {

@@ -5,6 +5,9 @@ import { Platform } from 'react-native';
 /** Quanto esperar depois de mandar tocar para concluir que o navegador bloqueou o som. */
 const AUTOPLAY_CHECK_MS = 700;
 
+/** Quanto esperar a versão reduzida ficar pronta antes de trocar para o original. */
+const FALLBACK_AFTER_MS = 4000;
+
 type Props = {
   uri: string;
   /** Toca este se o `uri` falhar (versão reduzida do Cloudinary ainda processando). */
@@ -33,22 +36,38 @@ export function StoryVideo({ uri, fallbackUri, paused, muted, onReady, onBlocked
   // a versão reduzida pode ainda não estar pronta: tenta o original uma vez antes de desistir
   const fellBack = useRef(false);
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const clear = () => {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+    };
+    const swap = () => {
+      if (!fallbackUri || fellBack.current) return false;
+      fellBack.current = true;
+      clear();
+      player
+        .replaceAsync(fallbackUri)
+        .then(() => {
+          if (!pausedRef.current) player.play();
+        })
+        .catch(() => ready.current());
+      return true;
+    };
     const onStatus = (status: string) => {
-      if (status === 'error' && fallbackUri && !fellBack.current) {
-        fellBack.current = true;
-        player
-          .replaceAsync(fallbackUri)
-          .then(() => {
-            if (!pausedRef.current) player.play();
-          })
-          .catch(() => ready.current());
-        return;
+      if (status === 'error' && swap()) return;
+      if (status === 'readyToPlay' || status === 'error') {
+        clear();
+        ready.current();
       }
-      if (status === 'readyToPlay' || status === 'error') ready.current();
     };
     onStatus(player.status);
+    // a reduzida pode travar sem dar erro: passou o prazo sem ficar pronta, vai para o original
+    if (fallbackUri && !fellBack.current && player.status !== 'readyToPlay') timer = setTimeout(swap, FALLBACK_AFTER_MS);
     const sub = player.addListener('statusChange', ({ status }) => onStatus(status));
-    return () => sub.remove();
+    return () => {
+      clear();
+      sub.remove();
+    };
   }, [player, fallbackUri]);
 
   useEffect(() => {

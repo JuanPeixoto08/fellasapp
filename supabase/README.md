@@ -34,6 +34,13 @@ cada uma no SQL editor; todas são idempotentes):
 | `0020_post_location.sql` | local nos posts: `posts.location` + `place_key` (gatilho), `place_suggestions` | postar com local, sugestões de local e página do local falham (post sem local funciona) |
 | `0021_stories.sql` | stories: `stories`, `story_views`, `story_reactions`, notificação `story_reaction`, limpeza de 24 h (linhas e, via função `stories-media`, arquivos no Cloudinary) | faixa e postar story falham. Antes: segredo `stories_cron_secret` no Vault e a função publicada |
 
+**Função `stories-media` (Edge Function)**: publique sempre com
+`npx supabase functions deploy stories-media --no-verify-jwt`. A função confere o login sozinha; já a limpeza
+(`/cleanup`) é chamada pelo cron do banco só com o cabeçalho `x-cron-secret`, sem login. Sem `--no-verify-jwt`
+o gateway do Supabase recusa essa chamada e os arquivos nunca são apagados. Segredos da função:
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` e `STORIES_CRON_SECRET`. No Vault do
+banco: `stories_cron_secret` (mesmo valor de `STORIES_CRON_SECRET`). Nunca escreva os valores no repositório.
+
 Em Auth > Providers, habilite Email (OTP / magic link).
 
 ## Modelo de acesso
