@@ -13,8 +13,8 @@ export default function NotInvitedScreen() {
       <View style={{ gap: t.spacing.md }}>
         <Heading level={1}>Você ainda não foi convidado</Heading>
         <Text tone="muted">
-          Este app é só para um grupo fechado de amigos. Pede pra alguém do grupo liberar o seu email e
-          volta aqui, bora.
+          Este app é só para um grupo fechado de amigos. Pede um link de convite pra quem te chamou e entra
+          por ele, bora.
         </Text>
         {email ? (
           <Text tone="muted">

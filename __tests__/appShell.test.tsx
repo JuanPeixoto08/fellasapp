@@ -51,6 +51,7 @@ describe('shellVisible', () => {
     expect(shellVisible({ ...base, first: '(auth)' })).toBe(false);
     expect(shellVisible({ ...base, first: 'not-invited' })).toBe(false);
     expect(shellVisible({ ...base, first: 'set-password' })).toBe(false);
+    expect(shellVisible({ ...base, first: 'invites' })).toBe(false);
   });
 });
 

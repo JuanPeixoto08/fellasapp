@@ -48,11 +48,13 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)/login" />
+            <Stack.Screen name="(auth)/convite/[token]" />
             <Stack.Screen name="not-invited" />
             <Stack.Screen name="set-password" />
             <Stack.Screen name="profile/edit" options={{ headerShown: true, title: 'Editar perfil' }} />
             <Stack.Screen name="user/[id]" options={{ headerShown: true, title: 'Perfil' }} />
             <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
+            <Stack.Screen name="invites" options={{ headerShown: true, title: 'Convidar' }} />
             <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Notificações' }} />
           </Stack>
         </AppShell>
