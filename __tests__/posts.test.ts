@@ -19,7 +19,7 @@ jest.mock('../lib/supabase', () => {
   const makeBuilder = (table: string) => {
     let op = 'select';
     const b: any = {};
-    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'in', 'lt', 'not', 'order', 'limit']) {
+    for (const m of ['select', 'insert', 'upsert', 'delete', 'eq', 'in', 'lt', 'not', 'order', 'limit', 'contains']) {
       b[m] = (...args: unknown[]) => {
         if (['insert', 'upsert', 'delete'].includes(m)) op = m;
         mockCalls.push({ table, op: m, args });
@@ -292,5 +292,13 @@ describe('listComments', () => {
       myReaction: '👍',
     });
     expect(mockCalls.filter((c) => c.table === 'comment_reactions' && c.op === 'in')).toHaveLength(1);
+  });
+});
+
+describe('listFeed por tag', () => {
+  it('filtra os posts que têm a tag', async () => {
+    mockResults['posts.select'] = { data: [], error: null };
+    await listFeed({ tag: 'artes' });
+    expect(mockCalls).toContainEqual({ table: 'posts', op: 'contains', args: ['tags', ['artes']] });
   });
 });

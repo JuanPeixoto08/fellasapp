@@ -125,10 +125,12 @@ export type FeedFilter = {
   authorId?: string;
   /** Só posts com foto (aba Fotos do perfil). */
   photosOnly?: boolean;
+  /** Só posts com esta #tag (página da tag), já em minúsculas. */
+  tag?: string;
 };
 
 export async function listFeed(
-  { cursor, authorId, photosOnly }: { cursor?: string | null } & FeedFilter = {},
+  { cursor, authorId, photosOnly, tag }: { cursor?: string | null } & FeedFilter = {},
 ): Promise<FeedPage> {
   const userId = await currentUserId();
   let query = supabase
@@ -139,6 +141,7 @@ export async function listFeed(
   if (cursor) query = query.lt('created_at', cursor);
   if (authorId) query = query.eq('author_id', authorId);
   if (photosOnly) query = query.not('image_url', 'is', null);
+  if (tag) query = query.contains('tags', [tag]);
 
   const { data, error } = await query;
   if (error) throw error;
