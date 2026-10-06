@@ -14,6 +14,7 @@ jest.mock('../lib/api/ideas', () => ({
   ideaErrorMessage: (_e: unknown, action: string) => `erro:${action}`,
 }));
 
+import { setMemberDirectory } from '../lib/memberDirectory';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 import { useIdeas } from '../lib/useIdeas';
 
@@ -122,5 +123,46 @@ describe('useIdeas', () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
     await act(async () => result.current.remove('i1'));
     expect(result.current.ideas).toEqual([]);
+  });
+
+  it('carregamento normal substituído por um silencioso não deixa o carregando preso', async () => {
+    const { result } = await loaded();
+    let slowNew: (v: Idea[]) => void = () => {};
+    mockFetch.mockImplementationOnce(() => new Promise<Idea[]>((r) => (slowNew = r)));
+    await act(async () => result.current.setSort('new'));
+    expect(result.current.loading).toBe(true);
+    // mandar uma ideia dispara um recarregamento silencioso no meio do normal
+    mockFetch.mockResolvedValueOnce([idea({ id: 'nova' })]);
+    await act(async () => result.current.create('bora'));
+    await act(async () => slowNew([idea({ id: 'velha' })]));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.ideas[0].id).toBe('nova');
+  });
+
+  it('recarregamento no meio do meu voto não apaga o voto; depois confere com o banco', async () => {
+    let finish: () => void = () => {};
+    mockVote.mockImplementation(() => new Promise<void>((r) => (finish = r)));
+    const { result } = await loaded();
+    await act(async () => result.current.vote('i1', 1));
+    // a busca foi feita antes do meu voto chegar no banco
+    mockFetch.mockResolvedValueOnce([idea({ score: 3, myVote: null })]);
+    await act(async () => result.current.create('outra'));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    expect(result.current.ideas[0]).toMatchObject({ myVote: 1, score: 4 });
+    mockFetch.mockResolvedValueOnce([idea({ score: 4, myVote: 1 })]);
+    await act(async () => finish());
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3));
+    expect(result.current.ideas[0]).toMatchObject({ myVote: 1, score: 4 });
+  });
+
+  it('nome do autor aparece quando o diretório de membros chega depois', async () => {
+    setMemberDirectory([]);
+    mockFetch.mockResolvedValue([idea({ author: { id: 'u2', name: 'Alguém', avatarUrl: null } })]);
+    const { result } = await loaded();
+    expect(result.current.ideas[0].author.name).toBe('Alguém');
+    await act(async () =>
+      setMemberDirectory([{ id: 'u2', username: 'bia', name: 'Bia', avatarUrl: 'https://signed/b.jpg' }]),
+    );
+    expect(result.current.ideas[0].author).toEqual({ id: 'u2', name: 'Bia', avatarUrl: 'https://signed/b.jpg' });
   });
 });
