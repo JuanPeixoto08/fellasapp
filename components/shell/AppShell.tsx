@@ -9,6 +9,8 @@ import { ComposeDialog } from './ComposeDialog';
 import { RightRail } from './RightRail';
 import { ShellContext } from './ShellContext';
 import { Sidebar } from './Sidebar';
+import { useMiddleClickScroll } from './autoScroll';
+import { AutoScrollMark } from './AutoScrollMark';
 import { useForwardWheel } from './wheelForward';
 
 /** Telas que ficam sem as colunas dos lados, só com o conteúdo no meio. */
@@ -40,8 +42,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     () => ({ contentWidth, openCompose: framed ? () => setComposing(true) : null }),
     [contentWidth, framed],
   );
-  // computador: a roda em qualquer lugar da página rola o meio
+  // computador: a roda (e o clique na rodinha) em qualquer lugar da página rola o meio
   useForwardWheel(center, framed);
+  const autoScrollAt = useMiddleClickScroll(center, framed);
 
   return (
     <ShellContext.Provider value={value}>
@@ -64,6 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </View>
         {framed && tier === 'expanded' ? <RightRail /> : null}
+        {autoScrollAt ? <AutoScrollMark at={autoScrollAt} /> : null}
       </View>
       {framed ? <ComposeDialog visible={composing} onClose={() => setComposing(false)} /> : null}
     </ShellContext.Provider>

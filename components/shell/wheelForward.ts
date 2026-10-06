@@ -33,10 +33,18 @@ export function scrollableAncestor<T extends ScrollBox>(
   return null;
 }
 
-const scrollsY = (el: Element) => {
+export const scrollsY = (el: Element) => {
   const overflow = getComputedStyle(el).overflowY;
   return overflow === 'auto' || overflow === 'scroll';
 };
+
+/** O que rola no meio na altura `clientY`, como se o mouse estivesse no centro da coluna. */
+export function centerScroller(center: HTMLElement, clientY: number, deltaY: number): Element | null {
+  const box = center.getBoundingClientRect();
+  const y = Math.min(Math.max(clientY, box.top + 1), box.bottom - 1);
+  const under = document.elementFromPoint(box.left + box.width / 2, y);
+  return under && center.contains(under) ? scrollableAncestor<Element>(under, deltaY, scrollsY) : null;
+}
 
 /**
  * Computador: cada tela do meio rola sozinha, e o navegador só rola o que está embaixo do mouse.
@@ -55,10 +63,7 @@ export function useForwardWheel(centerRef: RefObject<View | null>, enabled: bool
       if (center.contains(target) || target.closest('[aria-modal="true"]')) return;
       const dy = wheelPixels(e.deltaY, e.deltaMode, window.innerHeight);
       if (scrollableAncestor<Element>(target, dy, scrollsY)) return;
-      const box = center.getBoundingClientRect();
-      const y = Math.min(Math.max(e.clientY, box.top + 1), box.bottom - 1);
-      const under = document.elementFromPoint(box.left + box.width / 2, y);
-      const scroller = under && center.contains(under) ? scrollableAncestor<Element>(under, dy, scrollsY) : null;
+      const scroller = centerScroller(center, e.clientY, dy);
       if (!scroller) return;
       e.preventDefault();
       scroller.scrollBy({ top: dy });
