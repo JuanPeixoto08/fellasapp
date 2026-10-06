@@ -6,6 +6,7 @@ import { Composer } from '../../components/feed/Composer';
 import { NewPostsPill } from '../../components/feed/NewPostsPill';
 import { IdeasButton } from '../../components/ideas/IdeasButton';
 import { NotificationsBell } from '../../components/notifications/NotificationsBell';
+import { TagsButton } from '../../components/tags/TagsButton';
 import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -60,6 +61,7 @@ export default function FeedScreen() {
                     <Logo height={t.layout.logoHeight.sm} />
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TagsButton />
                     <IdeasButton />
                     <NotificationsBell />
                   </View>

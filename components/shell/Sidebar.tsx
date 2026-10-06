@@ -10,17 +10,18 @@ import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, Text, type IconName } from '../ui';
 
-export type NavKey = 'feed' | 'notifications' | 'profile' | 'members' | 'ideas';
+export type NavKey = 'feed' | 'notifications' | 'tags' | 'profile' | 'members' | 'ideas';
 
 const ITEMS: {
   key: NavKey;
   label: string;
-  href: '/feed' | '/notifications' | '/profile' | '/members' | '/ideas';
+  href: '/feed' | '/notifications' | '/tags' | '/profile' | '/members' | '/ideas';
   icon: IconName;
   iconActive: IconName;
 }[] = [
   { key: 'feed', label: 'Feed', href: '/feed', icon: 'newspaper-outline', iconActive: 'newspaper' },
   { key: 'notifications', label: 'Notificações', href: '/notifications', icon: 'notifications-outline', iconActive: 'notifications' },
+  { key: 'tags', label: 'Tags', href: '/tags', icon: 'pricetags-outline', iconActive: 'pricetags' },
   { key: 'profile', label: 'Perfil', href: '/profile', icon: 'person-outline', iconActive: 'person' },
   { key: 'members', label: 'Membros', href: '/members', icon: 'people-outline', iconActive: 'people' },
   { key: 'ideas', label: 'Ideias', href: '/ideas', icon: 'bulb-outline', iconActive: 'bulb' },
@@ -32,13 +33,14 @@ export function activeNavItem(pathname: string): NavKey | null {
   if (pathname === '/profile') return 'profile';
   if (pathname === '/members') return 'members';
   if (pathname === '/notifications') return 'notifications';
+  if (pathname === '/tags') return 'tags';
   if (pathname === '/ideas') return 'ideas';
   return null;
 }
 
 type Props = { tier: Exclude<LayoutTier, 'compact'>; onCompose: () => void };
 
-/** Barra lateral do desktop: logo, Feed/Notificações/Perfil/Membros/Ideias, Postar e eu no pé. */
+/** Barra lateral do desktop: logo, Feed/Notificações/Tags/Perfil/Membros/Ideias, Postar e eu no pé. */
 export function Sidebar({ tier, onCompose }: Props) {
   const t = useTheme();
   const router = useRouter();

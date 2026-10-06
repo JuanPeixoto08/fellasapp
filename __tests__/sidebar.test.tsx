@@ -39,6 +39,7 @@ describe('activeNavItem', () => {
     ['/new', null],
     ['/notifications', 'notifications'],
     ['/ideas', 'ideas'],
+    ['/tags', 'tags'],
   ] as const)('%s → %s', (path, key) => {
     expect(activeNavItem(path)).toBe(key);
   });
@@ -73,6 +74,14 @@ describe('Sidebar', () => {
     expect(labels.indexOf('Notificações, 2 novas')).toBe(labels.indexOf('Feed') + 1);
     await fireEvent.press(item);
     expect(mockNavigate).toHaveBeenCalledWith('/notifications');
+  });
+
+  it('Tags logo abaixo de Notificações e navega', async () => {
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    const labels = screen.getAllByRole('link').map((el) => el.props.accessibilityLabel);
+    expect(labels.indexOf('Tags')).toBe(labels.indexOf('Notificações') + 1);
+    await fireEvent.press(screen.getByLabelText('Tags'));
+    expect(mockNavigate).toHaveBeenCalledWith('/tags');
   });
 
   it('Ideias depois de Membros e navega', async () => {

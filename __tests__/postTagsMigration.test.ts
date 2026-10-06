@@ -11,3 +11,12 @@ describe('0016_post_tags.sql', () => {
     expect(sql).not.toMatch(/update of body/);
   });
 });
+
+describe('0017_tag_list.sql', () => {
+  const list = readFileSync(`${__dirname}/../supabase/migrations/0017_tag_list.sql`, 'utf8');
+
+  it('a lista de tags pode pedir até 200 (sugestões continuam pedindo 5)', () => {
+    expect(list).toMatch(/create or replace function public\.tag_suggestions/);
+    expect(list).toMatch(/least\(greatest\(coalesce\(p_limit, 5\), 1\), 200\)/);
+  });
+});

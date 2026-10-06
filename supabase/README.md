@@ -28,6 +28,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0014_pinned_post.sql` | post fixado no perfil (`profiles.pinned_post_id` + `set_pinned_post`) | fixar post falha e o perfil não mostra o fixado |
 | `0015_profile_banner.sql` | banner do perfil (`profiles.banner_url`) | salvar banner falha |
 | `0016_post_tags.sql` | #tags em posts: `posts.tags` (gatilho tira do texto), `tag_suggestions` | página da tag e sugestões de # falham |
+| `0017_tag_list.sql` | tela Tags: `tag_suggestions` aceita até 200 | a lista de tags para em 20 |
 
 Em Auth > Providers, habilite Email (OTP / magic link).
 
