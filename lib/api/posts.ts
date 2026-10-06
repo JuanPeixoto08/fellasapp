@@ -14,6 +14,8 @@ import { BUCKET, resolveUrl, signPaths } from './storage';
 export const PAGE_SIZE = 10;
 /** Fotos por post (mesmo limite do check posts_images_max). */
 export const MAX_IMAGES = 4;
+/** Imagens por comentário (mesmo limite do check comments_images_max, 0022). */
+export const MAX_COMMENT_IMAGES = 4;
 
 /** `avatar_url` já vem como URL assinada (pronta para exibir) ou null. */
 export type Author = Pick<Tables<'profiles'>, 'id' | 'username' | 'display_name' | 'avatar_url'> & {
@@ -46,6 +48,8 @@ export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
 export type Comment = {
   id: string;
   body: string;
+  /** URLs assinadas das imagens (até 4), na ordem. Falta em dados antigos/de teste. */
+  images?: string[];
   createdAt: string;
   author: Author;
   reactions: ReactionSummary[];
@@ -281,7 +285,7 @@ export async function listComments(postId: string): Promise<Comment[]> {
   const { data, error } = await supabase
     .from('comments')
     .select(
-      `id, body, created_at, author_id, author:profiles!comments_author_id_fkey(${AUTHOR_COLUMNS})`,
+      `id, body, images, created_at, author_id, author:profiles!comments_author_id_fkey(${AUTHOR_COLUMNS})`,
     )
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
@@ -289,6 +293,7 @@ export async function listComments(postId: string): Promise<Comment[]> {
   type Row = {
     id: string;
     body: string;
+    images?: string[] | null;
     created_at: string;
     author_id: string;
     author: Author | null;
@@ -296,13 +301,14 @@ export async function listComments(postId: string): Promise<Comment[]> {
   const rows = (data ?? []) as unknown as Row[];
   const [reactions, signed] = await Promise.all([
     commentReactionsMap(userId, rows.map((c) => c.id)),
-    signPaths(rows.map((c) => c.author?.avatar_url)),
+    signPaths(rows.flatMap((c) => [c.author?.avatar_url, ...(c.images ?? [])])),
   ]);
   return rows.map((c) => {
     const r = reactions.get(c.id) ?? NO_REACTIONS;
     return {
       id: c.id,
       body: c.body,
+      images: (c.images ?? []).map((p) => resolveUrl(p, signed)).filter((u): u is string => !!u),
       createdAt: c.created_at,
       author: mapAuthor(c.author, c.author_id, signed),
       reactions: r.reactions,
@@ -319,9 +325,11 @@ export async function deleteComment(commentId: string): Promise<void> {
     .delete()
     .eq('id', commentId)
     .eq('author_id', userId)
-    .select('id');
+    .select('id, images');
   if (error) throw error;
   if (!data || data.length === 0) throw new Error('Comentário não encontrado ou não é seu');
+  // as imagens somem do armazenamento junto (falhar aqui não desfaz o apagar)
+  await removeImages((data as { images?: string[] | null }[]).flatMap((c) => c.images ?? [])).catch(() => {});
 }
 
 /**
@@ -344,18 +352,31 @@ export async function deletePost(postId: string): Promise<void> {
   await removeImages([...new Set([...(images ?? []), ...(image_url ? [image_url] : [])])]);
 }
 
+/** Comenta com texto, até 4 imagens (foto ou GIF), ou os dois. */
 export async function addComment(
   postId: string,
   body: string,
+  imageUris: string[] = [],
 ): Promise<Tables<'comments'>> {
   const text = body.trim();
-  if (!text) throw new Error('Comentário vazio');
+  if (!text && imageUris.length === 0) throw new Error('Comentário vazio');
+  if (imageUris.length > MAX_COMMENT_IMAGES) throw new Error(`No máximo ${MAX_COMMENT_IMAGES} imagens por comentário`);
   const userId = await currentUserId();
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({ post_id: postId, author_id: userId, body: text })
-    .select()
-    .single();
-  if (error) throw error;
+
+  const results = await Promise.allSettled(imageUris.map((uri, i) => uploadImage(userId, uri, i)));
+  const paths = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) {
+    await removeImages(paths);
+    throw failed.reason;
+  }
+
+  // só texto: o insert é o de antes (funciona mesmo sem a migration 0022)
+  const row = { post_id: postId, author_id: userId, body: text, ...(paths.length > 0 ? { images: paths } : {}) };
+  const { data, error } = await supabase.from('comments').insert(row).select().single();
+  if (error) {
+    await removeImages(paths);
+    throw error;
+  }
   return data;
 }

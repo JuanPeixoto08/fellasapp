@@ -33,6 +33,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0019_lastfm_user.sql` | usuário do Last.fm no perfil (`profiles.lastfm_user`) | salvar perfil com Last.fm falha |
 | `0020_post_location.sql` | local nos posts: `posts.location` + `place_key` (gatilho), `place_suggestions` | postar com local, sugestões de local e página do local falham (post sem local funciona) |
 | `0021_stories.sql` | stories: `stories`, `story_views`, `story_reactions`, notificação `story_reaction`, limpeza de 24 h (linhas e, via função `stories-media`, arquivos no Cloudinary) | faixa e postar story falham. Antes: segredo `stories_cron_secret` no Vault e a função publicada |
+| `0022_comment_images.sql` | até 4 imagens por comentário: `comments.images` (caminhos no bucket `post-images`), comentário só com imagem passa a valer | abrir post falha (a lista de comentários pede `images`) |
 
 **Função `stories-media` (Edge Function)**: publique sempre com
 `npx supabase functions deploy stories-media --no-verify-jwt`. A função confere o login sozinha; já a limpeza

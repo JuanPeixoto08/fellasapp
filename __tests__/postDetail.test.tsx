@@ -11,6 +11,8 @@ import { emitLive, LIVE_DEBOUNCE_MS, type LiveChange } from '../lib/realtime';
 import { setMemberDirectory } from '../lib/memberDirectory';
 
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
+const mockPick = jest.fn();
+jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: (o: unknown) => mockPick(o) }));
 const mockBack = jest.fn();
 let mockMe = 'u9';
 jest.mock('expo-router', () => ({
@@ -50,6 +52,7 @@ jest.mock('../lib/api/posts', () => ({
     },
   ]),
   addComment: jest.fn(),
+  MAX_COMMENT_IMAGES: 4,
   toggleLike: jest.fn(),
   deletePost: jest.fn(),
   deleteComment: jest.fn(),
@@ -75,6 +78,7 @@ beforeEach(() => {
   deleteCommentMock.mockReset().mockResolvedValue(undefined);
   mockBack.mockClear();
   mockMe = 'u9';
+  mockPick.mockReset();
 });
 
 const SafeArea = ({ children }: { children: ReactNode }) => (
@@ -156,7 +160,7 @@ describe('PostDetailScreen', () => {
     await renderLoaded();
     await fireEvent.changeText(screen.getByLabelText('Comentar'), 'kkkk');
     await fireEvent.press(screen.getByLabelText('Enviar'));
-    await waitFor(() => expect(addCommentMock).toHaveBeenCalledWith('p1', 'kkkk'));
+    await waitFor(() => expect(addCommentMock).toHaveBeenCalledWith('p1', 'kkkk', []));
     await waitFor(() => expect(listCommentsMock).toHaveBeenCalledTimes(2));
     expect(getPostMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByDisplayValue('kkkk')).toBeNull();
@@ -344,5 +348,51 @@ describe('PostDetailScreen ao vivo', () => {
     await change('comment_reactions', 'INSERT', { comment_id: 'outro', user_id: 'u2' });
     await settle();
     expect(getPostMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe('imagens no comentário', () => {
+    const pick = (...uris: string[]) =>
+      mockPick.mockResolvedValueOnce({ canceled: false, assets: uris.map((uri) => ({ uri })) });
+
+    it('escolhe imagens, mostra as miniaturas e o ✕ tira uma', async () => {
+      pick('file://a.jpg', 'file://b.gif');
+      await renderLoaded();
+      await fireEvent.press(screen.getByLabelText('Adicionar imagens'));
+      expect(await screen.findByLabelText('Imagem 2 de 2')).toBeTruthy();
+      expect(mockPick).toHaveBeenCalledWith(expect.objectContaining({ mediaTypes: ['images'], selectionLimit: 4 }));
+      await fireEvent.press(screen.getByLabelText('Remover imagem 1'));
+      expect(screen.getByLabelText('Imagem 1 de 1').props.source).toEqual({ uri: 'file://b.gif' });
+    });
+
+    it('comentário só com imagem pode ser enviado; depois o campo e as miniaturas limpam', async () => {
+      addCommentMock.mockResolvedValueOnce({ id: 'c2' });
+      pick('file://a.jpg');
+      await renderLoaded();
+      expect(screen.getByLabelText('Enviar')).toBeDisabled();
+      await fireEvent.press(screen.getByLabelText('Adicionar imagens'));
+      await screen.findByLabelText('Imagem 1 de 1');
+      await fireEvent.press(screen.getByLabelText('Enviar'));
+      await waitFor(() => expect(addCommentMock).toHaveBeenCalledWith('p1', '', ['file://a.jpg']));
+      await waitFor(() => expect(screen.queryByLabelText('Imagem 1 de 1')).toBeNull());
+    });
+
+    it('com 4 imagens o botão trava; a mais escolhida fica de fora com aviso', async () => {
+      pick('file://1.jpg', 'file://2.jpg', 'file://3.jpg', 'file://4.jpg', 'file://5.jpg');
+      await renderLoaded();
+      await fireEvent.press(screen.getByLabelText('Adicionar imagens'));
+      expect(await screen.findByLabelText('Imagem 4 de 4')).toBeTruthy();
+      expect(screen.getByText('Cabem 4 imagens por comentário. Fiquei com as primeiras.')).toBeTruthy();
+      expect(screen.getByLabelText('Já tem 4 imagens')).toBeDisabled();
+    });
+
+    it('imagens de um comentário aparecem e abrem no visualizador', async () => {
+      const [base] = await listCommentsMock();
+      listCommentsMock.mockResolvedValueOnce([{ ...base, images: ['https://x/c1.jpg', 'https://x/c2.gif'] }]);
+      await renderLoaded();
+      await fireEvent.press(screen.getByLabelText('Imagem de Bia (2 de 2)'));
+      expect(await screen.findByText('2/2')).toBeTruthy();
+      await fireEvent.press(screen.getByLabelText('Fechar fotos'));
+      await waitFor(() => expect(screen.queryByText('2/2')).toBeNull());
+    });
   });
 });

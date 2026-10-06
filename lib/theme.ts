@@ -164,6 +164,9 @@ export const layout = {
   storySideScale: 0.45,
   /** Desfoque da imagem que preenche o story atrás de uma foto/vídeo que não é em pé. */
   storyBackdropBlur: 24,
+  /** Imagens de um comentário: largura máxima do bloco e lado da miniatura no campo de comentar. */
+  commentMediaWidth: 280,
+  commentThumb: 64,
   gutter: spacing.lg,
   minTouch: 44,
 } as const;

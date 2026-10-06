@@ -9,16 +9,19 @@ import { postTime } from '../../lib/format';
 import { MentionText } from '../MentionText';
 import { AuthorLink } from '../profile/AuthorLink';
 import { nextReaction } from '../../lib/reactionState';
+import { PostImages } from './PostImages';
 
 type Props = {
   comment: Comment;
   onReact?: (comment: Comment, emoji: string | null) => void;
   /** Só para comentários meus: mostra a lixeira e pede confirmação antes de chamar. */
   onDelete?: (comment: Comment) => Promise<void>;
+  /** Tocar numa imagem do comentário (abre o visualizador). */
+  onPressImage?: (comment: Comment, index: number) => void;
 };
 
 /** Comentário no mesmo desenho do post: sem caixa, data à direita, chips e carinha de reagir. */
-export function CommentItem({ comment, onReact, onDelete }: Props) {
+export function CommentItem({ comment, onReact, onDelete, onPressImage }: Props) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -64,12 +67,21 @@ export function CommentItem({ comment, onReact, onDelete }: Props) {
             accessibilityLabel={`Comentário de ${name}`}
             style={{ flex: 1 }}
           >
-            <MentionText text={comment.body} />
+            {comment.body ? <MentionText text={comment.body} /> : null}
           </Pressable>
           <View style={{ marginVertical: -t.spacing.sm, marginRight: -t.spacing.sm }}>
             <ReactButton myReaction={comment.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
           </View>
         </View>
+        {comment.images?.length ? (
+          <View style={{ maxWidth: t.layout.commentMediaWidth }}>
+            <PostImages
+              uris={comment.images}
+              alt={`Imagem de ${name}`}
+              onPressImage={onPressImage ? (i) => onPressImage(comment, i) : undefined}
+            />
+          </View>
+        ) : null}
         <ReactionBar reactions={comment.reactions} myReaction={comment.myReaction} onPressChip={react} />
         <ReactionPicker
           anchorRef={reactAnchor}

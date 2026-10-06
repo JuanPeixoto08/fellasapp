@@ -1,4 +1,4 @@
-import { createPost, deleteComment, deletePost, listComments, listFeed, toggleLike } from '../lib/api/posts';
+import { addComment, createPost, deleteComment, deletePost, listComments, listFeed, MAX_COMMENT_IMAGES, toggleLike } from '../lib/api/posts';
 import { clearSignedUrlCache } from '../lib/api/storage';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
@@ -349,5 +349,61 @@ describe('local no post', () => {
     mockResults['posts.select'] = { data: [], error: null };
     await listFeed({ place: 'bar do ze' });
     expect(mockCalls).toContainEqual({ table: 'posts', op: 'eq', args: ['place_key', 'bar do ze'] });
+  });
+});
+
+describe('imagens no comentário', () => {
+  beforeEach(() => {
+    mockUploaded.length = 0;
+    mockUploadFail = [];
+  });
+  const inserted = () => mockCalls.find((c) => c.table === 'comments' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+
+  it('até 4 imagens; sobem como as fotos do post e vão na ordem', async () => {
+    mockResults['comments.insert'] = { data: { id: 'c9' }, error: null };
+    await addComment('p1', 'olha isso', ['file://a.jpg', 'file://b.gif']);
+    expect(MAX_COMMENT_IMAGES).toBe(4);
+    expect(inserted()).toMatchObject({ post_id: 'p1', body: 'olha isso' });
+    // na ordem escolhida (o GIF sobe mais rápido, mas o comentário guarda pelo índice)
+    expect((inserted().images as string[]).map((p) => p.split('-').pop())).toEqual(['0.jpg', '1.gif']);
+  });
+
+  it('só imagem, sem texto, vale', async () => {
+    mockResults['comments.insert'] = { data: { id: 'c9' }, error: null };
+    await addComment('p1', '   ', ['file://a.jpg']);
+    expect(inserted()).toMatchObject({ body: '', images: [mockUploaded[0]] });
+  });
+
+  it('só texto: o insert é o de antes (sem a coluna das imagens)', async () => {
+    mockResults['comments.insert'] = { data: { id: 'c9' }, error: null };
+    await addComment('p1', 'oi');
+    expect(inserted()).toEqual({ post_id: 'p1', author_id: 'me', body: 'oi' });
+  });
+
+  it('vazio ou mais de 4 é recusado antes de subir', async () => {
+    await expect(addComment('p1', '  ')).rejects.toThrow();
+    await expect(addComment('p1', 'x', ['1', '2', '3', '4', '5'])).rejects.toThrow(/4 imagens/);
+    expect(mockUploaded).toEqual([]);
+  });
+
+  it('o banco recusou: as imagens que subiram são apagadas', async () => {
+    mockResults['comments.insert'] = { data: null, error: { message: 'caiu' } };
+    await expect(addComment('p1', 'x', ['file://a.jpg'])).rejects.toMatchObject({ message: 'caiu' });
+    expect(mockRemoved).toEqual(mockUploaded);
+  });
+
+  it('a lista traz as imagens assinadas', async () => {
+    mockResults['comments.select'] = {
+      data: [{ id: 'c1', body: '', created_at: 't', author_id: 'u1', author: null, images: ['u1/1-0.jpg'] }],
+      error: null,
+    };
+    const [c] = await listComments('p1');
+    expect(c.images).toEqual(['https://signed/u1/1-0.jpg']);
+  });
+
+  it('apagar o comentário apaga as imagens dele', async () => {
+    mockResults['comments.delete'] = { data: [{ id: 'c1', images: ['me/1-0.jpg', 'me/1-1.gif'] }], error: null };
+    await deleteComment('c1');
+    expect(mockRemoved).toEqual(['me/1-0.jpg', 'me/1-1.gif']);
   });
 });

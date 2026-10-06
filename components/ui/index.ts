@@ -8,6 +8,7 @@ export { Emoji, type EmojiProps } from './Emoji';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Icon, type IconName, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { ImageThumbs, type ImageThumbsProps } from './ImageThumbs';
 export { interactiveStyle } from './interactive';
 export { Logo, type LogoProps } from './Logo';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';

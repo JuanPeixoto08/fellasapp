@@ -313,6 +313,8 @@ export type Database = {
           post_id: string;
           author_id: string;
           body: string;
+          /** Caminhos das imagens (até 4), na ordem; vazio em comentário só de texto. */
+          images: string[];
           created_at: string;
         };
         Insert: {
@@ -320,6 +322,7 @@ export type Database = {
           post_id: string;
           author_id: string;
           body: string;
+          images?: string[];
           created_at?: string;
         };
         Update: {
@@ -327,6 +330,7 @@ export type Database = {
           post_id?: string;
           author_id?: string;
           body?: string;
+          images?: string[];
           created_at?: string;
         };
         Relationships: [

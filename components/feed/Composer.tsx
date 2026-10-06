@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { createPost, MAX_IMAGES } from '../../lib/api/posts';
 import { clearDraft, setDraft, useDraft } from '../../lib/composerDraft';
@@ -18,7 +18,7 @@ import { TagSuggestions } from '../TagSuggestions';
 import { PlaceChip } from '../places/PlaceChip';
 import { PlaceField } from '../places/PlaceField';
 import { useContentWidth } from '../shell/ShellContext';
-import { Avatar, Button, ConfirmDialog, Icon, IconButton, Text, useAutoGrow } from '../ui';
+import { Avatar, Button, ConfirmDialog, IconButton, ImageThumbs, Text, useAutoGrow } from '../ui';
 
 /** Mesmo limite do check posts_body_check (0001). */
 const MAX_BODY = 2000;
@@ -210,47 +210,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             }}
           />
         ) : null}
-        {imageUris.length > 0 ? (
-          <View style={{ flexDirection: 'row', gap: t.spacing.sm }}>
-            {imageUris.map((uri, i) => (
-              <View key={uri} style={{ width: thumb, height: thumb }}>
-                <Image
-                  source={{ uri }}
-                  accessibilityLabel={`Foto ${i + 1} de ${imageUris.length}`}
-                  style={{ width: '100%', height: '100%', borderRadius: t.radii.md, backgroundColor: t.colors.surfaceSunken }}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remover foto ${i + 1}`}
-                  disabled={saving}
-                  onPress={() => setDraft((d) => ({ ...d, imageUris: d.imageUris.filter((_, j) => j !== i) }))}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: t.layout.minTouch,
-                    height: t.layout.minTouch,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: t.layout.chipHeight,
-                      height: t.layout.chipHeight,
-                      borderRadius: t.radii.pill,
-                      backgroundColor: t.colors.overlay,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon name="close" size="sm" color={t.colors.onOverlay} />
-                  </View>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        <ImageThumbs
+          uris={imageUris}
+          size={thumb}
+          noun="foto"
+          disabled={saving}
+          onRemove={(i) => setDraft((d) => ({ ...d, imageUris: d.imageUris.filter((_, j) => j !== i) }))}
+        />
         {location && !placeOpen ? (
           <PlaceChip
             location={location}

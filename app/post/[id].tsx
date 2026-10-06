@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
@@ -8,12 +9,13 @@ import { MentionSuggestions } from '../../components/MentionSuggestions';
 import { PhotoViewer } from '../../components/feed/PhotoViewer';
 import { PostCard } from '../../components/PostCard';
 import { stackHeader } from '../../components/profile/headerOptions';
-import { Avatar, EmptyState, IconButton, Screen, Text, TextField } from '../../components/ui';
+import { Avatar, EmptyState, IconButton, ImageThumbs, Screen, Text, TextField } from '../../components/ui';
 import {
   addComment,
   deleteComment,
   getPost,
   listComments,
+  MAX_COMMENT_IMAGES,
   toggleLike,
   type Comment,
   type FeedPost,
@@ -22,6 +24,7 @@ import { setCommentReaction, setPostReaction } from '../../lib/api/reactions';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { friendlyError } from '../../lib/errors';
 import { activeMention, insertMention } from '../../lib/mentions';
+import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { withLike, withReaction } from '../../lib/reactionState';
 import { debounce, LIVE_DEBOUNCE_MS, onLive, postIdOf, type LiveEvent } from '../../lib/realtime';
 import { useTheme } from '../../lib/theme';
@@ -46,6 +49,32 @@ export default function PostDetailScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // imagens do comentário (galeria ou Ctrl+V), até MAX_COMMENT_IMAGES
+  const [images, setImages] = useState<string[]>([]);
+  const room = MAX_COMMENT_IMAGES - images.length;
+  const addImages = (picked: string[]) => {
+    const { uris, overflow } = addPasted(images, picked, MAX_COMMENT_IMAGES);
+    setImages(uris);
+    setSendError(overflow ? `Cabem ${MAX_COMMENT_IMAGES} imagens por comentário. Fiquei com as primeiras.` : null);
+  };
+  usePasteImages(commentInput, (uris) => {
+    if (!sending) addImages(uris);
+  });
+  const pickImages = async () => {
+    setSendError(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        // sem compressão aqui: reduz uma vez só, no envio (GIF sobe como está)
+        quality: 1,
+        allowsMultipleSelection: room > 1,
+        selectionLimit: room,
+      });
+      if (!result.canceled) addImages(result.assets.map((a) => a.uri));
+    } catch {
+      setSendError('Não consegui abrir suas fotos. Confere a permissão do app e tenta de novo.');
+    }
+  };
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -130,7 +159,8 @@ export default function PostDetailScreen() {
     });
   };
 
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // visualizador: fotos do post ou imagens de um comentário
+  const [viewer, setViewer] = useState<{ uris: string[]; index: number; alt: string } | null>(null);
 
   const onDelete = async (p: FeedPost) => {
     await removePost(p.id);
@@ -171,12 +201,13 @@ export default function PostDetailScreen() {
   };
 
   const send = async () => {
-    if (sending || !text.trim()) return;
+    if (sending || (!text.trim() && images.length === 0)) return;
     setSending(true);
     setSendError(null);
     try {
-      await addComment(id, text);
+      await addComment(id, text, images);
       setText('');
+      setImages([]);
       setPost((cur) => (cur ? { ...cur, commentCount: cur.commentCount + 1 } : cur));
       emitCommentCountChanged(id, 1);
       // só os comentários: o post já está na tela e não precisa ser buscado (nem assinado) de novo
@@ -220,7 +251,9 @@ export default function PostDetailScreen() {
                   post={post}
                   onToggleLike={onLike}
                   onReact={onReactPost}
-                  onPressImage={(_, i) => setViewerIndex(i)}
+                  onPressImage={(p, i) =>
+                    setViewer({ uris: p.images, index: i, alt: `Foto postada por ${p.author.display_name || p.author.username}` })
+                  }
                   onDelete={post.author.id === myId ? onDelete : undefined}
                 />
               </View>
@@ -244,6 +277,9 @@ export default function PostDetailScreen() {
               comment={item}
               onReact={onReactComment}
               onDelete={item.author.id === myId ? onDeleteComment : undefined}
+              onPressImage={(c, i) =>
+                setViewer({ uris: c.images ?? [], index: i, alt: `Imagem de ${c.author.display_name || c.author.username}` })
+              }
             />
           )}
         />
@@ -274,6 +310,13 @@ export default function PostDetailScreen() {
               }}
             />
           ) : null}
+          <ImageThumbs
+            uris={images}
+            size={t.layout.commentThumb}
+            noun="imagem"
+            disabled={sending}
+            onRemove={(i) => setImages((cur) => cur.filter((_, j) => j !== i))}
+          />
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: t.spacing.sm }}>
             {/* avatar centrado na altura de uma linha do campo (44) */}
             <View style={{ height: t.layout.minTouch, justifyContent: 'center' }}>
@@ -299,23 +342,23 @@ export default function PostDetailScreen() {
               />
             </View>
             <IconButton
+              icon="image-outline"
+              variant="ghost"
+              accessibilityLabel={room > 0 ? 'Adicionar imagens' : `Já tem ${MAX_COMMENT_IMAGES} imagens`}
+              onPress={pickImages}
+              disabled={room === 0 || sending}
+            />
+            <IconButton
               icon="arrow-up"
               variant="solid"
               accessibilityLabel="Enviar"
               onPress={send}
-              disabled={!text.trim() || sending}
+              disabled={(!text.trim() && images.length === 0) || sending}
             />
           </View>
         </View>
       </KeyboardAvoidingView>
-      {post && viewerIndex !== null ? (
-        <PhotoViewer
-          uris={post.images}
-          index={viewerIndex}
-          onClose={() => setViewerIndex(null)}
-          alt={`Foto postada por ${post.author.display_name || post.author.username}`}
-        />
-      ) : null}
+      {viewer ? <PhotoViewer uris={viewer.uris} index={viewer.index} alt={viewer.alt} onClose={() => setViewer(null)} /> : null}
     </Screen>
   );
 }
