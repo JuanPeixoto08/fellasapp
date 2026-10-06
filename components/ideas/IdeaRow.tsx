@@ -13,7 +13,7 @@ export function IdeaRow({ idea, canDelete, onVote, onDelete }: Props) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: t.spacing.sm, paddingVertical: t.spacing.sm }}>
-      <VoteColumn score={idea.score} myVote={idea.myVote} onVote={onVote} />
+      <VoteColumn score={idea.score} myVote={idea.myVote} onVote={onVote} context={idea.body} />
       <View style={{ flex: 1, gap: t.spacing.sm, paddingTop: t.spacing.md }}>
         <Text>{idea.body}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>

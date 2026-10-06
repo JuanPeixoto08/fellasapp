@@ -32,6 +32,13 @@ describe('VoteColumn', () => {
     expect(onVote).toHaveBeenCalledWith(-1);
   });
 
+  it('setas dizem de qual ideia são (leitor de tela)', async () => {
+    await render(<VoteColumn score={1} myVote={null} onVote={() => {}} context="Modo escuro automático" />);
+    expect(screen.getByRole('button', { name: 'Votar a favor' }).props.accessibilityHint).toBe(
+      'Ideia: Modo escuro automático',
+    );
+  });
+
   it('sem voto e pontuação negativa', async () => {
     await render(<VoteColumn score={-3} myVote={null} onVote={() => {}} />);
     expect(screen.getByText('−3')).toBeTruthy();

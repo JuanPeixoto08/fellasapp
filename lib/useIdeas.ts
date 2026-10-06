@@ -5,6 +5,9 @@ import { applyVote, type Idea, type IdeaSort } from './ideas';
 import { useMemberDirectory } from './memberDirectory';
 import { debounce, LIVE_DEBOUNCE_MS, onLive } from './realtime';
 
+/** Quanto tempo o aviso curto (voto recusado, lista que não atualizou) fica na tela. */
+export const NOTICE_MS = 4000;
+
 /**
  * Estado do mural de ideias. Voto é otimista (muda na hora, volta se o banco recusar) e não reordena
  * a lista: a ordem da aba Top se ajusta no próximo carregamento, para a linha não fugir do dedo.
@@ -14,7 +17,7 @@ export function useIdeas(userId: string | undefined) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [voteError, setVoteError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const ideasRef = useRef(ideas);
   ideasRef.current = ideas;
@@ -29,8 +32,11 @@ export function useIdeas(userId: string | undefined) {
   /** Chegou lista do banco com voto meu ainda indo: confere de novo quando os votos terminarem. */
   const stale = useRef(false);
 
-  /** `silent`: atualização ao vivo/depois de mandar, sem piscar o carregando nem trocar a lista por erro. */
-  const load = useCallback((silent: boolean) => {
+  /**
+   * `silent`: atualização ao vivo/depois de mandar, sem piscar o carregando nem trocar a lista por erro.
+   * `onSilentError`: quem pediu quer saber se a atualização silenciosa falhou.
+   */
+  const load = useCallback((silent: boolean, onSilentError?: (e: unknown) => void) => {
     const id = ++requestId.current;
     if (!silent) {
       showing.current = true;
@@ -52,7 +58,9 @@ export function useIdeas(userId: string | undefined) {
         setIdeas(list);
       })
       .catch((e) => {
-        if (id === requestId.current && showing.current) setError(ideaErrorMessage(e, 'load'));
+        if (id !== requestId.current) return;
+        if (showing.current) setError(ideaErrorMessage(e, 'load'));
+        else onSilentError?.(e);
       })
       .finally(() => {
         if (id === requestId.current && showing.current) {
@@ -63,6 +71,12 @@ export function useIdeas(userId: string | undefined) {
   }, []);
 
   const reload = useCallback(() => load(false), [load]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     load(false);
@@ -90,12 +104,12 @@ export function useIdeas(userId: string | undefined) {
       const patch = (values: Pick<Idea, 'score' | 'myVote'>) =>
         setIdeas((list) => list.map((i) => (i.id === ideaId ? { ...i, ...values } : i)));
       patch(next);
-      setVoteError(null);
+      setNotice(null);
       pending.current.add(ideaId);
       voteIdea(ideaId, userId, next.myVote)
         .catch((e) => {
           patch({ score: before.score, myVote: before.myVote });
-          setVoteError(ideaErrorMessage(e, 'vote'));
+          setNotice(ideaErrorMessage(e, 'vote'));
         })
         .finally(() => {
           pending.current.delete(ideaId);
@@ -112,13 +126,24 @@ export function useIdeas(userId: string | undefined) {
     async (text: string) => {
       if (!userId) return;
       await createIdea(text, userId);
-      load(true);
+      // a ideia foi; se só a lista não vier, avisa em vez de parecer que nada aconteceu
+      load(true, (e) => setNotice(ideaErrorMessage(e, 'refresh')));
     },
     [userId, load],
   );
 
   const remove = useCallback(async (ideaId: string) => {
-    await deleteIdea(ideaId);
+    try {
+      await deleteIdea(ideaId);
+    } catch (e) {
+      // o banco não apagou: se a ideia já tinha sumido (outra pessoa apagou), conta como apagada
+      const fresh = await fetchIdeas(sortRef.current).catch(() => null);
+      if (fresh && !fresh.some((i) => i.id === ideaId)) {
+        setIdeas(fresh);
+        return;
+      }
+      throw e;
+    }
     setIdeas((list) => list.filter((i) => i.id !== ideaId));
   }, []);
 
@@ -132,5 +157,5 @@ export function useIdeas(userId: string | undefined) {
     });
   }, [ideas, directory]);
 
-  return { sort, setSort, ideas: shown, loading, error, voteError, reload, vote, create, remove };
+  return { sort, setSort, ideas: shown, loading, error, notice, reload, vote, create, remove };
 }

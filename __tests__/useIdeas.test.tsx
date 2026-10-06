@@ -16,7 +16,7 @@ jest.mock('../lib/api/ideas', () => ({
 
 import { setMemberDirectory } from '../lib/memberDirectory';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
-import { useIdeas } from '../lib/useIdeas';
+import { NOTICE_MS, useIdeas } from '../lib/useIdeas';
 
 const idea = (over: Partial<Idea> = {}): Idea => ({
   id: 'i1',
@@ -63,7 +63,7 @@ describe('useIdeas', () => {
     const { result } = await loaded();
     await act(async () => result.current.vote('i1', -1));
     await waitFor(() => expect(result.current.ideas[0]).toMatchObject({ myVote: null, score: 3 }));
-    expect(result.current.voteError).toBe('erro:vote');
+    expect(result.current.notice).toBe('erro:vote');
   });
 
   it('toques seguidos na mesma ideia enquanto o voto está indo são ignorados', async () => {
@@ -164,5 +164,47 @@ describe('useIdeas', () => {
       setMemberDirectory([{ id: 'u2', username: 'bia', name: 'Bia', avatarUrl: 'https://signed/b.jpg' }]),
     );
     expect(result.current.ideas[0].author).toEqual({ id: 'u2', name: 'Bia', avatarUrl: 'https://signed/b.jpg' });
+  });
+
+  it('o aviso some sozinho depois de uns segundos', async () => {
+    mockVote.mockRejectedValue(new Error('boom'));
+    const { result } = await loaded();
+    jest.useFakeTimers();
+    try {
+      await act(async () => result.current.vote('i1', 1));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.notice).toBe('erro:vote');
+      await act(async () => {
+        jest.advanceTimersByTime(NOTICE_MS + 10);
+      });
+      expect(result.current.notice).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ideia mandada mas a lista não atualizou: avisa', async () => {
+    const { result } = await loaded();
+    mockFetch.mockRejectedValueOnce(new Error('caiu'));
+    await act(async () => result.current.create('bora'));
+    await waitFor(() => expect(result.current.notice).toBe('erro:refresh'));
+  });
+
+  it('apagar ideia que já tinha sumido conta como apagada', async () => {
+    const { result } = await loaded();
+    mockDelete.mockRejectedValue(new Error('0 linhas'));
+    mockFetch.mockResolvedValueOnce([]);
+    await act(async () => result.current.remove('i1'));
+    expect(result.current.ideas).toEqual([]);
+  });
+
+  it('apagar barrado com a ideia ainda lá: o erro sobe pro diálogo', async () => {
+    const { result } = await loaded();
+    mockDelete.mockRejectedValue(new Error('não é sua'));
+    mockFetch.mockResolvedValueOnce([idea()]);
+    await expect(act(async () => result.current.remove('i1'))).rejects.toThrow('não é sua');
+    expect(result.current.ideas).toHaveLength(1);
   });
 });

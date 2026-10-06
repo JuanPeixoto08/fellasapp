@@ -23,7 +23,7 @@ export default function IdeasScreen() {
   const { session, profile } = useSession();
   const me = session?.user.id;
   const isAdmin = !!profile?.is_admin;
-  const { sort, setSort, ideas, loading, error, voteError, reload, vote, create, remove } = useIdeas(me);
+  const { sort, setSort, ideas, loading, error, notice, reload, vote, create, remove } = useIdeas(me);
 
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -64,9 +64,9 @@ export default function IdeasScreen() {
         <Button title="Mandar" onPress={() => void send()} loading={sending} disabled={!validateIdea(text)} />
       </View>
       <Tabs items={TABS} value={sort} onChange={setSort} />
-      {voteError ? (
-        <Text variant="small" tone="danger" accessibilityRole="alert">
-          {voteError}
+      {notice ? (
+        <Text variant="small" tone="danger" accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {notice}
         </Text>
       ) : null}
     </View>

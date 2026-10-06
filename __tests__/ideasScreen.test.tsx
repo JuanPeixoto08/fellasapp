@@ -15,7 +15,7 @@ const mockHook = {
   ideas: [] as Idea[],
   loading: false,
   error: null as string | null,
-  voteError: null as string | null,
+  notice: null as string | null,
   reload: jest.fn(),
   vote: jest.fn(),
   create: jest.fn(),
@@ -45,7 +45,7 @@ const idea = (over: Partial<Idea>): Idea => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockProfile = { is_member: true, is_admin: false };
-  Object.assign(mockHook, { ideas: [], loading: false, error: null, voteError: null, sort: 'top' });
+  Object.assign(mockHook, { ideas: [], loading: false, error: null, notice: null, sort: 'top' });
   mockHook.create.mockResolvedValue(undefined);
   mockHook.remove.mockResolvedValue(undefined);
 });
@@ -99,8 +99,19 @@ describe('Tela Ideias', () => {
     await waitFor(() => expect(mockHook.remove).toHaveBeenCalledWith('a'));
   });
 
+  it('apagar que falha mostra o erro dentro do diálogo e a ideia fica', async () => {
+    mockProfile = { is_member: true, is_admin: true };
+    mockHook.ideas = [idea({ id: 'a', body: 'Enquete' })];
+    mockHook.remove.mockRejectedValue(new Error('não é sua'));
+    await open();
+    await fireEvent.press(screen.getByRole('button', { name: 'Apagar ideia' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Apagar' }));
+    expect(await screen.findByText('Não deu pra apagar a ideia. Tenta de novo.')).toBeTruthy();
+    expect(screen.getByText('Enquete')).toBeTruthy();
+  });
+
   it('voto recusado aparece como aviso', async () => {
-    mockHook.voteError = 'Não deu pra votar. Tenta de novo.';
+    mockHook.notice = 'Não deu pra votar. Tenta de novo.';
     await open();
     expect(screen.getByText('Não deu pra votar. Tenta de novo.')).toBeTruthy();
   });

@@ -4,10 +4,16 @@ import { formatScore, type Vote } from '../../lib/ideas';
 import { useTheme } from '../../lib/theme';
 import { Icon, interactiveStyle, Text } from '../ui';
 
-type Props = { score: number; myVote: Vote; onVote: (tapped: 1 | -1) => void };
+type Props = {
+  score: number;
+  myVote: Vote;
+  onVote: (tapped: 1 | -1) => void;
+  /** Texto da ideia: o leitor de tela diz de qual ideia é cada seta. */
+  context?: string;
+};
 
 /** ▲ pontuação ▼ do mural de ideias. Meu voto: seta e número em `brand`. */
-export function VoteColumn({ score, myVote, onVote }: Props) {
+export function VoteColumn({ score, myVote, onVote, context }: Props) {
   const t = useTheme();
   const arrow = (dir: 1 | -1) => {
     const on = myVote === dir;
@@ -16,6 +22,7 @@ export function VoteColumn({ score, myVote, onVote }: Props) {
         accessibilityRole="button"
         accessibilityLabel={dir === 1 ? 'Votar a favor' : 'Votar contra'}
         accessibilityState={{ selected: on }}
+        accessibilityHint={context ? `Ideia: ${context}` : undefined}
         onPress={() => onVote(dir)}
         style={(state) => ({
           width: t.layout.minTouch,

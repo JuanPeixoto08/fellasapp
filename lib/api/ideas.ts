@@ -7,13 +7,14 @@ import { supabase } from '../supabase';
 // o cliente do Supabase não é tipado pelo Database: as linhas da função vêm daqui
 type FeedRow = Database['public']['Functions']['ideas_feed']['Returns'][number];
 
-export type IdeaAction = 'load' | 'create' | 'vote' | 'remove';
+export type IdeaAction = 'load' | 'create' | 'vote' | 'remove' | 'refresh';
 
 export const IDEA_ERRORS: Record<IdeaAction, string> = {
   load: 'Pode ter sido a conexão. Tenta de novo daqui a pouco.',
   create: 'Não deu pra mandar a ideia. Tenta de novo.',
   vote: 'Não deu pra votar. Tenta de novo.',
   remove: 'Não deu pra apagar a ideia. Tenta de novo.',
+  refresh: 'Sua ideia foi! Só a lista que não atualizou: troca de aba pra ver.',
 };
 
 const toVote = (v: number | null): Vote => (v === 1 || v === -1 ? v : null);
