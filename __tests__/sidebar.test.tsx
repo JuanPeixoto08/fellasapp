@@ -38,6 +38,7 @@ describe('activeNavItem', () => {
     ['/post/123', null],
     ['/new', null],
     ['/notifications', 'notifications'],
+    ['/ideas', 'ideas'],
   ] as const)('%s → %s', (path, key) => {
     expect(activeNavItem(path)).toBe(key);
   });
@@ -72,6 +73,14 @@ describe('Sidebar', () => {
     expect(labels.indexOf('Notificações, 2 novas')).toBe(labels.indexOf('Feed') + 1);
     await fireEvent.press(item);
     expect(mockNavigate).toHaveBeenCalledWith('/notifications');
+  });
+
+  it('Ideias depois de Membros e navega', async () => {
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    const labels = screen.getAllByRole('link').map((el) => el.props.accessibilityLabel);
+    expect(labels.indexOf('Ideias')).toBe(labels.indexOf('Membros') + 1);
+    await fireEvent.press(screen.getByLabelText('Ideias'));
+    expect(mockNavigate).toHaveBeenCalledWith('/ideas');
   });
 
   it('medium: só ícones (sem nomes) e Postar redondo', async () => {
