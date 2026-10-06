@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { Composer } from '../../components/feed/Composer';
@@ -23,43 +23,56 @@ export default function FeedScreen() {
   const { posts, newPosts, showNewPosts, loading, refreshing, error, refresh, reload, loadMore, like, react } =
     usePostList();
   const list = useRef<FlatList<FeedPost>>(null);
+  // o aviso de posts novos fica entre o topo do feed e os posts; quando esse topo sai da tela, ele flutua
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const openNewPosts = () => {
+    showNewPosts();
+    list.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
   return (
     <Screen flush>
       <FlatList
         ref={list}
+        testID="feed-list"
         data={posts}
+        onScroll={(e) => setScrolledPast(headerHeight > 0 && e.nativeEvent.contentOffset.y > headerHeight)}
+        scrollEventThrottle={16}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ paddingBottom: t.spacing.xl }}
         ItemSeparatorComponent={Divider}
         ListHeaderComponent={
-          tier === 'compact' ? (
-            <View
-              style={{
-                paddingHorizontal: t.layout.gutter,
-                // o sino (alvo de 44) já dá o respiro de cima
-                paddingTop: t.spacing.sm,
-                paddingBottom: t.spacing.sm,
-                borderBottomWidth: t.borders.hairline,
-                borderColor: t.colors.border,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View accessibilityRole="header">
-                  <Logo height={t.layout.logoHeight.sm} />
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <IdeasButton />
-                  <NotificationsBell />
+          <View testID="feed-header" onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+            {tier === 'compact' ? (
+              <View
+                style={{
+                  paddingHorizontal: t.layout.gutter,
+                  // o sino (alvo de 44) já dá o respiro de cima
+                  paddingTop: t.spacing.sm,
+                  paddingBottom: t.spacing.sm,
+                  borderBottomWidth: t.borders.hairline,
+                  borderColor: t.colors.border,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View accessibilityRole="header">
+                    <Logo height={t.layout.logoHeight.sm} />
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <IdeasButton />
+                    <NotificationsBell />
+                  </View>
                 </View>
               </View>
-            </View>
-          ) : (
-            // desktop: o logo está na lateral; a coluna começa pelo compositor
-            <View style={{ borderBottomWidth: t.borders.hairline, borderColor: t.colors.border }}>
-              <Composer variant="inline" />
-            </View>
-          )
+            ) : (
+              // desktop: o logo está na lateral; a coluna começa pelo compositor
+              <View style={{ borderBottomWidth: t.borders.hairline, borderColor: t.colors.border }}>
+                <Composer variant="inline" />
+              </View>
+            )}
+            {scrolledPast ? null : <NewPostsPill count={newPosts} onPress={openNewPosts} />}
+          </View>
         }
         renderItem={({ item }) => (
           <PostCard
@@ -108,13 +121,7 @@ export default function FeedScreen() {
           ) : null
         }
       />
-      <NewPostsPill
-        count={newPosts}
-        onPress={() => {
-          showNewPosts();
-          list.current?.scrollToOffset({ offset: 0, animated: true });
-        }}
-      />
+      {scrolledPast ? <NewPostsPill count={newPosts} onPress={openNewPosts} floating /> : null}
     </Screen>
   );
 }
