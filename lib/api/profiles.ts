@@ -53,6 +53,9 @@ export type UpdateProfileInput = {
   username: string;
   bio: string;
   avatarUri?: string;
+  /** Banner novo (já recortado 3:1); `removeBanner` tira o atual. */
+  bannerUri?: string;
+  removeBanner?: boolean;
   /** Campos extras: string vazia vira null; undefined não altera. */
   status?: string | null;
   location?: string | null;
@@ -91,6 +94,16 @@ export function formatBirthday(iso: string | null | undefined): string {
 
 const emptyToNull = (v: string | null): string | null => (v?.trim() ? v.trim() : null);
 
+/** Sobe a foto num caminho novo a cada troca (o link assinado em cache não mostra a antiga). */
+async function uploadProfileImage(userId: string, kind: 'avatar' | 'banner', uri: string): Promise<string> {
+  const blob = await (await fetch(uri)).blob();
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${userId}/${kind}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+  if (error) throw error;
+  return path;
+}
+
 export async function updateMyProfile(input: UpdateProfileInput): Promise<Profile> {
   const username = input.username.trim().toLowerCase();
   const invalid = validateUsername(username);
@@ -113,16 +126,9 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (input.location !== undefined) fields.location = emptyToNull(input.location);
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
 
-  if (input.avatarUri) {
-    const blob = await (await fetch(input.avatarUri)).blob();
-    const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-    const path = `${userId}/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, blob, { contentType: blob.type || 'image/jpeg' });
-    if (upErr) throw upErr;
-    fields.avatar_url = path;
-  }
+  if (input.avatarUri) fields.avatar_url = await uploadProfileImage(userId, 'avatar', input.avatarUri);
+  if (input.bannerUri) fields.banner_url = await uploadProfileImage(userId, 'banner', input.bannerUri);
+  else if (input.removeBanner) fields.banner_url = null;
 
   const { data, error } = await supabase
     .from('profiles')

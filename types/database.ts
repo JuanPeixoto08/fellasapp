@@ -104,6 +104,7 @@ export type Database = {
           username: string;
           display_name: string | null;
           avatar_url: string | null;
+          banner_url: string | null;
           bio: string | null;
           status: string | null;
           location: string | null;
@@ -119,6 +120,7 @@ export type Database = {
           username: string;
           display_name?: string | null;
           avatar_url?: string | null;
+          banner_url?: string | null;
           bio?: string | null;
           status?: string | null;
           location?: string | null;
@@ -134,6 +136,7 @@ export type Database = {
           username?: string;
           display_name?: string | null;
           avatar_url?: string | null;
+          banner_url?: string | null;
           bio?: string | null;
           status?: string | null;
           location?: string | null;

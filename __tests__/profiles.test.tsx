@@ -167,6 +167,22 @@ describe('updateMyProfile', () => {
     expect(mockUpdate.mock.calls[0][0].avatar_url).toBe(mockUpload.mock.calls[0][0]);
   });
 
+  it('faz upload do banner e salva o caminho', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      blob: () => Promise.resolve({ type: 'image/jpeg' }),
+    });
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', bannerUri: 'file://praia.jpg' });
+    expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/banner-\d+\.jpg$/);
+    expect(mockUpdate.mock.calls[0][0].banner_url).toBe(mockUpload.mock.calls[0][0]);
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty('avatar_url');
+  });
+
+  it('tirar o banner grava null sem subir nada', async () => {
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', removeBanner: true });
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(mockUpdate.mock.calls[0][0].banner_url).toBeNull();
+  });
+
   it('rejeita nome acima de 50 e bio acima de 160 sem chamar o banco', async () => {
     expect(PROFILE_LIMITS).toEqual({ displayName: 50, bio: 160 });
     await expect(updateMyProfile({ display_name: 'a'.repeat(51), username: 'ana_01', bio: '' })).rejects.toThrow(
