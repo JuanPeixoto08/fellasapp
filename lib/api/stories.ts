@@ -1,11 +1,14 @@
-import { STORIES_URL } from '../storiesConfig';
+import { Platform } from 'react-native';
+
+import { storyMediaUrl, storyOriginalUrl } from '../cloudinary';
+import { STORIES_FUNCTION_URL } from '../storiesConfig';
 import { supabase } from '../supabase';
 import { isValidReactionEmoji } from './reactions';
 import { getCurrentUserId } from './profiles';
 import { resolveUrl, signPaths } from './storage';
 
 export type StoryKind = 'photo' | 'video';
-export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null };
+export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; /** Original: toca enquanto a versão reduzida do vídeo ainda processa. */ originalUrl?: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null };
 export type StoryAuthor = { id: string; name: string; username: string; avatarUrl: string | null };
 export type StoryGroup = { author: StoryAuthor; stories: Story[]; hasUnseen: boolean; latestAt: string };
 export type StoryViewer = { person: StoryAuthor; viewedAt: string; emoji: string | null };
@@ -17,46 +20,90 @@ export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 /** Erro de envio com mensagem pt-BR pronta para a tela (o resto passa por friendlyError). */
 export class StoryUploadError extends Error {}
 
-const UPLOAD_ERRORS: Record<number, string> = {
+const SIGN_ERRORS: Record<number, string> = {
   401: 'Sua sessão expirou. Entra de novo.',
   403: 'Só fellas podem postar story.',
-  413: 'Arquivo grande demais: foto até 5 MB, vídeo até 50 MB.',
-  415: 'Esse tipo de arquivo não rola. Usa foto ou vídeo.',
 };
+const OFFLINE = 'Sem conexão. Confere a internet e tenta de novo.';
+const GENERIC = 'Não rolou enviar. Tenta de novo.';
+export const STORY_LIMIT_MESSAGE = 'Os stories bateram o limite do mês. Volta dia 1.';
 
-/** Manda o arquivo para o Worker (R2) com o login; devolve o link secreto. */
-export async function uploadStoryMedia(uri: string): Promise<{ url: string; contentType: string }> {
-  const blob = await (await fetch(uri)).blob();
-  const contentType = blob.type || 'application/octet-stream';
+type Signed = { uploadUrl: string; fields: Record<string, string> };
+type Uploaded = { public_id: string; duration?: number };
+
+async function sessionToken(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) throw new StoryUploadError(UPLOAD_ERRORS[401]);
-  let res: Response;
-  try {
-    res = await fetch(`${STORIES_URL}/upload`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
-      body: blob,
-    });
-  } catch {
-    // sem rede (ou o Worker caiu sem responder): o navegador só diz "Failed to fetch"
-    throw new StoryUploadError('Sem conexão. Confere a internet e tenta de novo.');
-  }
-  if (!res.ok) throw new StoryUploadError(UPLOAD_ERRORS[res.status] ?? 'Não rolou enviar. Tenta de novo.');
-  const { url } = (await res.json()) as { url: string };
-  return { url, contentType };
+  if (!token) throw new StoryUploadError(SIGN_ERRORS[401]);
+  return token;
 }
 
-export async function createStory(input: { kind: StoryKind; mediaUrl: string; durationMs: number }): Promise<void> {
+/** Chama a função dos stories com o login; rede caída vira mensagem pt-BR. */
+async function callFunction(route: 'sign' | 'delete', token: string, body: unknown): Promise<Response> {
+  try {
+    return await fetch(`${STORIES_FUNCTION_URL}/${route}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new StoryUploadError(OFFLINE);
+  }
+}
+
+async function signUpload(token: string, kind: StoryKind): Promise<Signed> {
+  const res = await callFunction('sign', token, { kind });
+  if (!res.ok) throw new StoryUploadError(SIGN_ERRORS[res.status] ?? GENERIC);
+  return (await res.json()) as Signed;
+}
+
+/** O arquivo no formulário: na web um Blob; no celular o RN lê do disco pelo uri. */
+async function filePart(uri: string, kind: StoryKind): Promise<Blob> {
+  if (Platform.OS === 'web') return (await fetch(uri)).blob();
+  const name = kind === 'video' ? 'story.mp4' : 'story.jpg';
+  return { uri, name, type: kind === 'video' ? 'video/mp4' : 'image/jpeg' } as unknown as Blob;
+}
+
+/**
+ * Envia o arquivo ao Cloudinary em duas etapas: a função assina (só membro) e o app manda direto.
+ * Devolve o nome do arquivo e a duração (vídeo: a que o Cloudinary mediu, até 15 s).
+ */
+export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ mediaId: string; durationMs: number }> {
+  const token = await sessionToken();
+  for (let attempt = 0; ; attempt++) {
+    const signed = await signUpload(token, kind);
+    const form = new FormData();
+    for (const [k, v] of Object.entries(signed.fields)) form.append(k, v);
+    form.append('file', await filePart(uri, kind));
+    let res: Response;
+    try {
+      res = await fetch(signed.uploadUrl, { method: 'POST', body: form });
+    } catch {
+      throw new StoryUploadError(OFFLINE);
+    }
+    const out = (await res.json().catch(() => ({}))) as Uploaded & { error?: { message?: string } };
+    if (res.ok) {
+      const durationMs =
+        kind === 'photo' ? STORY_PHOTO_MS : Math.min(MAX_VIDEO_MS, Math.max(1, Math.round((out.duration ?? 0) * 1000)));
+      return { mediaId: out.public_id, durationMs };
+    }
+    const message = out.error?.message ?? '';
+    // assinatura vale 1 h: se venceu no caminho, pede outra uma vez
+    if (/stale request/i.test(message) && attempt === 0) continue;
+    throw new StoryUploadError(/limit|quota/i.test(message) ? STORY_LIMIT_MESSAGE : GENERIC);
+  }
+}
+
+export async function createStory(input: { kind: StoryKind; mediaId: string; durationMs: number }): Promise<void> {
   const me = await getCurrentUserId();
   const { error } = await supabase
     .from('stories')
-    .insert({ author_id: me, kind: input.kind, media_url: input.mediaUrl, duration_ms: input.durationMs });
+    .insert({ author_id: me, kind: input.kind, media_id: input.mediaId, duration_ms: input.durationMs });
   if (error) throw error;
 }
 
 type Row = {
-  id: string; author_id: string; kind: StoryKind; media_url: string; duration_ms: number; created_at: string;
+  id: string; author_id: string; kind: StoryKind; media_id: string; duration_ms: number; created_at: string;
   author: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null;
 };
 
@@ -66,7 +113,7 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
   const since = new Date(now.getTime() - STORY_TTL_MS).toISOString();
   const { data, error } = await supabase
     .from('stories')
-    .select('id, author_id, kind, media_url, duration_ms, created_at, author:profiles(id, username, display_name, avatar_url)')
+    .select('id, author_id, kind, media_id, duration_ms, created_at, author:profiles(id, username, display_name, avatar_url)')
     .gt('created_at', since)
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -99,8 +146,9 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
       groups.set(r.author_id, g);
     }
     const story: Story = {
-      id: r.id, authorId: r.author_id, kind: r.kind, mediaUrl: r.media_url, durationMs: r.duration_ms,
-      createdAt: r.created_at, seen: seen.has(r.id), myReaction: mine.get(r.id) ?? null,
+      id: r.id, authorId: r.author_id, kind: r.kind,
+      mediaUrl: storyMediaUrl(r.media_id, r.kind), originalUrl: storyOriginalUrl(r.media_id, r.kind),
+      durationMs: r.duration_ms, createdAt: r.created_at, seen: seen.has(r.id), myReaction: mine.get(r.id) ?? null,
     };
     g.stories.push(story);
     g.latestAt = r.created_at;
@@ -158,7 +206,8 @@ export async function reactToStory(storyId: string, emoji: string | null): Promi
   if (error) throw error;
 }
 
+/** Apaga pela função: o arquivo some do Cloudinary na hora e a linha do banco junto. */
 export async function deleteStory(storyId: string): Promise<void> {
-  const { error } = await supabase.from('stories').delete().eq('id', storyId);
-  if (error) throw error;
+  const res = await callFunction('delete', await sessionToken(), { storyId });
+  if (!res.ok) throw new StoryUploadError('Não rolou apagar. Tenta de novo.');
 }

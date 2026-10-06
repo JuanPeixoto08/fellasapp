@@ -20,11 +20,13 @@ jest.mock('../lib/api/stories', () => ({
   MAX_VIDEO_MS: 15000,
   StoryUploadError: class StoryUploadError extends Error {},
   STORY_PHOTO_MS: 5000,
-  uploadStoryMedia: (u: string) => mockUpload(u),
+  uploadStoryMedia: (u: string, k: string) => mockUpload(u, k),
   createStory: (i: unknown) => mockCreate(i),
 }));
 
 import { StoryComposer } from '../components/stories/StoryComposer';
+
+const MEDIA = `stories/${'a'.repeat(64)}`;
 
 const metrics = { frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 const open = (onClose = jest.fn()) =>
@@ -37,7 +39,7 @@ const open = (onClose = jest.fn()) =>
 beforeEach(() => {
   jest.clearAllMocks();
   mockDuration = 9000;
-  mockUpload.mockResolvedValue({ url: 'https://w/m/x', contentType: 'image/jpeg' });
+  mockUpload.mockImplementation(async (_u: string, kind: string) => ({ mediaId: MEDIA, durationMs: kind === 'video' ? 9000 : 5000 }));
   mockCreate.mockResolvedValue(undefined);
 });
 
@@ -47,8 +49,8 @@ describe('StoryComposer', () => {
     const onClose = jest.fn();
     await open(onClose);
     await fireEvent.press(await screen.findByLabelText('Postar story'));
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'photo', mediaUrl: 'https://w/m/x', durationMs: 5000 }));
-    expect(mockUpload).toHaveBeenCalledWith('file://a.jpg#reduzida');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'photo', mediaId: MEDIA, durationMs: 5000 }));
+    expect(mockUpload).toHaveBeenCalledWith('file://a.jpg#reduzida', 'photo');
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -57,7 +59,7 @@ describe('StoryComposer', () => {
     await open();
     expect(await screen.findByTestId('preview-video')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Postar story'));
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'video', mediaUrl: 'https://w/m/x', durationMs: 9000 }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'video', mediaId: MEDIA, durationMs: 9000 }));
   });
 
   it('vídeo maior que 15 s é recusado antes de enviar', async () => {
@@ -133,7 +135,7 @@ describe('StoryComposer no site', () => {
     await open();
     await fireEvent.press(screen.getByLabelText('Escolher foto ou vídeo'));
     await fireEvent.press(await screen.findByLabelText('Postar story'));
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'video', mediaUrl: 'https://w/m/x', durationMs: 9000 }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'video', mediaId: MEDIA, durationMs: 9000 }));
   });
 
   it('duração ilegível: recusa com aviso', async () => {

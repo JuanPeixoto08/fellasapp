@@ -32,52 +32,119 @@ jest.mock('../lib/api/storage', () => ({
   signPaths: async () => new Map(),
   resolveUrl: () => null,
 }));
-jest.mock('../lib/storiesConfig', () => ({ STORIES_URL: 'https://w.test' }));
+jest.mock('../lib/storiesConfig', () => ({ STORIES_FUNCTION_URL: 'https://sb.test/functions/v1/stories-media' }));
 
-import { createStory, listActiveStories, listStoryViewers, reactToStory, StoryUploadError, uploadStoryMedia } from '../lib/api/stories';
+import {
+  createStory,
+  deleteStory,
+  listActiveStories,
+  listStoryViewers,
+  reactToStory,
+  STORY_LIMIT_MESSAGE,
+  StoryUploadError,
+  uploadStoryMedia,
+} from '../lib/api/stories';
 
 beforeEach(() => {
   mockCalls.length = 0;
   mockResults = {};
 });
 
+const SIGNED = {
+  uploadUrl: 'https://api.cloudinary.com/v1_1/slxposvw/video/upload',
+  fields: { api_key: 'k', timestamp: '1', signature: 'sig', public_id: `stories/${'a'.repeat(64)}`, eager: 'e', eager_async: 'true' },
+};
+const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+const fail = (status: number, body: unknown = {}) => ({ ok: false, status, json: async () => body });
+
 describe('uploadStoryMedia', () => {
-  it('manda o arquivo com o token e devolve o endereço', async () => {
+  it('assina na função, envia ao Cloudinary com os campos e devolve o nome e a duração do vídeo', async () => {
     const fetchMock = jest
       .fn()
-      .mockResolvedValueOnce({ blob: async () => ({ type: 'video/mp4', size: 10 }) })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ url: 'https://w.test/m/x.mp4' }) });
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(ok({ public_id: SIGNED.fields.public_id, duration: 9.42 }));
     globalThis.fetch = fetchMock as never;
-    await expect(uploadStoryMedia('blob:v')).resolves.toEqual({ url: 'https://w.test/m/x.mp4', contentType: 'video/mp4' });
-    expect(fetchMock.mock.calls[1][0]).toBe('https://w.test/upload');
-    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer tok');
-    expect(fetchMock.mock.calls[1][1].headers['Content-Type']).toBe('video/mp4');
+    await expect(uploadStoryMedia('file://v.mp4', 'video')).resolves.toEqual({
+      mediaId: SIGNED.fields.public_id,
+      durationMs: 9420,
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://sb.test/functions/v1/stories-media/sign');
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ kind: 'video' });
+    expect(fetchMock.mock.calls[1][0]).toBe(SIGNED.uploadUrl);
+    const form = fetchMock.mock.calls[1][1].body as FormData;
+    expect(form.get('signature')).toBe('sig');
+    expect(form.get('public_id')).toBe(SIGNED.fields.public_id);
+    expect(form.get('api_key')).toBe('k');
+    expect(form.has('file')).toBe(true);
+  });
+
+  it('foto: 5000 ms; vídeo com duração acima de 15 s grava 15000', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(ok({ public_id: 'p' })) as never;
+    await expect(uploadStoryMedia('file://a.jpg', 'photo')).resolves.toEqual({ mediaId: 'p', durationMs: 5000 });
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(ok({ public_id: 'p', duration: 15.3 })) as never;
+    await expect(uploadStoryMedia('file://v.mp4', 'video')).resolves.toEqual({ mediaId: 'p', durationMs: 15000 });
   });
 
   it.each([
     [401, 'Sua sessão expirou. Entra de novo.'],
     [403, 'Só fellas podem postar story.'],
-    [413, 'Arquivo grande demais: foto até 5 MB, vídeo até 50 MB.'],
-    [415, 'Esse tipo de arquivo não rola. Usa foto ou vídeo.'],
     [500, 'Não rolou enviar. Tenta de novo.'],
-  ])('erro %i vira mensagem pt-BR', async (status, message) => {
+  ])('assinatura recusada %i vira mensagem pt-BR', async (status, message) => {
+    globalThis.fetch = jest.fn().mockResolvedValueOnce(fail(status)) as never;
+    await expect(uploadStoryMedia('file://a.jpg', 'photo')).rejects.toThrow(message);
+  });
+
+  it('Cloudinary sem cota: avisa do limite do mês', async () => {
     globalThis.fetch = jest
       .fn()
-      .mockResolvedValueOnce({ blob: async () => ({ type: 'image/jpeg', size: 1 }) })
-      .mockResolvedValueOnce({ ok: false, status, json: async () => ({}) }) as never;
-    await expect(uploadStoryMedia('file://a.jpg')).rejects.toThrow(message);
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(fail(420, { error: { message: 'Rate Limit Exceeded' } })) as never;
+    await expect(uploadStoryMedia('file://a.jpg', 'photo')).rejects.toThrow(STORY_LIMIT_MESSAGE);
+    expect(STORY_LIMIT_MESSAGE).toBe('Os stories bateram o limite do mês. Volta dia 1.');
+  });
+
+  it('assinatura vencida: pede outra e tenta de novo uma vez', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(fail(401, { error: { message: 'Stale request - reported time is 2026-10-06 which is more than 1 hour ago' } }))
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockResolvedValueOnce(ok({ public_id: 'p' }));
+    globalThis.fetch = fetchMock as never;
+    await expect(uploadStoryMedia('file://a.jpg', 'photo')).resolves.toEqual({ mediaId: 'p', durationMs: 5000 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('sem rede: mensagem pt-BR (StoryUploadError)', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok(SIGNED))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch')) as never;
+    const err = await uploadStoryMedia('file://a.jpg', 'photo').catch((e) => e);
+    expect(err).toBeInstanceOf(StoryUploadError);
+    expect(err.message).toBe('Sem conexão. Confere a internet e tenta de novo.');
   });
 });
 
-describe('uploadStoryMedia sem rede', () => {
-  it('falha de rede vira mensagem pt-BR (e é um StoryUploadError)', async () => {
-    globalThis.fetch = jest
-      .fn()
-      .mockResolvedValueOnce({ blob: async () => ({ type: 'image/jpeg', size: 1 }) })
-      .mockRejectedValueOnce(new TypeError('Failed to fetch')) as never;
-    const err = await uploadStoryMedia('file://a.jpg').catch((e) => e);
-    expect(err).toBeInstanceOf(StoryUploadError);
-    expect(err.message).toBe('Sem conexão. Confere a internet e tenta de novo.');
+describe('deleteStory', () => {
+  it('apaga pela função (arquivo e linha)', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(ok({ ok: true }));
+    globalThis.fetch = fetchMock as never;
+    await deleteStory('s1');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://sb.test/functions/v1/stories-media/delete');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ storyId: 's1' });
+  });
+
+  it('falhou: erro', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValueOnce(fail(403)) as never;
+    await expect(deleteStory('s1')).rejects.toThrow();
   });
 });
 
@@ -86,9 +153,9 @@ describe('listActiveStories', () => {
     const now = new Date('2026-10-04T12:00:00Z');
     mockResults['stories.select'] = {
       data: [
-        { id: 's1', author_id: 'ana', kind: 'photo', media_url: 'https://w/m/1.jpg', duration_ms: 5000, created_at: '2026-10-04T08:00:00Z', author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
-        { id: 's2', author_id: 'ana', kind: 'video', media_url: 'https://w/m/2.mp4', duration_ms: 9000, created_at: '2026-10-04T10:00:00Z', author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
-        { id: 's3', author_id: 'bia', kind: 'photo', media_url: 'https://w/m/3.jpg', duration_ms: 5000, created_at: '2026-10-04T11:00:00Z', author: { id: 'bia', username: 'bia', display_name: null, avatar_url: null } },
+        { id: 's1', author_id: 'ana', kind: 'photo', media_id: `stories/${'1'.repeat(64)}`, duration_ms: 5000, created_at: '2026-10-04T08:00:00Z', author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
+        { id: 's2', author_id: 'ana', kind: 'video', media_id: `stories/${'2'.repeat(64)}`, duration_ms: 9000, created_at: '2026-10-04T10:00:00Z', author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
+        { id: 's3', author_id: 'bia', kind: 'photo', media_id: `stories/${'3'.repeat(64)}`, duration_ms: 5000, created_at: '2026-10-04T11:00:00Z', author: { id: 'bia', username: 'bia', display_name: null, avatar_url: null } },
       ],
       error: null,
     };
@@ -104,14 +171,16 @@ describe('listActiveStories', () => {
     expect(ana.hasUnseen).toBe(true);
     expect(ana.latestAt).toBe('2026-10-04T10:00:00Z');
     expect(groups.find((g) => g.author.id === 'bia')!.author.name).toBe('bia');
+    expect(ana.stories[1].mediaUrl).toBe(`https://res.cloudinary.com/slxposvw/video/upload/c_limit,w_1280,h_1280,q_auto,f_mp4/stories/${'2'.repeat(64)}`);
+    expect(ana.stories[1].originalUrl).toBe(`https://res.cloudinary.com/slxposvw/video/upload/stories/${'2'.repeat(64)}`);
   });
 });
 
 describe('createStory e reactToStory', () => {
   it('cria em meu nome', async () => {
-    await createStory({ kind: 'photo', mediaUrl: 'https://w/m/1.jpg', durationMs: 5000 });
+    await createStory({ kind: 'photo', mediaId: `stories/${'1'.repeat(64)}`, durationMs: 5000 });
     expect(mockCalls.find((c) => c.table === 'stories' && c.op === 'insert')?.args[0]).toEqual({
-      author_id: 'me', kind: 'photo', media_url: 'https://w/m/1.jpg', duration_ms: 5000,
+      author_id: 'me', kind: 'photo', media_id: `stories/${'1'.repeat(64)}`, duration_ms: 5000,
     });
   });
 

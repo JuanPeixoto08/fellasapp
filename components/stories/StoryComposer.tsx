@@ -147,8 +147,8 @@ export function StoryComposer({ visible, onClose }: Props) {
     setError(null);
     try {
       const source = picked.kind === 'photo' ? await shrinkForUpload(picked.uri) : picked.uri;
-      const { url } = await uploadStoryMedia(source);
-      await createStory({ kind: picked.kind, mediaUrl: url, durationMs: picked.durationMs });
+      const { mediaId, durationMs } = await uploadStoryMedia(source, picked.kind);
+      await createStory({ kind: picked.kind, mediaId, durationMs });
       emitStoriesChanged();
       onClose();
     } catch (e) {

@@ -1,16 +1,19 @@
 -- fellasapp: stories (foto 5 s / vídeo até 15 s) que somem em 1 dia. Idempotente.
--- Arquivos ficam no Cloudflare R2 (workers/stories, apagados pela regra do bucket em 1 dia);
--- aqui só as listas. Story com mais de 24 h não é lido nem antes da limpeza (política de leitura).
+-- Arquivos ficam no Cloudinary (plano grátis), enviados direto do app com assinatura da Edge Function
+-- stories-media; aqui só as listas e o nome do arquivo (media_id). Story com mais de 24 h não é lido nem
+-- antes da limpeza (política de leitura). Arquivos com mais de 24 h somem pela limpeza da função (cron).
 
 create table if not exists public.stories (
   id          uuid primary key default gen_random_uuid(),
   author_id   uuid not null references public.profiles (id) on delete cascade,
   kind        text not null check (kind in ('photo', 'video')),
-  media_url   text not null check (media_url ~ '^https://'),
+  media_id    text not null check (media_id ~ '^stories/[0-9a-f]{64}$'),
   duration_ms integer not null check (duration_ms between 1 and 15000),
   created_at  timestamptz not null default now()
 );
 create index if not exists stories_created_at_idx on public.stories (created_at desc);
+-- um arquivo, um story: sem isso dava para apontar um story seu para o arquivo de outro e apagá-lo
+create unique index if not exists stories_media_id_key on public.stories (media_id);
 
 create table if not exists public.story_views (
   story_id  uuid not null references public.stories (id) on delete cascade,
@@ -88,6 +91,20 @@ $$;
 
 -- limpeza de hora em hora (visualizações e reações vão junto)
 select cron.schedule('fellas-stories-limpeza', '7 * * * *', $$delete from public.stories where created_at < now() - interval '24 hours'$$);
+
+-- arquivos no Cloudinary: a função stories-media apaga os com mais de 24 h. O segredo fica no Vault
+-- (criado por comando, fora do git): select vault.create_secret('<segredo>', 'stories_cron_secret');
+create extension if not exists pg_net;
+select cron.schedule('fellas-stories-arquivos', '17 * * * *', $$
+  select net.http_post(
+    url := 'https://xygtrrdliqhwibxalvap.supabase.co/functions/v1/stories-media/cleanup',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'stories_cron_secret')
+    ),
+    body := '{}'::jsonb
+  );
+$$);
 
 -- notificações: a função ganha a coluna story_id (mudar o retorno exige recriar) e o tipo story_reaction
 drop function if exists public.unread_notifications_count();

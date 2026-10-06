@@ -347,9 +347,9 @@ export type Database = {
         ];
       };
       stories: {
-        Row: { id: string; author_id: string; kind: string; media_url: string; duration_ms: number; created_at: string };
-        Insert: { id?: string; author_id: string; kind: string; media_url: string; duration_ms: number; created_at?: string };
-        Update: { id?: string; author_id?: string; kind?: string; media_url?: string; duration_ms?: number; created_at?: string };
+        Row: { id: string; author_id: string; kind: string; media_id: string; duration_ms: number; created_at: string };
+        Insert: { id?: string; author_id: string; kind: string; media_id: string; duration_ms: number; created_at?: string };
+        Update: { id?: string; author_id?: string; kind?: string; media_id?: string; duration_ms?: number; created_at?: string };
         Relationships: [];
       };
       story_views: {
