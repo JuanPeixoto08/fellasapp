@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 
 import { formatThousands } from '../../lib/lastfm/map';
+import { useTrackCover } from '../../lib/lastfm/trackCovers';
 import type { LastfmTopItem, LastfmTopKind } from '../../lib/lastfm/types';
 import { useTheme } from '../../lib/theme';
 import { interactiveStyle, Text } from '../ui';
@@ -11,6 +12,8 @@ type Props = { item: LastfmTopItem; kind: LastfmTopKind; onPress: () => void };
 /** Uma linha do ranking: posição, imagem, nome (e artista em álbuns/músicas) e plays. */
 export function TopRow({ item, kind, onPress }: Props) {
   const t = useTheme();
+  // tops de músicas chegam sem capa: busca a do álbum de cada uma quando a linha aparece
+  const cover = useTrackCover(item.artist, item.name, kind === 'tracks' && !item.image);
   const plays = `${formatThousands(item.plays)} ${item.plays === 1 ? 'play' : 'plays'}`;
   const label = `${item.rank}º ${item.name}${item.artist ? `, de ${item.artist}` : ''}, ${plays}`;
   return (
@@ -31,7 +34,7 @@ export function TopRow({ item, kind, onPress }: Props) {
       <Text variant="small" tone="muted" style={{ minWidth: t.spacing.xl, textAlign: 'right' }}>
         {String(item.rank)}
       </Text>
-      <ArtistTile name={item.name} uri={item.image} size={t.avatarSizes.md} round={kind === 'artists'} />
+      <ArtistTile name={item.name} uri={item.image ?? cover} size={t.avatarSizes.md} round={kind === 'artists'} />
       <View style={{ flex: 1 }}>
         <Text bold numberOfLines={1}>
           {item.name}

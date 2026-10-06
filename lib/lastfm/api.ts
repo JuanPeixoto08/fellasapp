@@ -1,4 +1,4 @@
-import { mapRecentTracks, mapTop, mapUserInfo } from './map';
+import { mapRecentTracks, mapTop, mapUserInfo, pickImage } from './map';
 import type {
   LastfmErrorKind,
   LastfmPage,
@@ -74,6 +74,14 @@ export async function getTop(
   page: number,
 ): Promise<LastfmPage<LastfmTopItem>> {
   return mapTop(kind, await lastfmGet(`user.gettop${kind}`, { user, period, page, limit: LASTFM_PAGE }));
+}
+
+/** Capa de uma música (a do álbum dela): os tops de músicas do Last.fm não trazem imagem. */
+export async function getTrackCover(artist: string, track: string): Promise<string | null> {
+  const json = (await lastfmGet('track.getinfo', { artist, track })) as {
+    track?: { album?: { image?: { '#text'?: string }[] } };
+  };
+  return pickImage(json?.track?.album?.image);
 }
 
 /** A música tocando agora (vem marcada no topo das recentes), ou null. */

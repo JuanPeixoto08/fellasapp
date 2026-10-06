@@ -1,4 +1,4 @@
-import { getNowPlaying, getRecentTracks, getTop, getUserInfo, hasLastfmKey, LastfmError } from '../lib/lastfm/api';
+import { getNowPlaying, getRecentTracks, getTop, getTrackCover, getUserInfo, hasLastfmKey, LastfmError } from '../lib/lastfm/api';
 
 const mockFetch = jest.fn();
 const ORIGINAL_KEY = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
@@ -41,6 +41,17 @@ describe('api do Last.fm', () => {
     });
     const page2 = await getRecentTracks('juan', 2);
     expect(page2.items.map((t) => t.name)).toEqual(['Antes']);
+  });
+
+  it('capa de uma música: vem do álbum dela (track.getinfo); estrela ou sem álbum = null', async () => {
+    ok({ track: { name: '360', album: { image: [{ '#text': 'https://x/34s/c.png' }, { '#text': 'https://x/300x300/c.png' }] } } });
+    await expect(getTrackCover('Charli xcx', '360')).resolves.toBe('https://x/300x300/c.png');
+    expect(query().get('method')).toBe('track.getinfo');
+    expect(query().get('artist')).toBe('Charli xcx');
+    expect(query().get('track')).toBe('360');
+    mockFetch.mockReset();
+    ok({ track: { name: 'x' } });
+    await expect(getTrackCover('A', 'x')).resolves.toBeNull();
   });
 
   it('tops: método por tipo e período', async () => {
