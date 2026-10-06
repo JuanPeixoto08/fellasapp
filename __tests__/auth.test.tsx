@@ -58,7 +58,7 @@ describe('LoginScreen', () => {
   it('envia o OTP e vai para o passo do código', async () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     await render(<LoginScreen />);
-    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
+    await fireEvent.press(screen.getByText('Esqueci a senha'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'Ana@Email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await waitFor(() =>
@@ -73,7 +73,7 @@ describe('LoginScreen', () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     mockAuth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
     await render(<LoginScreen />);
-    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
+    await fireEvent.press(screen.getByText('Esqueci a senha'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'ana@email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await await fireEvent.changeText(await screen.findByPlaceholderText('000000'), '123456');
@@ -91,7 +91,7 @@ describe('LoginScreen', () => {
     mockAuth.signInWithOtp.mockResolvedValue({ error: null });
     mockAuth.verifyOtp.mockResolvedValue({ data: {}, error: new Error('Token has expired or is invalid') });
     await render(<LoginScreen />);
-    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
+    await fireEvent.press(screen.getByText('Esqueci a senha'));
     await fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), 'ana@email.com');
     await fireEvent.press(screen.getByText('Enviar código'));
     await await fireEvent.changeText(await screen.findByPlaceholderText('000000'), '123456');

@@ -6,8 +6,8 @@ import type { Tables } from '../../types/database';
 export type Profile = Tables<'profiles'>;
 
 /**
- * Manda o código de 6 dígitos. `createUser`: primeiro acesso pode criar a conta (o convite é checado no
- * banco); "esqueci a senha" não, para email desconhecido não virar conta nova.
+ * Manda o código de 6 dígitos. `createUser`: o link de convite pode criar a conta (o convite já foi
+ * gasto no banco); "esqueci a senha" não, para email desconhecido não virar conta nova.
  */
 export async function sendOtp(email: string, { createUser = true }: { createUser?: boolean } = {}): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
@@ -76,7 +76,7 @@ export function authErrorMessage(error: unknown): string {
   if (msg.includes('password should be at least') || msg.includes('weak password'))
     return 'Senha fraca. Usa pelo menos 8 caracteres.';
   if (msg.includes('signups not allowed'))
-    return 'Não achamos uma conta com esse email. Se é seu primeiro acesso, usa "Primeiro acesso".';
+    return 'Não achamos uma conta com esse email. Ainda não entrou? Pede um link de convite pra quem te chamou.';
   if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('seconds'))
     return 'Muitas tentativas. Aguarde um pouco e tente novamente.';
   if (msg.includes('expired') || msg.includes('invalid'))

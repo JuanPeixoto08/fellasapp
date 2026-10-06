@@ -57,17 +57,10 @@ describe('login com senha', () => {
     expect(await screen.findByText(/Email ou senha errados/)).toBeTruthy();
   });
 
-  it('"Primeiro acesso" manda o código podendo criar a conta', async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({ error: null });
+  it('não tem mais "Primeiro acesso": conta nova só pelo link de convite', async () => {
     await render(<LoginScreen />);
-    await fireEvent.press(screen.getByText('Primeiro acesso? Receber código'));
-    await fireEvent.changeText(screen.getByLabelText('Email'), 'ana@email.com');
-    await fireEvent.press(screen.getByText('Enviar código'));
-    await waitFor(() =>
-      expect(mockAuth.signInWithOtp).toHaveBeenCalledWith({ email: 'ana@email.com', options: { shouldCreateUser: true } }),
-    );
-    expect(await screen.findByLabelText('Código de 6 dígitos')).toBeTruthy();
-    expect(isPasswordResetPending()).toBe(false);
+    expect(screen.queryByText(/Primeiro acesso/)).toBeNull();
+    expect(screen.getByText(/Pede um link de convite/)).toBeTruthy();
   });
 
   it('"Esqueci a senha" não cria conta e, com o código certo, marca a redefinição', async () => {
