@@ -136,9 +136,18 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
   if (input.lastfmUser !== undefined) fields.lastfm_user = emptyToNull(input.lastfmUser);
 
-  if (input.avatarUri) fields.avatar_url = await uploadProfileImage(userId, 'avatar', input.avatarUri);
-  if (input.bannerUri) fields.banner_url = await uploadProfileImage(userId, 'banner', input.bannerUri);
-  else if (input.removeBanner) fields.banner_url = null;
+  // as fotos salvas agora: as que forem trocadas (ou o banner tirado) somem do armazenamento depois
+  const { data: before } = await supabase.from('profiles').select('avatar_url, banner_url').eq('id', userId).single();
+
+  const uploaded: string[] = [];
+  try {
+    if (input.avatarUri) uploaded.push((fields.avatar_url = await uploadProfileImage(userId, 'avatar', input.avatarUri)));
+    if (input.bannerUri) uploaded.push((fields.banner_url = await uploadProfileImage(userId, 'banner', input.bannerUri)));
+    else if (input.removeBanner) fields.banner_url = null;
+  } catch (e) {
+    await removeOwnFiles(userId, uploaded);
+    throw e;
+  }
 
   const { data, error } = await supabase
     .from('profiles')
@@ -146,6 +155,24 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
     .eq('id', userId)
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    // não salvou: a foto nova não fica órfã e a antiga continua valendo
+    await removeOwnFiles(userId, uploaded);
+    throw error;
+  }
+  const replaced = (['avatar_url', 'banner_url'] as const)
+    .filter((k) => fields[k] !== undefined && before?.[k] && before[k] !== fields[k])
+    .map((k) => before![k] as string);
+  await removeOwnFiles(userId, replaced);
   return data;
+}
+
+/**
+ * Apaga do armazenamento fotos de perfil/banner que não valem mais. Só as da minha pasta (`<id>/…`; a
+ * política do bucket também só deixa o dono apagar). Falhar aqui não desfaz o salvamento.
+ */
+async function removeOwnFiles(userId: string, paths: string[]): Promise<void> {
+  const own = paths.filter((p) => p.startsWith(`${userId}/`) && !p.includes('://'));
+  if (own.length === 0) return;
+  await supabase.storage.from(BUCKET).remove(own).catch(() => {});
 }

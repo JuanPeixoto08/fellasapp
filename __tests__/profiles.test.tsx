@@ -45,6 +45,10 @@ const mockUpdate = jest.fn();
 const mockRpc = jest.fn();
 const mockUpload = jest.fn();
 const mockEqUpdate = jest.fn();
+const mockRemove = jest.fn();
+/** Fotos já salvas no perfil antes de salvar (o que deve sumir ao trocar). */
+let mockCurrent: { avatar_url: string | null; banner_url: string | null } | null = null;
+let mockUpdateError: unknown = null;
 
 const profileRow = {
   id: 'u1',
@@ -65,7 +69,7 @@ const postRows = [
 jest.mock('../lib/supabase', () => {
   // builder encadeável e "thenable" para consultas select
   const query = (table: string) => {
-    const result = { data: table === 'profiles' ? profileRow : postRows, error: null };
+    const result = { data: table === 'profiles' ? { ...profileRow, ...(mockCurrent ?? {}) } : postRows, error: null };
     const b: any = {
       select: () => b,
       eq: () => b,
@@ -76,7 +80,7 @@ jest.mock('../lib/supabase', () => {
         return {
           eq: (...args: unknown[]) => {
             mockEqUpdate(...args);
-            return { select: () => ({ single: () => Promise.resolve(result) }) };
+            return { select: () => ({ single: () => Promise.resolve(mockUpdateError ? { data: null, error: mockUpdateError } : result) }) };
           },
         };
       },
@@ -97,6 +101,10 @@ jest.mock('../lib/supabase', () => {
           upload: (...a: unknown[]) => {
             mockUpload(...a);
             return Promise.resolve({ error: null });
+          },
+          remove: (paths: string[]) => {
+            mockRemove(paths);
+            return Promise.resolve({ data: [], error: null });
           },
           createSignedUrls: (paths: string[]) =>
             Promise.resolve({
@@ -189,6 +197,55 @@ describe('updateMyProfile', () => {
     await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'blob:gif' });
     expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/avatar-\d+\.gif$/);
     expect(mockUpload.mock.calls[0][2]).toMatchObject({ contentType: 'image/gif' });
+  });
+
+  describe('fotos antigas não ficam guardadas à toa', () => {
+    const base = { display_name: 'Ana', username: 'ana_01', bio: '' };
+    beforeEach(() => {
+      mockRemove.mockClear();
+      mockUpload.mockClear();
+      mockUpdateError = null;
+      (globalThis as any).fetch = jest.fn().mockResolvedValue({ blob: () => Promise.resolve({ type: 'image/gif' }) });
+    });
+    afterEach(() => {
+      mockCurrent = null;
+      mockUpdateError = null;
+    });
+
+    it('trocar a foto apaga a antiga do armazenamento (depois de salvar)', async () => {
+      mockCurrent = { avatar_url: 'u1/avatar-1.jpg', banner_url: null };
+      await updateMyProfile({ ...base, avatarUri: 'blob:gif' });
+      expect(mockRemove).toHaveBeenCalledWith(['u1/avatar-1.jpg']);
+    });
+
+    it('trocar ou tirar o banner apaga o antigo', async () => {
+      mockCurrent = { avatar_url: null, banner_url: 'u1/banner-1.jpg' };
+      await updateMyProfile({ ...base, bannerUri: 'file://novo.jpg' });
+      expect(mockRemove).toHaveBeenCalledWith(['u1/banner-1.jpg']);
+      mockRemove.mockClear();
+      await updateMyProfile({ ...base, removeBanner: true });
+      expect(mockRemove).toHaveBeenCalledWith(['u1/banner-1.jpg']);
+    });
+
+    it('salvar sem trocar não apaga nada', async () => {
+      mockCurrent = { avatar_url: 'u1/avatar-1.jpg', banner_url: 'u1/banner-1.jpg' };
+      await updateMyProfile(base);
+      expect(mockRemove).not.toHaveBeenCalled();
+    });
+
+    it('só apaga arquivo da própria pasta', async () => {
+      mockCurrent = { avatar_url: 'u2/avatar-1.jpg', banner_url: 'https://fora/banner.jpg' };
+      await updateMyProfile({ ...base, avatarUri: 'blob:gif', removeBanner: true });
+      expect(mockRemove).not.toHaveBeenCalled();
+    });
+
+    it('salvar falhou: apaga a foto nova que subiu e mantém a antiga', async () => {
+      mockCurrent = { avatar_url: 'u1/avatar-1.jpg', banner_url: null };
+      mockUpdateError = { message: 'caiu' };
+      await expect(updateMyProfile({ ...base, avatarUri: 'blob:gif' })).rejects.toMatchObject({ message: 'caiu' });
+      expect(mockRemove).toHaveBeenCalledTimes(1);
+      expect(mockRemove).toHaveBeenCalledWith([mockUpload.mock.calls[0][0]]);
+    });
   });
 
   it('faz upload do banner e salva o caminho', async () => {
