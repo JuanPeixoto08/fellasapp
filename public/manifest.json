@@ -1,0 +1,9 @@
+{
+  "name": "fellas",
+  "short_name": "fellas",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "lang": "pt-BR"
+}
