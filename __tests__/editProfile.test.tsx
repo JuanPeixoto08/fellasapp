@@ -19,7 +19,10 @@ jest.mock('../components/profile/AvatarCropper', () => {
       ) : null,
   };
 });
-jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ signOut: jest.fn() }) }));
+const mockRefreshProfile = jest.fn();
+jest.mock('../lib/auth/SessionProvider', () => ({
+  useSession: () => ({ signOut: jest.fn(), refreshProfile: mockRefreshProfile }),
+}));
 jest.mock('../lib/api/profiles', () => ({
   ...jest.requireActual('../lib/api/profiles'),
   getCurrentUserId: jest.fn().mockResolvedValue('u1'),
@@ -27,8 +30,14 @@ jest.mock('../lib/api/profiles', () => ({
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../lib/api/storage', () => ({
+  ...jest.requireActual('../lib/api/storage'),
+  signPaths: async (paths: (string | null | undefined)[]) =>
+    new Map(paths.filter((p): p is string => !!p).map((p) => [p, `https://signed/${p}`])),
+}));
+
 import EditProfileScreen from '../app/profile/edit';
-import { updateMyProfile } from '../lib/api/profiles';
+import { getProfile, updateMyProfile } from '../lib/api/profiles';
 
 const metrics = { frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
@@ -99,5 +108,35 @@ describe('Editar perfil: foto com recorte', () => {
     expect(screen.queryByTestId('cropper-stub')).toBeNull();
     await fireEvent.press(screen.getByLabelText('Salvar'));
     expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: undefined }));
+  });
+});
+
+describe('Editar perfil: foto atual', () => {
+  const withPhoto = { id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null, avatar_url: 'u1/a.jpg' };
+
+  it('mostra a foto que já está salva (não a letra) e oferece trocar', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce(withPhoto);
+    await renderScreen();
+    const photo = await screen.findByLabelText('Foto de Ana');
+    expect(photo.props.source).toEqual({ uri: 'https://signed/u1/a.jpg' });
+    expect(screen.queryByLabelText('Avatar de Ana')).toBeNull();
+    expect(screen.getByText('Trocar foto')).toBeTruthy();
+  });
+
+  it('salvar sem trocar a foto não manda a foto de novo', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce(withPhoto);
+    (updateMyProfile as jest.Mock).mockClear();
+    await renderScreen();
+    await screen.findByLabelText('Foto de Ana');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: undefined }));
+  });
+
+  it('salvou: a sessão busca o perfil de novo (foto nova na lateral e no compositor)', async () => {
+    (updateMyProfile as jest.Mock).mockResolvedValueOnce({});
+    mockRefreshProfile.mockClear();
+    await renderScreen();
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(mockRefreshProfile).toHaveBeenCalled();
   });
 });

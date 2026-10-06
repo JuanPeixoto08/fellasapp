@@ -18,6 +18,7 @@ import {
   updateMyProfile,
   validateUsername,
 } from '../../lib/api/profiles';
+import { resolveUrl, signPaths } from '../../lib/api/storage';
 import { friendlyError, isUniqueViolation } from '../../lib/errors';
 import { useTheme } from '../../lib/theme';
 
@@ -27,7 +28,7 @@ export default function EditProfileScreen() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { signOut } = useSession();
+  const { signOut, refreshProfile } = useSession();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
@@ -35,7 +36,10 @@ export default function EditProfileScreen() {
   const [location, setLocation] = useState('');
   const [birthday, setBirthday] = useState('');
   const [birthdayError, setBirthdayError] = useState<string | undefined>();
+  /** Foto nova escolhida (vai pro upload ao salvar). */
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
+  /** Foto que já está salva: só para mostrar (salvar sem trocar não reenvia). */
+  const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
   /** Foto escolhida esperando o "Ajustar foto". */
   const [cropUri, setCropUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +56,10 @@ export default function EditProfileScreen() {
         setDisplayName(p.display_name ?? '');
         setUsername(p.username);
         setBio(p.bio ?? '');
+        // a foto é extra: se a assinatura falhar, a tela continua com a letra
+        signPaths([p.avatar_url])
+          .then((signed) => setCurrentAvatar(resolveUrl(p.avatar_url, signed)))
+          .catch(() => {});
       })
       .catch((e) => setError(friendlyError(e, 'Não deu pra carregar seu perfil. Volta e tenta de novo.')));
   }, []);
@@ -84,6 +92,8 @@ export default function EditProfileScreen() {
         location,
         birthday: parsedBirthday,
       });
+      // a cópia do perfil na sessão alimenta minha foto na lateral, no compositor e no comentário
+      await refreshProfile();
       router.back();
     } catch (e) {
       if (isUniqueViolation(e)) setUsernameError('Esse usuário já é de outro fella. Escolhe outro.');
@@ -106,9 +116,9 @@ export default function EditProfileScreen() {
       />
       <Screen scroll header style={{ paddingBottom: t.spacing.xl + insets.bottom }}>
         <View style={{ alignItems: 'center', gap: t.spacing.md }}>
-          <Avatar name={displayName || username || '?'} uri={avatarUri} size={t.avatarSizes.xl} />
+          <Avatar name={displayName || username || '?'} uri={avatarUri ?? currentAvatar} size={t.avatarSizes.xl} />
           <Button
-            title={avatarUri ? 'Trocar foto' : 'Escolher foto'}
+            title={avatarUri || currentAvatar ? 'Trocar foto' : 'Escolher foto'}
             variant="secondary"
             onPress={pickAvatar}
           />

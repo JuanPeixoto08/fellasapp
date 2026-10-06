@@ -28,7 +28,7 @@ jest.mock('../lib/supabase', () => ({
 import LoginScreen from '../app/(auth)/login';
 import NotInvitedScreen from '../app/not-invited';
 import { AuthGuard } from '../lib/auth/AuthGuard';
-import { SessionProvider } from '../lib/auth/SessionProvider';
+import { SessionProvider, useSession } from '../lib/auth/SessionProvider';
 
 // já criou senha: o guard não segura em /set-password
 const session = { user: { id: 'u1', user_metadata: { has_password: true } } };
@@ -97,6 +97,30 @@ describe('LoginScreen', () => {
     await await fireEvent.changeText(await screen.findByPlaceholderText('000000'), '123456');
     await fireEvent.press(screen.getByText('Entrar'));
     expect(await screen.findByText(/Código inválido ou expirado/)).toBeTruthy();
+  });
+});
+
+describe('SessionProvider: refreshProfile', () => {
+  function MyPhoto() {
+    const { profile, refreshProfile } = useSession();
+    return (
+      <Text accessibilityRole="button" onPress={() => void refreshProfile()}>
+        {`foto:${profile?.avatar_url ?? 'nenhuma'}`}
+      </Text>
+    );
+  }
+
+  it('busca o perfil de novo (ex.: trocou a foto em Editar perfil)', async () => {
+    setup(session, { id: 'u1', is_member: true, avatar_url: null });
+    await render(
+      <SessionProvider>
+        <MyPhoto />
+      </SessionProvider>,
+    );
+    expect(await screen.findByText('foto:nenhuma')).toBeTruthy();
+    mockMaybeSingle.mockResolvedValue({ data: { id: 'u1', is_member: true, avatar_url: 'u1/avatar-2.jpg' }, error: null });
+    await fireEvent.press(screen.getByText('foto:nenhuma'));
+    expect(await screen.findByText('foto:u1/avatar-2.jpg')).toBeTruthy();
   });
 });
 

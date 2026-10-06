@@ -12,6 +12,8 @@ type SessionContextValue = {
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  /** Busca meu perfil de novo (ex.: salvei nome/foto em Editar perfil). */
+  refreshProfile: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -23,7 +25,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 function FakeSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
-    () => ({ session: fakeSession, profile: fakeProfile, loading: false, signOut: async () => {} }),
+    () => ({
+      session: fakeSession,
+      profile: fakeProfile,
+      loading: false,
+      signOut: async () => {},
+      refreshProfile: async () => {},
+    }),
     [],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
@@ -86,14 +94,22 @@ function RealSessionProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // falhou: fica o perfil que já estava (a tela que pediu já salvou; isto é só a cópia da sessão)
+  const refreshProfile = useCallback(async () => {
+    if (!userId) return;
+    const p = await authApi.fetchProfile(userId).catch(() => null);
+    if (p) setProfile(p);
+  }, [userId]);
+
   const value = useMemo(
     () => ({
       session,
       profile,
       loading: !sessionReady || (!!userId && profileFor !== userId),
       signOut,
+      refreshProfile,
     }),
-    [session, profile, sessionReady, profileFor, userId, signOut],
+    [session, profile, sessionReady, profileFor, userId, signOut, refreshProfile],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
