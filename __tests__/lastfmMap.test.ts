@@ -7,6 +7,7 @@ import {
   mapUserInfo,
   PERIODS,
   pickImage,
+  safeLastfmUrl,
   sinceYear,
 } from '../lib/lastfm/map';
 
@@ -100,26 +101,26 @@ describe('mapTop', () => {
   it('artistas: sem artista na linha; estrela genérica vira null', () => {
     const page = mapTop('artists', {
       topartists: {
-        artist: [{ name: 'Pablo Vittar', playcount: '212', url: 'u1', image: img(STAR), '@attr': { rank: '1' } }],
+        artist: [{ name: 'Pablo Vittar', playcount: '212', url: 'https://www.last.fm/music/Pablo+Vittar', image: img(STAR), '@attr': { rank: '1' } }],
         '@attr': { page: '1', totalPages: '3' },
       },
     });
     expect(page).toEqual({
       page: 1,
       totalPages: 3,
-      items: [{ rank: 1, name: 'Pablo Vittar', artist: null, image: null, url: 'u1', plays: 212 }],
+      items: [{ rank: 1, name: 'Pablo Vittar', artist: null, image: null, url: 'https://www.last.fm/music/Pablo+Vittar', plays: 212 }],
     });
   });
 
   it('álbuns e músicas trazem o artista; um item só vira lista', () => {
     const albums = mapTop('albums', {
       topalbums: {
-        album: { name: 'Brat', playcount: '140', url: 'u2', artist: { name: 'Charli xcx' }, image: img('https://x/300x300/c.png'), '@attr': { rank: '1' } },
+        album: { name: 'Brat', playcount: '140', url: 'https://www.last.fm/music/Charli+xcx/Brat', artist: { name: 'Charli xcx' }, image: img('https://x/300x300/c.png'), '@attr': { rank: '1' } },
         '@attr': { page: '1', totalPages: '1' },
       },
     });
     expect(albums.items).toEqual([
-      { rank: 1, name: 'Brat', artist: 'Charli xcx', image: 'https://x/300x300/c.png', url: 'u2', plays: 140 },
+      { rank: 1, name: 'Brat', artist: 'Charli xcx', image: 'https://x/300x300/c.png', url: 'https://www.last.fm/music/Charli+xcx/Brat', plays: 140 },
     ]);
     const tracks = mapTop('tracks', {
       toptracks: {
@@ -156,5 +157,24 @@ describe('isValidLastfmUser e períodos', () => {
     expect(PERIODS.map((p) => p.label)).toEqual(['7 dias', '1 mês', '3 meses', '1 ano', 'sempre']);
     expect(PERIODS.map((p) => p.value)).toEqual(['7day', '1month', '3month', '12month', 'overall']);
     expect(DEFAULT_PERIOD).toBe('1month');
+  });
+});
+
+describe('safeLastfmUrl', () => {
+  it('só páginas do site do Last.fm passam; o resto vira vazio', () => {
+    expect(safeLastfmUrl('https://www.last.fm/music/Cher')).toBe('https://www.last.fm/music/Cher');
+    expect(safeLastfmUrl('https://last.fm/user/rj')).toBe('https://last.fm/user/rj');
+    expect(safeLastfmUrl('javascript:alert(1)')).toBe('');
+    expect(safeLastfmUrl('https://last.fm.evil.com/x')).toBe('');
+    expect(safeLastfmUrl('https://evillast.fm/x')).toBe('');
+    expect(safeLastfmUrl('http://www.last.fm/music/Cher')).toBe('');
+    expect(safeLastfmUrl(undefined)).toBe('');
+  });
+
+  it('as conversões usam a url segura', () => {
+    const page = mapRecentTracks({ recenttracks: { track: [{ name: 'x', artist: { '#text': 'y' }, url: 'javascript:alert(1)' }] } });
+    expect(page.items[0].url).toBe('');
+    const top = mapTop('artists', { topartists: { artist: [{ name: 'z', url: 'data:text/html,oi', playcount: '1' }] } });
+    expect(top.items[0].url).toBe('');
   });
 });

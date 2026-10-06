@@ -29,6 +29,20 @@ describe('api do Last.fm', () => {
     expect((mockFetch.mock.calls[0][0] as string).startsWith('https://ws.audioscrobbler.com/2.0/?')).toBe(true);
   });
 
+  it('recentes depois da página 1: tira o "ouvindo agora" repetido', async () => {
+    ok({
+      recenttracks: {
+        track: [
+          { name: 'Agora', artist: { '#text': 'A' }, url: 'https://www.last.fm/x', '@attr': { nowplaying: 'true' } },
+          { name: 'Antes', artist: { '#text': 'B' }, url: 'https://www.last.fm/y', date: { uts: '1' } },
+        ],
+        '@attr': { page: '2', totalPages: '3' },
+      },
+    });
+    const page2 = await getRecentTracks('juan', 2);
+    expect(page2.items.map((t) => t.name)).toEqual(['Antes']);
+  });
+
   it('tops: método por tipo e período', async () => {
     ok({ topalbums: { album: [], '@attr': { page: '1', totalPages: '0' } } });
     await getTop('albums', 'juan', '7day', 1);

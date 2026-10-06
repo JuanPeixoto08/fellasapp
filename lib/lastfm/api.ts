@@ -62,7 +62,9 @@ export async function getUserInfo(user: string): Promise<LastfmUser> {
 }
 
 export async function getRecentTracks(user: string, page: number): Promise<LastfmPage<LastfmTrack>> {
-  return mapRecentTracks(await lastfmGet('user.getrecenttracks', { user, page, limit: LASTFM_PAGE }));
+  const result = mapRecentTracks(await lastfmGet('user.getrecenttracks', { user, page, limit: LASTFM_PAGE }));
+  // o Last.fm repete o "ouvindo agora" no topo de toda página: só vale na primeira
+  return page > 1 ? { ...result, items: result.items.filter((t) => !t.nowPlaying) } : result;
 }
 
 export async function getTop(

@@ -65,5 +65,12 @@ export function useLastfmPages<T>(key: string | null, fetchPage: (page: number) 
     if (key) load(1, true);
   }, [key, load]);
 
-  return { items, loading, error, loadMore, reload };
+  /** A página seguinte falhou com itens na tela: busca ela de novo sem perder o que já veio. */
+  const retryMore = useCallback(() => {
+    if (!key || busy.current) return;
+    if (page === 0) load(1, true);
+    else load(page + 1, false);
+  }, [key, page, load]);
+
+  return { items, loading, error, loadMore, reload, retryMore };
 }

@@ -14,6 +14,15 @@ export function pickImage(images: Img[] | undefined): string | null {
   return url && !url.includes(GENERIC_STAR) ? url : null;
 }
 
+/**
+ * Só páginas do site do Last.fm (https); qualquer outra coisa (outro esquema, outro domínio) vira ''.
+ * Regex em vez de `new URL` para não depender do polyfill de URL no aparelho.
+ */
+export function safeLastfmUrl(value: unknown): string {
+  const url = String(value ?? '');
+  return /^https:\/\/(www\.)?last\.fm\//i.test(url) ? url : '';
+}
+
 /** Com um item só, o Last.fm manda objeto em vez de lista. */
 const list = <T>(value: T | T[] | undefined | null): T[] => (value == null ? [] : Array.isArray(value) ? value : [value]);
 const num = (value: unknown): number => {
@@ -33,7 +42,7 @@ export function mapRecentTracks(json: any): LastfmPage<LastfmTrack> {
     artist: String(t?.artist?.['#text'] ?? t?.artist?.name ?? ''),
     album: t?.album?.['#text'] ? String(t.album['#text']) : null,
     image: pickImage(t?.image),
-    url: String(t?.url ?? ''),
+    url: safeLastfmUrl(t?.url),
     playedAt: isoFromUnix(t?.date?.uts),
     nowPlaying: t?.['@attr']?.nowplaying === 'true',
   }));
@@ -54,7 +63,7 @@ export function mapTop(kind: LastfmTopKind, json: any): LastfmPage<LastfmTopItem
     name: String(x?.name ?? ''),
     artist: kind === 'artists' ? null : String(x?.artist?.name ?? x?.artist?.['#text'] ?? '') || null,
     image: pickImage(x?.image),
-    url: String(x?.url ?? ''),
+    url: safeLastfmUrl(x?.url),
     plays: num(x?.playcount),
   }));
   return { items, ...pageOf(root['@attr']) };

@@ -7,7 +7,7 @@ import { DEFAULT_PERIOD, formatThousands, PERIODS, sinceYear } from '../../lib/l
 import type { LastfmPeriod, LastfmTopItem, LastfmTopKind, LastfmTrack, LastfmUser } from '../../lib/lastfm/types';
 import { useLastfmPages } from '../../lib/lastfm/useLastfmPages';
 import { useTheme } from '../../lib/theme';
-import { Divider, EmptyState, Text } from '../ui';
+import { Button, Divider, EmptyState, Text } from '../ui';
 import { TopRow } from './TopRow';
 import { TrackRow } from './TrackRow';
 
@@ -56,9 +56,11 @@ export function MusicTab({ user, top }: Props) {
     (page: number) => (section === 'recent' ? getRecentTracks(user, page) : getTop(section, user, period, page)),
     [user, section, period],
   );
-  const { items, loading, error, loadMore, reload } = useLastfmPages<LastfmTrack | LastfmTopItem>(key, fetchPage);
+  const { items, loading, error, loadMore, reload, retryMore } = useLastfmPages<LastfmTrack | LastfmTopItem>(key, fetchPage);
 
   const since = sinceYear(info?.registeredAt ?? null);
+  const chipHeight = t.layout.minTouch * 0.75;
+  const chipSlop = Math.ceil((t.layout.minTouch - chipHeight) / 2);
   const header = (
     <View>
       {top}
@@ -77,8 +79,10 @@ export function MusicTab({ user, top }: Props) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
                 onPress={() => setSection(s.key)}
+                // a pílula é mais baixa que 44; o resto do alvo de toque vem do hitSlop
+                hitSlop={{ top: chipSlop, bottom: chipSlop, left: t.spacing.xs, right: t.spacing.xs }}
                 style={{
-                  minHeight: t.layout.minTouch * 0.75,
+                  minHeight: chipHeight,
                   justifyContent: 'center',
                   paddingHorizontal: t.spacing.md,
                   borderRadius: t.radii.pill,
@@ -155,7 +159,14 @@ export function MusicTab({ user, top }: Props) {
       ItemSeparatorComponent={Divider}
       ListEmptyComponent={empty}
       ListFooterComponent={
-        loading && items.length > 0 ? (
+        error && items.length > 0 ? (
+          <View style={{ alignItems: 'center', gap: t.spacing.sm, padding: t.spacing.lg }}>
+            <Text tone="muted" align="center" accessibilityRole="alert">
+              Não deu pra carregar mais.
+            </Text>
+            <Button variant="secondary" title="Tentar de novo" onPress={retryMore} />
+          </View>
+        ) : loading && items.length > 0 ? (
           <ActivityIndicator style={{ padding: t.spacing.xl }} color={t.colors.primary} accessibilityLabel="Carregando mais" />
         ) : null
       }

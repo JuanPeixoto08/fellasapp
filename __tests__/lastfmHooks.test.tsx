@@ -61,6 +61,22 @@ describe('useLastfmPages', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('página 2 falhou: retryMore busca a 2 de novo sem perder a 1', async () => {
+    const fetchPage = jest
+      .fn()
+      .mockResolvedValueOnce(page(['p1'], 1, 2))
+      .mockRejectedValueOnce(new LastfmError('network'))
+      .mockResolvedValueOnce(page(['p2'], 2, 2));
+    const { result } = await renderHook(() => useLastfmPages('k', fetchPage));
+    await waitFor(() => expect(result.current.items).toEqual(['p1']));
+    await act(async () => result.current.loadMore());
+    await waitFor(() => expect(result.current.error?.kind).toBe('network'));
+    await act(async () => result.current.retryMore());
+    await waitFor(() => expect(result.current.items).toEqual(['p1', 'p2']));
+    expect(fetchPage).toHaveBeenLastCalledWith(2);
+    expect(result.current.error).toBeNull();
+  });
+
   it('sem chave (sem usuário): não busca nada', async () => {
     const fetchPage = jest.fn();
     await renderHook(() => useLastfmPages(null, fetchPage));

@@ -18,7 +18,8 @@ export function NowPlayingLine({ user, onPress }: Props) {
       accessibilityRole="button"
       accessibilityLabel={`Ouvindo agora: ${track.name}, de ${track.artist}`}
       onPress={onPress}
-      hitSlop={t.spacing.xs}
+      // a linha é baixa: o hitSlop completa o alvo de toque de 44
+      hitSlop={{ top: t.spacing.md, bottom: t.spacing.md, left: t.spacing.xs, right: t.spacing.xs }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
