@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react';
-import { Image, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Image, Pressable, View } from 'react-native';
 
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Heading, Icon, Text, VerifiedBadge, type IconName } from '../ui';
 import { hasBadge } from '../../lib/badges';
+import { PhotoViewer } from '../feed/PhotoViewer';
 import { NowPlayingLine } from '../music/NowPlayingLine';
 
 type Props = {
@@ -28,7 +29,8 @@ function birthdayDayMonth(iso: string | null | undefined): string | null {
 /**
  * Cabeçalho estilo Twitter: banner 3:1 de ponta a ponta, foto grande com anel da cor do fundo encostada
  * na borda de baixo do banner e ações à direita; nome, status como chip neutro, bio e info logo abaixo.
- * Ocupa a largura toda (o banner encosta nas bordas); o resto tem o gutter da tela.
+ * Ocupa a largura toda (o banner encosta nas bordas); o resto tem o gutter da tela. Tocar na foto ou no
+ * banner abre a imagem maior (o mesmo visualizador das fotos dos posts).
  */
 export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMusic }: Props) {
   const t = useTheme();
@@ -43,11 +45,20 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
   const banner = { width: '100%' as const, aspectRatio: t.layout.bannerAspect, backgroundColor: t.colors.surfaceSunken };
   // a foto fica metade em cima do banner: o anel (cor do fundo) separa ela da imagem
   const ringed = t.avatarSizes.xl + t.borders.selected * 2;
+  const [viewing, setViewing] = useState<{ uri: string; alt: string } | null>(null);
+  const zoomStyle = ({ pressed }: { pressed: boolean }) => ({ cursor: 'pointer' as const, opacity: pressed ? 0.85 : 1 });
 
   return (
     <View>
       {bannerUri ? (
-        <Image accessibilityLabel={`Banner de ${name}`} source={{ uri: bannerUri }} style={banner} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Ver banner de ${name}`}
+          onPress={() => setViewing({ uri: bannerUri, alt: `Banner de ${name} (ampliado)` })}
+          style={zoomStyle}
+        >
+          <Image accessibilityLabel={`Banner de ${name}`} source={{ uri: bannerUri }} style={banner} />
+        </Pressable>
       ) : (
         <View testID="profile-banner-empty" style={banner} />
       )}
@@ -61,7 +72,18 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
               backgroundColor: t.colors.bg,
             }}
           >
-            <Avatar name={name} uri={avatarUri} size={t.avatarSizes.xl} />
+            {avatarUri ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver foto de ${name}`}
+                onPress={() => setViewing({ uri: avatarUri, alt: `Foto de ${name} (ampliada)` })}
+                style={zoomStyle}
+              >
+                <Avatar name={name} uri={avatarUri} size={t.avatarSizes.xl} />
+              </Pressable>
+            ) : (
+              <Avatar name={name} uri={avatarUri} size={t.avatarSizes.xl} />
+            )}
           </View>
           {actions ? <View style={{ flexDirection: 'row', gap: t.spacing.xs }}>{actions}</View> : null}
         </View>
@@ -112,6 +134,7 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
           </View>
         ) : null}
       </View>
+      {viewing ? <PhotoViewer uris={[viewing.uri]} index={0} onClose={() => setViewing(null)} alt={viewing.alt} /> : null}
     </View>
   );
 }
