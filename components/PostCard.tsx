@@ -11,6 +11,7 @@ import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
 import { MentionText } from './MentionText';
 import { AuthorLink } from './profile/AuthorLink';
+import { PlaceLink } from './places/PlaceLink';
 import { nextReaction } from '../lib/reactionState';
 
 type Props = {
@@ -24,6 +25,8 @@ type Props = {
   onDelete?: (post: FeedPost) => Promise<void>;
   /** Foto e nome abrem o perfil do autor (padrão). Desligado no perfil da própria pessoa. */
   linkAuthor?: boolean;
+  /** O local abre a página dele (padrão). Desligado na própria página do local. */
+  linkPlace?: boolean;
   /** Post fixado no topo do perfil: etiqueta "Fixado". */
   pinned?: boolean;
   /** Só no meu perfil: alfinete para fixar/desafixar. */
@@ -42,6 +45,7 @@ export function PostCard({
   onReact,
   onDelete,
   linkAuthor = true,
+  linkPlace = true,
   pinned = false,
   onTogglePin,
 }: Props) {
@@ -97,40 +101,46 @@ export function PostCard({
               </Text>
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
-            <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
-              <NameWithBadge name={name} badges={post.author.badges} bold />
-            </AuthorLink>
-            <View style={{ flex: 1 }} />
-            {date ? (
-              <Text variant="caption" tone="muted">
-                {date}
-              </Text>
-            ) : null}
-            {onTogglePin ? (
-              <View style={{ marginVertical: -t.spacing.md, marginRight: onDelete ? -t.spacing.md : 0 }}>
-                <IconButton
-                  icon="pin-outline"
-                  accessibilityLabel={pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
-                  variant="ghost"
-                  tone={pinned ? 'default' : 'muted'}
-                  size="sm"
-                  onPress={() => onTogglePin(post)}
-                />
-              </View>
-            ) : null}
-            {onDelete ? (
-              // a lixeira mantém 44pt de toque sem esticar a linha do nome
-              <View style={{ marginVertical: -t.spacing.md, marginRight: -t.spacing.md }}>
-                <IconButton
-                  icon="trash-outline"
-                  accessibilityLabel="Apagar post"
-                  variant="ghost"
-                  tone="muted"
-                  size="sm"
-                  onPress={() => setConfirming(true)}
-                />
-              </View>
+          {/* nome e local juntos, na altura do avatar (sem o espaço da coluna entre eles) */}
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
+              <AuthorLink userId={post.author.id} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
+                <NameWithBadge name={name} badges={post.author.badges} bold />
+              </AuthorLink>
+              <View style={{ flex: 1 }} />
+              {date ? (
+                <Text variant="caption" tone="muted">
+                  {date}
+                </Text>
+              ) : null}
+              {onTogglePin ? (
+                <View style={{ marginVertical: -t.spacing.md, marginRight: onDelete ? -t.spacing.md : 0 }}>
+                  <IconButton
+                    icon="pin-outline"
+                    accessibilityLabel={pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
+                    variant="ghost"
+                    tone={pinned ? 'default' : 'muted'}
+                    size="sm"
+                    onPress={() => onTogglePin(post)}
+                  />
+                </View>
+              ) : null}
+              {onDelete ? (
+                // a lixeira mantém 44pt de toque sem esticar a linha do nome
+                <View style={{ marginVertical: -t.spacing.md, marginRight: -t.spacing.md }}>
+                  <IconButton
+                    icon="trash-outline"
+                    accessibilityLabel="Apagar post"
+                    variant="ghost"
+                    tone="muted"
+                    size="sm"
+                    onPress={() => setConfirming(true)}
+                  />
+                </View>
+              ) : null}
+            </View>
+            {post.location ? (
+              <PlaceLink location={post.location} placeKey={post.placeKey} enabled={linkPlace} />
             ) : null}
           </View>
           {post.body ? (
