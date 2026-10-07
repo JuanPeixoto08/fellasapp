@@ -44,6 +44,12 @@ describe('app instalado (atalho da tela inicial)', () => {
     expect(size('icon-512.png')).toEqual([512, 512]);
     expect(size('apple-touch-icon.png')).toEqual([180, 180]);
     expect(size('favicon.png')).toEqual([48, 48]);
+    // fundo transparente: o canto de cima (fora do desenho) não tem cor
+    const { PNG } = require('pngjs') as unknown as { PNG: { sync: { read: (b: unknown) => { data: Uint8Array } } } };
+    for (const file of ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.png']) {
+      const { data } = PNG.sync.read(readFileSync(`${__dirname}/../public/${file}`));
+      expect([file, data[3]]).toEqual([file, 0]);
+    }
     expect(html).toContain('<link rel="icon" type="image/png" href="/favicon.png" />');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
   });
