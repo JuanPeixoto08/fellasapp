@@ -1,5 +1,7 @@
 // o tsconfig não carrega os tipos do Node (só jest): declara o pouco que o teste usa
-declare const require: (id: string) => { readFileSync: (path: string, encoding: string) => string };
+declare const require: (id: string) => {
+  readFileSync: (path: string, encoding?: string) => string & { readUInt32BE: (offset: number) => number };
+};
 declare const __dirname: string;
 
 const { readFileSync } = require('fs');
@@ -26,5 +28,23 @@ describe('app instalado (atalho da tela inicial)', () => {
     expect(html).toContain('%LANG_ISO_CODE%');
     expect(html).toContain('%WEB_TITLE%');
     expect(html).toContain('<div id="root"></div>');
+  });
+
+  it('ícone do app (aba, atalho do iPhone e Android): PNGs quadrados nos tamanhos certos', () => {
+    // largura e altura ficam nos bytes 16–23 do PNG
+    const size = (file: string) => {
+      const png = readFileSync(`${__dirname}/../public/${file}`);
+      return [png.readUInt32BE(16), png.readUInt32BE(20)];
+    };
+    expect(manifest.icons).toEqual([
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    ]);
+    expect(size('icon-192.png')).toEqual([192, 192]);
+    expect(size('icon-512.png')).toEqual([512, 512]);
+    expect(size('apple-touch-icon.png')).toEqual([180, 180]);
+    expect(size('favicon.png')).toEqual([48, 48]);
+    expect(html).toContain('<link rel="icon" type="image/png" href="/favicon.png" />');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
   });
 });
