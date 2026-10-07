@@ -13,7 +13,7 @@ type BarProps = {
   onPressChip?: (emoji: string) => void;
 };
 
-/** Chips mínimos "😂 3", um por emoji; o da minha reação fica invertido (acento neutro). */
+/** Chips mínimos "😂 3", um por emoji; o da minha reação ganha fundo roxo suave, borda roxa e número em negrito. */
 export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
   const t = useTheme();
   if (!reactions || reactions.length === 0) return null;
@@ -33,6 +33,7 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
             hitSlop={{ top: t.spacing.sm, bottom: t.spacing.sm, left: t.spacing.xs, right: t.spacing.xs }}
           >
             <View
+              testID={`reaction-chip-${emoji}`}
               style={{
                 height: t.layout.chipHeight,
                 flexDirection: 'row',
@@ -41,12 +42,12 @@ export function ReactionBar({ reactions, myReaction, onPressChip }: BarProps) {
                 paddingHorizontal: t.spacing.sm,
                 borderRadius: t.radii.pill,
                 borderWidth: t.borders.hairline,
-                borderColor: mine ? t.colors.accent : t.colors.border,
-                backgroundColor: mine ? t.colors.accent : 'transparent',
+                borderColor: mine ? t.colors.brand : t.colors.border,
+                backgroundColor: mine ? t.colors.brandSoft : 'transparent',
               }}
             >
               <Emoji emoji={emoji} size="sm" />
-              <Text variant="caption" tone="muted" style={mine ? { color: t.colors.onAccent } : undefined}>
+              <Text variant="caption" tone="muted" style={mine ? { color: t.colors.text, fontFamily: t.fonts.bodyBold } : undefined}>
                 {count}
               </Text>
             </View>

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { ReactButton, ReactionBar, ReactionPicker } from '../components/reactions';
+import { colors, fonts } from '../lib/theme';
 
 describe('ReactionPicker', () => {
   it('calls onSelect with the emoji', async () => {
@@ -54,6 +55,19 @@ describe('ReactionBar', () => {
     expect(screen.getByLabelText('❤️ 3 reações').props.accessibilityState).toMatchObject({ selected: false });
     await fireEvent.press(screen.getByLabelText('❤️ 3 reações'));
     expect(onPressChip).toHaveBeenCalledWith('❤️');
+  });
+
+  it('minha reação: fundo roxo suave, borda roxa e número em negrito (o emoji amarelo continua visível)', async () => {
+    await render(<ReactionBar reactions={reactions} myReaction="😂" />);
+    const mine = StyleSheet.flatten(screen.getByTestId('reaction-chip-😂').props.style);
+    expect(mine.backgroundColor).toBe(colors.light.brandSoft);
+    expect(mine.borderColor).toBe(colors.light.brand);
+    const other = StyleSheet.flatten(screen.getByTestId('reaction-chip-❤️').props.style);
+    expect(other.backgroundColor).toBe('transparent');
+    expect(other.borderColor).toBe(colors.light.border);
+    const count = StyleSheet.flatten(screen.getByText('1').props.style);
+    expect(count.color).toBe(colors.light.text);
+    expect(count.fontFamily).toBe(fonts.bodyBold);
   });
 
   it('renders nothing when empty', async () => {

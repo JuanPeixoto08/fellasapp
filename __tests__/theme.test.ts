@@ -15,6 +15,15 @@ function contrast(a: string, b: string) {
 }
 
 describe('cores do tema', () => {
+  it('brandSoft (fundo da minha reação): texto AA, borda brand visível e emoji amarelo legível no escuro', () => {
+    for (const scheme of [colors.light, colors.dark]) {
+      expect(contrast(scheme.text, scheme.brandSoft)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(scheme.brand, scheme.brandSoft)).toBeGreaterThanOrEqual(3);
+    }
+    // o amarelo dos emojis (😮 🎃) sumia no chip creme do tema escuro
+    expect(contrast('#FFCC4D', colors.dark.brandSoft)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('acento neutro (sem amarelo) e onAccent têm contraste AA nos dois temas', () => {
     for (const scheme of [colors.light, colors.dark]) {
       expect(scheme.accent).not.toBe('#FFE14D');

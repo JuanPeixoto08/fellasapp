@@ -14,6 +14,8 @@ export type Colors = {
   accent: string;
   onAccent: string;
   brand: string;
+  /** Fundo roxo suave (chip da minha reação): emoji amarelo continua visível, ao contrário do creme do `accent`. */
+  brandSoft: string;
   /** Texto sobre `brand` (bolinha de notificações). */
   onBrand: string;
   /** Coração curtido: vermelho próprio, diferente do `danger`. */
@@ -43,6 +45,7 @@ export const colors: Record<ColorScheme, Colors> = {
     accent: '#2E2B26',
     onAccent: '#F4F1EA',
     brand: '#5B3FD9',
+    brandSoft: '#E6DFFB',
     onBrand: '#FFFFFF',
     like: '#C81E3A',
     verified: '#C81E3A',
@@ -65,6 +68,7 @@ export const colors: Record<ColorScheme, Colors> = {
     accent: '#E0DCD3',
     onAccent: '#121212',
     brand: '#B8A2FF',
+    brandSoft: '#2B2347',
     onBrand: '#121212',
     like: '#FF5A6E',
     verified: '#FF5A6E',
