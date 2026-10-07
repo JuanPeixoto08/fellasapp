@@ -159,7 +159,7 @@ export default function PostDetailScreen() {
     });
   };
 
-  // visualizador: fotos do post ou imagens de um comentário
+  // visualizador das imagens de um comentário (as do post o PostCard abre sozinho)
   const [viewer, setViewer] = useState<{ uris: string[]; index: number; alt: string } | null>(null);
 
   const onDelete = async (p: FeedPost) => {
@@ -251,9 +251,6 @@ export default function PostDetailScreen() {
                   post={post}
                   onToggleLike={onLike}
                   onReact={onReactPost}
-                  onPressImage={(p, i) =>
-                    setViewer({ uris: p.images, index: i, alt: `Foto postada por ${p.author.display_name || p.author.username}` })
-                  }
                   onDelete={post.author.id === myId ? onDelete : undefined}
                 />
               </View>

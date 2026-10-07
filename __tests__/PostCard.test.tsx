@@ -1,9 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { PostCard } from '../components/PostCard';
 import type { FeedPost } from '../lib/api/posts';
 
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
+const metrics = { frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
 const post: FeedPost = {
   id: 'p1',
@@ -71,12 +74,22 @@ describe('PostCard layout', () => {
     expect(button.props.accessibilityHint).toMatch(/Sua reação: 😂/);
   });
 
-  it('a photo opens the post when there is no image handler', async () => {
+  it('tocar na foto abre a foto (não o post); o resto do post continua abrindo o post', async () => {
     const onPress = jest.fn();
-    const withPhoto = { ...post, images: ['https://x/a.jpg'], imageUrl: 'https://x/a.jpg' };
-    await render(<PostCard post={withPhoto} onPress={onPress} />);
-    await fireEvent.press(screen.getByLabelText('Foto postada por Ana'));
-    expect(onPress).toHaveBeenCalledWith(withPhoto);
+    const withPhotos = { ...post, images: ['https://x/a.jpg', 'https://x/b.gif'], imageUrl: 'https://x/a.jpg' };
+    await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <PostCard post={withPhotos} onPress={onPress} />
+      </SafeAreaProvider>,
+    );
+    await fireEvent.press(screen.getByLabelText('Foto postada por Ana (2 de 2)'));
+    expect(onPress).not.toHaveBeenCalled();
+    expect(screen.getByText('2/2')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Fechar fotos'));
+    expect(screen.queryByText('2/2')).toBeNull();
+    expect(onPress).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('post-row'));
+    expect(onPress).toHaveBeenCalledWith(withPhotos);
   });
 });
 

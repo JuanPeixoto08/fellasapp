@@ -3,6 +3,7 @@ import { Platform, Pressable, View } from 'react-native';
 
 import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
+import { PhotoViewer } from './feed/PhotoViewer';
 import { PostImages } from './feed/PostImages';
 import { ReactButton, ReactionBar, ReactionPicker } from './reactions';
 import { Avatar, ConfirmDialog, Icon, IconButton, NameWithBadge, Text } from './ui';
@@ -18,8 +19,6 @@ type Props = {
   post: FeedPost;
   onToggleLike?: (post: FeedPost) => void;
   onPress?: (post: FeedPost) => void;
-  /** Toque numa foto; sem isso, a foto abre o post (`onPress`). */
-  onPressImage?: (post: FeedPost, index: number) => void;
   onReact?: (post: FeedPost, emoji: string | null) => void;
   /** Só para posts meus: mostra a lixeira e pede confirmação antes de chamar. */
   onDelete?: (post: FeedPost) => Promise<void>;
@@ -41,7 +40,6 @@ export function PostCard({
   post,
   onToggleLike,
   onPress,
-  onPressImage,
   onReact,
   onDelete,
   linkAuthor = true,
@@ -58,11 +56,8 @@ export function PostCard({
   const react = (emoji: string) => onReact?.(post, nextReaction(post.myReaction, emoji));
   const name = post.author.display_name || post.author.username;
   const date = postTime(post.createdAt);
-  const pressImage = onPressImage
-    ? (i: number) => onPressImage(post, i)
-    : onPress
-      ? () => onPress(post)
-      : undefined;
+  // tocar numa foto abre ela em tela cheia; o resto da linha é que abre o post
+  const [viewing, setViewing] = useState<number | null>(null);
 
   return (
     <>
@@ -153,7 +148,7 @@ export function PostCard({
               <MentionText text={post.body} tags />
             </Pressable>
           ) : null}
-          <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={pressImage} />
+          <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={setViewing} />
           <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>
             <LikeButton liked={post.likedByMe} count={post.likeCount} onPress={() => onToggleLike?.(post)} />
@@ -166,6 +161,9 @@ export function PostCard({
         </View>
       </Pressable>
       {/* fora da linha tocável: na web o toque num modal sobe pela árvore e abriria o post */}
+      {viewing !== null ? (
+        <PhotoViewer uris={post.images} index={viewing} alt={`Foto postada por ${name}`} onClose={() => setViewing(null)} />
+      ) : null}
       <ReactionPicker
         anchorRef={reactAnchor}
         visible={picking}
