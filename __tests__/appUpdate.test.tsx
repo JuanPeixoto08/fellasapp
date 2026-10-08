@@ -1,13 +1,13 @@
 import { act, render } from '@testing-library/react-native';
 import { AppState, Platform } from 'react-native';
 
-const mockHasNewVersion = jest.fn();
-jest.mock('../lib/appUpdate', () => ({ ...jest.requireActual('../lib/appUpdate'), hasNewVersion: () => mockHasNewVersion() }));
+const mockNewVersion = jest.fn();
+jest.mock('../lib/appUpdate', () => ({ ...jest.requireActual('../lib/appUpdate'), newVersion: () => mockNewVersion() }));
 
 import { AppUpdater, UPDATE_CHECK_MS } from '../components/shell/AppUpdater';
 import { clearDraft, setDraft } from '../lib/composerDraft';
 
-const { entryOf, hasNewVersion } = jest.requireActual('../lib/appUpdate');
+const { entryOf, newVersion } = jest.requireActual('../lib/appUpdate');
 
 const OLD = '/_expo/static/js/web/entry-171ee776603853487c78a9fa573ee165.js';
 const NEW = '/_expo/static/js/web/entry-9b0c2f1d7e3a4b5c6d7e8f9a0b1c2d3e.js';
@@ -20,7 +20,7 @@ describe('entryOf', () => {
   });
 });
 
-describe('hasNewVersion', () => {
+describe('newVersion', () => {
   const g = globalThis as { document?: unknown };
   beforeEach(() => {
     g.document = { querySelectorAll: () => [{ getAttribute: () => OLD }] };
@@ -32,25 +32,31 @@ describe('hasNewVersion', () => {
 
   it('servidor com outro bundle: tem versão nova (busca sem cache)', async () => {
     const fetchMock = jest.fn(() => res(page(NEW)));
-    await expect(hasNewVersion(fetchMock)).resolves.toBe(true);
+    await expect(newVersion(fetchMock)).resolves.toBe(NEW);
     expect(fetchMock).toHaveBeenCalledWith('/', { cache: 'no-store' });
   });
 
   it('mesmo bundle, erro do servidor ou sem rede: nada', async () => {
-    await expect(hasNewVersion(() => res(page(OLD)))).resolves.toBe(false);
-    await expect(hasNewVersion(() => res('', false))).resolves.toBe(false);
-    await expect(hasNewVersion(() => Promise.reject(new Error('offline')))).resolves.toBe(false);
+    await expect(newVersion(() => res(page(OLD)))).resolves.toBeNull();
+    await expect(newVersion(() => res('', false))).resolves.toBeNull();
+    await expect(newVersion(() => Promise.reject(new Error('offline')))).resolves.toBeNull();
   });
 
   it('página sem bundle conhecido (modo dev) ou fora da web: nem busca', async () => {
     g.document = { querySelectorAll: () => [] };
     const fetchMock = jest.fn(() => res(page(NEW)));
-    await expect(hasNewVersion(fetchMock)).resolves.toBe(false);
+    await expect(newVersion(fetchMock)).resolves.toBeNull();
     delete g.document;
-    await expect(hasNewVersion(fetchMock)).resolves.toBe(false);
+    await expect(newVersion(fetchMock)).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+const store = new Map<string, string>();
+(globalThis as { sessionStorage?: unknown }).sessionStorage = {
+  getItem: (k: string) => store.get(k) ?? null,
+  setItem: (k: string, v: string) => void store.set(k, v),
+};
 
 describe('AppUpdater', () => {
   let handler: (state: string) => void = () => {};
@@ -64,7 +70,8 @@ describe('AppUpdater', () => {
         return { remove: jest.fn() } as never;
       })
       .mockClear();
-    mockHasNewVersion.mockReset().mockResolvedValue(true);
+    mockNewVersion.mockReset().mockResolvedValue(NEW);
+    store.clear();
     clearDraft();
   });
   afterEach(() => {
@@ -84,8 +91,26 @@ describe('AppUpdater', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it('abrindo o app (página restaurada do cache do Chrome): confere na hora e recarrega se tiver versão nova', async () => {
+    const reload = jest.fn();
+    await render(<AppUpdater reload={reload} />);
+    await act(async () => {});
+    expect(mockNewVersion).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('não recarrega duas vezes pelo mesmo bundle na mesma aba (página recarregada ainda velha)', async () => {
+    const reload = jest.fn();
+    await render(<AppUpdater reload={reload} />);
+    await act(async () => {});
+    await render(<AppUpdater reload={reload} />);
+    await act(async () => {});
+    expect(mockNewVersion).toHaveBeenCalledTimes(2);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('sem versão nova: não recarrega', async () => {
-    mockHasNewVersion.mockResolvedValue(false);
+    mockNewVersion.mockResolvedValue(null);
     const reload = jest.fn();
     await render(<AppUpdater reload={reload} />);
     await back();
@@ -100,20 +125,21 @@ describe('AppUpdater', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it('indo pro segundo plano não confere; voltar de novo em menos de 1 min também não', async () => {
+  it('indo pro segundo plano não confere; voltar em menos de 1 min da última conferência também não', async () => {
     const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
-    mockHasNewVersion.mockResolvedValue(false);
+    mockNewVersion.mockResolvedValue(null);
     await render(<AppUpdater reload={jest.fn()} />);
     await act(async () => {
       handler('background');
     });
-    expect(mockHasNewVersion).not.toHaveBeenCalled();
+    // só a de quando abriu
+    expect(mockNewVersion).toHaveBeenCalledTimes(1);
     await back();
     await back();
-    expect(mockHasNewVersion).toHaveBeenCalledTimes(1);
+    expect(mockNewVersion).toHaveBeenCalledTimes(1);
     now.mockReturnValue(1_000_000 + UPDATE_CHECK_MS);
     await back();
-    expect(mockHasNewVersion).toHaveBeenCalledTimes(2);
+    expect(mockNewVersion).toHaveBeenCalledTimes(2);
   });
 
   it('no app nativo não faz nada', async () => {

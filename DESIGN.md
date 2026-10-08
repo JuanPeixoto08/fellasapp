@@ -73,7 +73,7 @@ Ionicons (`@expo/vector-icons`) via `<Icon>` de `components/ui`, sempre na varia
 Token `borders`: `hairline` 1 (contornos de chip, cartão, divisória) · `selected` 3 (opção escolhida).
 
 ## Layout por largura
-Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celular em pé: tab bar, como sempre) · **medium** 700–1099 (lateral só com ícones) · **expanded** ≥ 1100 (lateral com nomes + coluna direita). Tocar em Feed (aba, lateral) ou no logo já estando no feed volta a lista ao topo e recarrega; fora do feed, leva até ele. Web/PWA/APK: ao voltar pro app, se saiu versão nova do site, a página recarrega sozinha no mesmo endereço (`AppUpdater`; não recarrega com post sendo escrito).
+Faixas (`useLayoutTier`, tokens `layout.breakpoints`): **compact** < 700 (celular em pé: tab bar, como sempre) · **medium** 700–1099 (lateral só com ícones) · **expanded** ≥ 1100 (lateral com nomes + coluna direita). Tocar em Feed (aba, lateral) ou no logo já estando no feed volta a lista ao topo e recarrega; fora do feed, leva até ele. Web/PWA/APK: ao abrir e ao voltar pro app, se saiu versão nova do site, a página recarrega sozinha no mesmo endereço (`AppUpdater`; uma vez por versão; não recarrega com post sendo escrito).
 - `AppShell` envolve a pilha de telas: `[Sidebar][coluna central 600 (layout.centerWidth), fios dos dois lados][RightRail 350]`, centralizado. Login, "sem convite" e carregamento ficam fora.
 - Sidebar: logo (→ feed), Feed/Notificações/Perfil/Membros (Notificações com `Badge`; ativo = ícone cheio + `brand` + negrito), botão Postar (abre a janela do compositor), eu no pé.
 - RightRail: "Os fellas" (até 4 + Ver todos) e "Aniversários" (próximos 4; Hoje/Amanhã/12 out; ícone `gift-outline`).
