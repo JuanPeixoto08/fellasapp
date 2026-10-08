@@ -12,7 +12,7 @@ export const TTL_MS = 24 * 60 * 60 * 1000;
 /** Versão reduzida pedida no envio (eager) e usada na entrega (lib/cloudinary.ts tem a mesma). */
 export const TRANSFORMATIONS: Record<Kind, string> = {
   video: 'c_limit,w_1280,h_1280,q_auto,f_mp4',
-  photo: 'c_limit,w_1920,h_1920,q_auto,f_jpg',
+  photo: 'c_limit,w_1920,h_1920,q_auto,f_webp,fl_awebp',
 };
 
 const API = 'https://api.cloudinary.com/v1_1';

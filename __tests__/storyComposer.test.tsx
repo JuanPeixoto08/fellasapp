@@ -54,6 +54,28 @@ describe('StoryComposer', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('GIF: sobe o arquivo como está (reduzir salva em JPEG e mata a animação)', async () => {
+    mockPick.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file://dança.gif', type: 'image', mimeType: 'image/gif', fileSize: 2_000_000 }],
+    });
+    await open();
+    await fireEvent.press(await screen.findByLabelText('Postar story'));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({ kind: 'photo', mediaId: MEDIA, durationMs: 5000 }));
+    expect(mockUpload).toHaveBeenCalledWith('file://dança.gif', 'photo');
+  });
+
+  it('GIF maior que 5 MB é recusado antes de enviar', async () => {
+    mockPick.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file://enorme.gif', type: 'image', mimeType: 'image/gif', fileSize: 6_000_000 }],
+    });
+    await open();
+    expect(await screen.findByText('Esse GIF passa de 5 MB. Escolhe um menor.')).toBeTruthy();
+    expect(screen.queryByLabelText('Postar story')).toBeNull();
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
   it('vídeo até 15 s: envia com a duração', async () => {
     mockPick.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://v.mp4', type: 'video', duration: 9000 }] });
     await open();

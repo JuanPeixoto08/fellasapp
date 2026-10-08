@@ -34,7 +34,7 @@ describe('regras dos stories (Cloudinary)', () => {
 
   it('transformações e tipo por kind', () => {
     expect(TRANSFORMATIONS.video).toBe('c_limit,w_1280,h_1280,q_auto,f_mp4');
-    expect(TRANSFORMATIONS.photo).toBe('c_limit,w_1920,h_1920,q_auto,f_jpg');
+    expect(TRANSFORMATIONS.photo).toBe('c_limit,w_1920,h_1920,q_auto,f_webp,fl_awebp');
     expect(resourceType('video')).toBe('video');
     expect(resourceType('photo')).toBe('image');
   });

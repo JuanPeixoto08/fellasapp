@@ -15,6 +15,7 @@ import {
 import { friendlyError } from '../../lib/errors';
 import { shrinkForUpload } from '../../lib/imageUpload';
 import { imagesFromPaste } from '../../lib/pasteImages';
+import { gifProblem, isGif } from '../../lib/profileImage';
 import { emitStoriesChanged } from '../../lib/storyViewerStore';
 import { useTheme } from '../../lib/theme';
 import { videoDurationMs } from '../../lib/videoDuration';
@@ -23,14 +24,23 @@ import { Button, IconButton, Text } from '../ui';
 /** Folga para o arredondamento da duração lida do arquivo. */
 const DURATION_SLACK_MS = 500;
 
-type Picked = { kind: StoryKind; uri: string; durationMs: number };
-type Asset = { uri: string; type?: string | null; duration?: number | null };
-/** Vídeo que não dá para postar: longo demais ou duração ilegível. */
-type Problem = 'tooLong' | 'unreadable' | null;
+/** `gif`: sobe como está (reduzir salva em JPEG e mataria a animação). */
+type Picked = { kind: StoryKind; uri: string; durationMs: number; gif?: boolean };
+type Asset = {
+  uri: string;
+  type?: string | null;
+  duration?: number | null;
+  mimeType?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+};
+/** O que não dá para postar: vídeo longo demais ou ilegível, GIF grande demais. */
+type Problem = 'tooLong' | 'unreadable' | 'gifTooBig' | null;
 
 const PROBLEM_TEXT: Record<Exclude<Problem, null>, string> = {
   tooLong: 'Esse vídeo passa de 15 s. Escolhe um menor.',
   unreadable: 'Não consegui ler esse vídeo. Tenta outro.',
+  gifTooBig: 'Esse GIF passa de 5 MB. Escolhe um menor.',
 };
 
 function PreviewVideo({ uri }: { uri: string }) {
@@ -78,7 +88,13 @@ export function StoryComposer({ visible, onClose }: Props) {
     setError(null);
     setProblem(null);
     if (asset.type !== 'video') {
-      setPicked({ kind: 'photo', uri: asset.uri, durationMs: STORY_PHOTO_MS });
+      const gif = isGif(asset);
+      if (gif && gifProblem(asset)) {
+        setPicked(null);
+        setProblem('gifTooBig');
+        return;
+      }
+      setPicked({ kind: 'photo', uri: asset.uri, durationMs: STORY_PHOTO_MS, gif });
       return;
     }
     const duration = await durationOf(asset);
@@ -135,7 +151,7 @@ export function StoryComposer({ visible, onClose }: Props) {
     if (!visible || !web || typeof document === 'undefined') return;
     const onPaste = (e: ClipboardEvent) => {
       const [file] = imagesFromPaste(e as never);
-      if (file) void use({ uri: URL.createObjectURL(file), type: 'image' });
+      if (file) void use({ uri: URL.createObjectURL(file), type: 'image', mimeType: file.type, fileSize: file.size });
     };
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
@@ -146,7 +162,7 @@ export function StoryComposer({ visible, onClose }: Props) {
     setSending(true);
     setError(null);
     try {
-      const source = picked.kind === 'photo' ? await shrinkForUpload(picked.uri) : picked.uri;
+      const source = picked.kind === 'photo' && !picked.gif ? await shrinkForUpload(picked.uri) : picked.uri;
       const { mediaId, durationMs } = await uploadStoryMedia(source, picked.kind);
       await createStory({ kind: picked.kind, mediaId, durationMs });
       emitStoriesChanged();

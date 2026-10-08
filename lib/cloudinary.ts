@@ -6,7 +6,7 @@ export const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NA
 /** Mesma transformação que a função pede no envio (eager): a entrega acha a versão pronta. */
 export const STORY_TRANSFORMATIONS: Record<StoryKind, string> = {
   video: 'c_limit,w_1280,h_1280,q_auto,f_mp4',
-  photo: 'c_limit,w_1920,h_1920,q_auto,f_jpg',
+  photo: 'c_limit,w_1920,h_1920,q_auto,f_webp,fl_awebp',
 };
 
 const base = (kind: StoryKind) =>

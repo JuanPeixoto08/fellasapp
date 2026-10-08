@@ -6,7 +6,8 @@ const ID = `stories/${'a'.repeat(64)}`;
 describe('endereços do Cloudinary', () => {
   it('versão reduzida e original por tipo', () => {
     expect(storyMediaUrl(ID, 'video')).toBe(`https://res.cloudinary.com/slxposvw/video/upload/c_limit,w_1280,h_1280,q_auto,f_mp4/${ID}`);
-    expect(storyMediaUrl(ID, 'photo')).toBe(`https://res.cloudinary.com/slxposvw/image/upload/c_limit,w_1920,h_1920,q_auto,f_jpg/${ID}`);
+    // WebP animado (fl_awebp): GIF continua animado; foto comum vira WebP parado
+    expect(storyMediaUrl(ID, 'photo')).toBe(`https://res.cloudinary.com/slxposvw/image/upload/c_limit,w_1920,h_1920,q_auto,f_webp,fl_awebp/${ID}`);
     expect(storyOriginalUrl(ID, 'video')).toBe(`https://res.cloudinary.com/slxposvw/video/upload/${ID}`);
   });
 
