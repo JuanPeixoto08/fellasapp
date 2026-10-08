@@ -72,3 +72,42 @@ describe('splitMentions com tags', () => {
     expect(splitMentions('olha #arte', byUsername)).toEqual([{ text: 'olha #arte' }]);
   });
 });
+
+describe('links no texto', () => {
+  const byUsername = new Map([['ana', { id: 'u1' }]]);
+
+  it('https vira link; pontuação do fim fica de fora', () => {
+    expect(splitMentions('olha https://open.spotify.com/track/abc. top', byUsername)).toEqual([
+      { text: 'olha ' },
+      { text: 'open.spotify.com/track/abc', url: 'https://open.spotify.com/track/abc' },
+      { text: '. top' },
+    ]);
+  });
+
+  it('@ e # dentro do link não viram menção nem tag', () => {
+    expect(splitMentions('https://x.com/@ana#arte', byUsername, { tags: true })).toEqual([
+      { text: 'x.com/@ana#arte', url: 'https://x.com/@ana#arte' },
+    ]);
+  });
+
+  it('só https: http e javascript ficam texto', () => {
+    expect(splitMentions('http://a.com javascript:alert(1)', byUsername)).toEqual([
+      { text: 'http://a.com javascript:alert(1)' },
+    ]);
+  });
+
+  it('link longo aparece encurtado (sem https://, sem www., com …)', () => {
+    const url = 'https://www.letterboxd.com/oliveira/film/a-story-of-yonosuke/reviews/';
+    const [part] = splitMentions(url, byUsername);
+    expect(part.url).toBe(url);
+    expect(part.text).toBe('letterboxd.com/oliveira/film/a-st…');
+  });
+
+  it('parênteses em volta do link', () => {
+    expect(splitMentions('(https://a.com/b)', byUsername)).toEqual([
+      { text: '(' },
+      { text: 'a.com/b', url: 'https://a.com/b' },
+      { text: ')' },
+    ]);
+  });
+});

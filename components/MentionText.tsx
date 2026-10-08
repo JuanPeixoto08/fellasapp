@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
 
 import { useMembersByUsername } from '../lib/memberDirectory';
 import { splitMentions } from '../lib/mentions';
@@ -12,14 +13,29 @@ type Props = Omit<TextProps, 'children'> & {
   tags?: boolean;
 };
 
-/** Texto de post/comentário com @usuario de fella (e, em posts, #tag) destacado em `brand` e tocável. */
+/**
+ * Texto de post/comentário com @usuario de fella (e, em posts, #tag) destacado em `brand` e tocável.
+ * Link https vira link sublinhado em `brand`, encurtado, que abre fora do app.
+ */
 export function MentionText({ text, tags = false, ...rest }: Props) {
   const t = useTheme();
   const byUsername = useMembersByUsername();
   return (
     <Text {...rest}>
       {splitMentions(text, byUsername, { tags }).map((part, i) =>
-        part.member ? (
+        part.url ? (
+          <Text
+            key={i}
+            {...rest}
+            accessibilityRole="link"
+            accessibilityLabel={`Abrir link ${part.url.replace(/^https:\/\/(www\.)?/i, '').split('/')[0]}`}
+            suppressHighlighting
+            onPress={() => void Linking.openURL(part.url!).catch(() => {})}
+            style={{ color: t.colors.brand, textDecorationLine: 'underline' }}
+          >
+            {part.text}
+          </Text>
+        ) : part.member ? (
           <Text
             key={i}
             {...rest}

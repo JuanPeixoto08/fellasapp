@@ -48,6 +48,15 @@ describe('MentionText', () => {
     await render(<MentionText text="olha #arte" />);
     expect(screen.queryByLabelText('Ver posts com #arte')).toBeNull();
   });
+
+  it('link https vira link tocável que abre fora do app, encurtado', async () => {
+    const { Linking } = require('react-native');
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    await render(<MentionText text="ouve isso https://open.spotify.com/track/abc" />);
+    expect(screen.getByText('open.spotify.com/track/abc')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Abrir link open.spotify.com'));
+    expect(open).toHaveBeenCalledWith('https://open.spotify.com/track/abc');
+  });
 });
 
 describe('MentionSuggestions', () => {

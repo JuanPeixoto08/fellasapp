@@ -45,11 +45,30 @@ export function insertMention(text: string, active: ActiveMention, username: str
   return `${text.slice(0, active.start)}@${username}${rest.startsWith(' ') ? '' : ' '}${rest}`;
 }
 
-export type MentionPart<M> = { text: string; member?: M; tag?: string };
+export type MentionPart<M> = { text: string; member?: M; tag?: string; url?: string };
+
+/** Só https (nada de http, javascript:, data:); começa no início ou depois de algo que não é letra. */
+const LINK = /(^|[^a-z0-9_])(https:\/\/[^\s<>"]+)/gi;
+/** Pontuação colada no fim ("olha https://a.com.") não faz parte do link. */
+const TRAILING = /[.,;:!?'"…\]}]+$/;
+const LINK_SHOWN = 33;
+
+/** O link como entra no texto: sem a pontuação do fim; ")" sai quando o link não abriu "(". */
+function trimLink(raw: string): string {
+  let url = raw.replace(TRAILING, '');
+  while (url.endsWith(')') && !url.includes('(')) url = url.slice(0, -1).replace(TRAILING, '');
+  return url;
+}
+
+/** Como o link aparece: sem https:// e www., cortado com "…" quando é comprido. */
+export function shortLink(url: string): string {
+  const bare = url.replace(/^https:\/\//i, '').replace(/^www\./i, '');
+  return bare.length > LINK_SHOWN ? `${bare.slice(0, LINK_SHOWN)}…` : bare;
+}
 
 /**
- * Divide o texto em pedaços; @usuario de quem existe vira menção e, com `tags`, #tag vira tag
- * (o resto fica texto comum).
+ * Divide o texto em pedaços; link https vira link, @usuario de quem existe vira menção e, com `tags`,
+ * #tag vira tag (o resto fica texto comum).
  */
 export function splitMentions<M>(
   text: string,
@@ -57,6 +76,12 @@ export function splitMentions<M>(
   { tags = false }: { tags?: boolean } = {},
 ): MentionPart<M>[] {
   const hits: { at: number; length: number; part: MentionPart<M> }[] = [];
+  // links primeiro: @ e # dentro de um link continuam parte dele
+  for (const match of text.matchAll(LINK)) {
+    const url = trimLink(match[2]);
+    const at = (match.index ?? 0) + match[1].length;
+    if (url.length > 'https://'.length) hits.push({ at, length: url.length, part: { text: shortLink(url), url } });
+  }
   for (const match of text.matchAll(MENTION)) {
     const member = byUsername.get(match[2].toLowerCase());
     if (!member) continue;
