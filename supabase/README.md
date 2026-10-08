@@ -36,6 +36,7 @@ cada uma no SQL editor; todas são idempotentes):
 | `0022_comment_images.sql` | até 4 imagens por comentário: `comments.images` (caminhos no bucket `post-images`), comentário só com imagem passa a valer | abrir post falha (a lista de comentários pede `images`) |
 | `0023_profile_display.sql` | "O que aparece no perfil": `profiles.show_now_playing` (ouvindo agora nos posts e no perfil) e `profiles.hidden_badges` (selos escondidos) | feed, posts e comentários não carregam (o app busca esses campos do autor) |
 | `0024_featured_badge.sql` | selo escolhido para aparecer do lado do nome (`profiles.featured_badge`); `hidden_badges` da 0023 fica sem uso | feed, posts e comentários não carregam (o app busca `featured_badge` do autor) |
+| `0025_polls.sql` | enquetes: `posts.poll_options`/`poll_ends_at`/`poll_counts` (gatilhos validam e contam) e `poll_votes` (anônimo: cada um lê só o próprio; voto definitivo) | postar enquete e votar falham (posts sem enquete funcionam) |
 
 **Função `stories-media` (Edge Function)**: publique sempre com
 `npx supabase functions deploy stories-media --no-verify-jwt`. A função confere o login sozinha; já a limpeza

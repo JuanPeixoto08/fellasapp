@@ -177,6 +177,10 @@ export type Database = {
           location: string | null;
           /** Chave do local (minúsculas, sem acento); o gatilho preenche. */
           place_key: string | null;
+          /** Enquete (0025): opções (2–4), fim e votos por opção (o banco mantém); null sem enquete. */
+          poll_options: string[] | null;
+          poll_ends_at: string | null;
+          poll_counts: number[] | null;
           created_at: string;
         };
         Insert: {
@@ -188,6 +192,9 @@ export type Database = {
           tags?: string[];
           location?: string | null;
           place_key?: string | null;
+          poll_options?: string[] | null;
+          poll_ends_at?: string | null;
+          poll_counts?: number[] | null;
           created_at?: string;
         };
         Update: {
@@ -199,6 +206,9 @@ export type Database = {
           tags?: string[];
           location?: string | null;
           place_key?: string | null;
+          poll_options?: string[] | null;
+          poll_ends_at?: string | null;
+          poll_counts?: number[] | null;
           created_at?: string;
         };
         Relationships: [
@@ -210,6 +220,28 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      poll_votes: {
+        Row: {
+          post_id: string;
+          user_id: string;
+          /** Índice da opção (0–3). Só o próprio voto é legível (anônimo). */
+          option: number;
+          created_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id: string;
+          option: number;
+          created_at?: string;
+        };
+        Update: {
+          post_id?: string;
+          user_id?: string;
+          option?: number;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       likes: {
         Row: {
