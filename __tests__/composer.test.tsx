@@ -291,7 +291,7 @@ describe('Composer: ingresso', () => {
 
   it('review: abre a lista, anexa e posta só com o ingresso (sem texto)', async () => {
     await render(<Composer variant="inline" />);
-    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
     await fireEvent.press(await screen.findByLabelText('Anexar review de A Story of Yonosuke'));
     expect(screen.queryByTestId('media-picker')).toBeNull();
     expect(screen.getByTestId('post-ticket')).toBeTruthy();
@@ -303,7 +303,8 @@ describe('Composer: ingresso', () => {
 
   it('música: tocando agora no topo; anexar e tirar com o ✕', async () => {
     await render(<Composer variant="inline" />);
-    await fireEvent.press(screen.getByLabelText('Anexar música'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Música' }));
     expect(mockRecent).toHaveBeenCalledWith('juanfm', 1);
     await fireEvent.press(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter'));
     expect(screen.getByText('Tocando agora')).toBeTruthy();
@@ -314,18 +315,36 @@ describe('Composer: ingresso', () => {
   it('um anexo por post: com ingresso, enquete desabilitada; com enquete, ingressos desabilitados', async () => {
     await render(<Composer variant="inline" />);
     await fireEvent.press(screen.getByLabelText('Adicionar enquete'));
-    expect(screen.getByLabelText('Anexar review do Letterboxd')).toBeDisabled();
-    expect(screen.getByLabelText('Anexar música')).toBeDisabled();
+    expect(screen.getByLabelText('Anexar filme ou música')).toBeDisabled();
     await fireEvent.press(screen.getByRole('button', { name: 'Remover enquete' }));
-    await fireEvent.press(screen.getByLabelText('Anexar música'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Música' }));
     await fireEvent.press(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter'));
     expect(screen.getByLabelText('Adicionar enquete')).toBeDisabled();
   });
 
-  it('sem Letterboxd no perfil: explica e leva pro Editar perfil', async () => {
+  it('um botão só: abre em Filme e troca pra Música na caixa', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
+    expect(screen.getByRole('tab', { name: 'Filme' })).toHaveProp('accessibilityState', { selected: true });
+    await screen.findByLabelText('Anexar review de A Story of Yonosuke');
+    await fireEvent.press(screen.getByRole('tab', { name: 'Música' }));
+    expect(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter')).toBeTruthy();
+    expect(screen.queryByLabelText('Anexar review de A Story of Yonosuke')).toBeNull();
+  });
+
+  it('só com Last.fm: a caixa já abre em Música', async () => {
     mockProfile = { letterboxd_user: null, lastfm_user: 'juanfm' };
     await render(<Composer variant="inline" />);
-    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
+    expect(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter')).toBeTruthy();
+    expect(mockListMyReviews).not.toHaveBeenCalled();
+  });
+
+  it('sem Letterboxd no perfil: explica e leva pro Editar perfil', async () => {
+    mockProfile = { letterboxd_user: null, lastfm_user: null };
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
     expect(screen.getByText('Coloca seu usuário do Letterboxd em Editar perfil pra puxar suas reviews.')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Ir pra Editar perfil' }));
     expect(mockRouterPush).toHaveBeenCalledWith('/profile/edit');
@@ -334,7 +353,7 @@ describe('Composer: ingresso', () => {
 
   it('link colado: sua review anexa; de outra pessoa avisa', async () => {
     await render(<Composer variant="inline" />);
-    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
     await screen.findByLabelText('Anexar review de A Story of Yonosuke');
     await fireEvent.changeText(screen.getByLabelText('Colar link da review'), 'https://letterboxd.com/ana/film/x/');
     await fireEvent.press(screen.getByRole('button', { name: 'Usar esse link' }));
@@ -348,7 +367,7 @@ describe('Composer: ingresso', () => {
     const { LetterboxdError } = jest.requireActual('../lib/api/letterboxd');
     mockListMyReviews.mockRejectedValueOnce(new LetterboxdError('unavailable'));
     await render(<Composer variant="inline" />);
-    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await fireEvent.press(screen.getByLabelText('Anexar filme ou música'));
     expect(await screen.findByText('O Letterboxd não respondeu agora. Tenta de novo daqui a pouco.')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(await screen.findByLabelText('Anexar review de A Story of Yonosuke')).toBeTruthy();

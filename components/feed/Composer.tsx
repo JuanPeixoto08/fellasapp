@@ -49,7 +49,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const contentWidth = useContentWidth();
   const { body, imageUris, location, poll, media } = useDraft();
   // ingresso sendo escolhido (caixa abaixo do texto): review do Letterboxd ou música
-  const [picking, setPicking] = useState<'review' | 'track' | null>(null);
+  const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
@@ -131,7 +131,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       emitPostCreated();
       clearDraft();
       setPlaceOpen(false);
-      setPicking(null);
+      setPicking(false);
       onPosted?.();
     } catch (e) {
       setError(friendlyError(e, 'Não rolou postar. Tenta de novo.'));
@@ -229,11 +229,10 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         ) : null}
         {picking ? (
           <MediaPicker
-            kind={picking}
-            onClose={() => setPicking(null)}
+            onClose={() => setPicking(false)}
             onPick={(picked) => {
               setDraft((d) => ({ ...d, media: picked }));
-              setPicking(null);
+              setPicking(false);
             }}
           />
         ) : null}
@@ -312,19 +311,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         }}
         disabled={!!poll || !!media || imageUris.length > 0 || saving}
       />
-      {/* ingresso: a sua review do Letterboxd ou a música; um anexo por post, nunca junto da enquete */}
+      {/* ingresso: um botão só, e na caixa a pessoa escolhe Filme (review do Letterboxd) ou Música;
+          um anexo por post, nunca junto da enquete */}
       <IconButton
-        icon="film-outline"
-        accessibilityLabel="Anexar review do Letterboxd"
+        icon="ticket-outline"
+        accessibilityLabel="Anexar filme ou música"
         variant="ghost"
-        onPress={() => setPicking('review')}
-        disabled={!!poll || !!media || saving}
-      />
-      <IconButton
-        icon="musical-notes-outline"
-        accessibilityLabel="Anexar música"
-        variant="ghost"
-        onPress={() => setPicking('track')}
+        onPress={() => setPicking(true)}
         disabled={!!poll || !!media || saving}
       />
       <View style={{ flex: 1 }} />
@@ -353,7 +346,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
       onConfirm={() => {
         clearDraft();
         setPlaceOpen(false);
-        setPicking(null);
+        setPicking(false);
         setError(null);
         setDiscarding(false);
         onCancel?.();

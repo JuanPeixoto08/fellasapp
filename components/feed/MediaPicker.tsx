@@ -7,10 +7,15 @@ import { LetterboxdError, listMyReviews } from '../../lib/api/letterboxd';
 import { getRecentTracks, hasLastfmKey } from '../../lib/lastfm/api';
 import { matchReviewLink, ratingStars, trackMedia, type PostMedia, type ReviewMedia, type TrackMedia } from '../../lib/postMedia';
 import { useTheme } from '../../lib/theme';
-import { Button, Icon, IconButton, interactiveStyle, Text, TextField } from '../ui';
+import { Button, Icon, IconButton, interactiveStyle, Tabs, Text, TextField } from '../ui';
 
 type Kind = 'review' | 'track';
-type Props = { kind: Kind; onPick: (media: PostMedia) => void; onClose: () => void };
+type Props = { onPick: (media: PostMedia) => void; onClose: () => void };
+
+const KINDS: { key: Kind; label: string }[] = [
+  { key: 'review', label: 'Filme' },
+  { key: 'track', label: 'Música' },
+];
 
 /** Músicas mostradas: a que está tocando (se tiver) e as últimas. */
 const RECENT_TRACKS = 6;
@@ -89,15 +94,17 @@ function MiniStars({ rating }: { rating: number | null }) {
 }
 
 /**
- * Escolher o ingresso no compositor: as suas reviews recentes do Letterboxd (ou o link de uma delas) ou a música
- * do Last.fm (tocando agora + as últimas). Caixa abaixo do texto, como a da enquete.
+ * Escolher o ingresso no compositor (um botão só): abas Filme | Música. Filme = as suas reviews recentes do
+ * Letterboxd (ou o link de uma delas); Música = o Last.fm (tocando agora + as últimas). Caixa abaixo do texto,
+ * como a da enquete. Abre em Filme, ou em Música se a pessoa só tem Last.fm.
  */
-export function MediaPicker({ kind, onPick, onClose }: Props) {
+export function MediaPicker({ onPick, onClose }: Props) {
   const t = useTheme();
   const router = useRouter();
   const { profile } = useSession();
   const letterboxdUser = profile?.letterboxd_user ?? null;
   const lastfmUser = profile?.lastfm_user ?? null;
+  const [kind, setKind] = useState<Kind>(!letterboxdUser && lastfmUser ? 'track' : 'review');
   const [load, setLoad] = useState<Load<ReviewMedia | TrackMedia>>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [link, setLink] = useState('');
@@ -157,10 +164,18 @@ export function MediaPicker({ kind, onPick, onClose }: Props) {
       testID="media-picker"
       style={{ borderWidth: t.borders.hairline, borderColor: t.colors.border, borderRadius: t.radii.lg, padding: t.spacing.sm, gap: t.spacing.sm }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: t.spacing.sm }}>
-        <Text variant="small" bold style={{ flex: 1 }}>
-          {kind === 'review' ? 'Suas reviews no Letterboxd' : 'O que você tá ouvindo'}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <Tabs
+            items={KINDS}
+            value={kind}
+            onChange={(next) => {
+              setKind(next);
+              setLink('');
+              setLinkError(undefined);
+            }}
+          />
+        </View>
         <IconButton icon="close" accessibilityLabel="Fechar" variant="ghost" size="sm" onPress={onClose} />
       </View>
 
