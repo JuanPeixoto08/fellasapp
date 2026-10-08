@@ -18,3 +18,18 @@ describe('0027_fellas_games.sql', () => {
     expect(credits).toContain("cron.schedule('fellas-games-reset', '0 3 * * 1'");
   });
 });
+
+const blackjack = readFileSync(`${__dirname}/../supabase/migrations/0028_blackjack.sql`, 'utf8');
+
+describe('0028_blackjack.sql', () => {
+  it('o sapato (bj_secrets) não tem política nenhuma: ninguém lê', () => {
+    expect(blackjack).toContain('alter table public.bj_secrets enable row level security;');
+    expect(blackjack).not.toMatch(/create policy[^;]*bj_secrets/);
+  });
+
+  it('o app só joga pelas funções', () => {
+    expect(blackjack).toContain('grant execute on function public.bj_deal(int) to authenticated;');
+    expect(blackjack).toContain('grant execute on function public.bj_act(uuid, text) to authenticated;');
+    expect(blackjack).toContain('revoke all on function public.bj_finish(uuid) from public, anon, authenticated;');
+  });
+});
