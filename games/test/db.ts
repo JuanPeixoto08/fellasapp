@@ -10,6 +10,7 @@ export const MIGRATIONS: string[] = [
   '0028_blackjack.sql',
   '0029_fellas_games_ajustes.sql',
   '0030_poker.sql',
+  '0031_poker_safeupdate.sql',
 ];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;
