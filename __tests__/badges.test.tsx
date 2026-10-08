@@ -7,7 +7,7 @@ import { PostCard } from '../components/PostCard';
 import { CommentItem } from '../components/feed/CommentItem';
 import { MemberRow } from '../components/profile/MemberRow';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
-import { VerifiedBadge } from '../components/ui';
+import { TrophyBadge, UserBadge, VerifiedBadge } from '../components/ui';
 import { badgeLabel, ownBadges, shownBadge } from '../lib/badges';
 import type { Comment, FeedPost } from '../lib/api/posts';
 import type { Profile } from '../lib/api/profiles';
@@ -72,6 +72,22 @@ describe('ownBadges', () => {
 
 describe('badgeLabel', () => {
   it('nome do selo', () => expect(badgeLabel('verified')).toBe('Verificado'));
+  it('troféu do campeão', () => expect(badgeLabel('weekly_champion')).toBe('Campeão da semana'));
+});
+
+describe('selo de campeão da semana', () => {
+  it('o app conhece e mostra o escolhido', () => {
+    expect(ownBadges(['weekly_champion', 'verified'])).toEqual(['weekly_champion', 'verified']);
+    expect(shownBadge(['verified', 'weekly_champion'], 'weekly_champion')).toBe('weekly_champion');
+  });
+  it('perdeu o título no reset: volta pro selo que ainda tem', () =>
+    expect(shownBadge(['verified'], 'weekly_champion')).toBe('verified'));
+  it('desenho com nome pro leitor de tela', async () => {
+    await render(<UserBadge badge="weekly_champion" />);
+    expect(screen.getByLabelText('Campeão da semana')).toBeTruthy();
+    await render(<TrophyBadge size="md" />);
+    expect(screen.getAllByLabelText('Campeão da semana').length).toBeGreaterThan(0);
+  });
 });
 
 describe('VerifiedBadge', () => {
