@@ -190,3 +190,18 @@ describe('folhas', () => {
     expect(snapAmount(100, { min: 200, max: 500 })).toBe(200);
   });
 });
+
+describe('valores que o banco aceita (revisão final)', () => {
+  it('entrada máxima de 10 em 10 quando a carteira é quebrada', () => {
+    expect(buyinRange(st(), 255)).toEqual({ min: 200, max: 250, ok: true });
+    expect(buyinRange(st({ me: { rathole_min: 735 } }), 2005)).toEqual({ min: 735, max: 735, ok: true });
+  });
+
+  it('½ pote e pote de 5 em 5 mesmo com aposta quebrada na mesa', () => {
+    const odd = st({ hand: hand({ current_bet: 33, min_raise_to: 56, pot: 66 }) });
+    const o = offer(odd, ME)!;
+    expect(o.halfPotTo % 5).toBe(0);
+    expect(o.potTo % 5).toBe(0);
+    expect(o.potTo).toBe(120); // 33 + 66 + 23 = 122 → 120
+  });
+});

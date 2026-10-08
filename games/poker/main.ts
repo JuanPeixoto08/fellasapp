@@ -9,7 +9,9 @@ import { watchTable as realWatch } from '../shared/realtime';
 import type { BoardRow, Fella, PokerAction, PokerHistoryRow, PokerState } from '../shared/types';
 import { initial, reduce, type PokerUi, type UiEvent } from './machine';
 import { buyinRange, clampRaise, isMyTurn, offer, playerOf, rebuyRange, seatOf, snapAmount } from './rules';
+import { createPlayer } from './player';
 import { createPokerTable, type PokerTable } from './table';
+import type { Step } from './tableDiff';
 import { buildView, diff, type TableView } from './tableDiff';
 import { createView } from './view';
 
@@ -51,7 +53,7 @@ let ui: PokerUi = initial;
 let table: PokerTable | null = null;
 let me: string | null = null;
 let drawn: TableView | null = null;
-let animating: Promise<void> = Promise.resolve();
+const player = createPlayer<Step[]>((steps) => table?.play(steps) ?? Promise.resolve());
 const people = new Map<string, Fella>();
 let history: PokerHistoryRow[] = [];
 let board: BoardRow[] = [];
@@ -122,12 +124,16 @@ function send(e: UiEvent) {
 function paint() {
   view.render(ui, table, { me, fella: (id) => people.get(id), history, board, tab, now: Date.now() });
   if (!table) return;
+  if (document.hidden) {
+    // escondida a mesa não anima: nada entra na fila e, ao voltar, ela é redesenhada inteira
+    drawn = null;
+    return;
+  }
   const next = buildView(ui.table, me, ui.cards, table.orientation());
   const steps = diff(drawn, next);
   if (!steps.length) return;
   drawn = next;
-  const t = table;
-  animating = animating.then(() => t.play(steps)).catch(() => {});
+  player.push(steps);
 }
 
 /** Retrato novo (tempo real ou resposta): cartas da mão nova, histórico, nomes, carteira, vibrar na minha vez. */
@@ -266,6 +272,8 @@ addEventListener('keydown', (e) => {
 
 // voltou para a aba: pode ter perdido eventos
 document.addEventListener('visibilitychange', () => {
+  player.cancel(); // o que ficou na fila é passado
+  drawn = null;
   if (!document.hidden && ui.phase === 'ready') void reload();
 });
 

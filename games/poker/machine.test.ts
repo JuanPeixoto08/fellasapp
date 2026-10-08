@@ -71,3 +71,18 @@ describe('poker machine', () => {
     expect(s.notice).toBe(WEEK_TURNED_POKER);
   });
 });
+
+describe('respostas fora de ordem (revisão final)', () => {
+  it('carga mais velha que o tempo real não apaga a mesa mais nova', () => {
+    let s = reduce(loaded(), { type: 'table', table: table(7, { hand: { id: 'h2', action_no: 4 } as PokerState['hand'] }), now: NOW });
+    s = reduce(s, { type: 'loaded', table: table(6), cards: { hand_id: 'h1', cards: [1, 2] }, wallet: wallet(), now: NOW });
+    expect(s.table!.seq).toBe(7);
+    expect(s.cards).toBeNull(); // cartas de outra mão não entram
+  });
+
+  it('cartas de outra mão chegando atrasadas são ignoradas', () => {
+    const s = reduce(loaded(), { type: 'table', table: table(7, { hand: { id: 'h2', action_no: 0 } as PokerState['hand'] }), now: NOW });
+    expect(reduce(s, { type: 'cards', cards: { hand_id: 'h1', cards: [1, 2] } }).cards).toBeNull();
+    expect(reduce(s, { type: 'cards', cards: { hand_id: 'h2', cards: [3, 4] } }).cards).toEqual({ hand_id: 'h2', cards: [3, 4] });
+  });
+});

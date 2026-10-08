@@ -1181,5 +1181,82 @@ begin
 end;
 $$;
 
+-- Blackjack (0028) com a carteira travada antes da mão, como o reset faz (revisão final)
+create or replace function public.bj_act(p_round uuid, p_action text)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  r       public.bj_rounds;
+  s       public.bj_secrets;
+  h       jsonb;
+  v_cards smallint[];
+  v_bet   int;
+  v_aces  boolean;
+  v_next  int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  if p_action is null or p_action not in ('hit', 'stand', 'double', 'split') then
+    raise exception 'invalid_action' using errcode = 'P0001';
+  end if;
+  -- carteira antes da mão: mesma ordem do reset de segunda (mesa → carteiras → rodadas), sem deadlock à meia-noite
+  perform 1 from public.game_wallets where user_id = auth.uid() for update;
+  select * into r from public.bj_rounds where id = p_round and user_id = auth.uid() for update;
+  if not found then
+    raise exception 'round_not_found' using errcode = 'P0001';
+  end if;
+  if r.status <> 'playing' then
+    raise exception 'round_done' using errcode = 'P0001';
+  end if;
+  perform 1 from public.game_wallets where user_id = r.user_id for update;
+  select * into s from public.bj_secrets where round_id = r.id for update;
+
+  h := r.hands -> r.active;
+  v_cards := public.bj_cards(h -> 'cards');
+  v_bet := (h ->> 'bet')::int;
+
+  if p_action = 'hit' then
+    v_cards := v_cards || s.shoe[1];
+    s.shoe := s.shoe[2:];
+    h := h || jsonb_build_object('cards', to_jsonb(v_cards), 'done', public.bj_hand_total(v_cards) >= 21);
+    r.hands := jsonb_set(r.hands, array[r.active::text], h);
+  elsif p_action = 'stand' then
+    r.hands := jsonb_set(r.hands, array[r.active::text], h || '{"done": true}');
+  elsif p_action = 'double' then
+    if array_length(v_cards, 1) <> 2 or (h ->> 'from_split_aces')::boolean then
+      raise exception 'invalid_action' using errcode = 'P0001';
+    end if;
+    perform public.games_move(r.user_id, -v_bet, 'bet', r.id);
+    v_cards := v_cards || s.shoe[1];
+    s.shoe := s.shoe[2:];
+    h := h || jsonb_build_object('cards', to_jsonb(v_cards), 'bet', v_bet * 2, 'doubled', true, 'done', true);
+    r.hands := jsonb_set(r.hands, array[r.active::text], h);
+  else -- split
+    if jsonb_array_length(r.hands) <> 1 or array_length(v_cards, 1) <> 2
+       or public.bj_card_value(v_cards[1]) <> public.bj_card_value(v_cards[2]) then
+      raise exception 'invalid_action' using errcode = 'P0001';
+    end if;
+    perform public.games_move(r.user_id, -v_bet, 'bet', r.id);
+    v_aces := v_cards[1] % 13 = 0;
+    r.hands := jsonb_build_array(
+      public.bj_new_hand(array[v_cards[1], s.shoe[1]], v_bet, v_aces),
+      public.bj_new_hand(array[v_cards[2], s.shoe[2]], v_bet, v_aces));
+    s.shoe := s.shoe[3:];
+  end if;
+
+  -- próxima mão não pronta; nenhuma → banca joga e acerta
+  select min(o - 1) into v_next
+    from jsonb_array_elements(r.hands) with ordinality e(x, o)
+   where not (x ->> 'done')::boolean;
+  update public.bj_secrets set shoe = s.shoe where round_id = r.id;
+  update public.bj_rounds set hands = r.hands, active = coalesce(v_next, active) where id = r.id
+  returning * into r;
+  if v_next is null then
+    r := public.bj_finish(r.id);
+  end if;
+  return public.bj_state(r);
+end;
+$$;
+
 -- primeiro retrato (a mesa vazia)
 select public.poker_snapshot();

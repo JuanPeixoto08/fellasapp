@@ -52,21 +52,27 @@ export const initial: PokerUi = {
 
 const offset = (t: PokerState, now: number) => Date.parse(t.server_now) - now;
 const turned = (s: PokerUi, w: Wallet) => s.weekStart !== null && w.week_start !== s.weekStart;
+/** Cartas que valem para a mesa: da mão que está nela (ou nenhuma). */
+const sameHand = (t: PokerState | null, c: PokerCards) => !c || !t?.hand || c.hand_id === t.hand.id;
 
 export function reduce(s: PokerUi, e: UiEvent): PokerUi {
   switch (e.type) {
-    case 'loaded':
+    case 'loaded': {
+      // o tempo real pode ter trazido um retrato mais novo enquanto a carga ia e voltava: fica o mais novo
+      const keep = !!s.table && s.table.seq > e.table.seq;
+      const table = keep ? { ...s.table!, me: e.table.me ?? s.table!.me } : e.table;
       return {
         ...s,
         phase: 'ready',
-        table: e.table,
-        cards: e.cards,
+        table,
+        cards: sameHand(table, e.cards) ? e.cards : s.cards,
         wallet: e.wallet,
         offsetMs: offset(e.table, e.now),
         weekStart: e.wallet.week_start,
         notice: turned(s, e.wallet) ? WEEK_TURNED_POKER : s.notice,
         busy: false,
       };
+    }
     case 'table': {
       if (s.table && e.table.seq < s.table.seq) return s; // retrato velho chegou depois
       const sameTurn = e.table.hand?.id === s.table?.hand?.id && e.table.hand?.action_no === s.table?.hand?.action_no;
@@ -78,7 +84,8 @@ export function reduce(s: PokerUi, e: UiEvent): PokerUi {
       };
     }
     case 'cards':
-      return { ...s, cards: e.cards };
+      // resposta atrasada de outra mão não apaga as cartas da mão de agora
+      return sameHand(s.table, e.cards) ? { ...s, cards: e.cards } : s;
     case 'wallet':
       return { ...s, wallet: e.wallet, weekStart: e.wallet.week_start, notice: turned(s, e.wallet) ? WEEK_TURNED_POKER : s.notice };
     case 'request':

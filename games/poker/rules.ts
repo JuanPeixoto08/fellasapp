@@ -52,8 +52,9 @@ export function offer(s: PokerState | null, me: string | null): Offer | null {
     canRaise: !p.capped && maxTo > h.current_bet,
     minTo,
     maxTo,
-    halfPotTo: clamp(h.current_bet + down(potAfterCall / 2)),
-    potTo: clamp(h.current_bet + down(potAfterCall)),
+    // de 5 em 5 no total (a aposta na mesa pode estar quebrada depois de um empate com ficha sobrando)
+    halfPotTo: clamp(down(h.current_bet + potAfterCall / 2)),
+    potTo: clamp(down(h.current_bet + potAfterCall)),
   };
 }
 
@@ -98,7 +99,9 @@ export function lastLabel(p: PokerPlayer): string | null {
 /** Faixa da folha de sentar: entrada da mesa, anti-rathole e o que tenho na carteira. */
 export function buyinRange(s: PokerState, wallet: number): { min: number; max: number; ok: boolean } {
   const min = Math.max(s.buyin[0], s.me?.rathole_min ?? 0);
-  const max = Math.min(Math.max(s.buyin[1], min), wallet);
+  const cap = Math.min(Math.max(s.buyin[1], min), wallet);
+  // de 10 em 10 (o banco recusa 255); só o mínimo exato do anti-rathole pode ser quebrado
+  const max = cap === min ? cap : Math.floor(cap / 10) * 10;
   return { min, max, ok: max >= min };
 }
 

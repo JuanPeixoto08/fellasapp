@@ -27,4 +27,10 @@ describe('0030_poker.sql', () => {
   it('reset trava mesa e carteiras antes de mexer (M2)', () => {
     expect(poker).toContain('perform 1 from public.game_wallets where week_start < v_new for update;');
   });
+
+  it('Blackjack trava a carteira antes da mão, na mesma ordem do reset (sem deadlock à meia-noite)', () => {
+    expect(poker).toMatch(
+      /create or replace function public\.bj_act[\s\S]*?from public\.game_wallets where user_id = auth\.uid\(\) for update;[\s\S]*?from public\.bj_rounds where id = p_round/,
+    );
+  });
 });
