@@ -117,3 +117,13 @@ describe('matchReviewLink (link colado → qual review sua)', () => {
     expect(matchReviewLink('oi', 'oliveira')).toEqual({ error: 'not_review' });
   });
 });
+
+describe('dayLabel', () => {
+  it('data do ingresso', () => {
+    const { dayLabel } = require('../lib/postMedia');
+    expect(dayLabel('2025-12-30')).toBe('30 dez 2025');
+    expect(dayLabel('2026-01-05')).toBe('5 jan 2026');
+    expect(dayLabel(null)).toBeNull();
+    expect(dayLabel('2026-13-01')).toBeNull();
+  });
+});

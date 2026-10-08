@@ -132,3 +132,12 @@ export function matchReviewLink(input: string, username: string): ReviewLinkMatc
   if (m[1].toLowerCase() !== username.toLowerCase()) return { error: 'not_yours' };
   return { url: `https://letterboxd.com/${m[1].toLowerCase()}/film/${m[2].toLowerCase()}/${m[3] ? `${m[3]}/` : ''}` };
 }
+
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** "2025-12-30" → "30 dez 2025" (a sessão do ingresso). */
+export function dayLabel(day: string | null): string | null {
+  const m = day ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(day) : null;
+  const month = m ? MONTHS_SHORT[Number(m[2]) - 1] : undefined;
+  return m && month ? `${Number(m[3])} ${month} ${m[1]}` : null;
+}

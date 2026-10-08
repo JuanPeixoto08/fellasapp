@@ -177,6 +177,11 @@ export const layout = {
   /** Imagens de um comentário: largura máxima do bloco e lado da miniatura no campo de comentar. */
   commentMediaWidth: 280,
   commentThumb: 64,
+  /**
+   * Ingresso no post (review/música): largura do canhoto (pôster 2:3 na review, capa quadrada na música),
+   * altura mínima, raio dos recortes redondos e o espaçamento das letras do rótulo do bilhete.
+   */
+  ticket: { reviewStub: 92, reviewMinHeight: 138, trackStub: 96, trackMinHeight: 96, notch: 10, kickerTracking: 1.2 },
   gutter: spacing.lg,
   minTouch: 44,
 } as const;

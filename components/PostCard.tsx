@@ -14,6 +14,7 @@ import { MentionText } from './MentionText';
 import { AuthorLink } from './profile/AuthorLink';
 import { PostNowPlaying } from './music/PostNowPlaying';
 import { PostPoll } from './feed/PostPoll';
+import { PostTicket } from './feed/PostTicket';
 import { openProfile } from '../lib/openProfile';
 import { PlaceLink } from './places/PlaceLink';
 import { nextReaction } from '../lib/reactionState';
@@ -105,7 +106,8 @@ export function PostCard({
               <AuthorLink username={post.author.username} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
                 <NameWithBadge name={name} badges={post.author.badges} featuredBadge={post.author.featured_badge} bold />
               </AuthorLink>
-              {post.author.lastfm_user && post.author.show_now_playing !== false ? (
+              {/* com música anexada, a linha ao vivo some: senão o post mostra duas músicas */}
+              {post.author.lastfm_user && post.author.show_now_playing !== false && post.media?.kind !== 'track' ? (
                 <PostNowPlaying
                   user={post.author.lastfm_user}
                   onPress={linkAuthor ? () => openProfile(post.author.username, { tab: 'music' }) : undefined}
@@ -158,6 +160,7 @@ export function PostCard({
             </Pressable>
           ) : null}
           {post.poll ? <PostPoll postId={post.id} poll={post.poll} /> : null}
+          {post.media ? <PostTicket media={post.media} /> : null}
           <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={setViewing} />
           <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>
