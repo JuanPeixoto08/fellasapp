@@ -1,4 +1,15 @@
-import { addComment, createPost, deleteComment, deletePost, listComments, listFeed, MAX_COMMENT_IMAGES, toggleLike } from '../lib/api/posts';
+import {
+  addComment,
+  createPost,
+  deleteComment,
+  deletePost,
+  listComments,
+  listFeed,
+  MAX_COMMENT_IMAGES,
+  PollVoteError,
+  toggleLike,
+  votePoll,
+} from '../lib/api/posts';
 import { clearSignedUrlCache } from '../lib/api/storage';
 
 const mockCalls: { table: string; op: string; args: unknown[] }[] = [];
@@ -405,5 +416,82 @@ describe('imagens no comentário', () => {
     mockResults['comments.delete'] = { data: [{ id: 'c1', images: ['me/1-0.jpg', 'me/1-1.gif'] }], error: null };
     await deleteComment('c1');
     expect(mockRemoved).toEqual(['me/1-0.jpg', 'me/1-1.gif']);
+  });
+});
+
+describe('enquete no post', () => {
+  const pollRow = (extra: Record<string, unknown> = {}) => ({
+    id: 'p1',
+    author_id: 'u1',
+    body: 'Bora?',
+    image_url: null,
+    images: [],
+    created_at: '2026-10-07T12:00:00Z',
+    poll_options: ['Sim', 'Não'],
+    poll_ends_at: '2026-10-08T12:00:00Z',
+    poll_counts: [3, 1],
+    author: null,
+    likes: [],
+    comments: [],
+    ...extra,
+  });
+
+  it('createPost grava as opções limpas e o fim pelo prazo', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-07T12:00:00Z'));
+    try {
+      mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+      await createPost({ body: 'Bora?', poll: { options: [' Sim ', '', 'Não'], minutes: 90 } });
+      const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+      expect(row.poll_options).toEqual(['Sim', 'Não']);
+      expect(row.poll_ends_at).toBe('2026-10-07T13:30:00.000Z');
+      expect(row).not.toHaveProperty('poll_counts');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('enquete precisa da pergunta e de 2 opções; não vai com fotos', async () => {
+    await expect(createPost({ body: '  ', poll: { options: ['Sim', 'Não'], minutes: 60 } })).rejects.toThrow();
+    await expect(createPost({ body: 'Bora?', poll: { options: ['Sim', ' '], minutes: 60 } })).rejects.toThrow();
+    await expect(
+      createPost({ body: 'Bora?', imageUris: ['a.jpg'], poll: { options: ['Sim', 'Não'], minutes: 60 } }),
+    ).rejects.toThrow();
+  });
+
+  it('post sem enquete não manda as colunas (funciona sem a migration 0025)', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: 'oi' });
+    const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+    expect(row).not.toHaveProperty('poll_options');
+  });
+
+  it('listFeed traz a enquete e o meu voto (uma consulta, só posts com enquete)', async () => {
+    mockResults['posts.select'] = { data: [pollRow(), { ...pollRow({ id: 'p2', poll_options: null, poll_ends_at: null, poll_counts: null }) }], error: null };
+    mockResults['poll_votes.select'] = { data: [{ post_id: 'p1', option: 1 }], error: null };
+    const { posts } = await listFeed();
+    expect(posts[0].poll).toEqual({ options: ['Sim', 'Não'], counts: [3, 1], endsAt: '2026-10-08T12:00:00Z', myVote: 1 });
+    expect(posts[1].poll).toBeUndefined();
+    expect(mockCalls).toContainEqual({ table: 'poll_votes', op: 'in', args: ['post_id', ['p1']] });
+  });
+
+  it('nenhum post com enquete: nem pergunta dos votos', async () => {
+    mockResults['posts.select'] = { data: [pollRow({ poll_options: null, poll_ends_at: null, poll_counts: null })], error: null };
+    await listFeed();
+    expect(mockCalls.some((c) => c.table === 'poll_votes')).toBe(false);
+  });
+
+  it('votePoll grava o meu voto', async () => {
+    mockResults['poll_votes.insert'] = { data: null, error: null };
+    await votePoll('p1', 1);
+    expect(mockCalls).toContainEqual({ table: 'poll_votes', op: 'insert', args: [{ post_id: 'p1', user_id: 'me', option: 1 }] });
+  });
+
+  it('enquete encerrada: erro próprio', async () => {
+    mockResults['poll_votes.insert'] = { data: null, error: { message: 'poll_closed', code: '23514' } };
+    await expect(votePoll('p1', 0)).rejects.toMatchObject({ kind: 'closed' });
+    mockResults['poll_votes.insert'] = { data: null, error: { message: 'duplicate key', code: '23505' } };
+    await expect(votePoll('p1', 0)).rejects.toMatchObject({ kind: 'voted' });
+    mockResults['poll_votes.insert'] = { data: null, error: { message: 'rede', code: '' } };
+    await expect(votePoll('p1', 0)).rejects.toBeInstanceOf(PollVoteError);
   });
 });

@@ -1,5 +1,6 @@
 import { shrinkForUpload } from '../imageUpload';
 import { cleanPlace } from '../places';
+import { cleanOptions, POLL_LIMITS } from '../polls';
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
 import {
@@ -46,7 +47,12 @@ export type FeedPost = {
   likedByMe: boolean;
   reactions: ReactionSummary[];
   myReaction: string | null;
+  /** Enquete (só em posts com enquete). */
+  poll?: FeedPoll;
 };
+
+/** Enquete do post: opções, votos por opção (o banco conta), fim e o meu voto (índice) ou null. */
+export type FeedPoll = { options: string[]; counts: number[]; endsAt: string; myVote: number | null };
 
 export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
 
@@ -99,6 +105,7 @@ async function mapPosts(
   rows: PostRow[],
   liked: Set<string>,
   reactions: Map<string, ReactionGroup>,
+  votes: Map<string, number> = new Map(),
 ): Promise<FeedPost[]> {
   const signed = await signPaths(rows.flatMap((r) => [...imagePaths(r), r.author?.avatar_url]));
   return rows.map((row) => {
@@ -120,8 +127,31 @@ async function mapPosts(
       likedByMe: liked.has(row.id),
       reactions: r.reactions,
       myReaction: r.myReaction,
+      ...(row.poll_options && row.poll_ends_at
+        ? {
+            poll: {
+              options: row.poll_options,
+              counts: row.poll_options.map((_, i) => row.poll_counts?.[i] ?? 0),
+              endsAt: row.poll_ends_at,
+              myVote: votes.get(row.id) ?? null,
+            },
+          }
+        : {}),
     };
   });
+}
+
+/** Meus votos nas enquetes destes posts (só eu leio os meus: anônimo). Sem enquete, nem pergunta. */
+async function myPollVotes(userId: string, rows: PostRow[]): Promise<Map<string, number>> {
+  const ids = rows.filter((r) => r.poll_options).map((r) => r.id);
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from('poll_votes')
+    .select('post_id, option')
+    .eq('user_id', userId)
+    .in('post_id', ids);
+  if (error) throw error;
+  return new Map((data ?? []).map((v) => [v.post_id, v.option]));
 }
 
 async function likedSet(userId: string, postIds: string[]): Promise<Set<string>> {
@@ -166,11 +196,12 @@ export async function listFeed(
   if (error) throw error;
   const rows = (data ?? []) as unknown as PostRow[];
   const ids = rows.map((r) => r.id);
-  const [liked, reactions] = await Promise.all([
+  const [liked, reactions, votes] = await Promise.all([
     likedSet(userId, ids),
     postReactionsMap(userId, ids),
+    myPollVotes(userId, rows),
   ]);
-  const posts = await mapPosts(rows, liked, reactions);
+  const posts = await mapPosts(rows, liked, reactions, votes);
   return {
     posts,
     nextCursor:
@@ -186,11 +217,13 @@ export async function getPost(postId: string): Promise<FeedPost> {
     .eq('id', postId)
     .single();
   if (error) throw error;
-  const [liked, reactions] = await Promise.all([
+  const row = data as unknown as PostRow;
+  const [liked, reactions, votes] = await Promise.all([
     likedSet(userId, [postId]),
     postReactionsMap(userId, [postId]),
+    myPollVotes(userId, [row]),
   ]);
-  const [post] = await mapPosts([data as unknown as PostRow], liked, reactions);
+  const [post] = await mapPosts([row], liked, reactions, votes);
   return post;
 }
 
@@ -218,16 +251,25 @@ export async function createPost({
   body,
   imageUris = [],
   location = null,
+  poll = null,
 }: {
   body: string;
   /** Fotos locais (até 4), na ordem de exibição. */
   imageUris?: string[];
   /** Local escrito por quem posta; limpo aqui (pontas, espaços repetidos). */
   location?: string | null;
+  /** Enquete: opções como digitadas (as vazias saem) e o prazo em minutos. */
+  poll?: { options: string[]; minutes: number } | null;
 }): Promise<Tables<'posts'>> {
   const text = body.trim();
   if (!text && imageUris.length === 0) throw new Error('Escreva algo ou escolha uma imagem');
   if (imageUris.length > MAX_IMAGES) throw new Error(`No máximo ${MAX_IMAGES} fotos por post`);
+  const pollOptions = poll ? cleanOptions(poll.options).slice(0, POLL_LIMITS.maxOptions) : null;
+  if (pollOptions) {
+    if (!text) throw new Error('Escreve a pergunta da enquete');
+    if (pollOptions.length < POLL_LIMITS.minOptions) throw new Error('A enquete precisa de 2 opções');
+    if (imageUris.length > 0) throw new Error('Enquete vai sem fotos');
+  }
   const userId = await currentUserId();
   const place = cleanPlace(location);
 
@@ -249,6 +291,10 @@ export async function createPost({
     ...(paths.length > 1 ? { images: paths } : {}),
     // só com local: sem ele o insert é o mesmo de antes (funciona mesmo sem a migration 0020)
     ...(place ? { location: place } : {}),
+    // só com enquete (funciona mesmo sem a migration 0025); as contagens o banco zera
+    ...(pollOptions && poll
+      ? { poll_options: pollOptions, poll_ends_at: new Date(Date.now() + poll.minutes * 60_000).toISOString() }
+      : {}),
   };
   const { data, error } = await supabase.from('posts').insert(row).select().single();
   if (error) {
@@ -256,6 +302,25 @@ export async function createPost({
     throw error;
   }
   return data;
+}
+
+/** Voto recusado: enquete encerrada, já votei (voto é definitivo) ou outro erro (rede etc.). */
+export class PollVoteError extends Error {
+  constructor(readonly kind: 'closed' | 'voted' | 'other', cause?: unknown) {
+    super(kind === 'closed' ? 'A enquete já acabou.' : kind === 'voted' ? 'Você já votou nessa.' : 'Não rolou votar. Tenta de novo.');
+    if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
+  }
+}
+
+/** Vota numa opção (índice). Definitivo: não troca nem tira. */
+export async function votePoll(postId: string, option: number): Promise<void> {
+  const userId = await currentUserId();
+  const { error } = await supabase.from('poll_votes').insert({ post_id: postId, user_id: userId, option });
+  if (!error) return;
+  const { code, message } = error as { code?: string; message?: string };
+  if (message?.includes('poll_closed')) throw new PollVoteError('closed', error);
+  if (code === '23505') throw new PollVoteError('voted', error);
+  throw new PollVoteError('other', error);
 }
 
 /** Curte/descurte. Retorna o novo estado (true = curtido). */
