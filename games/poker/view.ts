@@ -122,8 +122,10 @@ export function createView(root: HTMLElement, h: ViewHandlers): View {
 
   // topo
   const top = el('header', 'top');
-  const back = el('a', undefined, '← Voltar');
+  const back = el('a');
   back.href = '/games';
+  back.setAttribute('aria-label', 'Voltar');
+  back.append(el('span', undefined, '←'), el('span', 'word', 'Voltar'));
   const title = el('span', 'title', 'Poker');
   const tools = el('div', 'tools');
   const histBtn = button('Mãos', 'ghost hist', h.openHistory);
@@ -323,7 +325,7 @@ export function createView(root: HTMLElement, h: ViewHandlers): View {
     const full = s.seats.length >= 6;
     const away = mine?.status === 'away';
 
-    title.textContent = `Poker · cegas ${s.blinds[0]}/${s.blinds[1]}`;
+    title.replaceChildren(document.createTextNode('Poker'), el('small', 'blinds', ` · cegas ${s.blinds[0]}/${s.blinds[1]}`));
     leaveBtn.hidden = !mine;
     rebuyBtn.hidden = !mine || inOpenHand || mine.stack >= s.buyin[1];
 

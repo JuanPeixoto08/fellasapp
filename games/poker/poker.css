@@ -1,6 +1,10 @@
 /* HUD do poker: lugares em volta da mesa, relógio, régua do aumento e folhas. Cores do hud.css (mockups aprovados
    em .superpowers/brainstorm/20068-1791484731/content/mesa-celular.html e tela-pc-sentar.html). */
-.poker .top .title { font-weight: 700; }
+.poker .top .title { font-weight: 700; white-space: nowrap; }
+.poker .top .title .blinds { font-size: inherit; font-weight: 600; }
+.app[data-orient='portrait'] .top .title, .app[data-orient='portrait'] .top .word { display: none; }
+.app[data-orient='portrait'] .ghost { padding: 0 10px; }
+.poker .top > a { white-space: nowrap; gap: 4px; }
 .poker .tools { display: flex; align-items: center; gap: 8px; }
 .ghost { min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid rgba(244, 241, 234, 0.45); background: transparent; cursor: pointer; white-space: nowrap; }
 .app[data-orient='landscape'] .ghost.hist { display: none; }

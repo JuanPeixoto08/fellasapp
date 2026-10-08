@@ -390,8 +390,9 @@ export function createPokerTable(canvas: HTMLCanvasElement): PokerTable | null {
     return project(SEATS[orient][visual]);
   }
   function potAnchor() {
+    // em pé, acima das fichas do pote; deitado, ao lado delas (acima cobriria as cartas de quem senta em cima)
     const p = POT[orient];
-    return project({ x: p.x, z: p.z - 0.55 });
+    return project(orient === 'portrait' ? { x: p.x, z: p.z - 0.55 } : { x: p.x + 1.15, z: p.z });
   }
   function mineAnchor() {
     const a = myCardSlot(orient, 0);

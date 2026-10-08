@@ -8,19 +8,19 @@ export type Slot = P2 & { scale: number };
 
 /** Meia largura (x) e meio comprimento (z) do feltro. */
 export const FELT: Record<Orientation, { rx: number; rz: number }> = {
-  portrait: { rx: 2.75, rz: 4.3 },
+  portrait: { rx: 2.3, rz: 4.2 },
   landscape: { rx: 4.9, rz: 2.75 },
 };
 
 /** Lugares na tela, no sentido horário. Em pé: 0 embaixo. Deitado: 0 à esquerda (o lugar 0 do banco). */
 export const SEATS: Record<Orientation, P2[]> = {
   portrait: [
-    { x: 0, z: 4.55 },
-    { x: -2.95, z: 2.2 },
-    { x: -2.95, z: -1.9 },
-    { x: 0, z: -4.55 },
-    { x: 2.95, z: -1.9 },
-    { x: 2.95, z: 2.2 },
+    { x: 0, z: 5.0 },
+    { x: -2.5, z: 2.2 },
+    { x: -2.5, z: -1.9 },
+    { x: 0, z: -4.45 },
+    { x: 2.5, z: -1.9 },
+    { x: 2.5, z: 2.2 },
   ],
   landscape: [
     { x: -5.2, z: 0 },
@@ -43,17 +43,19 @@ export function holeSlot(o: Orientation, v: number, i: number): Slot {
 /** As minhas 2 cartas: embaixo, no meio da mesa, grandes. */
 export function myCardSlot(o: Orientation, i: number): Slot {
   return o === 'portrait'
-    ? { x: (i - 0.5) * 1.15, z: 2.85, scale: 1.25 }
+    ? { x: (i - 0.5) * 1.05, z: 2.55, scale: 1.15 }
     : { x: (i - 0.5) * 1.05, z: 1.75, scale: 1.1 };
 }
 
 /** As 5 cartas da mesa, em fila no meio. */
 export function boardSlot(o: Orientation, i: number): Slot {
-  return { x: (i - 2) * 0.98, z: o === 'portrait' ? -0.15 : -0.35, scale: 0.98 };
+  return o === 'portrait' ? { x: (i - 2) * 0.84, z: -0.15, scale: 0.84 } : { x: (i - 2) * 0.98, z: -0.1, scale: 0.98 };
 }
 
 /** Fichas apostadas na rodada: entre o lugar e o meio. */
 export function betSpot(o: Orientation, v: number): P2 {
+  // em pé, quem está embaixo tem as cartas grandes na frente: a aposta vai acima delas
+  if (o === 'portrait' && v === 0) return { x: 0, z: 1.45 };
   return toward(SEATS[o][v], 0.45);
 }
 
@@ -64,11 +66,11 @@ export function buttonSpot(o: Orientation, v: number): P2 {
 }
 
 /** Pote (acima das cartas da mesa) e o baralho de onde as cartas saem (no meio). */
-export const POT: Record<Orientation, P2> = { portrait: { x: 0, z: -1.55 }, landscape: { x: 0, z: -1.55 } };
-export const DECK: Record<Orientation, P2> = { portrait: { x: 0, z: -0.15 }, landscape: { x: 0, z: -0.35 } };
+export const POT: Record<Orientation, P2> = { portrait: { x: 0, z: -1.45 }, landscape: { x: 0, z: -1.3 } };
+export const DECK: Record<Orientation, P2> = { portrait: { x: 0, z: -0.15 }, landscape: { x: 0, z: -0.1 } };
 
 export function camera(o: Orientation): { fov: number; pos: [number, number, number]; look: [number, number, number] } {
   return o === 'portrait'
-    ? { fov: 50, pos: [0, 12.6, 1.6], look: [0, 0, 0.1] }
+    ? { fov: 50, pos: [0, 14.2, 1.4], look: [0, 0, 0.1] }
     : { fov: 40, pos: [0, 11.5, 3.6], look: [0, 0, 0.15] };
 }
