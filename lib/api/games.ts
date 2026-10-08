@@ -28,6 +28,9 @@ type WalletRow = { balance: number; fiado_count: number; can_fiado: boolean; ope
 type BoardRow = Pick<Database['public']['Tables']['game_wallets']['Row'], 'user_id' | 'balance' | 'fiado_count'>;
 type WeekRow = Database['public']['Tables']['game_weeks']['Row'];
 
+/** Aposta mínima da mesa: abaixo disso não dá pra jogar (e o fiado libera). */
+export const MIN_BET = 10;
+
 export const GAMES_ERRORS = {
   load: 'Não deu pra carregar o placar. Tenta de novo.',
   fiado: 'Não deu pra pegar o fiado. Tenta de novo.',

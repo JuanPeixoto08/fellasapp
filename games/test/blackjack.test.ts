@@ -274,3 +274,26 @@ describe('fiado depois de quebrar na mesa', () => {
     expect(e).toMatchObject({ balance: 0, can_fiado: true });
   });
 });
+
+describe('ajustes (0029)', () => {
+  it('aposta só em múltiplos de 10 (o 3:2 sempre fecha em crédito inteiro)', async () => {
+    await expect(deal(15)).rejects.toThrow(/bet_out_of_range/);
+    expect((await t.rpc<{ balance: number }>('games_wallet')).balance).toBe(1000);
+  });
+
+  it('funções de conta não ficam abertas para o app nem para quem não logou', async () => {
+    for (const role of ['authenticated', 'anon'] as const) {
+      await expect(t.asRole(role, `select public.bj_hand_total('{1,2}'::smallint[])`)).rejects.toThrow();
+      await expect(t.asRole(role, `select public.games_week_start()`)).rejects.toThrow();
+      await expect(t.asRole(role, `select public.bj_new_hand('{1,2}'::smallint[], 10, false)`)).rejects.toThrow();
+    }
+  });
+
+  it('mão fechada não guarda mais o sapato', async () => {
+    await rig(t, ['10h', '10s', '9c', '7d']);
+    const s = await deal(100);
+    expect(await q('select count(*)::int as n from public.bj_secrets')).toEqual([{ n: 1 }]);
+    await act(s.id, 'stand');
+    expect(await q('select count(*)::int as n from public.bj_secrets')).toEqual([{ n: 0 }]);
+  });
+});
