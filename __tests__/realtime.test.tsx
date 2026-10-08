@@ -146,6 +146,10 @@ describe('affectsNotifications', () => {
     expect(affectsNotifications({ kind: 'change', table: 'posts', type: 'DELETE', row: {}, mine: false })).toBe(false);
   });
 
+  it('mesa de poker não vira notificação', () => {
+    expect(affectsNotifications({ kind: 'change', table: 'poker_tables', type: 'UPDATE', row: {}, mine: false })).toBe(false);
+  });
+
   it('ideia e voto em ideia não viram notificação', () => {
     expect(affectsNotifications({ kind: 'change', table: 'ideas', type: 'INSERT', row: {}, mine: false })).toBe(false);
     expect(affectsNotifications({ kind: 'change', table: 'idea_votes', type: 'INSERT', row: {}, mine: false })).toBe(false);

@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { GAMES_ERRORS, MIN_BET, type Champion, type Wallet } from '../../lib/api/games';
+import { GAMES_ERRORS, MIN_BET, type Champion, type PokerTable, type Wallet } from '../../lib/api/games';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Button, Divider, Text, TrophyBadge } from '../ui';
 import { TableArt } from './TableArt';
@@ -26,15 +26,22 @@ export function WalletRow({
   onFiado: () => void;
 }) {
   const t = useTheme();
-  // sem dar pra apostar, sem mão aberta e sem fiado liberado: o de hoje já foi
+  const seated = wallet.seatedStack !== null;
+  // sem dar pra apostar: sentado no poker, primeiro levanta; sem mão aberta e sem fiado liberado, o de hoje já foi
   const note =
     fiadoMessage ??
-    (wallet.balance < MIN_BET && !wallet.canFiado && !wallet.openRoundId ? GAMES_ERRORS.fiadoToday : null);
+    (wallet.balance < MIN_BET
+      ? seated
+        ? GAMES_ERRORS.fiadoSeated
+        : !wallet.canFiado && !wallet.openRoundId
+          ? GAMES_ERRORS.fiadoToday
+          : null
+      : null);
   return (
     <View style={{ gap: t.spacing.md }}>
       <View
         accessible
-        accessibilityLabel={`Seus créditos: ${fmt(wallet.balance)}. ${position ? `${position}º lugar` : 'Fora do placar até a primeira mão'}`}
+        accessibilityLabel={`Seus créditos: ${fmt(wallet.balance)}${seated ? `, mais ${fmt(wallet.seatedStack!)} na mesa de poker` : ''}. ${position ? `${position}º lugar` : 'Fora do placar até a primeira mão'}`}
         style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}
       >
         <Avatar name={name} uri={avatarUri} size={t.avatarSizes.lg} />
@@ -45,6 +52,9 @@ export function WalletRow({
           <Text variant="small" tone="muted">
             {position ? `${position}º lugar` : 'Fora do placar até a primeira mão'}
           </Text>
+          {seated ? (
+            <Text variant="small" tone="muted">{`+ ${fmt(wallet.seatedStack!)} na mesa de poker`}</Text>
+          ) : null}
         </View>
       </View>
       {wallet.canFiado ? (
@@ -63,12 +73,14 @@ export function WalletRow({
 export function GameRow({
   title,
   subtitle,
+  meta,
   art,
   playLabel,
   onPlay,
 }: {
   title: string;
   subtitle: string;
+  meta?: string;
   art: Parameters<typeof TableArt>[0]['cards'];
   playLabel?: string;
   onPlay?: () => void;
@@ -84,6 +96,11 @@ export function GameRow({
         <Text variant="small" tone="muted">
           {subtitle}
         </Text>
+        {meta ? (
+          <Text variant="small" tone="muted">
+            {meta}
+          </Text>
+        ) : null}
       </View>
       {onPlay ? (
         <Button title={playLabel ?? 'Jogar'} accessibilityLabel={`${playLabel ?? 'Jogar'} ${title}`} onPress={onPlay} />
@@ -96,7 +113,17 @@ export function GameRow({
   );
 }
 
-export function GameList({ openRound, onBlackjack }: { openRound: boolean; onBlackjack: () => void }) {
+export function GameList({
+  openRound,
+  onBlackjack,
+  poker,
+  onPoker,
+}: {
+  openRound: boolean;
+  onBlackjack: () => void;
+  poker: PokerTable | null;
+  onPoker: () => void;
+}) {
   return (
     <View>
       <GameRow
@@ -112,11 +139,14 @@ export function GameList({ openRound, onBlackjack }: { openRound: boolean; onBla
       <Divider />
       <GameRow
         title="Poker"
-        subtitle="Texas Hold'em · 2 a 6 fellas"
+        subtitle="Texas Hold'em · 2 a 6 fellas · entrada 200 a 500"
+        meta={poker ? (poker.count ? `${poker.count} na mesa` : 'Mesa vazia') : undefined}
         art={[
           { rank: 'Q', suit: '♣', red: false },
           { rank: 'Q', suit: '♦', red: true },
         ]}
+        playLabel={poker?.seated ? 'Voltar pra mesa' : 'Jogar'}
+        onPlay={onPoker}
       />
     </View>
   );

@@ -14,6 +14,7 @@ export const LIVE_TABLES = [
   'idea_votes',
   'stories',
   'story_reactions',
+  'poker_tables',
 ] as const;
 export type LiveTable = (typeof LIVE_TABLES)[number];
 
@@ -77,6 +78,7 @@ export function affectsNotifications(event: LiveEvent): boolean {
   // mural de ideias não gera notificação
   if (event.table === 'ideas' || event.table === 'idea_votes') return false;
   if (event.table === 'stories') return false; // story novo aparece na faixa, não vira notificação
+  if (event.table === 'poker_tables') return false; // a mesa de poker só atualiza o card da aba Games
   if (event.table === 'profiles' || event.table === 'posts') return event.type === 'INSERT';
   return true;
 }
