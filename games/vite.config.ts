@@ -11,6 +11,7 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@electric-sql/pglite'] },
   build: {
     target: 'es2022',
+    chunkSizeWarningLimit: 900, // three.js + supabase-js numa página só (~205 KB comprimido)
     outDir: resolve(__dirname, '../dist/games'),
     emptyOutDir: false, // o dist/ é do Expo: nunca apagar
     rollupOptions: { input: { blackjack: resolve(__dirname, 'blackjack/index.html') } },

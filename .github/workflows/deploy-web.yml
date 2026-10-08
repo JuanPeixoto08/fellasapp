@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            games/package-lock.json
 
       - run: npm ci
 
@@ -40,6 +43,14 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_LASTFM_API_KEY: ${{ secrets.EXPO_PUBLIC_LASTFM_API_KEY }}
+
+      # mesas dos Fellas Games (Vite + Three.js) em dist/games/<jogo>/, no mesmo deploy do app
+      - run: npm ci --prefix games
+      - run: npm test --prefix games
+      - run: npm run build --prefix games
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
       - uses: cloudflare/wrangler-action@v3
         with:
