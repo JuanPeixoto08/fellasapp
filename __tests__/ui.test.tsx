@@ -150,3 +150,38 @@ describe('ChoiceRow', () => {
     expect(screen.getByRole('radio', { name: 'Verificado' }).props.accessibilityState).toMatchObject({ checked: true });
   });
 });
+
+describe('Select', () => {
+  const options = [0, 1, 2].map((n) => ({ value: n, label: String(n) }));
+
+  it('mostra o rótulo e o valor; tocar abre a lista e escolher fecha', async () => {
+    const { Select } = require('../components/ui');
+    const onChange = jest.fn();
+    await render(<Select label="Dias" value={1} options={options} onChange={onChange} />);
+    const field = screen.getByRole('button', { name: 'Dias: 1' });
+    expect(screen.queryByRole('radio', { name: '2' })).toBeNull();
+    await fireEvent.press(field);
+    expect(screen.getByRole('radio', { name: '1' }).props.accessibilityState).toMatchObject({ checked: true });
+    await fireEvent.press(screen.getByRole('radio', { name: '2' }));
+    expect(onChange).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole('radio', { name: '2' })).toBeNull();
+  });
+
+  it('tocar fora fecha sem mudar', async () => {
+    const { Select } = require('../components/ui');
+    const onChange = jest.fn();
+    await render(<Select label="Horas" value={0} options={options} onChange={onChange} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Horas: 0' }));
+    // o painel é modal para o leitor de tela (fecha pelo voltar/Esc); o toque fora continua valendo
+    await fireEvent.press(screen.getByLabelText('Fechar lista', { includeHiddenElements: true }));
+    expect(screen.queryByRole('radio', { name: '1' })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('desabilitado não abre', async () => {
+    const { Select } = require('../components/ui');
+    await render(<Select label="Minutos" value={0} options={options} onChange={jest.fn()} disabled />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Minutos: 0' }));
+    expect(screen.queryByRole('radio', { name: '1' })).toBeNull();
+  });
+});
