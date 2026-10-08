@@ -39,8 +39,8 @@ cada uma no SQL editor; todas são idempotentes):
 | `0025_polls.sql` | enquetes: `posts.poll_options`/`poll_ends_at`/`poll_counts` (gatilhos validam e contam) e `poll_votes` (anônimo: cada um lê só o próprio; voto definitivo) | postar enquete e votar falham (posts sem enquete funcionam) |
 | `0026_post_media.sql` | ingresso no post: `posts.media` (review do Letterboxd ou música, validada por `post_media_ok`, travada depois de postar; post só com ingresso vale) e `profiles.letterboxd_user` | feed, posts e o Editar perfil não carregam (o app busca `media` e `letterboxd_user`) |
 
-**Função `letterboxd-reviews` (Edge Function)**: publique com `npx supabase functions deploy letterboxd-reviews`
-(com a verificação de login padrão). Não recebe parâmetros: lê o `letterboxd_user` de quem chama e busca só
+**Função `letterboxd-reviews` (Edge Function)**: publique com `npx supabase functions deploy letterboxd-reviews --no-verify-jwt`
+(a função confere o login e se é membro sozinha; sem a flag o gateway recusa a pré-checagem CORS do navegador). Não recebe parâmetros: lê o `letterboxd_user` de quem chama e busca só
 `https://letterboxd.com/<usuário>/rss/`. Sem segredos.
 
 **Função `stories-media` (Edge Function)**: publique sempre com
