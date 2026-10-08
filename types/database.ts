@@ -50,6 +50,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Fellas Games (0027): o app só lê; quem escreve são as funções do banco
+      game_wallets: {
+        Row: {
+          user_id: string;
+          balance: number;
+          week_start: string;
+          fiado_count: number;
+          last_fiado_on: string | null;
+          last_played_at: string | null;
+          updated_at: string;
+        };
+        Insert: { [_ in never]: never };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
+      game_weeks: {
+        Row: {
+          week_start: string;
+          champion_id: string | null;
+          podium: Json;
+          closed_at: string;
+        };
+        Insert: { [_ in never]: never };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
       idea_votes: {
         Row: {
           idea_id: string;
@@ -446,6 +472,14 @@ export type Database = {
       place_suggestions: {
         Args: { p_prefix: string; p_limit?: number };
         Returns: { key: string; name: string; posts: number }[];
+      };
+      games_wallet: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      games_fiado: {
+        Args: Record<string, never>;
+        Returns: Json;
       };
       ideas_feed: {
         Args: { p_sort?: string };
