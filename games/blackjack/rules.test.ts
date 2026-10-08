@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Hand, RoundState } from '../shared/types';
-import { canDouble, canSplit, chipEnabled, handTotal, isRed, rankLabel, resultLabel, suitSymbol } from './rules';
+import { actionDelta, canDouble, canSplit, chipEnabled, handTotal, isRed, rankLabel, resultLabel, suitSymbol } from './rules';
 
 // mesma numeração do banco: rank = c % 13 (0 Ás … 9 = 10, 12 K); naipe = c / 13 (♠ ♥ ♦ ♣)
 const As = 0, Ah = 13, s6 = 5, s9 = 8, c9 = 47, h10 = 22, Kc = 51, Ks = 12;
@@ -25,6 +25,7 @@ const round = (hands: Hand[], extra: Partial<RoundState> = {}): RoundState => ({
   dealer_total: 9,
   payout: 0,
   balance: 900,
+  can_fiado: false,
   ...extra,
 });
 
@@ -77,5 +78,23 @@ describe('resultLabel', () => {
     expect(resultLabel(hand([h10, s9, Kc], { result: 'bust' }))).toBe('Estourou');
     expect(resultLabel(hand([h10, s6], { result: 'lose' }))).toBe('Banca ganhou');
     expect(resultLabel(hand([h10, s6]))).toBe('');
+  });
+});
+
+describe('actionDelta (a resposta bate com o que a tela tem?)', () => {
+  const prev = round([hand([s6, s9])]);
+  it('pedir: uma carta nova na mão ativa', () => {
+    expect(actionDelta(prev, round([hand([s6, s9, As])]), 'hit')).toEqual({ kind: 'card', hand: 0, i: 2, card: As });
+  });
+  it('parar: nada novo na mão', () => {
+    expect(actionDelta(prev, round([hand([s6, s9], { done: true })], { status: 'done' }), 'stand')).toEqual({ kind: 'none' });
+  });
+  it('dividir: uma mão vira duas', () => {
+    expect(actionDelta(round([hand([h10, Kc])]), round([hand([h10, As]), hand([Kc, s6])]), 'split')).toEqual({ kind: 'split' });
+  });
+  it('outra aba mexeu antes: não bate, redesenha tudo', () => {
+    expect(actionDelta(prev, round([hand([s6, s9, As, Ah])]), 'hit')).toBeNull();
+    expect(actionDelta(prev, round([hand([s6, As]), hand([s9, Ah])]), 'hit')).toBeNull();
+    expect(actionDelta(prev, round([hand([s6, s9, As])]), 'stand')).toBeNull();
   });
 });

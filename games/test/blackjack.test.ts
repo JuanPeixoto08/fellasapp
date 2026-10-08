@@ -251,3 +251,26 @@ describe('reset com mão aberta', () => {
     expect((await t.rpc<{ balance: number }>('games_wallet')).balance).toBe(1000);
   });
 });
+
+describe('fechar mão já fechada (reset correndo junto com a jogada)', () => {
+  it('bj_force_finish numa mão que já acabou não paga de novo nem mexe na mesa', async () => {
+    await rig(t, ['10h', '10s', '9c', '7d']);
+    const s = await deal(100);
+    const done = await act(s.id, 'stand');
+    const ledger = await q('select count(*)::int as n from public.game_ledger');
+    await q('select public.bj_force_finish($1)', [s.id]);
+    expect((await t.rpc<{ balance: number }>('games_wallet')).balance).toBe(done.balance);
+    expect(await q('select count(*)::int as n from public.game_ledger')).toEqual(ledger);
+    expect((await q<{ dealer: number[] }>('select dealer from public.bj_rounds where id = $1', [s.id]))[0].dealer).toEqual(done.dealer);
+  });
+});
+
+describe('fiado depois de quebrar na mesa', () => {
+  it('a mão que zera o saldo já diz que dá pra pegar fiado', async () => {
+    await t.rpc('games_wallet');
+    await q('update public.game_wallets set balance = 100 where user_id = $1', [A]);
+    await rig(t, ['10h', '10s', '6c', '9d']);
+    const e = await act((await deal(100)).id, 'stand'); // 16 x 19
+    expect(e).toMatchObject({ balance: 0, can_fiado: true });
+  });
+});

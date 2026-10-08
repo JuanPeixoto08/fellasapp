@@ -1,5 +1,5 @@
 // O que a tela precisa saber das cartas. Quem decide de verdade (pagar, banca, validar) é o banco.
-import type { Card, Hand, RoundState } from '../shared/types';
+import type { Action, Card, Hand, RoundState } from '../shared/types';
 
 export const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as const;
 export const SUITS = ['♠', '♥', '♦', '♣'] as const;
@@ -47,6 +47,22 @@ export function canSplit(round: RoundState, balance: number): boolean {
 
 export function chipEnabled(value: number, bet: number, balance: number): boolean {
   return bet + value <= Math.min(MAX_BET, balance);
+}
+
+export type Delta = { kind: 'card'; hand: number; i: number; card: Card } | { kind: 'none' } | { kind: 'split' };
+
+/**
+ * O que mudou na mesa com a jogada, se a resposta bate com o que a tela tinha. null = não bate (outra aba jogou
+ * antes): a tela redesenha a mão inteira em vez de animar uma carta que não é a dela.
+ */
+export function actionDelta(prev: RoundState, next: RoundState, action: Action): Delta | null {
+  const a = prev.active;
+  const before = prev.hands[a]?.cards.length ?? -1;
+  if (action === 'split') return prev.hands.length === 1 && next.hands.length === 2 ? { kind: 'split' } : null;
+  if (next.hands.length !== prev.hands.length) return null;
+  const after = next.hands[a]?.cards.length ?? -1;
+  if (action === 'stand') return after === before ? { kind: 'none' } : null;
+  return after === before + 1 ? { kind: 'card', hand: a, i: before, card: next.hands[a].cards[before] } : null;
 }
 
 const fmt = (n: number) => n.toLocaleString('pt-BR');

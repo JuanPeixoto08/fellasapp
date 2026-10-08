@@ -23,6 +23,7 @@ const round = (extra: Partial<RoundState> = {}): RoundState => ({
   dealer_total: 10,
   payout: 0,
   balance: 900,
+  can_fiado: false,
   ...extra,
 });
 const state = (extra: Partial<MachineState>): MachineState => ({ ...initial, wallet: wallet(), weekStart: '2026-10-05', ...extra });

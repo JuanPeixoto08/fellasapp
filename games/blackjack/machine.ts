@@ -69,7 +69,12 @@ export function reduce(s: MachineState, e: MachineEvent): MachineState {
       return { ...s, phase: 'busy', back: s.phase, notice: null };
     case 'round': {
       const done = e.round.status === 'done';
-      const wallet = s.wallet && { ...s.wallet, balance: e.round.balance, open_round_id: done ? null : e.round.id };
+      const wallet = s.wallet && {
+        ...s.wallet,
+        balance: e.round.balance,
+        can_fiado: e.round.can_fiado ?? s.wallet.can_fiado,
+        open_round_id: done ? null : e.round.id,
+      };
       return { ...s, phase: done ? 'done' : 'playing', round: e.round, wallet, lastBet: done ? e.round.bet : s.lastBet, back: null };
     }
     case 'wallet':
@@ -86,6 +91,15 @@ export function reduce(s: MachineState, e: MachineEvent): MachineState {
       if (e.error.code === 'no_session') return { ...s, phase: 'no_session', back: null };
       return { ...s, phase: s.phase === 'busy' ? (s.back ?? 'betting') : s.phase, notice: ERROR_TEXT[e.error.code], back: null };
   }
+}
+
+/**
+ * Marca d'água das jogadas: cada jogada avança o contador; uma recarga que começou antes dela chega "velha"
+ * e não pode sobrescrever o estado que a jogada trouxe.
+ */
+export function createEpoch() {
+  let n = 0;
+  return { bump: () => ++n, now: () => n, stale: (at: number) => at !== n };
 }
 
 export const canAct = (s: MachineState) => s.phase === 'betting' || s.phase === 'playing' || s.phase === 'done';

@@ -70,7 +70,10 @@ create or replace function public.bj_state(r public.bj_rounds)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', r.id, 'status', r.status, 'bet', r.bet, 'hands', r.hands, 'active', r.active,
     'dealer', to_jsonb(r.dealer), 'dealer_total', public.bj_hand_total(r.dealer), 'payout', r.payout,
-    'balance', (select balance from public.game_wallets where user_id = r.user_id))
+    'balance', (select balance from public.game_wallets where user_id = r.user_id),
+    -- quebrou na mesa: a tela já sabe se dá pra pegar fiado sem perguntar de novo
+    'can_fiado', (select (public.games_wallet_json(w) ->> 'can_fiado')::boolean
+                    from public.game_wallets w where w.user_id = r.user_id))
 $$;
 
 -- revela, banca joga (se precisa), acerta cada mão, paga e fecha
@@ -90,6 +93,10 @@ declare
   any_live boolean;
 begin
   select * into r from public.bj_rounds where id = p_round for update;
+  -- já fechada (o reset e a jogada podem chegar juntos): não revela de novo nem paga outra vez
+  if r.status <> 'playing' then
+    return r;
+  end if;
   select * into s from public.bj_secrets where round_id = p_round for update;
   r.dealer := r.dealer || s.hole;
   d_nat := public.bj_hand_total(r.dealer) = 21;
