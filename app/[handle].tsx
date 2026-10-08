@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 
 import ProfileView from '../components/ProfileView';
+import { parseProfileTab, profileTabParam } from '../lib/profileTab';
 import { stackHeader } from '../components/profile/headerOptions';
 import { EmptyState, Screen } from '../components/ui';
 import { getProfileByUsername } from '../lib/api/profiles';
@@ -17,7 +18,8 @@ type Found = { status: 'loading' } | { status: 'found'; id: string } | { status:
  */
 export default function HandleScreen() {
   const t = useTheme();
-  const { handle } = useLocalSearchParams<{ handle: string }>();
+  const { handle, aba } = useLocalSearchParams<{ handle: string; aba?: string }>();
+  const initialTab = parseProfileTab(aba);
   const raw = String(handle ?? '');
   const username = raw.startsWith('@') ? raw.slice(1).toLowerCase() : null;
   const me = useSession().session?.user.id;
@@ -37,7 +39,9 @@ export default function HandleScreen() {
     };
   }, [username, attempt]);
 
-  if (found.status === 'found' && found.id === me) return <Redirect href="/profile" />;
+  if (found.status === 'found' && found.id === me) {
+    return <Redirect href={initialTab ? `/profile?aba=${profileTabParam(initialTab)}` : '/profile'} />;
+  }
 
   let body;
   if (!username) {
@@ -47,7 +51,7 @@ export default function HandleScreen() {
       </Screen>
     );
   } else if (found.status === 'found') {
-    body = <ProfileView userId={found.id} header />;
+    body = <ProfileView userId={found.id} header initialTab={initialTab} />;
   } else if (found.status === 'missing') {
     body = (
       <Screen header>

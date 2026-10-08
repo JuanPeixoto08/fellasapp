@@ -98,7 +98,7 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
             @{profile.username}
           </Text>
         </View>
-        {profile.lastfm_user && onOpenMusic ? <NowPlayingLine user={profile.lastfm_user} onPress={onOpenMusic} /> : null}
+        {profile.lastfm_user && profile.show_now_playing !== false && onOpenMusic ? <NowPlayingLine user={profile.lastfm_user} onPress={onOpenMusic} /> : null}
         {profile.status ? (
           <View
             testID="profile-status"

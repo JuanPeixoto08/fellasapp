@@ -10,13 +10,23 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => mockParams,
     Stack: { Screen: () => null },
     Redirect: ({ href }: { href: string }) => <RNText>{`redirect:${href}`}</RNText>,
+    useFocusEffect: (cb: () => void | (() => void)) => require('react').useEffect(cb, [cb]),
   };
 });
+jest.mock('../lib/lastfm/api', () => ({
+  ...jest.requireActual('../lib/lastfm/api'),
+  getNowPlaying: async () => ({ name: 'Espresso', artist: 'Sabrina', album: null, image: null, url: 'u', playedAt: null, nowPlaying: true }),
+}));
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
 jest.mock('../components/ProfileView', () => {
   const { Text: RNText } = require('react-native');
-  return { __esModule: true, default: ({ userId }: { userId: string }) => <RNText>{`perfil:${userId}`}</RNText> };
+  return {
+    __esModule: true,
+    default: ({ userId, initialTab }: { userId: string; initialTab?: string }) => (
+      <RNText>{`perfil:${userId}${initialTab ? `:${initialTab}` : ''}`}</RNText>
+    ),
+  };
 });
 const mockGetProfile = jest.fn();
 const mockByUsername = jest.fn();
@@ -65,6 +75,18 @@ describe('foto e nome do autor abrem o perfil', () => {
     expect(mockPush).toHaveBeenCalledWith('/@bia');
   });
 
+  it('no post: tocar no "ouvindo" abre a aba Música do autor', async () => {
+    await render(<PostCard post={{ ...post, author: { ...author, lastfm_user: 'biafm' } }} />);
+    await fireEvent.press(await screen.findByRole('link', { name: 'Ouvindo Espresso, de Sabrina' }));
+    expect(mockPush).toHaveBeenCalledWith('/@bia?aba=musica');
+  });
+
+  it('no perfil da própria pessoa (nome sem link): o "ouvindo" só mostra', async () => {
+    await render(<PostCard post={{ ...post, author: { ...author, lastfm_user: 'biafm' } }} linkAuthor={false} />);
+    expect(await screen.findByLabelText('Ouvindo Espresso, de Sabrina')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Ouvindo Espresso, de Sabrina' })).toBeNull();
+  });
+
   it('no post: o resto da linha abre o post, não o perfil', async () => {
     const onPress = jest.fn();
     await render(<PostCard post={post} onPress={onPress} />);
@@ -100,6 +122,19 @@ describe('/@usuario', () => {
     await render(<HandleScreen />);
     expect(await screen.findByText('perfil:u2')).toBeTruthy();
     expect(mockByUsername).toHaveBeenCalledWith('bia');
+  });
+
+  it('?aba=musica abre o perfil na aba Música', async () => {
+    mockParams = { handle: '@bia', aba: 'musica' };
+    await render(<HandleScreen />);
+    expect(await screen.findByText('perfil:u2:music')).toBeTruthy();
+  });
+
+  it('o meu com ?aba=musica vai pra aba Perfil já na Música', async () => {
+    mockParams = { handle: '@eu', aba: 'musica' };
+    mockByUsername.mockResolvedValue({ id: 'me', username: 'eu' });
+    await render(<HandleScreen />);
+    expect(await screen.findByText('redirect:/profile?aba=musica')).toBeTruthy();
   });
 
   it('o meu vai pra aba Perfil', async () => {

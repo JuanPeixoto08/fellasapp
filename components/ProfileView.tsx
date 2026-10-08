@@ -19,6 +19,7 @@ import { PostTile } from './profile/PostTile';
 import { ProfileHeader } from './profile/ProfileHeader';
 import { ProfileStats } from './profile/ProfileStats';
 import { Divider, EmptyState, Tabs, Text } from './ui';
+import type { ProfileTab } from '../lib/profileTab';
 
 type Props = {
   userId: string;
@@ -28,9 +29,11 @@ type Props = {
   header?: boolean;
   /** O perfil chegou (ex.: a tela põe o @ da pessoa no título). */
   onLoaded?: (profile: Profile) => void;
+  /** Aba pedida pelo endereço (`?aba=musica`, vindo do "ouvindo agora" de um post). */
+  initialTab?: ProfileTab;
 };
 
-export type ProfileTab = 'posts' | 'photos' | 'music';
+export type { ProfileTab };
 
 /** O que a apresentação precisa de uma lista de posts (o `usePostList` entrega isso). */
 export type PostListView = {
@@ -48,7 +51,7 @@ export type PostListView = {
 
 const COLUMNS = 3;
 
-export default function ProfileView({ userId, actions, header, onLoaded }: Props) {
+export default function ProfileView({ userId, actions, header, onLoaded, initialTab }: Props) {
   const t = useTheme();
   const router = useRouter();
   const isMe = useSession().session?.user.id === userId;
@@ -58,7 +61,11 @@ export default function ProfileView({ userId, actions, header, onLoaded }: Props
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<ProfileTab>('posts');
+  const [tab, setTab] = useState<ProfileTab>(initialTab ?? 'posts');
+  // a aba Perfil fica montada: um novo `?aba=` (tocar na minha música no feed) troca a aba
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
   const [pinError, setPinError] = useState<string | null>(null);
   const pinnedId = profile?.pinned_post_id ?? undefined;
   const posts = usePostList({ authorId: userId, pinnedId });

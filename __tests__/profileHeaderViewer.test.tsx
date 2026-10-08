@@ -76,3 +76,46 @@ describe('selos no cabeçalho', () => {
     expect(screen.queryByLabelText('Verificado')).toBeNull();
   });
 });
+
+const mockHeaderNowPlaying = jest.fn();
+jest.mock('../lib/lastfm/api', () => ({
+  ...jest.requireActual('../lib/lastfm/api'),
+  getNowPlaying: (user: string) => mockHeaderNowPlaying(user),
+}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    ...jest.requireActual('expo-router'),
+    useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]),
+  };
+});
+
+describe('ouvindo agora no cabeçalho', () => {
+  const playing = { name: 'Agora', artist: 'A', album: null, image: null, url: 'u', playedAt: null, nowPlaying: true };
+  const withMusic = (show: boolean) =>
+    render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <ProfileHeader
+          profile={{ ...profile, lastfm_user: 'juanfm', show_now_playing: show } as Profile}
+          avatarUri={null}
+          bannerUri={null}
+          onOpenMusic={jest.fn()}
+        />
+      </SafeAreaProvider>,
+    );
+  beforeEach(() => {
+    require('../lib/lastfm/nowPlayingStore').resetNowPlayingStore();
+    mockHeaderNowPlaying.mockReset().mockResolvedValue(playing);
+  });
+
+  it('chave ligada: mostra a linha', async () => {
+    await withMusic(true);
+    expect(await screen.findByLabelText('Ouvindo agora: Agora, de A')).toBeTruthy();
+  });
+
+  it('chave desligada: sem linha e sem perguntar', async () => {
+    await withMusic(false);
+    expect(screen.queryByLabelText('Ouvindo agora: Agora, de A')).toBeNull();
+    expect(mockHeaderNowPlaying).not.toHaveBeenCalled();
+  });
+});

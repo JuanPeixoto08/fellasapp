@@ -12,6 +12,8 @@ import type { FeedPost } from '../lib/api/posts';
 import { postTime } from '../lib/format';
 import { MentionText } from './MentionText';
 import { AuthorLink } from './profile/AuthorLink';
+import { PostNowPlaying } from './music/PostNowPlaying';
+import { openProfile } from '../lib/openProfile';
 import { PlaceLink } from './places/PlaceLink';
 import { nextReaction } from '../lib/reactionState';
 
@@ -102,6 +104,12 @@ export function PostCard({
               <AuthorLink username={post.author.username} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
                 <NameWithBadge name={name} badges={post.author.badges} hiddenBadges={post.author.hidden_badges} bold />
               </AuthorLink>
+              {post.author.lastfm_user && post.author.show_now_playing !== false ? (
+                <PostNowPlaying
+                  user={post.author.lastfm_user}
+                  onPress={linkAuthor ? () => openProfile(post.author.username, { tab: 'music' }) : undefined}
+                />
+              ) : null}
               <View style={{ flex: 1 }} />
               {date ? (
                 <Text variant="caption" tone="muted">

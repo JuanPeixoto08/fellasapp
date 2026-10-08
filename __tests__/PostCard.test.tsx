@@ -163,3 +163,51 @@ describe('PostCard selos', () => {
     expect(screen.queryByLabelText('Verificado')).toBeNull();
   });
 });
+
+const mockNowPlaying = jest.fn();
+jest.mock('../lib/lastfm/api', () => ({
+  ...jest.requireActual('../lib/lastfm/api'),
+  hasLastfmKey: () => true,
+  getNowPlaying: (user: string) => mockNowPlaying(user),
+}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    ...jest.requireActual('expo-router'),
+    useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]),
+  };
+});
+
+describe('PostCard ouvindo agora', () => {
+  const playing = { name: 'Espresso', artist: 'Sabrina Carpenter', album: null, image: null, url: 'u', playedAt: null, nowPlaying: true };
+  beforeEach(() => {
+    require('../lib/lastfm/nowPlayingStore').resetNowPlayingStore();
+    mockNowPlaying.mockReset().mockResolvedValue(playing);
+  });
+
+  it('autor ouvindo algo: "ouvindo" + música ao lado do nome', async () => {
+    await render(<PostCard post={{ ...post, author: { ...post.author, lastfm_user: 'anafm' } }} />);
+    expect(await screen.findByLabelText('Ouvindo Espresso, de Sabrina Carpenter')).toBeTruthy();
+    expect(screen.getByText('Espresso')).toBeTruthy();
+    expect(mockNowPlaying).toHaveBeenCalledWith('anafm');
+  });
+
+  it('chave desligada: nada e nem pergunta ao Last.fm', async () => {
+    await render(<PostCard post={{ ...post, author: { ...post.author, lastfm_user: 'anafm', show_now_playing: false } }} />);
+    expect(screen.queryByText('Espresso')).toBeNull();
+    expect(mockNowPlaying).not.toHaveBeenCalled();
+  });
+
+  it('sem Last.fm: nada', async () => {
+    await render(<PostCard post={post} />);
+    expect(screen.queryByText(/ouvindo/)).toBeNull();
+    expect(mockNowPlaying).not.toHaveBeenCalled();
+  });
+
+  it('nada tocando: nada', async () => {
+    mockNowPlaying.mockResolvedValue(null);
+    await render(<PostCard post={{ ...post, author: { ...post.author, lastfm_user: 'anafm' } }} />);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByText(/ouvindo/)).toBeNull();
+  });
+});
