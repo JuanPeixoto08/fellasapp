@@ -3,7 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-export const MIGRATIONS: string[] = [];
+export const MIGRATIONS: string[] = ['0027_fellas_games.sql'];
 
 const SKELETON = `
 create role anon nologin; create role authenticated nologin;
