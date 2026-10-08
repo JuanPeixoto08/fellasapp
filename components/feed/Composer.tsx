@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/errors';
 import { activeMention, insertMention } from '../../lib/mentions';
 import { activeTag, insertTag } from '../../lib/tags';
 import { cleanPlace } from '../../lib/places';
+import { DEFAULT_POLL_DURATION, durationMinutes, pollReady } from '../../lib/polls';
 import { isFieldTarget } from '../../lib/fieldTarget';
 import { addPasted, usePasteImages } from '../../lib/pasteImages';
 import { emitPostCreated } from '../../lib/postEvents';
@@ -17,6 +18,7 @@ import { MentionSuggestions } from '../MentionSuggestions';
 import { TagSuggestions } from '../TagSuggestions';
 import { PlaceChip } from '../places/PlaceChip';
 import { PlaceField } from '../places/PlaceField';
+import { PollEditor } from './PollEditor';
 import { useContentWidth } from '../shell/ShellContext';
 import { Avatar, Button, ConfirmDialog, IconButton, ImageThumbs, Text, useAutoGrow } from '../ui';
 
@@ -43,7 +45,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const t = useTheme();
   const me = useMyAvatar();
   const contentWidth = useContentWidth();
-  const { body, imageUris, location } = useDraft();
+  const { body, imageUris, location, poll } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
@@ -71,9 +73,10 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const tag = mention ? null : activeTag(body, Math.min(cursor ?? body.length, body.length));
 
   const room = MAX_IMAGES - imageUris.length;
-  const hasDraft = body.trim().length > 0 || imageUris.length > 0;
-  // local sozinho não dá post, mas é rascunho: descartar pergunta antes
-  const hasAnything = hasDraft || !!location || !!placeToPost;
+  // enquete: precisa da pergunta e de 2 opções; sem ela, texto ou foto
+  const hasDraft = poll ? pollReady(body, poll.options) : body.trim().length > 0 || imageUris.length > 0;
+  // local ou enquete sozinhos não dão post, mas são rascunho: descartar pergunta antes
+  const hasAnything = hasDraft || body.trim().length > 0 || !!location || !!placeToPost || !!poll;
   // coluna de conteúdo - margens - avatar - espaço entre avatar e conteúdo
   const column = contentWidth - t.layout.gutter * 2 - t.avatarSizes.md - t.spacing.md;
   const thumb = Math.floor((column - t.spacing.sm * (MAX_IMAGES - 1)) / MAX_IMAGES);
@@ -87,6 +90,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   // web: Ctrl+V com imagem no campo vira foto do post
   usePasteImages(input, (uris) => {
     if (saving) return;
+    if (poll) return setError('Enquete vai sem fotos. Tira a enquete pra colar a foto.');
     setError(null);
     addImages(uris);
   });
@@ -111,7 +115,12 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await createPost({ body, imageUris, location: placeToPost });
+      await createPost({
+        body,
+        imageUris,
+        location: placeToPost,
+        ...(poll ? { poll: { options: poll.options, minutes: durationMinutes(poll.duration) } } : {}),
+      });
       emitPostCreated();
       clearDraft();
       setPlaceOpen(false);
@@ -159,7 +168,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             autoFocus={variant === 'dialog'}
             numberOfLines={1}
             accessibilityLabel="O que rolou?"
-            placeholder="O que rolou, fella?"
+            placeholder={poll ? 'Faz uma pergunta…' : 'O que rolou, fella?'}
             placeholderTextColor={t.colors.textMuted}
             selectionColor={t.colors.primary}
             multiline
@@ -194,7 +203,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             }}
           />
         ) : null}
-        {!hasDraft && variant !== 'inline' ? (
+        {!hasDraft && !poll && variant !== 'inline' ? (
           <Text variant="small" tone="muted">
             Uma frase, até {MAX_IMAGES} fotos, ou os dois. Só os fellas veem.
           </Text>
@@ -208,6 +217,14 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
               setDraft((d) => ({ ...d, location: next }));
               setPlaceOpen(false);
             }}
+          />
+        ) : null}
+        {poll ? (
+          <PollEditor
+            poll={poll}
+            disabled={saving}
+            onChange={(next) => setDraft((d) => ({ ...d, poll: next }))}
+            onRemove={() => setDraft((d) => ({ ...d, poll: null }))}
           />
         ) : null}
         <ImageThumbs
@@ -253,7 +270,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         accessibilityLabel={room > 0 ? 'Adicionar fotos' : `Já tem ${MAX_IMAGES} fotos`}
         variant="ghost"
         onPress={pickImages}
-        disabled={room === 0 || saving}
+        disabled={room === 0 || !!poll || saving}
       />
       <Text variant="small" tone="muted">
         {imageUris.length}/{MAX_IMAGES} fotos
@@ -264,6 +281,17 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         variant="ghost"
         onPress={openPlace}
         disabled={saving}
+      />
+      {/* enquete ou fotos, nunca os dois (como no Twitter) */}
+      <IconButton
+        icon="stats-chart-outline"
+        accessibilityLabel="Adicionar enquete"
+        variant="ghost"
+        onPress={() => {
+          setError(null);
+          setDraft((d) => ({ ...d, poll: { options: ['', ''], duration: DEFAULT_POLL_DURATION } }));
+        }}
+        disabled={!!poll || imageUris.length > 0 || saving}
       />
       <View style={{ flex: 1 }} />
       {body.length >= COUNTER_FROM ? (
@@ -285,7 +313,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     <ConfirmDialog
       visible={discarding}
       title="Descartar o rascunho?"
-      message="O texto e as fotos escolhidas somem."
+      message={poll ? 'O texto e a enquete somem.' : 'O texto e as fotos escolhidas somem.'}
       confirmLabel="Descartar"
       cancelLabel="Continuar escrevendo"
       onConfirm={() => {

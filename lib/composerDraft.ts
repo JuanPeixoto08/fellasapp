@@ -1,8 +1,13 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
-export type Draft = { body: string; imageUris: string[]; location: string | null };
+import type { PollDuration } from './polls';
 
-const EMPTY: Draft = { body: '', imageUris: [], location: null };
+/** Enquete sendo montada: opções como digitadas e a duração escolhida. */
+export type DraftPoll = { options: string[]; duration: PollDuration };
+
+export type Draft = { body: string; imageUris: string[]; location: string | null; poll: DraftPoll | null };
+
+const EMPTY: Draft = { body: '', imageUris: [], location: null, poll: null };
 let draft: Draft = EMPTY;
 const listeners = new Set<() => void>();
 
@@ -14,7 +19,7 @@ function subscribe(listener: () => void) {
 }
 
 /**
- * Rascunho único do post: página /new, topo do feed e janela mostram o mesmo texto, fotos e local, então
+ * Rascunho único do post: página /new, topo do feed e janela mostram o mesmo texto, fotos, local e enquete, então
  * redimensionar a janela (que troca o formato) não perde nada.
  */
 export function useDraft(): Draft {

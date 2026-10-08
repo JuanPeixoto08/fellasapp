@@ -168,3 +168,78 @@ describe('Composer', () => {
     expect(screen.getByDisplayValue('meio escrito')).toBeTruthy();
   });
 });
+
+describe('Composer: enquete', () => {
+  const openPoll = async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Adicionar enquete'));
+  };
+
+  it('abre a caixa com 2 opções, a duração (1 dia) e a pergunta no lugar do texto', async () => {
+    await openPoll();
+    expect(screen.getByLabelText('Opção 1')).toBeTruthy();
+    expect(screen.getByLabelText('Opção 2')).toBeTruthy();
+    expect(screen.queryByLabelText('Opção 3')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Dias: 1' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Horas: 0' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Minutos: 0' })).toBeTruthy();
+    expect(screen.getByPlaceholderText('Faz uma pergunta…')).toBeTruthy();
+    expect(screen.getByLabelText('Adicionar enquete')).toBeDisabled();
+  });
+
+  it('"+" vai até 4 opções; ✕ tira a 3ª ou a 4ª', async () => {
+    await openPoll();
+    await fireEvent.press(screen.getByLabelText('Adicionar opção'));
+    await fireEvent.press(screen.getByLabelText('Adicionar opção'));
+    expect(screen.getByLabelText('Opção 4')).toBeTruthy();
+    expect(screen.queryByLabelText('Adicionar opção')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Tirar opção 3'));
+    expect(screen.queryByLabelText('Opção 4')).toBeNull();
+    expect(screen.getByLabelText('Opção 3')).toBeTruthy();
+  });
+
+  it('com enquete, o botão de fotos fica desabilitado; "Remover enquete" volta tudo', async () => {
+    await openPoll();
+    expect(screen.getByLabelText('Adicionar fotos')).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Remover enquete' }));
+    expect(screen.queryByLabelText('Opção 1')).toBeNull();
+    expect(screen.getByLabelText('Adicionar fotos')).not.toBeDisabled();
+    expect(screen.getByLabelText('Adicionar enquete')).not.toBeDisabled();
+  });
+
+  it('"Postar" só com a pergunta e 2 opções; manda as opções e o prazo em minutos', async () => {
+    await openPoll();
+    await fireEvent.changeText(screen.getByLabelText('Opção 1'), 'Sim');
+    await fireEvent.changeText(screen.getByLabelText('Opção 2'), 'Não');
+    expect(screen.getByLabelText('Postar')).toBeDisabled();
+    await fireEvent.changeText(screen.getByLabelText('O que rolou?'), 'Bora no rolê?');
+    await fireEvent.press(screen.getByRole('button', { name: 'Horas: 0' }));
+    await fireEvent.press(screen.getByRole('radio', { name: '2' }));
+    await fireEvent.press(screen.getByLabelText('Postar'));
+    await waitFor(() =>
+      expect(createPostMock).toHaveBeenCalledWith({
+        body: 'Bora no rolê?',
+        imageUris: [],
+        location: null,
+        poll: { options: ['Sim', 'Não'], minutes: 24 * 60 + 2 * 60 },
+      }),
+    );
+    await waitFor(() => expect(screen.queryByLabelText('Opção 1')).toBeNull());
+  });
+
+  it('7 dias zera horas e minutos', async () => {
+    await openPoll();
+    await fireEvent.press(screen.getByRole('button', { name: 'Horas: 0' }));
+    await fireEvent.press(screen.getByRole('radio', { name: '5' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Dias: 1' }));
+    await fireEvent.press(screen.getByRole('radio', { name: '7' }));
+    expect(screen.getByRole('button', { name: 'Horas: 0' })).toBeTruthy();
+  });
+
+  it('enquete sozinha (sem pergunta) já conta como rascunho para descartar', async () => {
+    await render(<Composer variant="page" onCancel={() => {}} />);
+    await fireEvent.press(screen.getByLabelText('Adicionar enquete'));
+    await fireEvent.press(screen.getByText('Cancelar'));
+    expect(screen.getByText('Descartar o rascunho?')).toBeTruthy();
+  });
+});
