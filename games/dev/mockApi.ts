@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 import m27 from '../../supabase/migrations/0027_fellas_games.sql?raw';
 import m28 from '../../supabase/migrations/0028_blackjack.sql?raw';
+import m29 from '../../supabase/migrations/0029_fellas_games_ajustes.sql?raw';
 import { toGameError } from '../shared/errors';
 import type { Action, BoardRow, RoundState, Wallet } from '../shared/types';
 import { SKELETON } from '../test/skeleton';
@@ -20,6 +21,7 @@ const ready = (async () => {
   await db.exec(SKELETON);
   await db.exec(m27);
   await db.exec(m28);
+  await db.exec(m29);
   await db.query(`insert into public.profiles (id, username, display_name) values ($1, 'eu', 'Você')`, [ME]);
   for (const [id, name, balance] of FRIENDS) {
     await db.query(`insert into public.profiles (id, username, display_name) values ($1, lower($2), $2)`, [id, name]);

@@ -121,6 +121,20 @@ describe('Fellas Games', () => {
     await waitFor(() => expect(screen.getByText('Fiado de hoje já foi. Volta amanhã.')).toBeTruthy());
   });
 
+  it('sem saldo e já pegou o fiado de hoje: a aba explica sozinha', async () => {
+    mockApi.getWallet.mockResolvedValue(wallet({ balance: 5, canFiado: false, fiadoCount: 1 }));
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText('Fiado de hoje já foi. Volta amanhã.')).toBeTruthy());
+    expect(screen.queryByText('Pegar fiado (+100)')).toBeNull();
+  });
+
+  it('sem saldo com mão aberta: nada de aviso de fiado (dá pra continuar a mão)', async () => {
+    mockApi.getWallet.mockResolvedValue(wallet({ balance: 0, canFiado: false, openRoundId: 'r1' }));
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText('Continuar mão')).toBeTruthy());
+    expect(screen.queryByText('Fiado de hoje já foi. Volta amanhã.')).toBeNull();
+  });
+
   it('Jogar abre a mesa; com mão aberta vira Continuar mão; Poker em breve', async () => {
     await render(<GamesScreen />, { wrapper: Wrapper });
     await waitFor(() => expect(screen.getByLabelText('Jogar Blackjack')).toBeTruthy());

@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import type { Champion, Wallet } from '../../lib/api/games';
+import { GAMES_ERRORS, MIN_BET, type Champion, type Wallet } from '../../lib/api/games';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Button, Divider, Text, TrophyBadge } from '../ui';
 import { TableArt } from './TableArt';
@@ -26,6 +26,10 @@ export function WalletRow({
   onFiado: () => void;
 }) {
   const t = useTheme();
+  // sem dar pra apostar, sem mão aberta e sem fiado liberado: o de hoje já foi
+  const note =
+    fiadoMessage ??
+    (wallet.balance < MIN_BET && !wallet.canFiado && !wallet.openRoundId ? GAMES_ERRORS.fiadoToday : null);
   return (
     <View style={{ gap: t.spacing.md }}>
       <View
@@ -46,9 +50,9 @@ export function WalletRow({
       {wallet.canFiado ? (
         <Button title="Pegar fiado (+100)" variant="secondary" loading={fiadoBusy} onPress={onFiado} />
       ) : null}
-      {fiadoMessage ? (
+      {note ? (
         <Text variant="small" tone="muted">
-          {fiadoMessage}
+          {note}
         </Text>
       ) : null}
     </View>

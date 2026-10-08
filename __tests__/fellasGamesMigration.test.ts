@@ -19,6 +19,16 @@ describe('0027_fellas_games.sql', () => {
   });
 });
 
+const ajustes = readFileSync(`${__dirname}/../supabase/migrations/0029_fellas_games_ajustes.sql`, 'utf8');
+
+describe('0029_fellas_games_ajustes.sql', () => {
+  it('aposta múltipla de 10, sapato apagado no fim, funções de conta fechadas', () => {
+    expect(ajustes).toContain('p_bet % 10 <> 0');
+    expect(ajustes).toContain('delete from public.bj_secrets where round_id = r.id;');
+    expect(ajustes).toContain('revoke all on function public.bj_hand_total(smallint[]) from public, anon, authenticated;');
+  });
+});
+
 const blackjack = readFileSync(`${__dirname}/../supabase/migrations/0028_blackjack.sql`, 'utf8');
 
 describe('0028_blackjack.sql', () => {
