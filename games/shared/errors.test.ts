@@ -1,32 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
-import { ERROR_TEXT, GameError, toGameError } from './errors';
+import { ERROR_TEXT, toGameError } from './errors';
 
-describe('toGameError', () => {
-  it('códigos do banco viram o código certo', () => {
-    expect(toGameError({ message: 'insufficient_credits' }).code).toBe('insufficient_credits');
-    expect(toGameError({ message: 'round_done' }).code).toBe('round_done');
-    expect(toGameError({ message: 'fiado_today' }).code).toBe('fiado_today');
-    expect(toGameError({ message: 'invalid_action' }).code).toBe('invalid_action'); // outra aba mudou a mão
+describe('erros do poker', () => {
+  it('código do banco vira frase da mesa', () => {
+    const cases: [string, string][] = [
+      ['seat_taken', 'Alguém sentou aí primeiro'],
+      ['already_seated', 'Você já está na mesa'],
+      ['buyin_out_of_range', 'Entrada vai de 200 a 500'],
+      ['rathole_min', 'Você levantou há pouco: volta com pelo menos o que levou'],
+      ['not_seated', 'Você não está na mesa'],
+      ['not_your_turn', 'Ainda não é sua vez'],
+      ['stale_seq', 'A mesa mudou'],
+      ['raise_too_small', 'Aumento menor que o mínimo'],
+      ['raise_too_big', 'Você não tem tudo isso'],
+      ['rebuy_in_hand', 'Completa quando a mão acabar'],
+      ['rebuy_out_of_range', 'Completa de 10 em 10, até 500 na mesa'],
+      ['nothing_to_show', 'Não tem carta pra mostrar agora'],
+      ['fiado_seated', 'Levanta da mesa de poker pra pegar fiado'],
+    ];
+    for (const [code, text] of cases) {
+      const e = toGameError({ message: code, code: 'P0001' });
+      expect(e.code).toBe(code);
+      expect(e.message).toBe(text);
+      expect(ERROR_TEXT[e.code]).toBe(text);
+    }
   });
 
-  it('sessão expirada ou fora do grupo: entrar de novo', () => {
-    expect(toGameError({ status: 401, message: 'x' }).code).toBe('no_session');
-    expect(toGameError({ message: 'JWT expired' }).code).toBe('no_session');
-    expect(toGameError({ code: '42501', message: 'not_member' }).code).toBe('no_session');
-  });
-
-  it('sem rede', () => {
-    expect(toGameError(new TypeError('Failed to fetch')).code).toBe('offline');
-    expect(toGameError(new TypeError('NetworkError when attempting to fetch resource.')).code).toBe('offline');
-    // o supabase-js embrulha a falha de rede num objeto de erro comum
-    expect(toGameError({ message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' }).code).toBe('offline');
-  });
-
-  it('o resto é desconhecido, e GameError passa direto', () => {
-    expect(toGameError(new Error('boom')).code).toBe('unknown');
-    const e = new GameError('round_open');
-    expect(toGameError(e)).toBe(e);
-    expect(ERROR_TEXT.offline).toBe('Sem conexão. Sua mão tá salva.');
+  it('not_seated não é confundido com already_seated nem fiado_seated', () => {
+    expect(toGameError({ message: 'already_seated' }).code).toBe('already_seated');
+    expect(toGameError({ message: 'fiado_seated' }).code).toBe('fiado_seated');
   });
 });

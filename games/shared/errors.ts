@@ -11,6 +11,19 @@ export type GameErrorCode =
   | 'fiado_today'
   | 'fiado_not_broke'
   | 'fiado_open_round'
+  | 'fiado_seated'
+  | 'seat_taken'
+  | 'already_seated'
+  | 'buyin_out_of_range'
+  | 'rathole_min'
+  | 'not_seated'
+  | 'not_your_turn'
+  | 'stale_seq'
+  | 'raise_too_small'
+  | 'raise_too_big'
+  | 'rebuy_in_hand'
+  | 'rebuy_out_of_range'
+  | 'nothing_to_show'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -25,6 +38,19 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   fiado_today: 'Fiado de hoje já foi. Volta amanhã.',
   fiado_not_broke: 'Fiado só sai quando não dá pra apostar',
   fiado_open_round: 'Termina a mão antes do fiado',
+  fiado_seated: 'Levanta da mesa de poker pra pegar fiado',
+  seat_taken: 'Alguém sentou aí primeiro',
+  already_seated: 'Você já está na mesa',
+  buyin_out_of_range: 'Entrada vai de 200 a 500',
+  rathole_min: 'Você levantou há pouco: volta com pelo menos o que levou',
+  not_seated: 'Você não está na mesa',
+  not_your_turn: 'Ainda não é sua vez',
+  stale_seq: 'A mesa mudou',
+  raise_too_small: 'Aumento menor que o mínimo',
+  raise_too_big: 'Você não tem tudo isso',
+  rebuy_in_hand: 'Completa quando a mão acabar',
+  rebuy_out_of_range: 'Completa de 10 em 10, até 500 na mesa',
+  nothing_to_show: 'Não tem carta pra mostrar agora',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -46,6 +72,19 @@ const FROM_DB: GameErrorCode[] = [
   'fiado_today',
   'fiado_not_broke',
   'fiado_open_round',
+  'fiado_seated',
+  'seat_taken',
+  'already_seated',
+  'buyin_out_of_range',
+  'rathole_min',
+  'not_seated',
+  'not_your_turn',
+  'stale_seq',
+  'raise_too_small',
+  'raise_too_big',
+  'rebuy_in_hand',
+  'rebuy_out_of_range',
+  'nothing_to_show',
 ];
 
 export function toGameError(e: unknown): GameError {
