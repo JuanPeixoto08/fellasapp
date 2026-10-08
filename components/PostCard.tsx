@@ -160,7 +160,12 @@ export function PostCard({
             </Pressable>
           ) : null}
           {post.poll ? <PostPoll postId={post.id} poll={post.poll} /> : null}
-          {post.media ? <PostTicket media={post.media} /> : null}
+          {post.media ? (
+            <PostTicket
+              media={post.media}
+              lastfmUser={post.author.show_now_playing !== false ? (post.author.lastfm_user ?? null) : null}
+            />
+          ) : null}
           <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={setViewing} />
           <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>

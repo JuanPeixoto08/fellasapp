@@ -164,6 +164,37 @@ describe('PostCard com ingresso', () => {
 
   it('com música anexada, a linha ao vivo do cabeçalho some (nada de duas músicas)', async () => {
     await render(<PostCard post={{ ...post, media: track }} />);
+    await screen.findByText('Ouvi');
+    expect(screen.queryByLabelText(/^Ouvindo/)).toBeNull();
+  });
+
+  const playingNow = (name: string, artist: string) =>
+    mockNowPlaying.mockResolvedValue({ name, artist, album: null, image: null, url: 'u', playedAt: null, nowPlaying: true });
+
+  it('"Tocando agora" só enquanto o autor ainda ouve essa música', async () => {
+    playingNow('espresso', 'Sabrina Carpenter');
+    await render(<PostCard post={{ ...post, media: track }} />);
+    expect(await screen.findByText('Tocando agora')).toBeTruthy();
+    expect(mockNowPlaying).toHaveBeenCalledWith('anafm');
+  });
+
+  it('a música acabou (tocando outra ou nada): vira "Ouvi"', async () => {
+    playingNow('Outra', 'X');
+    await render(<PostCard post={{ ...post, media: track }} />);
+    expect(await screen.findByText('Ouvi')).toBeTruthy();
+    expect(screen.queryByText('Tocando agora')).toBeNull();
+  });
+
+  it('autor com a música ao vivo desligada: "Ouvi", sem perguntar ao Last.fm', async () => {
+    playingNow('Espresso', 'Sabrina Carpenter');
+    await render(<PostCard post={{ ...post, author: { ...post.author, show_now_playing: false }, media: track }} />);
+    expect(screen.getByText('Ouvi')).toBeTruthy();
+    expect(mockNowPlaying).not.toHaveBeenCalled();
+  });
+
+  it('anexada como já ouvida: nem pergunta ao Last.fm', async () => {
+    await render(<PostCard post={{ ...post, media: { ...track, live: false } }} />);
+    expect(screen.getByText('Ouvi')).toBeTruthy();
     expect(mockNowPlaying).not.toHaveBeenCalled();
   });
 

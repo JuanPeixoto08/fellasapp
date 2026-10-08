@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Linking, Platform, Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Image as SvgImage, Line, Path } from 'react-native-svg';
 
+import { useNowPlaying } from '../../lib/lastfm/useNowPlaying';
 import { dayLabel, ratingStars, type PostMedia, type ReviewMedia, type TrackMedia } from '../../lib/postMedia';
 import { useTheme } from '../../lib/theme';
 import { EqualizerBars } from '../music/EqualizerBars';
@@ -11,6 +12,11 @@ type Props = {
   media: PostMedia;
   /** No compositor: ✕ para tirar o ingresso (e sem abrir links). */
   onRemove?: () => void;
+  /**
+   * No post: o Last.fm do autor (null = sem conta ou com a música ao vivo desligada). Com isso, "Tocando agora"
+   * só aparece enquanto ele ainda ouve aquela música; acabou, vira "Ouvi". Sem a prop (compositor), vale o anexo.
+   */
+  lastfmUser?: string | null;
 };
 
 const open = (url: string) => void Linking.openURL(url).catch(() => {});
@@ -331,16 +337,26 @@ function Vinyl({ image }: { image: string | null }) {
   );
 }
 
-function TrackTicket({ media, interactive }: { media: TrackMedia; interactive: boolean }) {
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** O post de música ao vivo: "Tocando agora" enquanto o autor ainda ouve essa música no Last.fm. */
+function LiveTrackTicket({ media, interactive, lastfmUser }: { media: TrackMedia; interactive: boolean; lastfmUser: string | null }) {
+  // anexada como já ouvida: nem pergunta
+  const now = useNowPlaying(media.live ? lastfmUser : null);
+  const playing = media.live && !!now && same(now.name, media.title) && same(now.artist, media.artist);
+  return <TrackTicket media={media} interactive={interactive} playing={playing} />;
+}
+
+function TrackTicket({ media, interactive, playing }: { media: TrackMedia; interactive: boolean; playing: boolean }) {
   const t = useTheme();
-  const label = `${media.live ? 'Tocando agora' : 'Ouviu'}: ${media.title}, de ${media.artist}`;
+  const label = `${playing ? 'Tocando agora' : 'Ouviu'}: ${media.title}, de ${media.artist}`;
   const record = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
       <Vinyl image={media.image} />
       <View style={{ flex: 1, minWidth: 0, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs + t.spacing.xs / 2 }}>
-          {media.live ? <EqualizerBars /> : null}
-          <Stub>{media.live ? 'Tocando agora' : 'Ouvi'}</Stub>
+          {playing ? <EqualizerBars /> : null}
+          <Stub>{playing ? 'Tocando agora' : 'Ouvi'}</Stub>
         </View>
         <Text variant="lead" bold numberOfLines={2}>
           {media.title}
@@ -376,7 +392,7 @@ function TrackTicket({ media, interactive }: { media: TrackMedia; interactive: b
  * Ingresso no post (review do Letterboxd ou música): contorno fino juntando o bilhete, o texto e o link,
  * como a caixa da enquete. No compositor, com ✕ para tirar.
  */
-export function PostTicket({ media, onRemove }: Props) {
+export function PostTicket({ media, onRemove, lastfmUser }: Props) {
   const t = useTheme();
   const interactive = !onRemove;
   return (
@@ -390,7 +406,13 @@ export function PostTicket({ media, onRemove }: Props) {
         gap: t.spacing.sm + t.spacing.xs / 2,
       }}
     >
-      {media.kind === 'review' ? <ReviewTicket media={media} interactive={interactive} /> : <TrackTicket media={media} interactive={interactive} />}
+      {media.kind === 'review' ? (
+        <ReviewTicket media={media} interactive={interactive} />
+      ) : lastfmUser === undefined ? (
+        <TrackTicket media={media} interactive={interactive} playing={media.live} />
+      ) : (
+        <LiveTrackTicket media={media} interactive={interactive} lastfmUser={lastfmUser} />
+      )}
       {onRemove ? (
         <View style={{ position: 'absolute', top: -t.spacing.sm, right: -t.spacing.sm }}>
           <IconButton
