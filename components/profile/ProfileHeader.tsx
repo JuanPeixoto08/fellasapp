@@ -4,8 +4,8 @@ import { Image, Pressable, View } from 'react-native';
 import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
 import { useTheme } from '../../lib/theme';
-import { Avatar, Heading, Icon, Text, VerifiedBadge, type IconName } from '../ui';
-import { hasBadge, visibleBadges } from '../../lib/badges';
+import { Avatar, Heading, Icon, Text, UserBadge, type IconName } from '../ui';
+import { shownBadge } from '../../lib/badges';
 import { PhotoViewer } from '../feed/PhotoViewer';
 import { NowPlayingLine } from '../music/NowPlayingLine';
 
@@ -34,6 +34,7 @@ function birthdayDayMonth(iso: string | null | undefined): string | null {
  */
 export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMusic }: Props) {
   const t = useTheme();
+  const badge = shownBadge(profile.badges, profile.featured_badge);
   const name = profile.display_name || profile.username;
   const birthday = birthdayDayMonth(profile.birthday);
   const since = memberSince(profile.created_at);
@@ -92,7 +93,7 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
             <Heading level={2} numberOfLines={2} style={{ flexShrink: 1 }}>
               {name}
             </Heading>
-            {hasBadge(visibleBadges(profile.badges, profile.hidden_badges), 'verified') ? <VerifiedBadge size="md" /> : null}
+            {badge ? <UserBadge badge={badge} size="md" /> : null}
           </View>
           <Text variant="small" tone="muted" numberOfLines={1}>
             @{profile.username}

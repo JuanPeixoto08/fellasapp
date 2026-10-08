@@ -8,7 +8,7 @@ import { CommentItem } from '../components/feed/CommentItem';
 import { MemberRow } from '../components/profile/MemberRow';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { VerifiedBadge } from '../components/ui';
-import { hasBadge } from '../lib/badges';
+import { badgeLabel, ownBadges, shownBadge } from '../lib/badges';
 import type { Comment, FeedPost } from '../lib/api/posts';
 import type { Profile } from '../lib/api/profiles';
 
@@ -53,13 +53,25 @@ const profile = (badges: string[]) =>
     badges,
   }) as Profile;
 
-describe('hasBadge', () => {
-  it('acha o selo na lista; sem lista é false', () => {
-    expect(hasBadge(['verified'], 'verified')).toBe(true);
-    expect(hasBadge([], 'verified')).toBe(false);
-    expect(hasBadge(undefined, 'verified')).toBe(false);
-    expect(hasBadge(null, 'verified')).toBe(false);
+describe('shownBadge', () => {
+  it('mostra o selo escolhido', () => expect(shownBadge(['verified'], 'verified')).toBe('verified'));
+  it('sem escolha: o primeiro selo que a pessoa tem', () => expect(shownBadge(['verified'], null)).toBe('verified'));
+  it('escolheu um selo que não tem mais: cai no primeiro que tem', () =>
+    expect(shownBadge(['verified'], 'xyz')).toBe('verified'));
+  it('sem selo: nenhum (mesmo com escolha antiga)', () => {
+    expect(shownBadge([], 'verified')).toBeNull();
+    expect(shownBadge(undefined, undefined)).toBeNull();
   });
+  it('selo que o app não conhece não aparece', () => expect(shownBadge(['xyz'], 'xyz')).toBeNull());
+});
+
+describe('ownBadges', () => {
+  it('só os selos que o app conhece, na ordem', () => expect(ownBadges(['xyz', 'verified'])).toEqual(['verified']));
+  it('campo faltando', () => expect(ownBadges(null)).toEqual([]));
+});
+
+describe('badgeLabel', () => {
+  it('nome do selo', () => expect(badgeLabel('verified')).toBe('Verificado'));
 });
 
 describe('VerifiedBadge', () => {

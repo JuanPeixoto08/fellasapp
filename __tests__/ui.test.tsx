@@ -132,3 +132,21 @@ describe('Switch', () => {
     expect(screen.getByRole('switch', { name: 'Selo' }).props.disabled).toBe(true);
   });
 });
+
+describe('ChoiceRow', () => {
+  it('opção de escolha única: papel radio, marcada quando escolhida, tocar escolhe', async () => {
+    const { ChoiceRow } = require('../components/ui');
+    const onPress = jest.fn();
+    await render(<ChoiceRow label="Verificado" selected={false} onPress={onPress} />);
+    const row = screen.getByRole('radio', { name: 'Verificado' });
+    expect(row.props.accessibilityState).toMatchObject({ checked: false });
+    await fireEvent.press(row);
+    expect(onPress).toHaveBeenCalled();
+  });
+
+  it('escolhida: marcada', async () => {
+    const { ChoiceRow } = require('../components/ui');
+    await render(<ChoiceRow label="Verificado" selected onPress={jest.fn()} />);
+    expect(screen.getByRole('radio', { name: 'Verificado' }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+});

@@ -303,28 +303,20 @@ describe('Editar perfil: o que aparece no perfil', () => {
     );
   });
 
-  it('quem tem selo: uma chave por selo; desligar e salvar esconde', async () => {
-    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, badges: ['verified'], hidden_badges: [] });
+  it('quem tem selo: escolhe qual mostrar (sem opção de esconder) e salvar manda a escolha', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, badges: ['verified'], featured_badge: null });
     await renderScreen();
-    const toggle = await screen.findByRole('switch', { name: 'Selo de verificado' });
-    expect(toggle.props.value).toBe(true);
-    await fireEvent(toggle, 'valueChange', false);
+    const option = await screen.findByRole('radio', { name: 'Verificado' });
+    expect(option.props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.queryByRole('switch', { name: /Selo/ })).toBeNull();
+    await fireEvent.press(option);
     await fireEvent.press(screen.getByLabelText('Salvar'));
-    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ hiddenBadges: ['verified'] }));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ featuredBadge: 'verified' }));
   });
 
-  it('selo escondido antes: aparece desligado; religar e salvar mostra de novo', async () => {
-    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, badges: ['verified'], hidden_badges: ['verified'] });
+  it('sem selo: não aparece escolha de selo', async () => {
     await renderScreen();
-    const toggle = await screen.findByRole('switch', { name: 'Selo de verificado' });
-    expect(toggle.props.value).toBe(false);
-    await fireEvent(toggle, 'valueChange', true);
-    await fireEvent.press(screen.getByLabelText('Salvar'));
-    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ hiddenBadges: [] }));
-  });
-
-  it('sem selo: nenhuma chave de selo', async () => {
-    await renderScreen();
-    expect(screen.queryByRole('switch', { name: 'Selo de verificado' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Verificado' })).toBeNull();
+    expect(screen.queryByText('Selo do lado do nome')).toBeNull();
   });
 });

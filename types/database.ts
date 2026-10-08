@@ -114,6 +114,7 @@ export type Database = {
           lastfm_user: string | null;
           show_now_playing: boolean;
           hidden_badges: string[];
+          featured_badge: string | null;
           is_admin: boolean;
           pinned_post_id: string | null;
           created_at: string;
@@ -134,6 +135,7 @@ export type Database = {
           lastfm_user?: string | null;
           show_now_playing?: boolean;
           hidden_badges?: string[];
+          featured_badge?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -154,6 +156,7 @@ export type Database = {
           lastfm_user?: string | null;
           show_now_playing?: boolean;
           hidden_badges?: string[];
+          featured_badge?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;

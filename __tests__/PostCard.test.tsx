@@ -156,11 +156,9 @@ describe('PostCard selos', () => {
     expect(screen.getByLabelText('Verificado')).toBeTruthy();
   });
 
-  it('selo escondido pelo autor não aparece', async () => {
-    await render(
-      <PostCard post={{ ...post, author: { ...post.author, badges: ['verified'], hidden_badges: ['verified'] } }} />,
-    );
-    expect(screen.queryByLabelText('Verificado')).toBeNull();
+  it('escolha antiga de um selo que não existe mais: mostra o que ele tem', async () => {
+    await render(<PostCard post={{ ...post, author: { ...post.author, badges: ['verified'], featured_badge: 'xyz' } }} />);
+    expect(screen.getByLabelText('Verificado')).toBeTruthy();
   });
 });
 

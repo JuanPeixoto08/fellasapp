@@ -76,7 +76,7 @@ export function RightRail() {
                 >
                   <Avatar name={name} uri={resolveUrl(m.avatar_url, avatars)} size={t.avatarSizes.sm} />
                   <View style={{ flex: 1 }}>
-                    <NameWithBadge name={name} badges={m.badges} hiddenBadges={m.hidden_badges} variant="small" bold />
+                    <NameWithBadge name={name} badges={m.badges} featuredBadge={m.featured_badge} variant="small" bold />
                     <Text variant="caption" tone="muted" numberOfLines={1}>
                       @{m.username}
                     </Text>

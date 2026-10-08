@@ -55,24 +55,20 @@ describe('foto de perfil e banner abrem maiores', () => {
 });
 
 describe('selos no cabeçalho', () => {
-  const withBadges = (hidden: string[]) =>
+  const withBadges = (badges: string[]) =>
     render(
       <SafeAreaProvider initialMetrics={metrics}>
-        <ProfileHeader
-          profile={{ ...profile, badges: ['verified'], hidden_badges: hidden } as Profile}
-          avatarUri={null}
-          bannerUri={null}
-        />
+        <ProfileHeader profile={{ ...profile, badges, featured_badge: 'verified' } as Profile} avatarUri={null} bannerUri={null} />
       </SafeAreaProvider>,
     );
 
-  it('mostra o selo que a pessoa tem', async () => {
-    await withBadges([]);
+  it('mostra o selo escolhido', async () => {
+    await withBadges(['verified']);
     expect(screen.getByLabelText('Verificado')).toBeTruthy();
   });
 
-  it('selo escondido some do cabeçalho', async () => {
-    await withBadges(['verified']);
+  it('sem selo: nada (mesmo com escolha antiga)', async () => {
+    await withBadges([]);
     expect(screen.queryByLabelText('Verificado')).toBeNull();
   });
 });
