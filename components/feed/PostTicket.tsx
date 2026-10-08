@@ -250,8 +250,8 @@ function ReviewTicket({ media, interactive }: { media: ReviewMedia; interactive:
   );
 }
 
-/** Gira enquanto `spinning`; parado com "reduzir movimento". */
-function useSpin(spinning: boolean, ms: number) {
+/** Gira sem parar; parado com "reduzir movimento". */
+function useSpin(ms: number) {
   const turn = useRef(new Animated.Value(0)).current;
   const [still, setStill] = useState(false);
   useEffect(() => {
@@ -264,22 +264,22 @@ function useSpin(spinning: boolean, ms: number) {
     };
   }, []);
   useEffect(() => {
-    if (!spinning || still) return;
+    if (still) return;
     const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: ms, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
-  }, [spinning, still, ms, turn]);
+  }, [still, ms, turn]);
   return turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 }
 
 /**
  * A capa do álbum com o disco saindo dela pela direita; o selo do disco é a própria capa.
- * Tocando agora, o disco gira. Sem capa: fundo `surfaceSunken` com a nota e selo `brand`.
+ * O disco gira sempre (tocando agora ou já ouvida). Sem capa: fundo `surfaceSunken` com a nota e selo `brand`.
  */
-function Vinyl({ image, live }: { image: string | null; live: boolean }) {
+function Vinyl({ image }: { image: string | null }) {
   const t = useTheme();
   const v = t.layout.vinyl;
-  const rotate = useSpin(live, v.spinMs);
+  const rotate = useSpin(v.spinMs);
   const r = v.disc / 2;
   // sulcos: anéis finos entre o selo e a borda do disco
   const grooves: number[] = [];
@@ -336,7 +336,7 @@ function TrackTicket({ media, interactive }: { media: TrackMedia; interactive: b
   const label = `${media.live ? 'Tocando agora' : 'Ouviu'}: ${media.title}, de ${media.artist}`;
   const record = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
-      <Vinyl image={media.image} live={media.live} />
+      <Vinyl image={media.image} />
       <View style={{ flex: 1, minWidth: 0, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs + t.spacing.xs / 2 }}>
           {media.live ? <EqualizerBars /> : null}

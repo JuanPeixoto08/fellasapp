@@ -122,11 +122,12 @@ describe('PostTicket: música', () => {
     expect(screen.getByText('Short n’ Sweet')).toBeTruthy();
   });
 
-  it('o disco só gira tocando agora', async () => {
+  it('o disco gira tocando agora e também já ouvida', async () => {
     const { Animated } = require('react-native');
     const loop = jest.spyOn(Animated, 'loop');
     await render(<PostTicket media={{ ...track, live: false }} />);
-    expect(loop).not.toHaveBeenCalled();
+    expect(loop).toHaveBeenCalledTimes(1);
+    loop.mockClear();
     await render(<PostTicket media={track} />);
     // 3 barrinhas do equalizador + o disco
     expect(loop).toHaveBeenCalledTimes(4);
