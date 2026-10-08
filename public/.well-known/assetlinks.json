@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fellasinc.fellasapp",
+      "sha256_cert_fingerprints": [
+        "CC:D8:FF:53:20:20:37:60:8F:36:38:E6:85:14:E0:A1:C3:99:CB:3C:06:78:8C:93:8A:94:BD:8D:4F:D0:1E:DB"
+      ]
+    }
+  }
+]
