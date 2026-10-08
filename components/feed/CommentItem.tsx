@@ -38,7 +38,7 @@ export function CommentItem({ comment, onReact, onDelete, onPressImage }: Props)
       <View style={{ flex: 1, gap: t.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
           <AuthorLink username={comment.author.username} name={name} style={{ flexShrink: 1 }}>
-            <NameWithBadge name={name} badges={comment.author.badges} variant="small" bold />
+            <NameWithBadge name={name} badges={comment.author.badges} hiddenBadges={comment.author.hidden_badges} variant="small" bold />
           </AuthorLink>
           <View style={{ flex: 1 }} />
           {date ? (

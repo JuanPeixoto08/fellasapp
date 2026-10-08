@@ -21,6 +21,11 @@ export const MAX_COMMENT_IMAGES = 4;
 export type Author = Pick<Tables<'profiles'>, 'id' | 'username' | 'display_name' | 'avatar_url'> & {
   /** Selos (ex.: verificado); falta em dados antigos/de teste. */
   badges?: string[];
+  /** Selos que o autor escondeu (some do lado do nome). */
+  hidden_badges?: string[];
+  /** Last.fm e a chave "Mostrar o que estou ouvindo": o "ouvindo agora" ao lado do nome no post. */
+  lastfm_user?: string | null;
+  show_now_playing?: boolean;
 };
 
 export type FeedPost = {
@@ -62,7 +67,7 @@ type PostRow = Tables<'posts'> & {
   comments: { count: number }[] | null;
 };
 
-const AUTHOR_COLUMNS = 'id, username, display_name, avatar_url, badges';
+const AUTHOR_COLUMNS = 'id, username, display_name, avatar_url, badges, hidden_badges, lastfm_user, show_now_playing';
 const POST_SELECT = `*, author:profiles!posts_author_id_fkey(${AUTHOR_COLUMNS}), likes(count), comments(count)`;
 
 const unknownAuthor = (id: string): Author => ({

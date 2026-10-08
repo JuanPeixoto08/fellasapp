@@ -149,3 +149,17 @@ describe('PostCard fixado', () => {
     expect(screen.queryByLabelText('Desafixar do perfil')).toBeNull();
   });
 });
+
+describe('PostCard selos', () => {
+  it('mostra o selo do autor', async () => {
+    await render(<PostCard post={{ ...post, author: { ...post.author, badges: ['verified'] } }} />);
+    expect(screen.getByLabelText('Verificado')).toBeTruthy();
+  });
+
+  it('selo escondido pelo autor não aparece', async () => {
+    await render(
+      <PostCard post={{ ...post, author: { ...post.author, badges: ['verified'], hidden_badges: ['verified'] } }} />,
+    );
+    expect(screen.queryByLabelText('Verificado')).toBeNull();
+  });
+});

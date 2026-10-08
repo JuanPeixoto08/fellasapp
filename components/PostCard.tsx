@@ -100,7 +100,7 @@ export function PostCard({
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm, minHeight: t.avatarSizes.md / 2 }}>
               <AuthorLink username={post.author.username} name={name} enabled={linkAuthor} style={{ flexShrink: 1 }}>
-                <NameWithBadge name={name} badges={post.author.badges} bold />
+                <NameWithBadge name={name} badges={post.author.badges} hiddenBadges={post.author.hidden_badges} bold />
               </AuthorLink>
               <View style={{ flex: 1 }} />
               {date ? (

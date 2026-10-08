@@ -53,3 +53,26 @@ describe('foto de perfil e banner abrem maiores', () => {
     expect(screen.queryByRole('button', { name: 'Ver banner de Juan' })).toBeNull();
   });
 });
+
+describe('selos no cabeçalho', () => {
+  const withBadges = (hidden: string[]) =>
+    render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <ProfileHeader
+          profile={{ ...profile, badges: ['verified'], hidden_badges: hidden } as Profile}
+          avatarUri={null}
+          bannerUri={null}
+        />
+      </SafeAreaProvider>,
+    );
+
+  it('mostra o selo que a pessoa tem', async () => {
+    await withBadges([]);
+    expect(screen.getByLabelText('Verificado')).toBeTruthy();
+  });
+
+  it('selo escondido some do cabeçalho', async () => {
+    await withBadges(['verified']);
+    expect(screen.queryByLabelText('Verificado')).toBeNull();
+  });
+});

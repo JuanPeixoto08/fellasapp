@@ -5,7 +5,7 @@ import { formatBirthday, type Profile } from '../../lib/api/profiles';
 import { memberSince } from '../../lib/format';
 import { useTheme } from '../../lib/theme';
 import { Avatar, Heading, Icon, Text, VerifiedBadge, type IconName } from '../ui';
-import { hasBadge } from '../../lib/badges';
+import { hasBadge, visibleBadges } from '../../lib/badges';
 import { PhotoViewer } from '../feed/PhotoViewer';
 import { NowPlayingLine } from '../music/NowPlayingLine';
 
@@ -92,7 +92,7 @@ export function ProfileHeader({ profile, avatarUri, bannerUri, actions, onOpenMu
             <Heading level={2} numberOfLines={2} style={{ flexShrink: 1 }}>
               {name}
             </Heading>
-            {hasBadge(profile.badges, 'verified') ? <VerifiedBadge size="md" /> : null}
+            {hasBadge(visibleBadges(profile.badges, profile.hidden_badges), 'verified') ? <VerifiedBadge size="md" /> : null}
           </View>
           <Text variant="small" tone="muted" numberOfLines={1}>
             @{profile.username}
