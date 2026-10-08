@@ -43,8 +43,8 @@ cegas; estatísticas por jogador.
 - **Pronto** = sentado, `status = 'playing'`, fichas > 0, sem `wait_bb`, sem `leaving`.
 - Sentou ou voltou do ausente → `wait_bb = true`: entra quando a cega grande cair no lugar dele.
   **Exceção (mesa parada):** se no começo da mão houver menos de 2 prontos, todos os `wait_bb` viram prontos.
-- Fichas 0 no fim da mão: não recebe cartas; tem até o começo da mão seguinte para completar; senão é
-  levantado (sem fichas, nada volta).
+- Fichas 0 no fim da mão: não recebe cartas; tem **1 minuto** para completar; senão é levantado (sem fichas,
+  nada volta). (A próxima mão começa em 5 s: só até ela seria pouco tempo para completar.)
 - **Mesa fechada para o reset:** nenhuma mão começa entre **domingo 23:55** e a virada da semana
   (`poker_closed(ts)`: dia da semana domingo e hora ≥ 23:55 em `America/Sao_Paulo`). Mão já em andamento segue.
 
@@ -89,17 +89,23 @@ cegas; estatísticas por jogador.
 - `deadline` = início da vez + **30 s**. `poker_tick()` age se `now() > deadline`: mesa se pode, senão corre;
   incrementa `timeouts` do lugar (uma vez por mão). `timeouts` chega a **2** → `status = 'away'`, `away_since =
   now()`. Qualquer jogada própria zera `timeouts`.
-- Ausente não recebe cartas nem paga cegas. `poker_back()` → `status = 'playing'`, `wait_bb = true`.
+- Ausente não recebe cartas nem paga cegas. Se ficou ausente no meio de uma mão em que ainda está, a vez dele
+  é jogada na hora (mesa se pode, senão corre), sem esperar 30 s. `poker_back()` → `status = 'playing'`, `wait_bb = true`.
 - Ausente há 10 min → levantado pelo `poker_tick()` (fichas para a carteira, como `poker_leave`).
-- **Levantar no meio da mão:** marca `leaving = true`; quando a vez chega, corre; all-in fica até o fim. No fim
+- **Levantar no meio da mão:** marca `leaving = true`; quando a vez chega, corre na hora; all-in fica até o fim. No fim
   da mão o lugar é liberado e as fichas voltam. Fora de mão: levanta na hora.
 - **Anti-rathole:** ao levantar, grava `poker_leaves(user_id, stack, left_at)`. Sentar de novo em menos de
   30 min exige entrada ≥ `stack` de saída (pode passar de 500; nunca abaixo de 200).
 
+- Vários all-ins curtos que somados dariam um aumento completo **não** reabrem a ação (regra da TDA fica para
+  depois, como o gerente de sala sugeriu).
+
 ### Sequência
-`poker_tables.seq` sobe a cada mudança. `poker_act`, `poker_rebuy`, `poker_show` recebem o `seq` que a tela
-viu; diferente do atual → `stale_seq` ("A mesa mudou"). `poker_tick` não recebe seq (age só por prazo). Toda
-função trava a linha de `poker_tables` (`for update`) antes de qualquer coisa.
+`poker_tables.seq` sobe a cada mudança da mesa (a tela ignora retrato mais velho que o que já tem). A jogada usa
+o contador da própria mão: `poker_hands.action_no` sobe a cada jogada (inclusive as automáticas), e
+`poker_act(p_hand, p_action_no, …)` com número diferente → `stale_seq` ("A mesa mudou"). Assim alguém sentar
+ou levantar durante a minha vez não invalida o meu toque. `poker_tick` não recebe número (age só por prazo).
+Toda função trava a linha de `poker_tables` (`for update`) antes de qualquer coisa.
 
 ## 2. Banco — migração `0030_poker.sql`
 
@@ -112,17 +118,19 @@ para o app; funções `security definer`, `set search_path = public`, só membro
   `max_buyin 500`, `seq bigint`, `hand_no int`, `last_bb_seat smallint`, `next_hand_at timestamptz`,
   `state jsonb` (retrato público, abaixo), `updated_at`. Select para membros; **na publicação
   `supabase_realtime`** (bloco `do` idempotente como na 0021).
-- **`poker_seats`** (`table_id`, `seat 0..5`, pk dos dois; `user_id unique`, `stack int >= 0`,
-  `status 'playing'|'away'`, `wait_bb bool`, `leaving bool`, `timeouts smallint`, `away_since`, `sat_at`).
+- **`poker_seats`** (`seat 0..5` pk — uma mesa só, sem `table_id`; `user_id unique`, `stack int >= 0`,
+  `status 'playing'|'away'`, `wait_bb bool`, `leaving bool`, `timeouts smallint`, `away_since`, `busted_at`,
+  `sat_at`).
   Select para membros (é público na mesa).
-- **`poker_hands`** (`id uuid`, `table_id`, `hand_no`, `status 'betting'|'done'|'void'`,
+- **`poker_hands`** (`id uuid`, `hand_no`, `status 'betting'|'done'|'void'`,
   `street 'preflop'|'flop'|'turn'|'river'|'showdown'`, `button`, `sb_seat`, `bb_seat`, `board smallint[]`
   (só as abertas), `players jsonb` (por lugar: user_id, aposta na rodada, total na mão, correu, all-in,
-  agiu), `current_bet`, `last_raise`, `to_act smallint`, `deadline`, `results jsonb` (potes, vencedores,
+  agiu), `current_bet`, `last_raise`, `to_act smallint`, `action_no int`, `deadline`, `runout bool`, `results jsonb` (potes, vencedores,
   mãos mostradas com nome da mão), `shown jsonb` (lugar → cartas, por showdown ou `poker_show`),
-  `started_at`, `ended_at`). Select para membros (não tem carta escondida). Índice único de mão aberta por mesa.
+  `started_at`, `ended_at`). Select para membros (não tem carta escondida). Índice único: uma mão aberta só.
 - **`poker_secrets`** (`hand_id` pk, `deck smallint[]`, `holes jsonb` lugar → 2 cartas). RLS ligado, **sem
-  política**. Apagado quando a mão acaba (o que precisa ficar público já está em `shown`).
+  política**. Apagado quando a **mão seguinte começa** (até lá o "Mostrar" precisa das cartas); o que é
+  público já está em `shown`.
 - **`poker_leaves`** (`user_id` pk, `stack`, `left_at`). Sem acesso do app.
 - **`game_ledger.reason`** ganha `'buyin'` e `'cashout'` (troca do check).
 
@@ -137,13 +145,13 @@ Nunca contém carta de `poker_secrets` além do que está em `shown`. Cartas sã
 ### Funções para o app
 | Função | Faz | Erros |
 |---|---|---|
-| `poker_state()` | devolve `state` (carga inicial e reconexão) | |
+| `poker_state()` | devolve `state` com `server_now` de agora e `me: { rathole_min }` (carga inicial e reconexão) | |
 | `poker_sit(p_seat, p_buyin)` | trava carteira; confere lugar, entrada, anti-rathole; `games_move(-buyin,'buyin')`; senta com `wait_bb`; se a mesa estava parada, `poker_maybe_start()` | `seat_taken`, `already_seated`, `buyin_out_of_range`, `rathole_min`, `insufficient_credits` |
-| `poker_act(p_seq, p_action, p_amount)` | `fold`/`check`/`call`/`raise`/`allin` na sua vez; avança rodada, abre cartas, fecha a mão | `stale_seq`, `not_your_turn`, `invalid_action`, `raise_too_small`, `raise_too_big`, `not_seated` |
-| `poker_rebuy(p_seq, p_amount)` | entre mãos (ou sem estar na mão), mesa ≤ 500 | `rebuy_in_hand`, `rebuy_out_of_range`, `insufficient_credits` |
+| `poker_act(p_hand, p_action_no, p_action, p_amount)` | `fold`/`check`/`call`/`raise`/`allin` na sua vez; avança rodada, abre cartas, fecha a mão | `stale_seq`, `not_your_turn`, `invalid_action`, `raise_too_small`, `raise_too_big`, `not_seated` |
+| `poker_rebuy(p_amount)` | entre mãos (ou sem estar na mão), mesa ≤ 500 | `rebuy_in_hand`, `rebuy_out_of_range`, `insufficient_credits` |
 | `poker_leave()` | levanta agora ou marca `leaving` | `not_seated` |
 | `poker_back()` | ausente → playing + `wait_bb` | `not_seated` |
-| `poker_show(p_seq)` | mostra as suas 2 cartas da última mão (sem showdown) até a próxima começar | `nothing_to_show` |
+| `poker_show()` | mostra as suas 2 cartas da última mão (sem showdown) até a próxima começar | `nothing_to_show` |
 | `poker_my_cards()` | suas 2 cartas na mão aberta (ou null) | |
 | `poker_tick()` | relógio: vez vencida, próxima mão (`next_hand_at` vencido, mesa aberta, 2+ elegíveis), ausente de 10 min, sem fichas | |
 | `poker_history()` | últimas 20 mãos `done`: no, vencedores, potes, board, `shown`, nomes das mãos | |
@@ -154,7 +162,8 @@ Internas (sem execute para o app): `poker_shuffle()`, `poker_maybe_start()`, `po
 array comparável: categoria, desempates), `poker_rank_name(int[])`, `poker_snapshot()`, `poker_closed(ts)`,
 `poker_stand(seat)`.
 
-`poker_tick()` também roda pelo **pg_cron a cada minuto** (`fellas-poker-tick`, `* * * * *`); sem mesa ativa
+`poker_tick()` aceita ser chamada sem usuário (o cron) e, com usuário, só de membro. Também roda pelo
+**pg_cron a cada minuto** (`fellas-poker-tick`, `* * * * *`); sem mesa ativa
 não faz nada. O app chama `poker_tick()` quando o relógio local (com a diferença para `server_now`) passa de
 `deadline` ou `next_hand_at` + 1 s.
 
@@ -185,9 +194,10 @@ games/
     view.ts               HUD: lugares (foto, nome, fichas, ação, anel do relógio), régua do aumento, folha de
                           sentar, histórico, avisos
   shared/
-    table3d/              + layout de 6 lugares (em pé e deitado, com o meu lugar sempre embaixo), cartas da
-                          mesa, cartas viradas dos outros, fichas por lugar, botão do dealer, pote indo para o
-                          vencedor
+    table3d/              peças comuns (renderer, cartas, fichas, loop) que a mesa do poker reaproveita
+  poker/layout.ts         6 lugares em pé (eu sempre embaixo) e deitado (lugares fixos, minhas cartas embaixo
+                          no meio); cartas da mesa, fichas por lugar, botão do dealer
+  poker/table.ts          cena 3D do poker; poker/tableDiff.ts: passos de animação entre dois retratos
     hud/                  + estilos de lugar, anel do relógio, régua, folha (sheet)
     api.ts                + poker_*; games_board no placar
     realtime.ts           canal Supabase na linha de poker_tables; reconecta e recarrega poker_state()
@@ -197,14 +207,17 @@ games/
     hands.test.ts         casos de mão contra poker_rank (SQL) e hands.ts (TS)
     fixtures/hands.json   ~60 casos
   dev/
-    mockApi.ts            + poker com bots no PGlite (?mock); troca de jogador (?as=2)
-    frames.html           + duas telas de jogadores diferentes lado a lado
+    mockApi.ts            + poker com bots no PGlite (?mock): 3 fellas de mentira sentados que jogam sozinhos
+    frames.html           + a mesa de poker no celular e no PC (cada quadro tem o próprio banco)
 ```
 
 - Vite ganha a página `poker/index.html` (multi-página, como o Blackjack). `deploy-web.yml` não muda.
 - **Layout:** celular em pé = mesa oval em pé, 5 outros em volta, eu embaixo com as 2 cartas grandes e o
-  rótulo da mão, painel com os botões. Deitado/PC (≥ 700 e paisagem) = mesa deitada, painel à direita com
-  abas **Mãos | Placar**, "Você na mesa" à esquerda, atalhos **1 Correr · 2 Mesa/Pagar · 3 Aumentar · 4 All-in**.
+  rótulo da mão, painel com os botões. Deitado/PC (≥ 700 e paisagem) = mesa deitada com os **lugares fixos**
+  (cada um no seu número, como no mockup do PC); **minhas cartas ficam sempre embaixo, no meio da mesa**, seja
+  qual for o meu lugar, e **minhas fichas de aposta ficam na frente do meu lugar**, como as dos outros; painel à
+  direita com abas **Mãos | Placar**, "Você na mesa" à esquerda, atalhos
+  **1 Correr · 2 Mesa/Pagar · 3 Aumentar · 4 All-in**.
 - **Botões moeda:** Correr (vermelho ✕), Mesa ou Pagar X (verde), Aumentar (violeta; abre a régua: Mín,
   ½ pote, Pote, − / + de 10, "Aumentar p/ X"), All-in (laranja). Fora da vez: "Vez do Igor · 18 s".
 - **No alto:** ← Voltar, título com as cegas, Levantar, Completar (entre mãos), pílula da carteira, Histórico
@@ -243,7 +256,7 @@ mão (fase `playing`) com o aviso da semana, em vez de zerar a rodada.
 - **Ausente:** faixa "Você ficou ausente: as mãos seguem sem você." + **Voltar pra mesa** / **Levantar (X
   voltam pra carteira)**.
 - **Levantando:** "Você sai no fim dessa mão".
-- **Sem fichas:** "Acabaram suas fichas. Completa até a próxima mão ou você levanta."
+- **Sem fichas:** "Acabaram suas fichas. Completa em até 1 minuto ou você levanta."
 - **Fechada:** "A mesa fecha pro reset. Volta 00:00." · **Semana virou:** "A semana virou! Todo mundo foi
   levantado e as fichas voltaram pra carteira."
 - **Sem rede:** "Reconectando…" (botões travados); ao voltar, recarrega.
@@ -280,7 +293,7 @@ mão (fase `playing`) com o aviso da semana, em vez de zerar a rodada.
 - **Tela:** `poker/machine` e `poker/rules` (vitest), `poker/view` (happy-dom); M1 no `blackjack/machine`.
 - **App (jest):** card do Poker (N na mesa, Jogar/Voltar pra mesa), placar via `games_board`, nota de fiado
   sentado, `affectsNotifications` ignora `poker_tables`, teste de texto da 0030.
-- **Manual:** `?mock` com bots e `frames.html` com dois jogadores; depois Juan + 1 fella em dois celulares
+- **Manual:** `?mock` com bots e `frames.html` (celular e PC); depois Juan + 1 fella em dois celulares
   (all-in, relógio estourando, ausente, levantar no meio).
 
 ## 7. Como sobe
