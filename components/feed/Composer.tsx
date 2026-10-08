@@ -18,7 +18,9 @@ import { MentionSuggestions } from '../MentionSuggestions';
 import { TagSuggestions } from '../TagSuggestions';
 import { PlaceChip } from '../places/PlaceChip';
 import { PlaceField } from '../places/PlaceField';
+import { MediaPicker } from './MediaPicker';
 import { PollEditor } from './PollEditor';
+import { PostTicket } from './PostTicket';
 import { useContentWidth } from '../shell/ShellContext';
 import { Avatar, Button, ConfirmDialog, IconButton, ImageThumbs, Text, useAutoGrow } from '../ui';
 
@@ -45,7 +47,9 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
   const t = useTheme();
   const me = useMyAvatar();
   const contentWidth = useContentWidth();
-  const { body, imageUris, location, poll } = useDraft();
+  const { body, imageUris, location, poll, media } = useDraft();
+  // ingresso sendo escolhido (caixa abaixo do texto): review do Letterboxd ou música
+  const [picking, setPicking] = useState<'review' | 'track' | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
@@ -74,7 +78,9 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
 
   const room = MAX_IMAGES - imageUris.length;
   // enquete: precisa da pergunta e de 2 opções; sem ela, texto ou foto
-  const hasDraft = poll ? pollReady(body, poll.options) : body.trim().length > 0 || imageUris.length > 0;
+  const hasDraft = poll
+    ? pollReady(body, poll.options)
+    : body.trim().length > 0 || imageUris.length > 0 || !!media;
   // local ou enquete sozinhos não dão post, mas são rascunho: descartar pergunta antes
   const hasAnything = hasDraft || body.trim().length > 0 || !!location || !!placeToPost || !!poll;
   // coluna de conteúdo - margens - avatar - espaço entre avatar e conteúdo
@@ -120,10 +126,12 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
         imageUris,
         location: placeToPost,
         ...(poll ? { poll: { options: poll.options, minutes: durationMinutes(poll.duration) } } : {}),
+        ...(media ? { media } : {}),
       });
       emitPostCreated();
       clearDraft();
       setPlaceOpen(false);
+      setPicking(null);
       onPosted?.();
     } catch (e) {
       setError(friendlyError(e, 'Não rolou postar. Tenta de novo.'));
@@ -203,7 +211,7 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             }}
           />
         ) : null}
-        {!hasDraft && !poll && variant !== 'inline' ? (
+        {!hasDraft && !poll && !picking && variant !== 'inline' ? (
           <Text variant="small" tone="muted">
             Uma frase, até {MAX_IMAGES} fotos, ou os dois. Só os fellas veem.
           </Text>
@@ -219,6 +227,17 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
             }}
           />
         ) : null}
+        {picking ? (
+          <MediaPicker
+            kind={picking}
+            onClose={() => setPicking(null)}
+            onPick={(picked) => {
+              setDraft((d) => ({ ...d, media: picked }));
+              setPicking(null);
+            }}
+          />
+        ) : null}
+        {media ? <PostTicket media={media} onRemove={() => setDraft((d) => ({ ...d, media: null }))} /> : null}
         {poll ? (
           <PollEditor
             poll={poll}
@@ -291,7 +310,22 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
           setError(null);
           setDraft((d) => ({ ...d, poll: { options: ['', ''], duration: DEFAULT_POLL_DURATION } }));
         }}
-        disabled={!!poll || imageUris.length > 0 || saving}
+        disabled={!!poll || !!media || imageUris.length > 0 || saving}
+      />
+      {/* ingresso: a sua review do Letterboxd ou a música; um anexo por post, nunca junto da enquete */}
+      <IconButton
+        icon="film-outline"
+        accessibilityLabel="Anexar review do Letterboxd"
+        variant="ghost"
+        onPress={() => setPicking('review')}
+        disabled={!!poll || !!media || saving}
+      />
+      <IconButton
+        icon="musical-notes-outline"
+        accessibilityLabel="Anexar música"
+        variant="ghost"
+        onPress={() => setPicking('track')}
+        disabled={!!poll || !!media || saving}
       />
       <View style={{ flex: 1 }} />
       {body.length >= COUNTER_FROM ? (
@@ -313,12 +347,13 @@ export function Composer({ variant, onPosted, onCancel }: Props) {
     <ConfirmDialog
       visible={discarding}
       title="Descartar o rascunho?"
-      message={poll ? 'O texto e a enquete somem.' : 'O texto e as fotos escolhidas somem.'}
+      message={poll ? 'O texto e a enquete somem.' : media ? 'O texto e o ingresso somem.' : 'O texto e as fotos escolhidas somem.'}
       confirmLabel="Descartar"
       cancelLabel="Continuar escrevendo"
       onConfirm={() => {
         clearDraft();
         setPlaceOpen(false);
+        setPicking(null);
         setError(null);
         setDiscarding(false);
         onCancel?.();

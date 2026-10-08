@@ -13,6 +13,21 @@ const mockSuggestTags = jest.fn();
 jest.mock('../lib/api/tags', () => ({ suggestTags: (q: string) => mockSuggestTags(q) }));
 const mockSuggestPlaces = jest.fn();
 jest.mock('../lib/api/places', () => ({ suggestPlaces: (q: string) => mockSuggestPlaces(q) }));
+const mockListMyReviews = jest.fn();
+jest.mock('../lib/api/letterboxd', () => ({
+  ...jest.requireActual('../lib/api/letterboxd'),
+  listMyReviews: () => mockListMyReviews(),
+}));
+const mockRecent = jest.fn();
+jest.mock('../lib/lastfm/api', () => ({
+  ...jest.requireActual('../lib/lastfm/api'),
+  hasLastfmKey: () => true,
+  getRecentTracks: (u: string, p: number) => mockRecent(u, p),
+}));
+let mockProfile: Record<string, unknown> | null = { letterboxd_user: 'oliveira', lastfm_user: 'juanfm' };
+jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ profile: mockProfile }) }));
+const mockRouterPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockRouterPush }) }));
 
 const createPostMock = createPost as jest.Mock;
 
@@ -241,5 +256,101 @@ describe('Composer: enquete', () => {
     await fireEvent.press(screen.getByLabelText('Adicionar enquete'));
     await fireEvent.press(screen.getByText('Cancelar'));
     expect(screen.getByText('Descartar o rascunho?')).toBeTruthy();
+  });
+});
+
+describe('Composer: ingresso', () => {
+  const review = {
+    kind: 'review' as const,
+    title: 'A Story of Yonosuke',
+    year: 2013,
+    rating: 4,
+    liked: true,
+    rewatch: false,
+    watched: '2025-12-30',
+    poster: 'https://a.ltrbxd.com/p.jpg',
+    url: 'https://letterboxd.com/oliveira/film/a-story-of-yonosuke/',
+    text: 'Bom demais.',
+    spoiler: false,
+  };
+  const playing = {
+    name: 'Espresso',
+    artist: 'Sabrina Carpenter',
+    album: null,
+    image: 'https://lastfm-img.freetls.fastly.net/i/u/300x300/a.jpg',
+    url: 'https://www.last.fm/music/Sabrina+Carpenter/_/Espresso',
+    playedAt: null,
+    nowPlaying: true,
+  };
+  beforeEach(() => {
+    mockProfile = { letterboxd_user: 'oliveira', lastfm_user: 'juanfm' };
+    mockListMyReviews.mockReset().mockResolvedValue([review]);
+    mockRecent.mockReset().mockResolvedValue({ items: [playing], page: 1, totalPages: 1 });
+    mockRouterPush.mockClear();
+  });
+
+  it('review: abre a lista, anexa e posta só com o ingresso (sem texto)', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await fireEvent.press(await screen.findByLabelText('Anexar review de A Story of Yonosuke'));
+    expect(screen.queryByTestId('media-picker')).toBeNull();
+    expect(screen.getByTestId('post-ticket')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Postar'));
+    await waitFor(() =>
+      expect(createPostMock).toHaveBeenCalledWith({ body: '', imageUris: [], location: null, media: review }),
+    );
+  });
+
+  it('música: tocando agora no topo; anexar e tirar com o ✕', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar música'));
+    expect(mockRecent).toHaveBeenCalledWith('juanfm', 1);
+    await fireEvent.press(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter'));
+    expect(screen.getByText('Tocando agora')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Tirar a música'));
+    expect(screen.queryByTestId('post-ticket')).toBeNull();
+  });
+
+  it('um anexo por post: com ingresso, enquete desabilitada; com enquete, ingressos desabilitados', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Adicionar enquete'));
+    expect(screen.getByLabelText('Anexar review do Letterboxd')).toBeDisabled();
+    expect(screen.getByLabelText('Anexar música')).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Remover enquete' }));
+    await fireEvent.press(screen.getByLabelText('Anexar música'));
+    await fireEvent.press(await screen.findByLabelText('Anexar Espresso, de Sabrina Carpenter'));
+    expect(screen.getByLabelText('Adicionar enquete')).toBeDisabled();
+  });
+
+  it('sem Letterboxd no perfil: explica e leva pro Editar perfil', async () => {
+    mockProfile = { letterboxd_user: null, lastfm_user: 'juanfm' };
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    expect(screen.getByText('Coloca seu usuário do Letterboxd em Editar perfil pra puxar suas reviews.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Ir pra Editar perfil' }));
+    expect(mockRouterPush).toHaveBeenCalledWith('/profile/edit');
+    expect(mockListMyReviews).not.toHaveBeenCalled();
+  });
+
+  it('link colado: sua review anexa; de outra pessoa avisa', async () => {
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    await screen.findByLabelText('Anexar review de A Story of Yonosuke');
+    await fireEvent.changeText(screen.getByLabelText('Colar link da review'), 'https://letterboxd.com/ana/film/x/');
+    await fireEvent.press(screen.getByRole('button', { name: 'Usar esse link' }));
+    expect(screen.getByText('Esse link é de outra pessoa. Dá pra postar só review sua.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('Colar link da review'), 'letterboxd.com/oliveira/film/a-story-of-yonosuke');
+    await fireEvent.press(screen.getByRole('button', { name: 'Usar esse link' }));
+    expect(screen.getByTestId('post-ticket')).toBeTruthy();
+  });
+
+  it('Letterboxd fora do ar: mensagem e tentar de novo', async () => {
+    const { LetterboxdError } = jest.requireActual('../lib/api/letterboxd');
+    mockListMyReviews.mockRejectedValueOnce(new LetterboxdError('unavailable'));
+    await render(<Composer variant="inline" />);
+    await fireEvent.press(screen.getByLabelText('Anexar review do Letterboxd'));
+    expect(await screen.findByText('O Letterboxd não respondeu agora. Tenta de novo daqui a pouco.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByLabelText('Anexar review de A Story of Yonosuke')).toBeTruthy();
   });
 });

@@ -1,13 +1,21 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import type { PollDuration } from './polls';
+import type { PostMedia } from './postMedia';
 
 /** Enquete sendo montada: opções como digitadas e a duração escolhida. */
 export type DraftPoll = { options: string[]; duration: PollDuration };
 
-export type Draft = { body: string; imageUris: string[]; location: string | null; poll: DraftPoll | null };
+/** `media`: o ingresso escolhido (review ou música), já montado e conferido. */
+export type Draft = {
+  body: string;
+  imageUris: string[];
+  location: string | null;
+  poll: DraftPoll | null;
+  media: PostMedia | null;
+};
 
-const EMPTY: Draft = { body: '', imageUris: [], location: null, poll: null };
+const EMPTY: Draft = { body: '', imageUris: [], location: null, poll: null, media: null };
 let draft: Draft = EMPTY;
 const listeners = new Set<() => void>();
 
