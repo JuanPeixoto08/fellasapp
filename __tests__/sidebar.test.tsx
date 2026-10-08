@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import type { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
@@ -15,8 +15,9 @@ jest.mock('expo-router', () => ({
 jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan Peixoto', uri: null }) }));
 let mockUnread = 0;
 jest.mock('../lib/notificationsStore', () => ({ useUnreadNotifications: () => mockUnread }));
+let mockProfile: Record<string, unknown> = { username: 'juanzin' };
 jest.mock('../lib/auth/SessionProvider', () => ({
-  useSession: () => ({ profile: { username: 'juanzin' } }),
+  useSession: () => ({ profile: mockProfile }),
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -50,6 +51,7 @@ describe('Sidebar', () => {
     mockNavigate.mockClear();
     mockPath = '/feed';
     mockUnread = 0;
+    mockProfile = { username: 'juanzin' };
   });
 
   it('expanded: nomes visíveis, item ativo marcado, navega', async () => {
@@ -105,6 +107,17 @@ describe('Sidebar', () => {
     await render(<Sidebar tier="medium" onCompose={() => {}} />, { wrapper: Wrapper });
     const style = StyleSheet.flatten(screen.getByLabelText('Navegação').props.style);
     expect(style).toMatchObject({ paddingTop: 24 + 16, paddingBottom: 20 + 16 });
+  });
+
+  it('eu no pé: o meu selo do lado do nome', async () => {
+    mockProfile = { username: 'oliveira', badges: ['verified'], featured_badge: 'verified' };
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    expect(within(screen.getByLabelText('Meu perfil')).getByLabelText('Verificado')).toBeTruthy();
+  });
+
+  it('eu no pé: sem selo, só o nome', async () => {
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    expect(screen.queryByLabelText('Verificado')).toBeNull();
   });
 
   it('logo leva ao feed', async () => {

@@ -8,7 +8,7 @@ import { notificationsLabel } from '../../lib/notifications';
 import { useUnreadNotifications } from '../../lib/notificationsStore';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
-import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, Text, type IconName } from '../ui';
+import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, NameWithBadge, Text, type IconName } from '../ui';
 
 export type NavKey = 'feed' | 'notifications' | 'tags' | 'profile' | 'members' | 'ideas';
 
@@ -146,9 +146,7 @@ export function Sidebar({ tier, onCompose }: Props) {
         <Avatar name={me.name} uri={me.uri} size={t.avatarSizes.md} />
         {expanded ? (
           <View style={{ flex: 1 }}>
-            <Text bold numberOfLines={1}>
-              {me.name}
-            </Text>
+            <NameWithBadge name={me.name} badges={profile?.badges} featuredBadge={profile?.featured_badge} bold />
             {profile?.username ? (
               <Text variant="small" tone="muted" numberOfLines={1}>
                 @{profile.username}
