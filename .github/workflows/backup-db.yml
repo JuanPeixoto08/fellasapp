@@ -1,0 +1,65 @@
+# Backup semanal do banco (o plano grátis do Supabase não tem backup).
+# Domingo 03:00 de Brasília (ou na mão: Actions → Backup do banco → Run workflow): pg_dump do Postgres 17,
+# comprimido e criptografado (AES-256, senha só do Juan) e guardado como artefato por 90 dias (~13 cópias).
+# O repo é público: quem baixar o artefato sem a senha não lê nada. Como restaurar: supabase/README.md.
+# Segredos do repositório:
+#   SUPABASE_DB_URL     postgresql://postgres.<ref>:<senha>@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
+#   BACKUP_PASSPHRASE   senha do backup (guardada fora do repo)
+name: Backup do banco
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      # o pg_dump precisa ser da versão do servidor (17) ou mais novo
+      - name: Cliente do Postgres 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 > /dev/null
+
+      - name: Dump, conferência e criptografia
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          day=$(date -u +%F)
+          PGDUMP=/usr/lib/postgresql/17/bin/pg_dump
+          # public: estrutura + dados (posts, perfis, jogos…); auth e storage: só os dados (contas e a lista das fotos),
+          # porque a estrutura deles é do próprio Supabase
+          $PGDUMP "$DB_URL" --no-owner --no-privileges --schema=public > public.sql
+          $PGDUMP "$DB_URL" --no-owner --no-privileges --data-only --schema=auth --schema=storage > auth-storage.sql
+          # um dump sem as tabelas principais é um backup quebrado: falha aqui, não no dia de restaurar
+          for t in posts profiles comments game_wallets; do
+            grep -q "^COPY public.$t " public.sql || { echo "faltou a tabela $t no dump"; exit 1; }
+          done
+          grep -q '^COPY auth.users ' auth-storage.sql || { echo "faltou auth.users no dump"; exit 1; }
+          tar czf "fellas-$day.tar.gz" public.sql auth-storage.sql
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 \
+            -o "fellas-$day.tar.gz.gpg" "fellas-$day.tar.gz" 3<<< "$PASS"
+          rm -f public.sql auth-storage.sql "fellas-$day.tar.gz"
+          echo "BACKUP_FILE=fellas-$day.tar.gz.gpg" >> "$GITHUB_ENV"
+          ls -lh "fellas-$day.tar.gz.gpg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 90
+          if-no-files-found: error

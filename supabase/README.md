@@ -86,3 +86,27 @@ o link não é gasto, porque o email já estava na lista.
 
 `types/database.ts` é escrito à mão no formato do `supabase gen types typescript`.
 Se alterar o schema, atualize-o (ou regenere com a CLI).
+
+## Backup
+
+O plano grátis do Supabase não tem backup. A ação **Backup do banco** (`.github/workflows/backup-db.yml`) roda todo
+domingo às 03:00 de Brasília (ou na mão em Actions → Backup do banco → Run workflow): `pg_dump` do schema `public`
+(estrutura + dados) e dos dados de `auth` e `storage` (contas e a lista das fotos), comprimido e **criptografado com
+AES-256**. O arquivo fica nos artefatos da ação por 90 dias. O repo é público, mas sem a senha o arquivo não se lê.
+
+- Segredos do repo: `SUPABASE_DB_URL` (o mesmo endereço do `db push`) e `BACKUP_PASSPHRASE`.
+- **A senha do backup fica fora do repo**, com o Juan (`Documentos/fellasapp-backup-SENHA.txt` + gerenciador de senhas).
+  Sem ela o backup não abre.
+- As fotos (bucket `post-images`) não entram: o banco guarda só a lista. Os stories ficam no Cloudinary e somem em 24 h.
+
+**Restaurar** (num projeto Supabase novo, ou para olhar o que tinha):
+
+```bash
+gh run download <id-da-execução> -n fellas-AAAA-MM-DD.tar.gz.gpg        # baixa o artefato
+gpg -d fellas-AAAA-MM-DD.tar.gz.gpg | tar xz                              # pede a senha → public.sql e auth-storage.sql
+psql "<db-url>" -f auth-storage.sql                                       # contas primeiro (posts apontam para elas)
+psql "<db-url>" -f public.sql                                             # estrutura + dados do app
+```
+
+Num projeto novo, as funções que dependem do Supabase (cron, Vault, Edge Functions) voltam rodando as migrações e
+publicando as funções; o `public.sql` já traz tabelas, políticas e dados.
