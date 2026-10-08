@@ -3,13 +3,13 @@
  * Quem tem mais de um escolhe qual aparece do lado do nome (`profiles.featured_badge`, 0024).
  * Novos selos entram aqui (tipo, ordem e nome) e no desenho de `components/ui/UserBadge`.
  */
-export type Badge = 'verified';
+export type Badge = 'verified' | 'weekly_champion';
 
 /** Selos que o app sabe desenhar. */
-const BADGES: readonly Badge[] = ['verified'];
+const BADGES: readonly Badge[] = ['verified', 'weekly_champion'];
 
 /** Nome do selo (leitor de tela e escolha no Editar perfil). */
-export const BADGE_LABELS: Record<Badge, string> = { verified: 'Verificado' };
+export const BADGE_LABELS: Record<Badge, string> = { verified: 'Verificado', weekly_champion: 'Campeão da semana' };
 
 export function badgeLabel(badge: Badge): string {
   return BADGE_LABELS[badge];
