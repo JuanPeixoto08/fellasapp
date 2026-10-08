@@ -147,8 +147,9 @@ function ReviewText({ text, spoiler }: { text: string; spoiler: boolean }) {
   if (!text) return null;
   const body = (
     <View style={{ gap: t.spacing.xs }}>
+      {/* fechada, os parágrafos correm juntos: a linha em branco entre eles não gasta uma das 4 linhas */}
       <Text variant="small" numberOfLines={open ? undefined : 4}>
-        {text}
+        {open ? text : text.replace(/\s*\n+\s*/g, ' ')}
       </Text>
       {open ? null : (
         <Pressable accessibilityRole="button" accessibilityLabel="Ler a review inteira" onPress={() => setOpen(true)} hitSlop={t.spacing.md} style={{ alignSelf: 'flex-start', cursor: 'pointer' as const }}>
@@ -161,7 +162,8 @@ function ReviewText({ text, spoiler }: { text: string; spoiler: boolean }) {
   );
   if (shown) return body;
   return (
-    <View>
+    // review curta: o botão (44) não passa da área borrada
+    <View style={{ minHeight: t.layout.minTouch + t.spacing.sm, justifyContent: 'center' }}>
       {/* web: borrado; no app (sem desfoque nativo) o texto some e guarda o lugar */}
       <View
         accessibilityElementsHidden
