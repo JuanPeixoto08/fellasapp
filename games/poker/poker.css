@@ -1,0 +1,70 @@
+/* HUD do poker: lugares em volta da mesa, relógio, régua do aumento e folhas. Cores do hud.css (mockups aprovados
+   em .superpowers/brainstorm/20068-1791484731/content/mesa-celular.html e tela-pc-sentar.html). */
+.poker .top .title { font-weight: 700; }
+.poker .tools { display: flex; align-items: center; gap: 8px; }
+.ghost { min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid rgba(244, 241, 234, 0.45); background: transparent; cursor: pointer; white-space: nowrap; }
+.app[data-orient='landscape'] .ghost.hist { display: none; }
+
+/* lugares */
+.seat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; width: 88px; pointer-events: none; }
+.seat .av { width: 44px; height: 44px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: var(--ink); border: 2px solid #0b100d; }
+.seat .av img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.seat .ring { position: absolute; inset: -6px; border-radius: 50%; background: conic-gradient(var(--gold) calc(var(--k, 1) * 360deg), rgba(242, 210, 122, 0.15) 0);
+  -webkit-mask: radial-gradient(circle, transparent 25px, #000 26px); mask: radial-gradient(circle, transparent 25px, #000 26px); }
+.seat.turn .av { box-shadow: 0 0 16px rgba(242, 210, 122, 0.6); }
+.seat .nm { font-size: 11px; font-weight: 700; background: var(--tag-bg); border: 1px solid var(--gold-soft); border-radius: 999px; padding: 2px 9px; text-align: center; line-height: 1.25; max-width: 88px; }
+.seat .nm span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .nm small { display: block; color: var(--gold); font-size: 11px; font-weight: 600; }
+.seat .st { font-size: 10px; font-weight: 700; color: var(--mint); min-height: 12px; text-align: center; letter-spacing: 0.02em; }
+.seat.out { opacity: 0.5; }
+.seat.win .nm { background: var(--gold); color: var(--ink); }
+.seat.win .nm small { color: var(--ink); }
+.seat.empty { pointer-events: auto; background: none; border: 0; padding: 0; cursor: pointer; color: var(--paper); min-height: 64px; }
+.seat.empty .av { background: transparent; border: 1.5px dashed var(--gold-soft); color: var(--gold); font-size: 22px; font-weight: 600; }
+.c0 { background: #e8b4a0; } .c1 { background: #a0c4e8; } .c2 { background: #c9e8a0; }
+.c3 { background: #e8d9a0; } .c4 { background: #d2a0e8; } .c5 { background: #f2d27a; }
+
+/* faixa do ausente */
+.banner { position: absolute; left: 14px; right: 14px; top: 8px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 12px; background: var(--tag-bg); border: 1px solid var(--gold-soft); font-size: 13px; font-weight: 600; }
+.banner button { background: none; border: 0; color: var(--gold); font-weight: 800; min-height: 44px; padding: 0 8px; cursor: pointer; }
+
+/* moedas do poker */
+.fold .b, .back .b { background: var(--red); }
+.call .b { background: var(--green); }
+.raise .b { background: var(--violet); }
+.allin .b { background: var(--orange); }
+.coin .b .v { font-weight: 800; font-size: 15px; color: #fff; }
+
+/* régua do aumento */
+.ruler { display: grid; gap: 8px; padding: 0 14px 12px; }
+.ruler .row { display: flex; gap: 6px; }
+.ruler button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid rgba(244, 241, 234, 0.4); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ruler button.on { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.ruler button:disabled { opacity: 0.35; cursor: default; }
+.ruler .step { flex: 0 0 56px; font-size: 18px; }
+.ruler .val { flex: 1; align-self: center; text-align: center; font-size: 22px; font-weight: 800; color: var(--gold); }
+
+/* folhas */
+.sheetwrap { position: absolute; inset: 0; z-index: 7; display: flex; align-items: flex-end; }
+.sheetwrap .dim { position: absolute; inset: 0; background: rgba(4, 8, 6, 0.6); border: 0; }
+.sheet { position: relative; width: 100%; max-width: 480px; margin: 0 auto; background: #0d1611; border-top: 1px solid var(--gold-soft); border-radius: 20px 20px 0 0; padding: 18px 18px max(22px, env(safe-area-inset-bottom)); max-height: 80dvh; overflow: auto; }
+.sheet h2 { margin: 0 0 4px; font-size: 17px; }
+.sheet p { margin: 0 0 14px; font-size: 13px; color: var(--mint); }
+.sheet .amt { text-align: center; font-size: 30px; font-weight: 800; color: var(--gold); margin-bottom: 4px; }
+.sheet input[type='range'] { width: 100%; min-height: 44px; accent-color: var(--gold); }
+.sheet .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--mint); margin-bottom: 14px; }
+.sheet .btn { width: 100%; flex: none; margin-top: 8px; }
+.list .row { padding: 8px 0; border-bottom: 1px solid rgba(242, 210, 122, 0.12); font-size: 13px; }
+.list .row:last-child { border: 0; }
+.list .row b { color: var(--gold); }
+.list .row .m { color: var(--mint); font-size: 12px; margin-top: 2px; }
+.list .empty { color: var(--mint); font-size: 13px; }
+.mc { display: inline-block; background: #fff; color: var(--ink); border-radius: 3px; font-size: 11px; font-weight: 800; padding: 0 3px; margin-right: 2px; }
+.mc.r { color: #c81e3a; }
+
+/* painel da direita (deitado): abas Mãos | Placar */
+.side .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.side .tabs button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid rgba(244, 241, 234, 0.35); background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
+.side .tabs button[aria-selected='true'] { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.app.poker[data-orient='landscape'] .side { width: 230px; }
+.app.poker[data-orient='landscape'] .acts { flex: none; }

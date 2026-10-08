@@ -8,6 +8,8 @@ import {
   lastLabel,
   offer,
   readyCount,
+  rebuyRange,
+  snapAmount,
   resultLine,
   secondsLeft,
   statusLine,
@@ -170,5 +172,21 @@ describe('linhas de estado', () => {
     expect(resultLine(done({ '0': 150, '1': 150 }, [[0, 1]]), ME, names)).toBe('Você e Bia dividiram 300');
     expect(resultLine(done({ '0': 300, '1': 200 }, [[0], [1]]), ME, names)).toBe('Você levou 300 · Bia levou 200');
     expect(resultLine(hand(), ME, names)).toBeNull();
+  });
+});
+
+describe('folhas', () => {
+  it('completar: de 10 em 10 até 500 na mesa e até a carteira', () => {
+    expect(rebuyRange(295, 500, 1000)).toEqual({ min: 10, max: 200, ok: true });
+    expect(rebuyRange(100, 500, 155)).toEqual({ min: 10, max: 150, ok: true });
+    expect(rebuyRange(495, 500, 1000)).toEqual({ min: 10, max: 0, ok: false });
+  });
+
+  it('valor da régua da folha: o mínimo exato (anti-rathole) ou de 10 em 10', () => {
+    expect(snapAmount(735, { min: 735, max: 900 })).toBe(735);
+    expect(snapAmount(745, { min: 735, max: 900 })).toBe(750);
+    expect(snapAmount(305, { min: 200, max: 500 })).toBe(310);
+    expect(snapAmount(999, { min: 200, max: 500 })).toBe(500);
+    expect(snapAmount(100, { min: 200, max: 500 })).toBe(200);
   });
 });

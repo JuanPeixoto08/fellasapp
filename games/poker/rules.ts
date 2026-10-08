@@ -146,3 +146,15 @@ export function resultLine(h: PokerHand, me: string | null, name: Names): string
   }
   return pays.map((x) => `${who(x.uid)} levou ${fmt(x.v)}`).join(' · ');
 }
+
+/** Faixa da folha de completar: de 10 em 10, até o teto da mesa e até a carteira. */
+export function rebuyRange(stack: number, max: number, wallet: number): { min: number; max: number; ok: boolean } {
+  const top = Math.min(Math.floor((max - stack) / 10) * 10, Math.floor(wallet / 10) * 10);
+  return { min: 10, max: top, ok: top >= 10 };
+}
+
+/** Valor da régua da folha: o mínimo exato vale (anti-rathole pode ser quebrado); o resto, de 10 em 10. */
+export function snapAmount(v: number, r: { min: number; max: number }): number {
+  if (v <= r.min) return r.min;
+  return Math.min(Math.max(Math.round(v / 10) * 10, r.min), r.max);
+}
