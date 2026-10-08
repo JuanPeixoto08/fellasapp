@@ -7,6 +7,7 @@ describe('toGameError', () => {
     expect(toGameError({ message: 'insufficient_credits' }).code).toBe('insufficient_credits');
     expect(toGameError({ message: 'round_done' }).code).toBe('round_done');
     expect(toGameError({ message: 'fiado_today' }).code).toBe('fiado_today');
+    expect(toGameError({ message: 'invalid_action' }).code).toBe('invalid_action'); // outra aba mudou a mão
   });
 
   it('sessão expirada ou fora do grupo: entrar de novo', () => {

@@ -150,8 +150,9 @@ declare
   v_podium jsonb;
   v_champ  uuid;
 begin
-  select max(week_start) into v_old from public.game_wallets;
-  if v_old is null or v_old >= v_new then
+  -- só quem ficou na semana velha: quem criou a carteira já na semana nova (antes do cron) não conta nem zera
+  select max(week_start) into v_old from public.game_wallets where week_start < v_new;
+  if v_old is null then
     return;
   end if;
 
@@ -161,7 +162,7 @@ begin
                             order by balance desc, fiado_count asc, last_played_at asc), '[]')
     into v_podium
     from (select * from public.game_wallets
-           where last_played_at is not null
+           where last_played_at is not null and week_start < v_new
            order by balance desc, fiado_count asc, last_played_at asc
            limit 3) top;
   v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
@@ -176,11 +177,11 @@ begin
   end if;
 
   insert into public.game_ledger (user_id, delta, reason)
-  select user_id, 1000 - balance, 'reset' from public.game_wallets where balance <> 1000;
+  select user_id, 1000 - balance, 'reset' from public.game_wallets where balance <> 1000 and week_start < v_new;
   update public.game_wallets
      set balance = 1000, week_start = v_new, fiado_count = 0, last_fiado_on = null,
          last_played_at = null, updated_at = now()
-   where true;
+   where week_start < v_new;
 end;
 $$;
 

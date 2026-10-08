@@ -21,6 +21,8 @@ export type RoundState = {
   payout: number;
   /** Saldo da carteira depois da jogada. */
   balance: number;
+  /** Dá pra pegar fiado agora (quebrou na mesa: a tela não precisa perguntar de novo). */
+  can_fiado: boolean;
 };
 export type Wallet = {
   balance: number;

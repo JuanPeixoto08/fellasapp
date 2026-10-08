@@ -118,6 +118,22 @@ describe('games_weekly_reset', () => {
     expect(await q(`select count(*)::int as n from public.profiles where 'weekly_champion' = any (badges)`)).toEqual([{ n: 0 }]);
   });
 
+  it('alguém entrou na semana nova antes do cron: o reset ainda roda para quem ficou na semana velha', async () => {
+    await t.rpc('games_wallet');
+    await setBalance(A, 4000);
+    await played(A);
+    await ageWeek(); // A ficou na semana passada
+    await t.as(B);
+    await t.rpc('games_wallet'); // B nasceu já na semana nova, jogou e tem 1.300
+    await setBalance(B, 1300);
+    await q('select public.games_weekly_reset()');
+    expect(await q('select champion_id from public.game_weeks')).toEqual([{ champion_id: A }]);
+    expect(await q('select user_id, balance from public.game_wallets order by user_id')).toEqual([
+      { user_id: A, balance: 1000 },
+      { user_id: B, balance: 1300 }, // quem já está na semana nova não é zerado
+    ]);
+  });
+
   it('cron agendado segunda 03:00 UTC', async () => {
     expect(await q('select schedule from cron.jobs where name = $1', ['fellas-games-reset'])).toEqual([{ schedule: '0 3 * * 1' }]);
   });

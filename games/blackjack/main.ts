@@ -6,8 +6,8 @@ import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
 import type { Action, RoundState } from '../shared/types';
 import { createTable, type Table } from '../shared/table3d/scene';
-import { canAct, initial, reduce, type MachineEvent, type MachineState } from './machine';
-import { canDouble, canSplit, MIN_BET } from './rules';
+import { canAct, createEpoch, initial, reduce, type MachineEvent, type MachineState } from './machine';
+import { actionDelta, canDouble, canSplit, MIN_BET } from './rules';
 import { createView } from './view';
 
 // só no dev: ?shot faz a página se achar visível (o Chrome da automação marca a aba como escondida e freia timers)
@@ -29,6 +29,7 @@ const api: Api =
 let s: MachineState = initial;
 let table: Table | null = null;
 let me: string | null = null;
+const epoch = createEpoch();
 const wait = (ms: number) => new Promise((r) => setTimeout(r, table?.reducedMotion || SHOT ? 0 : ms));
 
 const view = createView(document.getElementById('app')!, {
@@ -61,21 +62,27 @@ function send(e: MachineEvent) {
 
 /** Erro vira aviso; se o banco disse que o estado mudou (saldo, mão fechada, semana nova), recarrega. */
 async function guard(work: () => Promise<void>) {
+  epoch.bump();
   try {
     await work();
   } catch (e) {
     const err = toGameError(e);
     send({ type: 'failed', error: err });
-    if (['insufficient_credits', 'round_done', 'round_open', 'round_not_found'].includes(err.code)) await reload();
+    if (['insufficient_credits', 'round_done', 'round_open', 'round_not_found', 'invalid_action'].includes(err.code)) {
+      await reload();
+    }
   }
 }
 
 async function reload() {
   try {
     const had = s.round;
+    const at = epoch.now();
     const [wallet, round] = await Promise.all([api.gamesWallet(), api.bjCurrent()]);
+    if (epoch.stale(at)) return; // uma jogada começou enquanto recarregava: o estado dela vale mais
     if (round) table?.placeRound(round);
     else if (had) await table?.clear();
+    else table?.setPot(0); // aposta recusada: as fichas saem da mesa junto com a aposta
     send({ type: 'loaded', wallet, round });
     refreshBoard();
   } catch (e) {
@@ -127,16 +134,18 @@ function act(action: Action) {
   send({ type: 'request' });
   void guard(async () => {
     const r = await api.bjAct(prev.id, action);
-    if (table) {
-      if (action === 'split') {
+    const delta = actionDelta(prev, r, action);
+    if (table && !delta) {
+      table.placeRound(r); // outra aba jogou antes: a resposta não bate com a mesa, redesenha a mão inteira
+    } else if (table && delta) {
+      if (delta.kind === 'split') {
         await table.splitHand();
         table.setPot(r.hands.reduce((sum, h) => sum + h.bet, 0));
         await table.dealCard('player', 0, 2, 1, r.hands[0].cards[1]);
         await table.dealCard('player', 1, 2, 1, r.hands[1].cards[1]);
-      } else if (action === 'hit' || action === 'double') {
-        const i = prev.hands[prev.active].cards.length;
+      } else if (delta.kind === 'card') {
         if (action === 'double') table.setPot(r.hands.reduce((sum, h) => sum + h.bet, 0));
-        await table.dealCard('player', prev.active, r.hands.length, i, r.hands[prev.active].cards[i]);
+        await table.dealCard('player', delta.hand, r.hands.length, delta.i, delta.card);
       }
       await dealerPlays(r);
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GameError } from '../shared/errors';
 import type { RoundState, Wallet } from '../shared/types';
-import { canAct, initial, reduce, type MachineEvent, type MachineState } from './machine';
+import { canAct, createEpoch, initial, reduce, type MachineEvent, type MachineState } from './machine';
 
 const wallet = (extra: Partial<Wallet> = {}): Wallet => ({
   balance: 1000,
@@ -22,6 +22,7 @@ const round = (extra: Partial<RoundState> = {}): RoundState => ({
   dealer_total: 10,
   payout: 0,
   balance: 900,
+  can_fiado: false,
   ...extra,
 });
 const run = (...events: MachineEvent[]) => events.reduce<MachineState>(reduce, initial);
@@ -100,6 +101,24 @@ describe('machine', () => {
     );
     expect(s).toMatchObject({ phase: 'betting', notice: msg, round: null, weekStart: '2026-10-12' });
     expect(reduce(run({ type: 'loaded', wallet: wallet(), round: null }), { type: 'wallet', wallet: wallet({ week_start: '2026-10-12' }) }).notice).toBe(msg);
+  });
+
+  it('quebrou na mesa: a resposta da mão já libera o fiado', () => {
+    const s = run(
+      { type: 'loaded', wallet: wallet({ balance: 500, can_fiado: false }), round: null },
+      { type: 'chip', value: 500 },
+      { type: 'request' },
+      { type: 'round', round: round({ status: 'done', bet: 500, balance: 0, can_fiado: true }) },
+    );
+    expect(s.wallet).toMatchObject({ balance: 0, can_fiado: true });
+  });
+
+  it('recarga velha não desfaz jogada mais nova', () => {
+    const epoch = createEpoch();
+    const reloadStarted = epoch.now();
+    epoch.bump(); // uma jogada começou depois
+    expect(epoch.stale(reloadStarted)).toBe(true);
+    expect(epoch.stale(epoch.now())).toBe(false);
   });
 
   it('fiado volta para a aposta com o saldo novo', () => {

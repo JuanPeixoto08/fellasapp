@@ -7,6 +7,7 @@ export type GameErrorCode =
   | 'round_open'
   | 'round_done'
   | 'round_not_found'
+  | 'invalid_action'
   | 'fiado_today'
   | 'fiado_not_broke'
   | 'fiado_open_round'
@@ -20,6 +21,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   round_open: 'Você já tem uma mão aberta',
   round_done: 'Essa mão já acabou',
   round_not_found: 'Essa mão não é sua',
+  invalid_action: 'Essa jogada não vale mais. A mesa foi atualizada.',
   fiado_today: 'Fiado de hoje já foi. Volta amanhã.',
   fiado_not_broke: 'Fiado só sai quando não dá pra apostar',
   fiado_open_round: 'Termina a mão antes do fiado',
@@ -40,6 +42,7 @@ const FROM_DB: GameErrorCode[] = [
   'round_open',
   'round_done',
   'round_not_found',
+  'invalid_action',
   'fiado_today',
   'fiado_not_broke',
   'fiado_open_round',
