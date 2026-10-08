@@ -37,6 +37,8 @@ export const fakeProfile: Profile = {
   is_member: true,
   badges: [],
   lastfm_user: null,
+  show_now_playing: true,
+  hidden_badges: [],
   is_admin: false,
   pinned_post_id: null,
   created_at: new Date(0).toISOString(),

@@ -112,6 +112,8 @@ export type Database = {
           is_member: boolean;
           badges: string[];
           lastfm_user: string | null;
+          show_now_playing: boolean;
+          hidden_badges: string[];
           is_admin: boolean;
           pinned_post_id: string | null;
           created_at: string;
@@ -130,6 +132,8 @@ export type Database = {
           is_member?: boolean;
           badges?: string[];
           lastfm_user?: string | null;
+          show_now_playing?: boolean;
+          hidden_badges?: string[];
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -148,6 +152,8 @@ export type Database = {
           is_member?: boolean;
           badges?: string[];
           lastfm_user?: string | null;
+          show_now_playing?: boolean;
+          hidden_badges?: string[];
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
