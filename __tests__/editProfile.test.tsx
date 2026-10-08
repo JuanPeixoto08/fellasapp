@@ -320,3 +320,34 @@ describe('Editar perfil: o que aparece no perfil', () => {
     expect(screen.queryByText('Selo do lado do nome')).toBeNull();
   });
 });
+
+describe('Editar perfil: Letterboxd', () => {
+  const base = { id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null };
+  beforeEach(() => (updateMyProfile as jest.Mock).mockClear());
+
+  it('mostra o usuário salvo e salva o novo', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, letterboxd_user: 'oliveira' });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Usuário no Letterboxd').props.value).toBe('oliveira'));
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Letterboxd'), 'juanzin');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ letterboxdUser: 'juanzin' }));
+  });
+
+  it('formato inválido: erro no campo e não salva', async () => {
+    await renderScreen();
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Letterboxd'), 'juan peixoto');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(await screen.findByText('Usuário do Letterboxd inválido: letras, números e _, até 15.')).toBeTruthy();
+    expect(updateMyProfile).not.toHaveBeenCalled();
+  });
+
+  it('apagar o campo desconecta', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, letterboxd_user: 'oliveira' });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Usuário no Letterboxd').props.value).toBe('oliveira'));
+    await fireEvent.changeText(screen.getByLabelText('Usuário no Letterboxd'), '');
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ letterboxdUser: '' }));
+  });
+});

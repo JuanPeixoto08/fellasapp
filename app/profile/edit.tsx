@@ -27,6 +27,9 @@ import { useTheme } from '../../lib/theme';
 import { gifProblem, isGif } from '../../lib/profileImage';
 
 const BIRTHDAY_ERROR = 'Essa data não rola. Usa DD/MM/AAAA, tipo 20/05/1999.';
+/** Mesmo formato do check de profiles.letterboxd_user (0026). */
+const LETTERBOXD_USER = /^[A-Za-z0-9_]{2,15}$/;
+const LETTERBOXD_ERROR = 'Usuário do Letterboxd inválido: letras, números e _, até 15.';
 
 export default function EditProfileScreen() {
   const t = useTheme();
@@ -56,6 +59,8 @@ export default function EditProfileScreen() {
   /** O que está salvo: igual a isso, não pergunta de novo ao Last.fm. */
   const [savedLastfm, setSavedLastfm] = useState('');
   const [lastfmError, setLastfmError] = useState<string | undefined>();
+  const [letterboxd, setLetterboxd] = useState('');
+  const [letterboxdError, setLetterboxdError] = useState<string | undefined>();
   /** "O que aparece no perfil": selos que a pessoa tem (só o banco dá) e qual deles vai do lado do nome. */
   const [showNowPlaying, setShowNowPlaying] = useState(true);
   const [badges, setBadges] = useState<string[]>([]);
@@ -74,6 +79,7 @@ export default function EditProfileScreen() {
         setBio(p.bio ?? '');
         setLastfm(p.lastfm_user ?? '');
         setSavedLastfm(p.lastfm_user ?? '');
+        setLetterboxd(p.letterboxd_user ?? '');
         setShowNowPlaying(p.show_now_playing ?? true);
         setBadges(p.badges ?? []);
         setFeaturedBadge(p.featured_badge ?? null);
@@ -112,6 +118,8 @@ export default function EditProfileScreen() {
     if (invalid) return setUsernameError(invalid);
     const parsedBirthday = parseBirthday(birthday);
     if (parsedBirthday === undefined) return setBirthdayError(BIRTHDAY_ERROR);
+    const letterboxdUser = letterboxd.trim().replace(/^@/, '');
+    if (letterboxdUser && !LETTERBOXD_USER.test(letterboxdUser)) return setLetterboxdError(LETTERBOXD_ERROR);
     setSaving(true);
     setError(null);
     setBirthdayError(undefined);
@@ -148,6 +156,7 @@ export default function EditProfileScreen() {
         location,
         birthday: parsedBirthday,
         lastfmUser,
+        letterboxdUser,
         showNowPlaying,
         featuredBadge: shownBadge(badges, featuredBadge),
       });
@@ -280,6 +289,20 @@ export default function EditProfileScreen() {
             if (lastfmError) setLastfmError(undefined);
           }}
           error={lastfmError}
+        />
+        <TextField
+          label="Usuário no Letterboxd"
+          placeholder="seu_usuario"
+          help="Pra postar suas reviews de filme."
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={16}
+          value={letterboxd}
+          onChangeText={(v) => {
+            setLetterboxd(v);
+            if (letterboxdError) setLetterboxdError(undefined);
+          }}
+          error={letterboxdError}
         />
         <View style={{ gap: t.spacing.sm, marginTop: t.spacing.sm }}>
           <Heading level={3}>O que aparece no perfil</Heading>

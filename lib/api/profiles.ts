@@ -65,6 +65,8 @@ export type UpdateProfileInput = {
   removeBanner?: boolean;
   /** Usuário do Last.fm; vazio desconecta (null); undefined não altera. */
   lastfmUser?: string | null;
+  /** Usuário do Letterboxd (as suas reviews no post); vazio desconecta (null); undefined não altera. */
+  letterboxdUser?: string | null;
   /** Campos extras: string vazia vira null; undefined não altera. */
   status?: string | null;
   location?: string | null;
@@ -138,6 +140,7 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (input.location !== undefined) fields.location = emptyToNull(input.location);
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
   if (input.lastfmUser !== undefined) fields.lastfm_user = emptyToNull(input.lastfmUser);
+  if (input.letterboxdUser !== undefined) fields.letterboxd_user = emptyToNull(input.letterboxdUser);
   if (input.showNowPlaying !== undefined) fields.show_now_playing = input.showNowPlaying;
   if (input.featuredBadge !== undefined) fields.featured_badge = input.featuredBadge;
 
