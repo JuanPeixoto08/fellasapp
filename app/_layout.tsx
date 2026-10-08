@@ -18,6 +18,7 @@ import { EmojiPickerHost } from '../components/reactions/EmojiPickerHost';
 import { StoryViewerHost } from '../components/stories/StoryViewerHost';
 import { MemberDirectorySync } from '../components/realtime/MemberDirectorySync';
 import { RealtimeSync } from '../components/realtime/RealtimeSync';
+import { AppUpdater } from '../components/shell/AppUpdater';
 import { AppShell } from '../components/shell/AppShell';
 import { AuthGuard } from '../lib/auth/AuthGuard';
 import { SessionProvider } from '../lib/auth/SessionProvider';
@@ -41,6 +42,7 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <StatusBar style="auto" />
+      <AppUpdater />
       <NotificationsSync />
       <RealtimeSync />
       <MemberDirectorySync />

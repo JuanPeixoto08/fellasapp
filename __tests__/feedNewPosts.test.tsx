@@ -12,6 +12,7 @@ jest.mock('../components/feed/Composer', () => {
   return { Composer: () => <Text>compositor</Text> };
 });
 const mockShowNewPosts = jest.fn();
+const mockRefresh = jest.fn();
 jest.mock('../lib/usePostList', () => ({
   removePost: jest.fn(),
   usePostList: () => ({
@@ -35,7 +36,7 @@ jest.mock('../lib/usePostList', () => ({
     loading: false,
     refreshing: false,
     error: null,
-    refresh: jest.fn(),
+    refresh: mockRefresh,
     reload: jest.fn(),
     loadMore: jest.fn(),
     like: jest.fn(),
@@ -44,6 +45,7 @@ jest.mock('../lib/usePostList', () => ({
 }));
 
 import FeedScreen from '../app/(tabs)/feed';
+import { emitFeedTop } from '../lib/postEvents';
 
 const metrics = { frame: { x: 0, y: 0, width: 1200, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 const pillStyle = () => StyleSheet.flatten(screen.getByTestId('new-posts-pill').props.style);
@@ -68,5 +70,18 @@ describe('Feed: aviso de posts novos', () => {
     expect(pillStyle().position).toBeUndefined();
     await fireEvent.press(screen.getByLabelText('2 posts novos'));
     expect(mockShowNewPosts).toHaveBeenCalled();
+  });
+});
+
+describe('Feed: tocar em Feed estando nele', () => {
+  it('recarrega (aba, lateral ou logo avisam por emitFeedTop)', async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <FeedScreen />
+      </SafeAreaProvider>,
+    );
+    mockRefresh.mockClear();
+    emitFeedTop();
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });

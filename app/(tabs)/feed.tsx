@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
 import { Composer } from '../../components/feed/Composer';
 import { NewPostsPill } from '../../components/feed/NewPostsPill';
@@ -12,6 +12,7 @@ import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { useLayoutTier } from '../../lib/layout';
+import { emitFeedTop, onFeedTop } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
 import type { FeedPost } from '../../lib/api/posts';
 import { removePost, usePostList } from '../../lib/usePostList';
@@ -32,6 +33,17 @@ export default function FeedScreen() {
     showNewPosts();
     list.current?.scrollToOffset({ offset: 0, animated: true });
   };
+  // tocou em Feed ou no logo já aqui: topo e recarrega (com os posts novos)
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useEffect(
+    () =>
+      onFeedTop(() => {
+        list.current?.scrollToOffset({ offset: 0, animated: true });
+        refreshRef.current();
+      }),
+    [],
+  );
 
   return (
     <Screen flush>
@@ -58,9 +70,15 @@ export default function FeedScreen() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View accessibilityRole="header">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Atualizar o feed"
+                    onPress={emitFeedTop}
+                    hitSlop={t.spacing.sm}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, cursor: 'pointer' as const })}
+                  >
                     <Logo height={t.layout.logoHeight.sm} />
-                  </View>
+                  </Pressable>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <TagsButton />
                     <IdeasButton />

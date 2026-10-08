@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { activeNavItem, Sidebar } from '../components/shell/Sidebar';
+import { onFeedTop } from '../lib/postEvents';
 
 const mockNavigate = jest.fn();
 let mockPath = '/feed';
@@ -65,6 +66,30 @@ describe('Sidebar', () => {
     expect(screen.getByText('@juanzin')).toBeTruthy();
   });
 
+  it('já no feed: Feed e o logo voltam ao topo e recarregam, sem navegar', async () => {
+    const top = jest.fn();
+    const off = onFeedTop(top);
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    await fireEvent.press(screen.getByLabelText('Feed'));
+    await fireEvent.press(screen.getByLabelText('Atualizar o feed'));
+    expect(top).toHaveBeenCalledTimes(2);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    off();
+  });
+
+  it('fora do feed: Feed e o logo só levam pro feed', async () => {
+    mockPath = '/members';
+    const top = jest.fn();
+    const off = onFeedTop(top);
+    await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
+    await fireEvent.press(screen.getByLabelText('Feed'));
+    await fireEvent.press(screen.getByLabelText('Ir para o feed'));
+    expect(mockNavigate).toHaveBeenCalledTimes(2);
+    expect(mockNavigate).toHaveBeenCalledWith('/feed');
+    expect(top).not.toHaveBeenCalled();
+    off();
+  });
+
   it('Notificações entre Feed e Perfil, com bolinha e rótulo', async () => {
     mockUnread = 2;
     mockPath = '/notifications';
@@ -121,6 +146,7 @@ describe('Sidebar', () => {
   });
 
   it('logo leva ao feed', async () => {
+    mockPath = '/post/1';
     await render(<Sidebar tier="expanded" onCompose={() => {}} />, { wrapper: Wrapper });
     await fireEvent.press(screen.getByLabelText('Ir para o feed'));
     expect(mockNavigate).toHaveBeenCalledWith('/feed');

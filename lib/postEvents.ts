@@ -39,3 +39,17 @@ export function onCommentCountChanged(listener: (postId: string, delta: number) 
     commentCounts.delete(listener);
   };
 }
+
+const feedTop = new Set<() => void>();
+
+/** Tocou em Feed (aba, lateral ou logo) já estando no feed: a lista volta ao topo e recarrega. */
+export function emitFeedTop(): void {
+  for (const listener of feedTop) listener();
+}
+
+export function onFeedTop(listener: () => void): () => void {
+  feedTop.add(listener);
+  return () => {
+    feedTop.delete(listener);
+  };
+}

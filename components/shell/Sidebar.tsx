@@ -6,6 +6,7 @@ import { useSession } from '../../lib/auth/SessionProvider';
 import type { LayoutTier } from '../../lib/layout';
 import { notificationsLabel } from '../../lib/notifications';
 import { useUnreadNotifications } from '../../lib/notificationsStore';
+import { emitFeedTop } from '../../lib/postEvents';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, NameWithBadge, Text, type IconName } from '../ui';
@@ -67,8 +68,8 @@ export function Sidebar({ tier, onCompose }: Props) {
     >
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel="Ir para o feed"
-        onPress={() => router.navigate('/feed')}
+        accessibilityLabel={active === 'feed' ? 'Atualizar o feed' : 'Ir para o feed'}
+        onPress={() => (active === 'feed' ? emitFeedTop() : router.navigate('/feed'))}
         style={(state) => ({
           minHeight: t.layout.minTouch,
           justifyContent: 'center',
@@ -89,7 +90,8 @@ export function Sidebar({ tier, onCompose }: Props) {
             accessibilityRole="link"
             accessibilityLabel={item.key === 'notifications' ? notificationsLabel(unread) : item.label}
             accessibilityState={{ selected: on }}
-            onPress={() => router.navigate(item.href)}
+            // Feed estando no feed: topo e recarrega
+            onPress={() => (on && item.key === 'feed' ? emitFeedTop() : router.navigate(item.href))}
             style={(state) => ({
               minHeight: t.layout.minTouch,
               minWidth: t.layout.minTouch,

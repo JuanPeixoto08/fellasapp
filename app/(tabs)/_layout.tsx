@@ -4,6 +4,7 @@ import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLayoutTier } from '../../lib/layout';
+import { emitFeedTop } from '../../lib/postEvents';
 import { getTabBarStyle } from '../../lib/tabBarStyle';
 import { useTheme } from '../../lib/theme';
 
@@ -34,6 +35,12 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="feed"
+        // tocar na aba Feed já estando nela: topo e recarrega
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            if (navigation.isFocused()) emitFeedTop();
+          },
+        })}
         options={{
           title: 'Feed',
           tabBarAccessibilityLabel: 'Feed',

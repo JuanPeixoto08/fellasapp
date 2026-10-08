@@ -39,6 +39,11 @@ export function setDraft(next: Draft | ((d: Draft) => Draft)): void {
   for (const listener of listeners) listener();
 }
 
+/** Nada escrito, escolhido nem anexado no post (dá pra recarregar a página sem perder nada). */
+export function draftIsEmpty(): boolean {
+  return !draft.body.trim() && draft.imageUris.length === 0 && !draft.location && !draft.poll && !draft.media;
+}
+
 export function clearDraft(): void {
   setDraft(EMPTY);
 }
