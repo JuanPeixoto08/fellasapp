@@ -37,6 +37,11 @@ cada uma no SQL editor; todas são idempotentes):
 | `0023_profile_display.sql` | "O que aparece no perfil": `profiles.show_now_playing` (ouvindo agora nos posts e no perfil) e `profiles.hidden_badges` (selos escondidos) | feed, posts e comentários não carregam (o app busca esses campos do autor) |
 | `0024_featured_badge.sql` | selo escolhido para aparecer do lado do nome (`profiles.featured_badge`); `hidden_badges` da 0023 fica sem uso | feed, posts e comentários não carregam (o app busca `featured_badge` do autor) |
 | `0025_polls.sql` | enquetes: `posts.poll_options`/`poll_ends_at`/`poll_counts` (gatilhos validam e contam) e `poll_votes` (anônimo: cada um lê só o próprio; voto definitivo) | postar enquete e votar falham (posts sem enquete funcionam) |
+| `0026_post_media.sql` | ingresso no post: `posts.media` (review do Letterboxd ou música, validada por `post_media_ok`, travada depois de postar; post só com ingresso vale) e `profiles.letterboxd_user` | feed, posts e o Editar perfil não carregam (o app busca `media` e `letterboxd_user`) |
+
+**Função `letterboxd-reviews` (Edge Function)**: publique com `npx supabase functions deploy letterboxd-reviews`
+(com a verificação de login padrão). Não recebe parâmetros: lê o `letterboxd_user` de quem chama e busca só
+`https://letterboxd.com/<usuário>/rss/`. Sem segredos.
 
 **Função `stories-media` (Edge Function)**: publique sempre com
 `npx supabase functions deploy stories-media --no-verify-jwt`. A função confere o login sozinha; já a limpeza

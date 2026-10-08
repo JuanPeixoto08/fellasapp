@@ -115,6 +115,7 @@ export type Database = {
           show_now_playing: boolean;
           hidden_badges: string[];
           featured_badge: string | null;
+          letterboxd_user: string | null;
           is_admin: boolean;
           pinned_post_id: string | null;
           created_at: string;
@@ -136,6 +137,7 @@ export type Database = {
           show_now_playing?: boolean;
           hidden_badges?: string[];
           featured_badge?: string | null;
+          letterboxd_user?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -157,6 +159,7 @@ export type Database = {
           show_now_playing?: boolean;
           hidden_badges?: string[];
           featured_badge?: string | null;
+          letterboxd_user?: string | null;
           is_admin?: boolean;
           pinned_post_id?: string | null;
           created_at?: string;
@@ -181,6 +184,8 @@ export type Database = {
           poll_options: string[] | null;
           poll_ends_at: string | null;
           poll_counts: number[] | null;
+          /** Ingresso (0026): review do Letterboxd ou música do Last.fm, congelada; ver lib/postMedia. */
+          media: Json | null;
           created_at: string;
         };
         Insert: {
@@ -195,6 +200,7 @@ export type Database = {
           poll_options?: string[] | null;
           poll_ends_at?: string | null;
           poll_counts?: number[] | null;
+          media?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -209,6 +215,7 @@ export type Database = {
           poll_options?: string[] | null;
           poll_ends_at?: string | null;
           poll_counts?: number[] | null;
+          media?: Json | null;
           created_at?: string;
         };
         Relationships: [

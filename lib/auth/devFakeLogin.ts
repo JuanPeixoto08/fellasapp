@@ -40,6 +40,7 @@ export const fakeProfile: Profile = {
   show_now_playing: true,
   hidden_badges: [],
   featured_badge: null,
+  letterboxd_user: null,
   is_admin: false,
   pinned_post_id: null,
   created_at: new Date(0).toISOString(),
