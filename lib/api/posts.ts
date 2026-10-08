@@ -1,6 +1,7 @@
 import { shrinkForUpload } from '../imageUpload';
 import { cleanPlace } from '../places';
 import { cleanOptions, POLL_LIMITS } from '../polls';
+import { toPostMedia, type PostMedia } from '../postMedia';
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
 import {
@@ -49,6 +50,8 @@ export type FeedPost = {
   myReaction: string | null;
   /** Enquete (só em posts com enquete). */
   poll?: FeedPoll;
+  /** Ingresso: review do Letterboxd ou música (só em posts com ingresso, já conferido). */
+  media?: PostMedia;
 };
 
 /** Enquete do post: opções, votos por opção (o banco conta), fim e o meu voto (índice) ou null. */
@@ -110,6 +113,7 @@ async function mapPosts(
   const signed = await signPaths(rows.flatMap((r) => [...imagePaths(r), r.author?.avatar_url]));
   return rows.map((row) => {
     const r = reactions.get(row.id) ?? NO_REACTIONS;
+    const media = toPostMedia(row.media);
     const images = imagePaths(row)
       .map((p) => resolveUrl(p, signed))
       .filter((u): u is string => !!u);
@@ -127,6 +131,7 @@ async function mapPosts(
       likedByMe: liked.has(row.id),
       reactions: r.reactions,
       myReaction: r.myReaction,
+      ...(media ? { media } : {}),
       ...(row.poll_options && row.poll_ends_at
         ? {
             poll: {
@@ -252,6 +257,7 @@ export async function createPost({
   imageUris = [],
   location = null,
   poll = null,
+  media = null,
 }: {
   body: string;
   /** Fotos locais (até 4), na ordem de exibição. */
@@ -260,9 +266,12 @@ export async function createPost({
   location?: string | null;
   /** Enquete: opções como digitadas (as vazias saem) e o prazo em minutos. */
   poll?: { options: string[]; minutes: number } | null;
+  /** Ingresso (review ou música), já montado por lib/postMedia. Post só com ele vale. */
+  media?: PostMedia | null;
 }): Promise<Tables<'posts'>> {
   const text = body.trim();
-  if (!text && imageUris.length === 0) throw new Error('Escreva algo ou escolha uma imagem');
+  if (!text && imageUris.length === 0 && !media) throw new Error('Escreva algo ou escolha uma imagem');
+  if (media && poll) throw new Error('Um post leva enquete ou ingresso, não os dois');
   if (imageUris.length > MAX_IMAGES) throw new Error(`No máximo ${MAX_IMAGES} fotos por post`);
   const pollOptions = poll ? cleanOptions(poll.options).slice(0, POLL_LIMITS.maxOptions) : null;
   if (pollOptions) {
@@ -291,6 +300,8 @@ export async function createPost({
     ...(paths.length > 1 ? { images: paths } : {}),
     // só com local: sem ele o insert é o mesmo de antes (funciona mesmo sem a migration 0020)
     ...(place ? { location: place } : {}),
+    // só com ingresso (funciona mesmo sem a migration 0026); o banco confere e trava
+    ...(media ? { media } : {}),
     // só com enquete (funciona mesmo sem a migration 0025); as contagens o banco zera
     ...(pollOptions && poll
       ? { poll_options: pollOptions, poll_ends_at: new Date(Date.now() + poll.minutes * 60_000).toISOString() }

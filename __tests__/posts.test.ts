@@ -495,3 +495,47 @@ describe('enquete no post', () => {
     await expect(votePoll('p1', 0)).rejects.toBeInstanceOf(PollVoteError);
   });
 });
+
+describe('ingresso no post', () => {
+  const track = {
+    kind: 'track' as const,
+    title: 'Espresso',
+    artist: 'Sabrina Carpenter',
+    album: null,
+    image: 'https://lastfm-img.freetls.fastly.net/i/u/300x300/a.jpg',
+    url: 'https://www.last.fm/music/Sabrina+Carpenter/_/Espresso',
+    live: true,
+  };
+  const inserted = () => mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
+
+  it('createPost manda o ingresso; post só com ingresso (sem texto) vale', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: '', media: track });
+    expect(inserted().media).toEqual(track);
+  });
+
+  it('sem ingresso não manda a coluna (funciona sem a migration 0026)', async () => {
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
+    await createPost({ body: 'oi' });
+    expect(inserted()).not.toHaveProperty('media');
+  });
+
+  it('ingresso e enquete juntos: recusa antes de enviar', async () => {
+    await expect(
+      createPost({ body: 'Bora?', media: track, poll: { options: ['Sim', 'Não'], minutes: 60 } }),
+    ).rejects.toThrow();
+  });
+
+  it('listFeed traz o ingresso conferido; inválido some', async () => {
+    mockResults['posts.select'] = {
+      data: [
+        { id: 'p1', author_id: 'u1', body: '', image_url: null, images: [], created_at: '2026-10-08T12:00:00Z', media: track, author: null, likes: [], comments: [] },
+        { id: 'p2', author_id: 'u1', body: 'x', image_url: null, images: [], created_at: '2026-10-08T11:00:00Z', media: { ...track, image: 'https://evil.example/p.gif' }, author: null, likes: [], comments: [] },
+      ],
+      error: null,
+    };
+    const { posts } = await listFeed();
+    expect(posts[0].media).toEqual(track);
+    expect(posts[1].media).toBeUndefined();
+  });
+});
