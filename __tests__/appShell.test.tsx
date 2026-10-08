@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AppShell, shellVisible } from '../components/shell/AppShell';
+import { AppShell, isWideRoute, shellVisible } from '../components/shell/AppShell';
 
 let mockTier = 'expanded';
 let mockSegments = ['(tabs)', 'feed'];
@@ -55,6 +55,14 @@ describe('shellVisible', () => {
   });
 });
 
+describe('isWideRoute', () => {
+  it('só a aba Fellas Games é larga', () => {
+    expect(isWideRoute(['(tabs)', 'games'])).toBe(true);
+    expect(isWideRoute(['(tabs)', 'feed'])).toBe(false);
+    expect(isWideRoute(['games'])).toBe(false);
+  });
+});
+
 describe('AppShell', () => {
   it('compact: só o conteúdo (celular igual a hoje)', async () => {
     mockTier = 'compact';
@@ -77,6 +85,15 @@ describe('AppShell', () => {
     expect(screen.getByText('coluna-direita')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Postar'));
     expect(screen.getByText('janela-aberta')).toBeTruthy();
+  });
+
+  it('Fellas Games: rota larga, sem coluna direita, com o item na lateral', async () => {
+    mockSegments = ['(tabs)', 'games'];
+    await renderShell();
+    expect(screen.queryByText('coluna-direita')).toBeNull();
+    expect(screen.getByText('Fellas Games')).toBeTruthy();
+    const col = screen.getByTestId('shell-center');
+    expect(col.props.style).toMatchObject({ width: 960 });
   });
 
   it('login em tela larga: sem moldura', async () => {

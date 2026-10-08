@@ -17,6 +17,11 @@ import { useForwardWheel } from './wheelForward';
 const UNFRAMED = ['(auth)', 'not-invited', 'set-password', 'invites'];
 
 /** A moldura só existe para membro logado, fora do login, do "sem convite" e do Convidar. */
+/** Rotas que usam a coluna larga, sem a coluna da direita (Fellas Games: placar e jogos lado a lado). */
+export function isWideRoute(segments: string[]): boolean {
+  return segments[0] === '(tabs)' && segments[1] === 'games';
+}
+
 export function shellVisible(s: { loading: boolean; hasSession: boolean; isMember: boolean; first: string | undefined }) {
   return !s.loading && s.hasSession && s.isMember && !UNFRAMED.includes(s.first ?? '');
 }
@@ -31,13 +36,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const tier = useLayoutTier();
   const { width } = useWindowDimensions();
   const { session, profile, loading } = useSession();
-  const first = useSegments()[0] as string | undefined;
+  const segments = useSegments() as string[];
+  const first = segments[0];
   const [composing, setComposing] = useState(false);
   const center = useRef<View>(null);
 
   const framed =
     tier !== 'compact' && shellVisible({ loading, hasSession: !!session, isMember: !!profile?.is_member, first });
-  const contentWidth = framed ? t.layout.centerWidth : Math.min(width, t.layout.maxContentWidth);
+  const wide = framed && isWideRoute(segments);
+  const columnWidth = wide ? t.layout.wideCenterWidth : t.layout.centerWidth;
+  const contentWidth = framed ? columnWidth : Math.min(width, t.layout.maxContentWidth);
   const value = useMemo(
     () => ({ contentWidth, openCompose: framed ? () => setComposing(true) : null }),
     [contentWidth, framed],
@@ -53,10 +61,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {framed ? <Sidebar tier={tier} onCompose={() => setComposing(true)} /> : null}
         <View
           ref={center}
+          testID="shell-center"
           style={
             framed
               ? {
-                  width: t.layout.centerWidth,
+                  width: columnWidth,
                   borderLeftWidth: t.borders.hairline,
                   borderRightWidth: t.borders.hairline,
                   borderColor: t.colors.border,
@@ -66,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {children}
         </View>
-        {framed && tier === 'expanded' ? <RightRail /> : null}
+        {framed && tier === 'expanded' && !wide ? <RightRail /> : null}
         {autoScrollAt ? <AutoScrollMark at={autoScrollAt} /> : null}
       </View>
       {framed ? <ComposeDialog visible={composing} onClose={() => setComposing(false)} /> : null}

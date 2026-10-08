@@ -11,12 +11,12 @@ import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 import { Avatar, Badge, Button, Icon, IconButton, interactiveStyle, Logo, NameWithBadge, Text, type IconName } from '../ui';
 
-export type NavKey = 'feed' | 'notifications' | 'tags' | 'profile' | 'members' | 'ideas';
+export type NavKey = 'feed' | 'notifications' | 'tags' | 'profile' | 'members' | 'ideas' | 'games';
 
 const ITEMS: {
   key: NavKey;
   label: string;
-  href: '/feed' | '/notifications' | '/tags' | '/profile' | '/members' | '/ideas';
+  href: '/feed' | '/notifications' | '/tags' | '/profile' | '/members' | '/ideas' | '/games';
   icon: IconName;
   iconActive: IconName;
 }[] = [
@@ -26,6 +26,7 @@ const ITEMS: {
   { key: 'profile', label: 'Perfil', href: '/profile', icon: 'person-outline', iconActive: 'person' },
   { key: 'members', label: 'Membros', href: '/members', icon: 'people-outline', iconActive: 'people' },
   { key: 'ideas', label: 'Ideias', href: '/ideas', icon: 'bulb-outline', iconActive: 'bulb' },
+  { key: 'games', label: 'Fellas Games', href: '/games', icon: 'game-controller-outline', iconActive: 'game-controller' },
 ];
 
 /** Item ativo pela rota exata; rotas filhas (post, perfil de outro, editar) não marcam nada. */
@@ -36,6 +37,7 @@ export function activeNavItem(pathname: string): NavKey | null {
   if (pathname === '/notifications') return 'notifications';
   if (pathname === '/tags') return 'tags';
   if (pathname === '/ideas') return 'ideas';
+  if (pathname === '/games') return 'games';
   return null;
 }
 

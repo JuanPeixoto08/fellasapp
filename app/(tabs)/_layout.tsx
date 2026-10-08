@@ -75,6 +75,14 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="games"
+        options={{
+          ...tabHeader(t, 'Fellas Games'),
+          tabBarAccessibilityLabel: 'Fellas Games',
+          tabBarIcon: tabIcon('game-controller', 'game-controller-outline'),
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           ...tabHeader(t, 'Notificações'),
