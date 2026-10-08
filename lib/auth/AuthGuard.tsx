@@ -59,7 +59,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
             },
           ]}
         >
-          <Logo height={t.layout.logoHeight.lg} />
+          <Logo height={t.layout.logoHeight.lg} centered />
           <ActivityIndicator color={t.colors.primary} />
         </View>
       ) : null}

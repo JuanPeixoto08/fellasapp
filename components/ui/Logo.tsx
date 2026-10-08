@@ -15,14 +15,21 @@ export type LogoProps = {
   height: number;
   /** Padrão: cor do texto (tinta), inverte com o tema. */
   color?: string;
+  /** Centraliza no contêiner (ex.: tela de carregamento). Padrão: encostado no início. */
+  centered?: boolean;
 };
 
 /** Marca "FELLAS". Acessível como imagem com o nome do app. */
-export function Logo({ height, color }: LogoProps) {
+export function Logo({ height, color, centered }: LogoProps) {
   const t = useTheme();
   // a acessibilidade fica na View: na web o Svg repassa `accessible` cru para o DOM (aviso do React)
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel="fellas" style={{ alignSelf: 'flex-start' }}>
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel="fellas"
+      style={{ alignSelf: centered ? 'center' : 'flex-start' }}
+    >
       <Svg width={height * ASPECT} height={height} viewBox={VIEWBOX}>
         <Path d={D} fill={color ?? t.colors.text} />
       </Svg>

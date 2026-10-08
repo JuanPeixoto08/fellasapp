@@ -102,6 +102,12 @@ describe('marca e fontes', () => {
     expect(screen.getByLabelText('fellas')).toBeTruthy();
   });
 
+  it('Logo centered fica no meio do contêiner (tela de carregamento)', async () => {
+    const { Logo } = require('../components/ui');
+    await render(<Logo height={24} centered />);
+    expect(screen.getByLabelText('fellas')).toHaveStyle({ alignSelf: 'center' });
+  });
+
   it('todas as fontes do tema são Golos Text (Inter e Instrument Serif saíram)', () => {
     const { fonts } = require('../lib/theme');
     for (const family of Object.values(fonts) as string[]) expect(family).toMatch(/^GolosText_/);
