@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { ChampionRow, GameList, WalletRow } from '../../components/games/GameRows';
@@ -13,12 +13,14 @@ import {
   getLeaderboard,
   getWallet,
   takeFiado,
+  withMember,
   type Champion,
   type LeaderRow,
   type Wallet,
 } from '../../lib/api/games';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { openGame } from '../../lib/games';
+import { useMemberDirectory } from '../../lib/memberDirectory';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 
@@ -33,7 +35,18 @@ export default function GamesScreen() {
   const width = useContentWidth();
   const me = useSession().session?.user.id ?? null;
   const avatar = useMyAvatar();
-  const [data, setData] = useState<Data | null>(null);
+  const [loaded, setData] = useState<Data | null>(null);
+  // nomes e fotos pelo diretório na hora de desenhar: atualizam quando a lista de fellas chega
+  const members = useMemberDirectory();
+  const data = useMemo<Data | null>(
+    () =>
+      loaded && {
+        ...loaded,
+        board: loaded.board.map((r) => withMember(r, members)),
+        champion: loaded.champion && withMember(loaded.champion, members),
+      },
+    [loaded, members],
+  );
   const [failed, setFailed] = useState(false);
   const [fiadoBusy, setFiadoBusy] = useState(false);
   const [fiadoMessage, setFiadoMessage] = useState<string | null>(null);

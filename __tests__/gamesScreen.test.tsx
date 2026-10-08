@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -27,6 +27,7 @@ jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: 
 jest.mock('../lib/useMyAvatar', () => ({ useMyAvatar: () => ({ name: 'Juan', uri: null }) }));
 
 import GamesScreen from '../app/(tabs)/games';
+import { setMemberDirectory } from '../lib/memberDirectory';
 
 const wallet = (extra: Partial<Wallet> = {}): Wallet => ({
   balance: 1090,
@@ -66,6 +67,26 @@ beforeEach(() => {
 });
 
 describe('Fellas Games', () => {
+  it('placar chegou antes da lista de fellas: os nomes aparecem quando ela carrega', async () => {
+    // voltando da mesa o app reabre direto na aba: o placar costuma ganhar da lista de fellas
+    setMemberDirectory([]);
+    mockApi.getLeaderboard.mockResolvedValue([row('u1', 'Alguém', 3420), row('me', 'Alguém', 1090)]);
+    mockApi.getLastChampion.mockResolvedValue({ userId: 'u1', name: 'Alguém', username: '', avatarUrl: null, balance: 4870, weekStart: '2026-09-28' });
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText('Placar da semana')).toBeTruthy());
+    expect(screen.queryByText('Oliveira')).toBeNull();
+    await act(async () => {
+      setMemberDirectory([
+        { id: 'u1', username: 'oliveira', name: 'Oliveira', avatarUrl: null },
+        { id: 'me', username: 'juan', name: 'Juan', avatarUrl: null },
+      ]);
+    });
+    // placar e campeão
+    expect(screen.getAllByText('Oliveira')).toHaveLength(2);
+    expect(screen.queryByText('Alguém')).toBeNull();
+    setMemberDirectory([]);
+  });
+
   it('carregando: linhas fantasma no lugar do placar', async () => {
     mockApi.getWallet.mockReturnValue(new Promise(() => {}));
     await render(<GamesScreen />, { wrapper: Wrapper });

@@ -1,5 +1,6 @@
 import type { Database } from '../../types/database';
 import { getMemberDirectory } from '../memberDirectory';
+import type { MentionMember } from '../mentions';
 import { supabase } from '../supabase';
 
 /**
@@ -49,6 +50,18 @@ function who(id: string) {
   const m = getMemberDirectory().find((x) => x.id === id);
   // saiu do grupo, ou o diretório ainda não carregou: a linha continua aparecendo
   return { name: m?.name ?? 'Alguém', username: m?.username ?? '', avatarUrl: m?.avatarUrl ?? null };
+}
+
+/**
+ * Nome e foto atuais do diretório por cima do que veio na busca. A lista de fellas carrega por conta própria
+ * e pode chegar depois do placar (voltando da mesa o app reabre direto na aba): sem isso ficava "Alguém".
+ */
+export function withMember<T extends { userId: string; name: string; username: string; avatarUrl: string | null }>(
+  row: T,
+  members: MentionMember[],
+): T {
+  const m = members.find((x) => x.id === row.userId);
+  return m ? { ...row, name: m.name, username: m.username, avatarUrl: m.avatarUrl } : row;
 }
 
 /** Minha carteira; o banco cria com 1.000 no primeiro acesso. */
