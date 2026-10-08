@@ -33,7 +33,7 @@ const mockOpenStories = jest.fn();
 jest.mock('../lib/api/stories', () => ({ listActiveStories: () => mockListStories() }));
 jest.mock('../lib/storyViewerStore', () => ({ openStories: (...a: unknown[]) => mockOpenStories(...a) }));
 
-import NotificationsScreen from '../app/notifications';
+import NotificationsScreen from '../app/(tabs)/notifications';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
 const ana = { id: 'u2', username: 'ana', name: 'Ana', avatarUrl: null };

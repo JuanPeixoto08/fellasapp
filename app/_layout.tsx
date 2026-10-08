@@ -63,7 +63,6 @@ export default function RootLayout() {
             <Stack.Screen name="members" options={{ headerShown: true, title: 'Membros' }} />
             <Stack.Screen name="invites" options={{ headerShown: true, title: 'Convidar' }} />
             <Stack.Screen name="ideas" options={{ headerShown: true, title: 'Ideias' }} />
-            <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Notificações' }} />
           </Stack>
         </AppShell>
         <EmojiPickerHost />

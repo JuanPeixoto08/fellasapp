@@ -1,19 +1,18 @@
-import { Stack, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { NotificationRow } from '../components/notifications/NotificationRow';
-import { stackHeader } from '../components/profile/headerOptions';
-import { Divider, EmptyState, Screen } from '../components/ui';
-import { fetchNotifications, markNotificationsSeen } from '../lib/api/notifications';
-import { listActiveStories } from '../lib/api/stories';
-import type { AppNotification } from '../lib/notifications';
-import { setUnreadNotifications } from '../lib/notificationsStore';
-import { openStories } from '../lib/storyViewerStore';
-import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../lib/realtime';
-import { useTheme } from '../lib/theme';
-import { profilePath } from '../lib/openProfile';
+import { NotificationRow } from '../../components/notifications/NotificationRow';
+import { Divider, EmptyState, Screen } from '../../components/ui';
+import { fetchNotifications, markNotificationsSeen } from '../../lib/api/notifications';
+import { listActiveStories } from '../../lib/api/stories';
+import type { AppNotification } from '../../lib/notifications';
+import { setUnreadNotifications } from '../../lib/notificationsStore';
+import { openStories } from '../../lib/storyViewerStore';
+import { affectsNotifications, debounce, LIVE_DEBOUNCE_MS, onLive } from '../../lib/realtime';
+import { useTheme } from '../../lib/theme';
+import { profilePath } from '../../lib/openProfile';
 
 export default function NotificationsScreen() {
   const t = useTheme();
@@ -121,10 +120,6 @@ export default function NotificationsScreen() {
     );
   }
 
-  return (
-    <>
-      <Stack.Screen options={stackHeader(t, 'Notificações')} />
-      <Screen header>{body}</Screen>
-    </>
-  );
+  // aba: o cabeçalho "Notificações" vem do layout das abas
+  return <Screen header>{body}</Screen>;
 }

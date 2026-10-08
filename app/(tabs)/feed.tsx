@@ -6,7 +6,6 @@ import { Composer } from '../../components/feed/Composer';
 import { NewPostsPill } from '../../components/feed/NewPostsPill';
 import { IdeasButton } from '../../components/ideas/IdeasButton';
 import { StoriesBar } from '../../components/stories/StoriesBar';
-import { NotificationsBell } from '../../components/notifications/NotificationsBell';
 import { TagsButton } from '../../components/tags/TagsButton';
 import { PostCard } from '../../components/PostCard';
 import { Button, Divider, EmptyState, Logo, Screen, Text } from '../../components/ui';
@@ -82,7 +81,6 @@ export default function FeedScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <TagsButton />
                     <IdeasButton />
-                    <NotificationsBell />
                   </View>
                 </View>
                 <View style={{ marginHorizontal: -t.layout.gutter }}>

@@ -1,8 +1,15 @@
+import { render, screen } from '@testing-library/react-native';
+
+let mockCount = 0;
+jest.mock('../lib/notificationsStore', () => ({ useUnreadNotifications: () => mockCount }));
+jest.mock('expo-router', () => ({ Tabs: Object.assign(() => null, { Screen: () => null }) }));
+
+import { NotificationsTabIcon } from '../app/(tabs)/_layout';
 import { getTabBarStyle } from '../lib/tabBarStyle';
 import { getTheme } from '../lib/theme';
 
 const t = getTheme('light');
-const base = 1 + t.spacing.xs + t.layout.minTouch + t.typography.caption.lineHeight;
+const base = 1 + t.spacing.xs + t.layout.minTouch;
 
 describe('getTabBarStyle', () => {
   it('soma insets.bottom uma única vez na altura', () => {
@@ -21,5 +28,16 @@ describe('getTabBarStyle', () => {
     const s = getTabBarStyle(t, { bottom: 0, left: 10, right: 20 });
     expect(s.paddingLeft).toBe(10);
     expect(s.paddingRight).toBe(20);
+  });
+});
+
+describe('NotificationsTabIcon', () => {
+  it('sem novas: só o sino; com novas, a bolinha com o número', async () => {
+    mockCount = 0;
+    const { rerender } = await render(<NotificationsTabIcon color="#000" size={24} focused={false} />);
+    expect(screen.queryByTestId('badge', { includeHiddenElements: true })).toBeNull();
+    mockCount = 3;
+    await rerender(<NotificationsTabIcon color="#000" size={24} focused={false} />);
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy();
   });
 });
