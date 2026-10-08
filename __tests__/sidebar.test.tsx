@@ -42,6 +42,7 @@ describe('activeNavItem', () => {
     ['/notifications', 'notifications'],
     ['/ideas', 'ideas'],
     ['/tags', 'tags'],
+    ['/games', 'games'],
   ] as const)('%s → %s', (path, key) => {
     expect(activeNavItem(path)).toBe(key);
   });

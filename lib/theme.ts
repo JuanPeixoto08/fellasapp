@@ -152,6 +152,10 @@ export const layout = {
   breakpoints: { medium: 700, expanded: 1100 },
   /** Coluna central nas faixas medium/expanded. */
   centerWidth: 600,
+  /** Coluna do meio das rotas largas (Fellas Games), sem a coluna da direita. */
+  wideCenterWidth: 960,
+  /** Miniatura da mesa no card de cada jogo (Fellas Games). */
+  gameArt: { width: 112, height: 76, card: 34 },
   /** Barra lateral: só ícones (medium) ou ícone + nome (expanded). */
   sidebarWidth: { medium: 72, expanded: 260 },
   /** Coluna da direita (só expanded). */
@@ -193,6 +197,18 @@ export const layout = {
   vinyl: { sleeve: 88, disc: 84, discOffset: 50, label: 32, spinMs: 3200 },
   gutter: spacing.lg,
   minTouch: 44,
+} as const;
+
+/**
+ * Mesa dos Fellas Games: a única cor fora do zine no app, só na miniatura dos jogos (a mesa em si é a página
+ * própria em `games/`). Igual nos dois temas, como um objeto desenhado.
+ */
+export const gameTable = {
+  felt: ['#1d8a58', '#0e5a3a', '#0a4029'],
+  rim: '#5a3a1e',
+  card: '#FFFFFF',
+  cardRed: '#C81E3A',
+  cardInk: '#121212',
 } as const;
 
 /** Durações em ms. */

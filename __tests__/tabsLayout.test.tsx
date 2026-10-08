@@ -2,9 +2,19 @@ import { render, screen } from '@testing-library/react-native';
 
 let mockCount = 0;
 jest.mock('../lib/notificationsStore', () => ({ useUnreadNotifications: () => mockCount }));
-jest.mock('expo-router', () => ({ Tabs: Object.assign(() => null, { Screen: () => null }) }));
+const mockScreens: { name: string; options?: { tabBarAccessibilityLabel?: string } }[] = [];
+jest.mock('expo-router', () => ({
+  Tabs: Object.assign(({ children }: { children: unknown }) => children, {
+    Screen: (props: { name: string; options?: object }) => {
+      mockScreens.push(props as never);
+      return null;
+    },
+  }),
+}));
+jest.mock('../lib/layout', () => ({ useLayoutTier: () => 'compact' }));
 
-import { NotificationsTabIcon } from '../app/(tabs)/_layout';
+import TabsLayout, { NotificationsTabIcon } from '../app/(tabs)/_layout';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getTabBarStyle } from '../lib/tabBarStyle';
 import { getTheme } from '../lib/theme';
 
@@ -39,5 +49,18 @@ describe('NotificationsTabIcon', () => {
     mockCount = 3;
     await rerender(<NotificationsTabIcon color="#000" size={24} focused={false} />);
     expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy();
+  });
+});
+
+describe('barra de baixo', () => {
+  it('cinco abas: Feed · Novo post · Games · Notificações · Perfil', async () => {
+    mockScreens.length = 0;
+    await render(
+      <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+        <TabsLayout />
+      </SafeAreaProvider>,
+    );
+    expect(mockScreens.map((x) => x.name)).toEqual(['feed', 'new', 'games', 'notifications', 'profile']);
+    expect(mockScreens[2].options?.tabBarAccessibilityLabel).toBe('Fellas Games');
   });
 });
