@@ -13,6 +13,7 @@ import { postTime } from '../lib/format';
 import { MentionText } from './MentionText';
 import { AuthorLink } from './profile/AuthorLink';
 import { PostNowPlaying } from './music/PostNowPlaying';
+import { PostPoll } from './feed/PostPoll';
 import { openProfile } from '../lib/openProfile';
 import { PlaceLink } from './places/PlaceLink';
 import { nextReaction } from '../lib/reactionState';
@@ -156,6 +157,7 @@ export function PostCard({
               <MentionText text={post.body} tags />
             </Pressable>
           ) : null}
+          {post.poll ? <PostPoll postId={post.id} poll={post.poll} /> : null}
           <PostImages uris={post.images} alt={`Foto postada por ${name}`} onPressImage={setViewing} />
           <ReactionBar reactions={post.reactions} myReaction={post.myReaction} onPressChip={react} />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -t.spacing.sm }}>
