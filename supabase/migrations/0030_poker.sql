@@ -1020,5 +1020,76 @@ grant execute on function public.poker_show() to authenticated;
 grant execute on function public.poker_my_cards() to authenticated;
 grant execute on function public.poker_history() to authenticated;
 
+-- ===== Relógio =====
+-- vez vencida, ausente de 10 min, sem fichas há 1 min e a próxima mão. Qualquer membro pode chamar (o app chama
+-- quando o prazo passa); o cron chama sem usuário a cada minuto. Só age por prazo: chamar antes não faz nada.
+create or replace function public.poker_tick()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  t       public.poker_tables;
+  h       public.poker_hands;
+  p       jsonb;
+  v_seat  smallint;
+  v_moved boolean := false;
+begin
+  if auth.uid() is not null and not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  select * into t from public.poker_tables where id = 1 for update;
+
+  -- vez vencida: mesa se pode, senão corre; conta um estouro por mão; 2 mãos seguidas → ausente
+  select * into h from public.poker_hands where status = 'betting';
+  if h.id is not null and h.deadline < now() then
+    v_seat := h.to_act;
+    p := h.players -> v_seat::text;
+    if not (p ->> 'timed_out')::boolean then
+      update public.poker_seats
+         set timeouts = timeouts + 1,
+             status = case when timeouts + 1 >= 2 then 'away' else status end,
+             away_since = case when timeouts + 1 >= 2 then now() else away_since end
+       where seat = v_seat and user_id = (p ->> 'user_id')::uuid;
+      perform public.poker_patch(h.id, v_seat, '{"timed_out": true}');
+    end if;
+    perform public.poker_apply(h.id, v_seat,
+      case when (p ->> 'bet')::int >= h.current_bet then 'check' else 'fold' end);
+    perform public.poker_advance(h.id);
+    v_moved := true;
+  end if;
+
+  -- fora da mão (ou já tendo corrido): ausente há 10 min e sem fichas há 1 min levantam
+  for v_seat in
+    select s.seat from public.poker_seats s
+     where ((s.status = 'away' and s.away_since < now() - interval '10 minutes')
+            or (s.stack = 0 and s.busted_at < now() - interval '1 minute'))
+       and not exists (select 1 from public.poker_hands x
+                        where x.status = 'betting' and x.players ? s.seat::text
+                          and (x.players -> s.seat::text ->> 'user_id')::uuid = s.user_id
+                          and not (x.players -> s.seat::text ->> 'folded')::boolean)
+  loop
+    perform public.poker_stand(v_seat, true);
+    v_moved := true;
+  end loop;
+
+  -- próxima mão (poker_maybe_start confere de novo pausa e mesa fechada)
+  if not exists (select 1 from public.poker_hands where status = 'betting') then
+    perform public.poker_maybe_start();
+    v_moved := v_moved or exists (select 1 from public.poker_hands where status = 'betting');
+  end if;
+
+  if v_moved then
+    perform public.poker_snapshot();
+  end if;
+  if auth.uid() is null then
+    return null;
+  end if;
+  return public.poker_state();
+end;
+$$;
+
+revoke all on function public.poker_tick() from public, anon;
+grant execute on function public.poker_tick() to authenticated;
+
+select cron.schedule('fellas-poker-tick', '* * * * *', $$select public.poker_tick()$$);
+
 -- primeiro retrato (a mesa vazia)
 select public.poker_snapshot();
