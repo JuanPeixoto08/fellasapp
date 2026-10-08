@@ -1,5 +1,6 @@
 -- fellasapp: Fellas Games — créditos semanais (de mentira), fiado, placar e troféu do campeão. Idempotente.
--- Todo mundo começa a semana com 1.000; segunda 00:00 de Brasília o cron grava o pódio, passa o selo
+-- Todo mundo começa a semana com 1.000; sem dar pra apostar (menos de 10, a aposta mínima), fiado de +100 1x/dia.
+-- Segunda 00:00 de Brasília o cron grava o pódio, passa o selo
 -- weekly_champion para o campeão e volta todo mundo para 1.000. O app só lê; quem escreve são as funções.
 -- Os jogos (0028 em diante) estendem os ganchos games_open_round / games_close_open_rounds.
 
@@ -97,7 +98,7 @@ begin
   return jsonb_build_object(
     'balance', w.balance,
     'fiado_count', w.fiado_count,
-    'can_fiado', w.balance = 0 and v_open is null and w.last_fiado_on is distinct from public.games_today(),
+    'can_fiado', w.balance < 10 and v_open is null and w.last_fiado_on is distinct from public.games_today(),
     'open_round_id', v_open,
     'week_start', w.week_start);
 end;
@@ -121,7 +122,8 @@ begin
     raise exception 'not_member' using errcode = '42501';
   end if;
   w := public.games_ensure_wallet(auth.uid());
-  if w.balance > 0 then
+  -- abaixo da aposta mínima (o troco de um blackjack pode deixar 5) já conta como quebrado
+  if w.balance >= 10 then
     raise exception 'fiado_not_broke' using errcode = 'P0001';
   end if;
   if public.games_open_round(w.user_id) is not null then

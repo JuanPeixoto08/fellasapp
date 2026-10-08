@@ -21,7 +21,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   round_done: 'Essa mão já acabou',
   round_not_found: 'Essa mão não é sua',
   fiado_today: 'Fiado de hoje já foi. Volta amanhã.',
-  fiado_not_broke: 'Fiado é só pra quem zerou',
+  fiado_not_broke: 'Fiado só sai quando não dá pra apostar',
   fiado_open_round: 'Termina a mão antes do fiado',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };

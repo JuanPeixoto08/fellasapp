@@ -51,6 +51,18 @@ describe('games_fiado', () => {
   });
 });
 
+describe('fiado com troco', () => {
+  it('saldo abaixo da aposta mínima (ex.: 5, troco de blackjack) também pega fiado', async () => {
+    await t.rpc('games_wallet');
+    await setBalance(A, 5);
+    expect((await t.rpc<Wallet>('games_wallet')).can_fiado).toBe(true);
+    expect((await t.rpc<Wallet>('games_fiado')).balance).toBe(105);
+    await setBalance(A, 10);
+    await q(`update public.game_wallets set last_fiado_on = null`);
+    await expect(t.rpc('games_fiado')).rejects.toThrow(/fiado_not_broke/);
+  });
+});
+
 describe('games_move', () => {
   it('nunca deixa negativo', async () => {
     await t.rpc('games_wallet');
