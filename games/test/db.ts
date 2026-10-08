@@ -5,7 +5,12 @@ import { resolve } from 'node:path';
 
 import { SKELETON } from './skeleton';
 
-export const MIGRATIONS: string[] = ['0027_fellas_games.sql', '0028_blackjack.sql', '0029_fellas_games_ajustes.sql'];
+export const MIGRATIONS: string[] = [
+  '0027_fellas_games.sql',
+  '0028_blackjack.sql',
+  '0029_fellas_games_ajustes.sql',
+  '0030_poker.sql',
+];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;
 
