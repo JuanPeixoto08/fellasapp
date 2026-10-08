@@ -46,10 +46,20 @@ export function reduce(s: MachineState, e: MachineEvent): MachineState {
   }
   switch (e.type) {
     case 'loaded': {
-      if (turned(s, e.wallet)) {
-        return { ...s, phase: 'betting', wallet: e.wallet, round: null, bet: 0, notice: WEEK_TURNED, weekStart: e.wallet.week_start, back: null };
-      }
       const playing = e.round?.status === 'playing';
+      if (turned(s, e.wallet)) {
+        // a mão da semana velha foi fechada pelo reset; uma aberta agora é da semana nova (outra aba): mostra (M1)
+        return {
+          ...s,
+          phase: playing ? 'playing' : 'betting',
+          wallet: e.wallet,
+          round: playing ? e.round : null,
+          bet: 0,
+          notice: WEEK_TURNED,
+          weekStart: e.wallet.week_start,
+          back: null,
+        };
+      }
       return {
         ...s,
         phase: playing ? 'playing' : 'betting',
@@ -79,7 +89,17 @@ export function reduce(s: MachineState, e: MachineEvent): MachineState {
     }
     case 'wallet':
       if (turned(s, e.wallet)) {
-        return { ...s, phase: 'betting', wallet: e.wallet, round: null, bet: 0, notice: WEEK_TURNED, weekStart: e.wallet.week_start, back: null };
+        const keep = s.round?.status === 'playing' && e.wallet.open_round_id === s.round.id;
+        return {
+          ...s,
+          phase: keep ? 'playing' : 'betting',
+          wallet: e.wallet,
+          round: keep ? s.round : null,
+          bet: 0,
+          notice: WEEK_TURNED,
+          weekStart: e.wallet.week_start,
+          back: null,
+        };
       }
       return { ...s, wallet: e.wallet, phase: s.phase === 'busy' ? (s.back ?? 'betting') : s.phase, back: null };
     case 'again': {

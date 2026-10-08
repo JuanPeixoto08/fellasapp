@@ -2,13 +2,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import type { ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import type { Champion, LeaderRow, Wallet } from '../lib/api/games';
+import type { Champion, LeaderRow, PokerTable, Wallet } from '../lib/api/games';
 
 const mockApi = {
   getWallet: jest.fn<Promise<Wallet>, []>(),
   takeFiado: jest.fn<Promise<Wallet>, []>(),
   getLeaderboard: jest.fn<Promise<LeaderRow[]>, []>(),
   getLastChampion: jest.fn<Promise<Champion | null>, []>(),
+  getPokerTable: jest.fn<Promise<PokerTable>, [string | null]>(),
 };
 jest.mock('../lib/api/games', () => ({
   ...jest.requireActual('../lib/api/games'),
@@ -16,6 +17,7 @@ jest.mock('../lib/api/games', () => ({
   takeFiado: () => mockApi.takeFiado(),
   getLeaderboard: () => mockApi.getLeaderboard(),
   getLastChampion: () => mockApi.getLastChampion(),
+  getPokerTable: (me: string | null) => mockApi.getPokerTable(me),
 }));
 const mockOpen = jest.fn();
 jest.mock('../lib/games', () => ({ openGame: (slug: string) => mockOpen(slug) }));
@@ -35,6 +37,7 @@ const wallet = (extra: Partial<Wallet> = {}): Wallet => ({
   canFiado: false,
   openRoundId: null,
   weekStart: '2026-10-05',
+  seatedStack: null,
   ...extra,
 });
 const row = (userId: string, name: string, balance: number, fiadoCount = 0): LeaderRow => ({
@@ -55,6 +58,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 beforeEach(() => {
   jest.clearAllMocks();
   mockApi.getWallet.mockResolvedValue(wallet());
+  mockApi.getPokerTable.mockResolvedValue({ count: 0, seated: false });
   mockApi.getLeaderboard.mockResolvedValue([row('u1', 'Oliveira', 3420), row('me', 'Juan', 1090), row('u2', 'Rafa', 640, 1)]);
   mockApi.getLastChampion.mockResolvedValue({
     userId: 'u1',
@@ -156,14 +160,33 @@ describe('Fellas Games', () => {
     expect(screen.queryByText('Fiado de hoje já foi. Volta amanhã.')).toBeNull();
   });
 
-  it('Jogar abre a mesa; com mão aberta vira Continuar mão; Poker em breve', async () => {
+  it('Jogar abre a mesa; com mão aberta vira Continuar mão', async () => {
     await render(<GamesScreen />, { wrapper: Wrapper });
     await waitFor(() => expect(screen.getByLabelText('Jogar Blackjack')).toBeTruthy());
     await fireEvent.press(screen.getByLabelText('Jogar Blackjack'));
     expect(mockOpen).toHaveBeenCalledWith('blackjack');
-    expect(screen.getByText('Em breve')).toBeTruthy();
     mockApi.getWallet.mockResolvedValue(wallet({ openRoundId: 'r1' }));
     await render(<GamesScreen />, { wrapper: Wrapper });
     await waitFor(() => expect(screen.getByText('Continuar mão')).toBeTruthy());
+  });
+
+  it('Poker: quantos na mesa, Jogar abre a mesa; sentado vira Voltar pra mesa', async () => {
+    mockApi.getPokerTable.mockResolvedValue({ count: 2, seated: false });
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText('2 na mesa')).toBeTruthy());
+    expect(screen.queryByText('Em breve')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Jogar Poker'));
+    expect(mockOpen).toHaveBeenCalledWith('poker');
+    mockApi.getPokerTable.mockResolvedValue({ count: 3, seated: true });
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByLabelText('Voltar pra mesa Poker')).toBeTruthy());
+  });
+
+  it('sem saldo e sentado no poker: mostra as fichas na mesa e pede para levantar antes do fiado', async () => {
+    mockApi.getWallet.mockResolvedValue(wallet({ balance: 0, seatedStack: 300 }));
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText('+ 300 na mesa de poker')).toBeTruthy());
+    expect(screen.getByText('Levanta da mesa de poker pra pegar fiado')).toBeTruthy();
+    expect(screen.queryByText('Fiado de hoje já foi. Volta amanhã.')).toBeNull();
   });
 });

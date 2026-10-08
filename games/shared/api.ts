@@ -1,7 +1,17 @@
 // Chamadas ao banco da mesa. Toda falha sai como GameError (código + frase).
 import { toGameError } from './errors';
 import { supabase } from './supabase';
-import type { Action, BoardRow, RoundState, Wallet } from './types';
+import type {
+  Action,
+  BoardRow,
+  Fella,
+  PokerAction,
+  PokerCards,
+  PokerHistoryRow,
+  PokerState,
+  RoundState,
+  Wallet,
+} from './types';
 
 export * from './errors';
 export * from './types';
@@ -22,22 +32,48 @@ export const bjDeal = (bet: number) => rpc<RoundState>('bj_deal', { p_bet: bet }
 export const bjAct = (id: string, action: Action) => rpc<RoundState>('bj_act', { p_round: id, p_action: action });
 export const bjCurrent = () => rpc<RoundState | null>('bj_current');
 
-/** Placar da semana para o painel do PC (só quem jogou, na ordem do placar). */
-export async function weekBoard(): Promise<BoardRow[]> {
-  const { data, error } = await supabase
-    .from('game_wallets')
-    .select('user_id, balance, profiles(display_name, username)')
-    .not('last_played_at', 'is', null)
-    .order('balance', { ascending: false })
-    .order('fiado_count', { ascending: true })
-    .order('last_played_at', { ascending: true })
-    .limit(6);
+export const pokerState = () => rpc<PokerState>('poker_state');
+export const pokerSit = (seat: number, buyin: number) => rpc<PokerState>('poker_sit', { p_seat: seat, p_buyin: buyin });
+export const pokerAct = (hand: string, actionNo: number, action: PokerAction, amount?: number) =>
+  rpc<PokerState>('poker_act', { p_hand: hand, p_action_no: actionNo, p_action: action, p_amount: amount ?? null });
+export const pokerRebuy = (amount: number) => rpc<PokerState>('poker_rebuy', { p_amount: amount });
+export const pokerLeave = () => rpc<PokerState>('poker_leave');
+export const pokerBack = () => rpc<PokerState>('poker_back');
+export const pokerShow = () => rpc<PokerState>('poker_show');
+export const pokerMyCards = () => rpc<PokerCards>('poker_my_cards');
+export const pokerTick = () => rpc<PokerState | null>('poker_tick');
+export const pokerHistory = () => rpc<PokerHistoryRow[]>('poker_history');
+
+const isUrl = (p: string) => /^https?:\/\//.test(p);
+
+/** Nome e foto dos fellas. Avatar no bucket privado: link assinado por 1 h (como o app faz). */
+export async function fellas(ids: string[]): Promise<Fella[]> {
+  if (!ids.length) return [];
+  const { data, error } = await supabase.from('profiles').select('id, display_name, username, avatar_url').in('id', ids);
   if (error) throw toGameError(error);
-  type Row = { user_id: string; balance: number; profiles: { display_name: string | null; username: string } | null };
-  return ((data ?? []) as unknown as Row[]).map((r) => ({
+  type Row = { id: string; display_name: string | null; username: string | null; avatar_url: string | null };
+  const rows = (data ?? []) as Row[];
+  const paths = rows.map((r) => r.avatar_url).filter((p): p is string => !!p && !isUrl(p));
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await supabase.storage.from('post-images').createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.display_name || r.username || 'Alguém',
+    avatarUrl: !r.avatar_url ? null : isUrl(r.avatar_url) ? r.avatar_url : (signed.get(r.avatar_url) ?? null),
+  }));
+}
+
+/** Placar da semana para o painel do PC: carteira + fichas na mesa (games_board), na ordem do placar. */
+export async function weekBoard(): Promise<BoardRow[]> {
+  const rows = (await rpc<{ user_id: string; balance: number }[]>('games_board')).slice(0, 6);
+  const names = await fellas(rows.map((r) => r.user_id)).catch(() => [] as Fella[]);
+  return rows.map((r) => ({
     userId: r.user_id,
     balance: r.balance,
-    name: r.profiles?.display_name || r.profiles?.username || 'Alguém',
+    name: names.find((n) => n.id === r.user_id)?.name ?? 'Alguém',
   }));
 }
 

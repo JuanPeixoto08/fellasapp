@@ -14,6 +14,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 900, // three.js + supabase-js numa página só (~205 KB comprimido)
     outDir: resolve(import.meta.dirname, '../dist/games'),
     emptyOutDir: false, // o dist/ é do Expo: nunca apagar
-    rollupOptions: { input: { blackjack: resolve(import.meta.dirname, 'blackjack/index.html') } },
+    rollupOptions: {
+      input: {
+        blackjack: resolve(import.meta.dirname, 'blackjack/index.html'),
+        poker: resolve(import.meta.dirname, 'poker/index.html'),
+      },
+    },
   },
 });

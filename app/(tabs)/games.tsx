@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { ChampionRow, GameList, WalletRow } from '../../components/games/GameRows';
@@ -11,16 +11,19 @@ import {
   gamesErrorMessage,
   getLastChampion,
   getLeaderboard,
+  getPokerTable,
   getWallet,
   takeFiado,
   withMember,
   type Champion,
   type LeaderRow,
+  type PokerTable,
   type Wallet,
 } from '../../lib/api/games';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { openGame } from '../../lib/games';
 import { useMemberDirectory } from '../../lib/memberDirectory';
+import { debounce, LIVE_DEBOUNCE_MS, onLive } from '../../lib/realtime';
 import { useTheme } from '../../lib/theme';
 import { useMyAvatar } from '../../lib/useMyAvatar';
 
@@ -50,16 +53,35 @@ export default function GamesScreen() {
   const [failed, setFailed] = useState(false);
   const [fiadoBusy, setFiadoBusy] = useState(false);
   const [fiadoMessage, setFiadoMessage] = useState<string | null>(null);
+  const [poker, setPoker] = useState<PokerTable | null>(null);
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const [wallet, board, champion] = await Promise.all([getWallet(), getLeaderboard(), getLastChampion()]);
+      const [wallet, board, champion, table] = await Promise.all([
+        getWallet(),
+        getLeaderboard(),
+        getLastChampion(),
+        getPokerTable(me).catch(() => null), // o card do poker não derruba a aba se falhar
+      ]);
       setData({ wallet, board, champion });
+      setPoker(table);
     } catch {
       setFailed(true);
     }
-  }, []);
+  }, [me]);
+
+  // quem senta ou levanta na mesa de poker muda o card
+  useEffect(() => {
+    const refresh = debounce(() => void getPokerTable(me).then(setPoker, () => {}), LIVE_DEBOUNCE_MS);
+    const off = onLive((e) => {
+      if (e.kind === 'resync' || e.table === 'poker_tables') refresh();
+    });
+    return () => {
+      off();
+      refresh.cancel();
+    };
+  }, [me]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,7 +133,15 @@ export default function GamesScreen() {
       )
     : null;
   const games = data
-    ? section('Jogos', <GameList openRound={!!data.wallet.openRoundId} onBlackjack={() => openGame('blackjack')} />)
+    ? section(
+        'Jogos',
+        <GameList
+          openRound={!!data.wallet.openRoundId}
+          onBlackjack={() => openGame('blackjack')}
+          poker={poker}
+          onPoker={() => openGame('poker')}
+        />,
+      )
     : null;
   const champion = data?.champion ? section('Campeão da semana passada', <ChampionRow champion={data.champion} />) : null;
   const board = section('Placar da semana', <Leaderboard rows={data?.board ?? []} me={me} loading={!data} />);

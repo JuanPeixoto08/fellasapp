@@ -30,6 +30,86 @@ export type Wallet = {
   can_fiado: boolean;
   open_round_id: string | null;
   week_start: string;
+  /** Fichas na mesa de poker (0030); null = não está sentado. */
+  seated_stack?: number | null;
 };
 export type Action = 'hit' | 'stand' | 'double' | 'split';
 export type BoardRow = { userId: string; name: string; balance: number };
+
+// Poker (0030): o retrato público da mesa (poker_tables.state) e o que só eu vejo.
+export type PokerLast = 'sb' | 'bb' | 'fold' | 'check' | 'call' | 'raise' | 'allin';
+export type PokerPlayer = {
+  user_id: string;
+  /** Aposta nesta rodada. */
+  bet: number;
+  /** Tudo que pôs na mão. */
+  total: number;
+  folded: boolean;
+  all_in: boolean;
+  acted: boolean;
+  /** Depois de um all-in curto: só paga ou corre. */
+  capped: boolean;
+  last: PokerLast | null;
+  timed_out: boolean;
+};
+export type PokerSeat = {
+  seat: number;
+  user_id: string;
+  stack: number;
+  status: 'playing' | 'away';
+  wait_bb: boolean;
+  leaving: boolean;
+  busted: boolean;
+};
+export type PokerPot = { amount: number; winners: number[]; name: string | null };
+export type PokerResults = {
+  showdown: boolean;
+  pots: PokerPot[];
+  payouts: Record<string, number>;
+  hands: Record<string, string>;
+};
+export type PokerHand = {
+  id: string;
+  no: number;
+  status: 'betting' | 'done' | 'void';
+  street: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
+  board: Card[];
+  /** Por lugar ("0".."5"). */
+  players: Record<string, PokerPlayer>;
+  pot: number;
+  current_bet: number;
+  min_raise_to: number;
+  to_act: number | null;
+  action_no: number;
+  deadline: string | null;
+  button: number;
+  sb: number;
+  bb: number;
+  runout: boolean;
+  results: PokerResults | null;
+  shown: Record<string, Card[]>;
+};
+export type PokerState = {
+  seq: number;
+  server_now: string;
+  closed: boolean;
+  next_hand_at: string | null;
+  blinds: [number, number];
+  buyin: [number, number];
+  seats: PokerSeat[];
+  hand: PokerHand | null;
+  /** Só na resposta das funções (não no tempo real). */
+  me?: { rathole_min: number | null };
+};
+export type PokerCards = { hand_id: string; cards: Card[] } | null;
+export type PokerAction = 'fold' | 'check' | 'call' | 'raise' | 'allin';
+export type PokerHistoryRow = {
+  id: string;
+  no: number;
+  board: Card[];
+  results: PokerResults;
+  shown: Record<string, Card[]>;
+  players: Record<string, string>;
+  ended_at: string;
+};
+export type Fella = { id: string; name: string; avatarUrl: string | null };

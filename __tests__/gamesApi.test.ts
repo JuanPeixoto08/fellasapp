@@ -5,7 +5,7 @@ let mockResult: { data: unknown; error: unknown } = { data: [], error: null };
 // consulta encadeada: registra cada passo e, no fim (await ou maybeSingle), devolve mockResult
 function mockQuery(table: string) {
   const chain: Record<string, unknown> = {};
-  for (const op of ['select', 'not', 'order', 'limit']) {
+  for (const op of ['select', 'not', 'order', 'limit', 'eq']) {
     chain[op] = (...args: unknown[]) => {
       mockCalls.push({ table, op, args });
       return chain;
@@ -23,7 +23,7 @@ jest.mock('../lib/supabase', () => ({
   },
 }));
 
-import { gamesErrorMessage, getLastChampion, getLeaderboard, getWallet, takeFiado } from '../lib/api/games';
+import { gamesErrorMessage, getLastChampion, getLeaderboard, getPokerTable, getWallet, takeFiado } from '../lib/api/games';
 import { setMemberDirectory } from '../lib/memberDirectory';
 
 const ROW = { balance: 1000, fiado_count: 0, can_fiado: false, open_round_id: null, week_start: '2026-10-05' };
@@ -47,6 +47,7 @@ describe('getWallet / takeFiado', () => {
       canFiado: false,
       openRoundId: null,
       weekStart: '2026-10-05',
+      seatedStack: null,
     });
     expect(mockRpc).toHaveBeenCalledWith('games_wallet');
   });
@@ -64,33 +65,45 @@ describe('getWallet / takeFiado', () => {
 });
 
 describe('getLeaderboard', () => {
-  it('só quem jogou, na ordem do placar, com nome e foto do diretório', async () => {
-    mockResult = {
+  it('placar do banco (carteira + fichas na mesa), com nome e foto do diretório', async () => {
+    mockRpc.mockResolvedValue({
       data: [
         { user_id: 'u2', balance: 2000, fiado_count: 0 },
         { user_id: 'u1', balance: 2000, fiado_count: 1 },
         { user_id: 'saiu', balance: 50, fiado_count: 3 },
       ],
       error: null,
-    };
+    });
     const rows = await getLeaderboard();
+    expect(mockRpc).toHaveBeenCalledWith('games_board');
     expect(rows.map((r) => [r.name, r.balance, r.fiadoCount])).toEqual([
       ['Teteu', 2000, 0],
       ['Bia', 2000, 1],
       ['Alguém', 50, 3],
     ]);
     expect(rows[1].avatarUrl).toBe('https://signed/a.jpg');
-    expect(mockCalls.filter((c) => c.op !== 'select').map((c) => [c.op, ...c.args])).toEqual([
-      ['not', 'last_played_at', 'is', null],
-      ['order', 'balance', { ascending: false }],
-      ['order', 'fiado_count', { ascending: true }],
-      ['order', 'last_played_at', { ascending: true }],
-    ]);
   });
 
   it('erro do banco sobe', async () => {
-    mockResult = { data: null, error: { message: 'boom' } };
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
     await expect(getLeaderboard()).rejects.toEqual({ message: 'boom' });
+  });
+});
+
+describe('carteira sentada e mesa de poker', () => {
+  it('fichas na mesa vêm na carteira; fiado sentado vira frase', async () => {
+    mockRpc.mockResolvedValue({ data: { ...ROW, seated_stack: 300 }, error: null });
+    expect((await getWallet()).seatedStack).toBe(300);
+    expect(gamesErrorMessage({ message: 'fiado_seated' })).toBe('Levanta da mesa de poker pra pegar fiado');
+  });
+
+  it('quantos na mesa e se eu estou nela', async () => {
+    mockResult = { data: { state: { seats: [{ user_id: 'u1' }, { user_id: 'me' }] } }, error: null };
+    await expect(getPokerTable('me')).resolves.toEqual({ count: 2, seated: true });
+    await expect(getPokerTable('u9')).resolves.toEqual({ count: 2, seated: false });
+    expect(mockCalls.find((c) => c.table === 'poker_tables' && c.op === 'eq')?.args).toEqual(['id', 1]);
+    mockResult = { data: null, error: null };
+    await expect(getPokerTable('me')).resolves.toEqual({ count: 0, seated: false });
   });
 });
 

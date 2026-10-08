@@ -65,6 +65,7 @@ export function cardBack(): HTMLCanvasElement {
 }
 
 export const CHIP_COLORS: Record<number, { fill: string; edge: string; text: string }> = {
+  5: { fill: '#1f9e8f', edge: '#FFFFFF', text: '#FFFFFF' },
   10: { fill: '#ECE9E2', edge: '#2b6cb0', text: INK },
   50: { fill: '#d6363b', edge: '#FFFFFF', text: '#FFFFFF' },
   100: { fill: '#161616', edge: '#F2D27A', text: '#F2D27A' },

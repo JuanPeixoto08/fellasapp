@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GameError } from '../shared/errors';
 import type { RoundState, Wallet } from '../shared/types';
-import { canAct, createEpoch, initial, reduce, type MachineEvent, type MachineState } from './machine';
+import { canAct, createEpoch, initial, reduce, WEEK_TURNED, type MachineEvent, type MachineState } from './machine';
 
 const wallet = (extra: Partial<Wallet> = {}): Wallet => ({
   balance: 1000,
@@ -28,6 +28,14 @@ const round = (extra: Partial<RoundState> = {}): RoundState => ({
 const run = (...events: MachineEvent[]) => events.reduce<MachineState>(reduce, initial);
 
 describe('machine', () => {
+  it('semana virou com mão aberta na semana nova: mostra a mão (M1)', () => {
+    const s = run(
+      { type: 'loaded', wallet: wallet(), round: null },
+      { type: 'loaded', wallet: wallet({ week_start: '2026-10-12', open_round_id: 'r1' }), round: round() },
+    );
+    expect(s).toMatchObject({ phase: 'playing', round: { id: 'r1' }, notice: WEEK_TURNED, weekStart: '2026-10-12' });
+  });
+
   it('abre apostando, ou na mão aberta', () => {
     expect(run({ type: 'loaded', wallet: wallet(), round: null })).toMatchObject({ phase: 'betting', weekStart: '2026-10-05' });
     expect(run({ type: 'loaded', wallet: wallet({ open_round_id: 'r1' }), round: round() }).phase).toBe('playing');

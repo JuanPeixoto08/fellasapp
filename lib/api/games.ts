@@ -7,7 +7,16 @@ import { supabase } from '../supabase';
  * Fellas Games no app: saldo da semana, fiado, placar e o campeão da semana passada (0027).
  * Quem mexe nos créditos é o banco; aqui só se lê e se pede o fiado. Nome e foto vêm do diretório de membros.
  */
-export type Wallet = { balance: number; fiadoCount: number; canFiado: boolean; openRoundId: string | null; weekStart: string };
+export type Wallet = {
+  balance: number;
+  fiadoCount: number;
+  canFiado: boolean;
+  openRoundId: string | null;
+  weekStart: string;
+  /** Fichas na mesa de poker (null = não está sentado). */
+  seatedStack: number | null;
+};
+export type PokerTable = { count: number; seated: boolean };
 export type LeaderRow = {
   userId: string;
   name: string;
@@ -25,8 +34,15 @@ export type Champion = {
   weekStart: string;
 };
 
-type WalletRow = { balance: number; fiado_count: number; can_fiado: boolean; open_round_id: string | null; week_start: string };
-type BoardRow = Pick<Database['public']['Tables']['game_wallets']['Row'], 'user_id' | 'balance' | 'fiado_count'>;
+type WalletRow = {
+  balance: number;
+  fiado_count: number;
+  can_fiado: boolean;
+  open_round_id: string | null;
+  week_start: string;
+  seated_stack?: number | null;
+};
+type BoardRow = { user_id: string; balance: number; fiado_count: number };
 type WeekRow = Database['public']['Tables']['game_weeks']['Row'];
 
 /** Aposta mínima da mesa: abaixo disso não dá pra jogar (e o fiado libera). */
@@ -36,6 +52,7 @@ export const GAMES_ERRORS = {
   load: 'Não deu pra carregar o placar. Tenta de novo.',
   fiado: 'Não deu pra pegar o fiado. Tenta de novo.',
   fiadoToday: 'Fiado de hoje já foi. Volta amanhã.',
+  fiadoSeated: 'Levanta da mesa de poker pra pegar fiado',
 };
 
 const toWallet = (w: WalletRow): Wallet => ({
@@ -44,6 +61,7 @@ const toWallet = (w: WalletRow): Wallet => ({
   canFiado: w.can_fiado,
   openRoundId: w.open_round_id,
   weekStart: w.week_start,
+  seatedStack: w.seated_stack ?? null,
 });
 
 function who(id: string) {
@@ -78,15 +96,9 @@ export async function takeFiado(): Promise<Wallet> {
   return toWallet(data as WalletRow);
 }
 
-/** Só quem jogou na semana: saldo maior primeiro; empate, menos fiado; depois quem chegou primeiro. */
+/** Placar da semana pelo banco: carteira + fichas na mesa de poker; só quem jogou; ordem do placar. */
 export async function getLeaderboard(): Promise<LeaderRow[]> {
-  const { data, error } = await supabase
-    .from('game_wallets')
-    .select('user_id, balance, fiado_count')
-    .not('last_played_at', 'is', null)
-    .order('balance', { ascending: false })
-    .order('fiado_count', { ascending: true })
-    .order('last_played_at', { ascending: true });
+  const { data, error } = await supabase.rpc('games_board');
   if (error) throw error;
   return ((data ?? []) as BoardRow[]).map((r) => ({
     userId: r.user_id,
@@ -94,6 +106,14 @@ export async function getLeaderboard(): Promise<LeaderRow[]> {
     fiadoCount: r.fiado_count,
     ...who(r.user_id),
   }));
+}
+
+/** Quantos estão sentados na mesa de poker agora e se eu sou um deles (retrato público da mesa, 0030). */
+export async function getPokerTable(me: string | null): Promise<PokerTable> {
+  const { data, error } = await supabase.from('poker_tables').select('state').eq('id', 1).maybeSingle();
+  if (error) throw error;
+  const seats = (data?.state as { seats?: { user_id: string }[] } | null)?.seats ?? [];
+  return { count: seats.length, seated: !!me && seats.some((s) => s.user_id === me) };
 }
 
 /** Campeão da última semana fechada (null na primeira semana ou se ninguém jogou). */
@@ -114,6 +134,7 @@ export async function getLastChampion(): Promise<Champion | null> {
 export function gamesErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? '';
   if (msg.includes('fiado_today')) return GAMES_ERRORS.fiadoToday;
+  if (msg.includes('fiado_seated')) return GAMES_ERRORS.fiadoSeated;
   if (msg.includes('fiado')) return GAMES_ERRORS.fiado;
   return GAMES_ERRORS.load;
 }

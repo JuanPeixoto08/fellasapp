@@ -76,6 +76,24 @@ export type Database = {
         Update: { [_ in never]: never };
         Relationships: [];
       };
+      poker_tables: {
+        Row: {
+          id: number;
+          small_blind: number;
+          big_blind: number;
+          min_buyin: number;
+          max_buyin: number;
+          seq: number;
+          hand_no: number;
+          last_bb_seat: number | null;
+          next_hand_at: string | null;
+          state: Json;
+          updated_at: string;
+        };
+        Insert: { [_ in never]: never };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
       idea_votes: {
         Row: {
           idea_id: string;
@@ -474,6 +492,10 @@ export type Database = {
         Returns: { key: string; name: string; posts: number }[];
       };
       games_wallet: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      games_board: {
         Args: Record<string, never>;
         Returns: Json;
       };
