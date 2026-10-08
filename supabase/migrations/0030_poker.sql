@@ -666,11 +666,12 @@ begin
         raise exception 'invalid_action' using errcode = 'P0001';
       end if;
       if v_to < v_bet + v_stack then
-        if v_to % 5 <> 0 then
-          raise exception 'invalid_action' using errcode = 'P0001';
-        end if;
         if v_to < h.current_bet + greatest(h.last_raise, v_bb) then
           raise exception 'raise_too_small' using errcode = 'P0001';
+        end if;
+        -- de 5 em 5; o mínimo exato e o tudo valem mesmo quebrados (empate com ficha sobrando deixa fichas fora do passo)
+        if v_to % 5 <> 0 and v_to <> h.current_bet + greatest(h.last_raise, v_bb) then
+          raise exception 'invalid_action' using errcode = 'P0001';
         end if;
       end if;
       perform public.poker_put(p_hand, p_seat, v_to - v_bet);
@@ -1090,6 +1091,95 @@ revoke all on function public.poker_tick() from public, anon;
 grant execute on function public.poker_tick() to authenticated;
 
 select cron.schedule('fellas-poker-tick', '* * * * *', $$select public.poker_tick()$$);
+
+-- ===== Semana (M2) =====
+-- gancho do reset: a mão de poker aberta é anulada (cada um recebe o que pôs), todo mundo levanta sem anti-rathole,
+-- e o Blackjack aberto fecha como na 0028
+create or replace function public.games_close_open_rounds()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  h      public.poker_hands;
+  e      record;
+  v_id   uuid;
+  v_seat smallint;
+  v_user uuid;
+  v_back int;
+begin
+  select * into h from public.poker_hands where status = 'betting';
+  if h.id is not null then
+    for e in select key, value from jsonb_each(h.players) loop
+      v_user := (e.value ->> 'user_id')::uuid;
+      v_back := (e.value ->> 'total')::int;
+      continue when v_back = 0;
+      update public.poker_seats set stack = stack + v_back where seat = e.key::smallint and user_id = v_user;
+      if not found then
+        -- já tinha levantado (ausente de 10 min que tinha corrido): volta direto para a carteira
+        perform public.games_ensure_wallet(v_user);
+        perform public.games_move(v_user, v_back, 'cashout');
+      end if;
+    end loop;
+    update public.poker_hands set status = 'void', to_act = null, deadline = null, ended_at = now() where id = h.id;
+  end if;
+  delete from public.poker_secrets;
+  for v_seat in select seat from public.poker_seats loop
+    perform public.poker_stand(v_seat, false);
+  end loop;
+  delete from public.poker_leaves;
+  update public.poker_tables set next_hand_at = null where id = 1;
+  perform public.poker_snapshot();
+
+  for v_id in select id from public.bj_rounds where status = 'playing' loop
+    perform public.bj_force_finish(v_id);
+  end loop;
+end;
+$$;
+
+-- segunda 00:00 (Brasília): trava a mesa e as carteiras antes de tudo (aposta à meia-noite fica inteira numa
+-- semana), fecha mãos, grava pódio (carteira + fichas, que já voltaram), passa o troféu, volta todo mundo pra 1.000
+create or replace function public.games_weekly_reset()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_new    date := public.games_week_start();
+  v_old    date;
+  v_podium jsonb;
+  v_champ  uuid;
+begin
+  perform 1 from public.poker_tables where id = 1 for update;
+  perform 1 from public.game_wallets where week_start < v_new for update;
+  -- só quem ficou na semana velha: quem criou a carteira já na semana nova (antes do cron) não conta nem zera
+  select max(week_start) into v_old from public.game_wallets where week_start < v_new;
+  if v_old is null then
+    return;
+  end if;
+
+  perform public.games_close_open_rounds();
+
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', user_id, 'balance', balance, 'fiado_count', fiado_count)
+                            order by balance desc, fiado_count asc, last_played_at asc), '[]')
+    into v_podium
+    from (select * from public.game_wallets
+           where last_played_at is not null and week_start < v_new
+           order by balance desc, fiado_count asc, last_played_at asc
+           limit 3) top;
+  v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
+
+  insert into public.game_weeks (week_start, champion_id, podium)
+  values (v_old, v_champ, v_podium)
+  on conflict (week_start) do nothing;
+
+  update public.profiles set badges = array_remove(badges, 'weekly_champion') where 'weekly_champion' = any (badges);
+  if v_champ is not null then
+    update public.profiles set badges = array_append(badges, 'weekly_champion') where id = v_champ;
+  end if;
+
+  insert into public.game_ledger (user_id, delta, reason)
+  select user_id, 1000 - balance, 'reset' from public.game_wallets where balance <> 1000 and week_start < v_new;
+  update public.game_wallets
+     set balance = 1000, week_start = v_new, fiado_count = 0, last_fiado_on = null,
+         last_played_at = null, updated_at = now()
+   where week_start < v_new;
+end;
+$$;
 
 -- primeiro retrato (a mesa vazia)
 select public.poker_snapshot();

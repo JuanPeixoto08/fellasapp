@@ -57,6 +57,17 @@ describe('apostas', () => {
     expect(s.hand).toMatchObject({ current_bet: 50, min_raise_to: 70, to_act: 2 });
   });
 
+  it('aumento mínimo quebrado (fichas fora do passo de 5, depois de empate com ficha sobrando) vale', async () => {
+    await startHand(t, { 0: 300, 1: 300, 2: 33 }, 2);
+    await act(t, 0, 'call');
+    await act(t, 1, 'call');
+    let s = await act(t, 2, 'allin'); // vai a 33: aumento completo de 23
+    expect(s.hand).toMatchObject({ current_bet: 33, min_raise_to: 56, to_act: 0 });
+    await expect(act(t, 0, 'raise', 57)).rejects.toThrow(/invalid_action/); // fora do passo e não é o mínimo
+    s = await act(t, 0, 'raise', 56);
+    expect(s.hand).toMatchObject({ current_bet: 56 });
+  });
+
   it('all-in curto não reabre a ação para quem já falou', async () => {
     await startHand(t, { 0: 300, 1: 300, 2: 60 }, 2);
     await act(t, 0, 'raise', 40);
