@@ -6,7 +6,11 @@ export default defineConfig({
   base: '/games/',
   envPrefix: 'EXPO_PUBLIC_', // mesmos segredos do build do app
   envDir: resolve(__dirname, '..'), // lê o .env da raiz no dev
+  // dev: o ?mock lê as migrações em ../supabase; o PGlite (wasm) não passa pelo pré-empacotamento
+  server: { fs: { allow: ['..'] } },
+  optimizeDeps: { exclude: ['@electric-sql/pglite'] },
   build: {
+    target: 'es2022',
     outDir: resolve(__dirname, '../dist/games'),
     emptyOutDir: false, // o dist/ é do Expo: nunca apagar
     rollupOptions: { input: { blackjack: resolve(__dirname, 'blackjack/index.html') } },

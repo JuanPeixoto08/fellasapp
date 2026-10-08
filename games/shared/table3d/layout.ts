@@ -16,26 +16,31 @@ export function orientationOf(w: number, h: number): Orientation {
 }
 
 const ROWS: Record<Orientation, Record<Who, number>> = {
-  portrait: { dealer: -2.2, player: 1.6 },
-  landscape: { dealer: -2.05, player: 1.3 },
+  portrait: { dealer: -2.7, player: 1.15 },
+  landscape: { dealer: -2.55, player: 1.2 },
 };
-const SPLIT_X: Record<Orientation, number> = { portrait: 1.6, landscape: 1.8 };
+const SPLIT_X: Record<Orientation, number> = { portrait: 1.2, landscape: 1.8 };
+/** Celular em pé com duas mãos: leque mais apertado para as duas caberem na largura. */
+const SPLIT_STEP_PORTRAIT = 0.42;
 
 /** i-ésima carta da mão `hand` (de `hands` mãos) de quem joga. */
 export function cardSlot(o: Orientation, who: Who, hand: number, hands: number, i: number): Slot {
-  const center = who === 'player' && hands === 2 ? (hand === 0 ? -SPLIT_X[o] : SPLIT_X[o]) : 0;
-  return { x: center + (i - 0.5) * FAN_STEP, y: 0.02 + i * (CARD_T + 0.004), z: ROWS[o][who] };
+  const split = who === 'player' && hands === 2;
+  const center = split ? (hand === 0 ? -SPLIT_X[o] : SPLIT_X[o]) : 0;
+  const step = split && o === 'portrait' ? SPLIT_STEP_PORTRAIT : FAN_STEP;
+  return { x: center + (i - 0.5) * step, y: 0.02 + i * (CARD_T + 0.004), z: ROWS[o][who] };
 }
 
 /** Ponto embaixo da mão onde a plaquinha do total fica presa. */
 export function tagPoint(o: Orientation, who: Who, hand: number, hands: number): Slot {
-  const first = cardSlot(o, who, hand, hands, 0);
-  return { x: first.x + FAN_STEP / 2, y: 0, z: first.z + CARD_D / 2 + 0.3 };
+  const a = cardSlot(o, who, hand, hands, 0);
+  const b = cardSlot(o, who, hand, hands, 1);
+  return { x: (a.x + b.x) / 2, y: 0, z: a.z + CARD_D / 2 + 0.3 };
 }
 
 export const SHOE: Record<Orientation, Slot> = {
-  portrait: { x: 2.9, y: 0.3, z: -3.3 },
-  landscape: { x: 3.6, y: 0.3, z: -2.6 },
+  portrait: { x: 2.6, y: 0.3, z: -3.6 },
+  landscape: { x: 3.6, y: 0.3, z: -3.1 },
 };
 export const POT: Record<Orientation, Slot> = {
   portrait: { x: 0, y: 0, z: -0.25 },
@@ -44,6 +49,6 @@ export const POT: Record<Orientation, Slot> = {
 
 export function camera(o: Orientation): { fov: number; pos: [number, number, number]; look: [number, number, number] } {
   return o === 'portrait'
-    ? { fov: 50, pos: [0, 9.5, 6.5], look: [0, 0, -0.2] }
+    ? { fov: 50, pos: [0, 7.4, 5.0], look: [0, 0, -0.75] }
     : { fov: 40, pos: [0, 6.4, 6.2], look: [0, 0, -0.35] };
 }

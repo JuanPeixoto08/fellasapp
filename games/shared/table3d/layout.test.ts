@@ -28,6 +28,13 @@ describe('cardSlot', () => {
     expect(b.y).toBeGreaterThan(a.y); // a de cima fica por cima
   });
 
+  it('celular em pé com duas mãos: cabem na largura (leque mais apertado, índice ainda à mostra)', () => {
+    const leftEdge = cardSlot('portrait', 'player', 0, 2, 0).x - CARD_W / 2;
+    expect(leftEdge).toBeGreaterThan(-2);
+    const step = cardSlot('portrait', 'player', 0, 2, 1).x - cardSlot('portrait', 'player', 0, 2, 0).x;
+    expect(step).toBeGreaterThanOrEqual(0.4);
+  });
+
   it('duas mãos (dividiu): uma de cada lado, sem se encostar mesmo com 4 cartas', () => {
     for (const o of ['portrait', 'landscape'] as const) {
       const leftEnd = cardSlot(o, 'player', 0, 2, 3).x + CARD_W / 2;
