@@ -295,10 +295,86 @@ begin
 end;
 $$;
 
--- começa uma mão se der (Task 3 troca este corpo pelo de verdade)
+-- começa uma mão se der: sem mão aberta, mesa aberta, pausa vencida e 2+ prontos
 create or replace function public.poker_maybe_start()
 returns void language plpgsql security definer set search_path = public as $$
+declare
+  t       public.poker_tables;
+  v_ready smallint[];
+  v_wait  smallint[];
+  v_bb    smallint;
+  v_sb    smallint;
+  v_btn   smallint;
+  v_cur   smallint;
+  v_deck  smallint[];
+  v_holes jsonb := '{}';
+  v_pl    jsonb := '{}';
+  v_hand  uuid;
+  i       int;
 begin
+  select * into t from public.poker_tables where id = 1;
+  if exists (select 1 from public.poker_hands where status = 'betting')
+     or public.poker_closed(now())
+     or (t.next_hand_at is not null and t.next_hand_at > now()) then
+    return;
+  end if;
+
+  select coalesce(array_agg(seat order by seat) filter (where not wait_bb), '{}'),
+         coalesce(array_agg(seat order by seat) filter (where wait_bb), '{}')
+    into v_ready, v_wait
+    from public.poker_seats
+   where status = 'playing' and stack > 0 and not leaving;
+  -- mesa parada: quem espera a cega grande entra já
+  if cardinality(v_ready) < 2 then
+    v_ready := array(select s from unnest(v_ready || v_wait) s order by s);
+    v_wait := '{}';
+  end if;
+  if cardinality(v_ready) < 2 then
+    return;
+  end if;
+  -- a cega grande anda para o próximo depois da última; quem espera e cai nela entra pagando
+  v_bb := public.poker_next(t.last_bb_seat, array(select s from unnest(v_ready || v_wait) s order by s));
+  if v_bb = any (v_wait) then
+    v_ready := array(select s from unnest(v_ready || v_bb) s order by s);
+  end if;
+  if cardinality(v_ready) = 2 then
+    v_sb := public.poker_next(v_bb, v_ready); -- heads-up: o botão é a cega pequena
+    v_btn := v_sb;
+  else
+    v_sb := public.poker_prev(v_bb, v_ready);
+    v_btn := public.poker_prev(v_sb, v_ready);
+  end if;
+
+  -- 2 cartas para cada um, a partir do primeiro à esquerda do botão
+  v_deck := public.poker_shuffle();
+  v_cur := v_btn;
+  for i in 1 .. cardinality(v_ready) loop
+    v_cur := public.poker_next(v_cur, v_ready);
+    v_holes := v_holes || jsonb_build_object(v_cur::text, jsonb_build_array(v_deck[2 * i - 1], v_deck[2 * i]));
+    v_pl := v_pl || jsonb_build_object(v_cur::text, jsonb_build_object(
+      'user_id', (select user_id from public.poker_seats where seat = v_cur),
+      'bet', 0, 'total', 0, 'folded', false, 'all_in', false, 'acted', false, 'capped', false,
+      'last', null, 'timed_out', false));
+  end loop;
+
+  delete from public.poker_secrets; -- cartas da mão anterior: o "Mostrar" acabou
+  insert into public.poker_hands (hand_no, button, sb_seat, bb_seat, players, current_bet, last_raise, to_act)
+  values (t.hand_no + 1, v_btn, v_sb, v_bb, v_pl, 0, t.big_blind, v_bb)
+  returning id into v_hand;
+  insert into public.poker_secrets (hand_id, deck, holes) values (v_hand, v_deck, v_holes);
+  update public.poker_seats set wait_bb = false where seat = any (v_ready);
+  update public.poker_tables set hand_no = hand_no + 1, last_bb_seat = v_bb, next_hand_at = null where id = 1;
+  update public.game_wallets set last_played_at = now()
+   where user_id in (select user_id from public.poker_seats where seat = any (v_ready));
+
+  -- cegas (quem não tem o bastante fica all-in com o que tem)
+  perform public.poker_put(v_hand, v_sb, least(t.small_blind, (select stack from public.poker_seats where seat = v_sb)));
+  perform public.poker_put(v_hand, v_bb, least(t.big_blind, (select stack from public.poker_seats where seat = v_bb)));
+  perform public.poker_patch(v_hand, v_sb, '{"last": "sb"}');
+  perform public.poker_patch(v_hand, v_bb, '{"last": "bb"}');
+  update public.poker_hands set current_bet = t.big_blind where id = v_hand;
+  -- a vez: o primeiro depois da cega grande (advance acha e joga sozinho por ausente/saindo)
+  perform public.poker_advance(v_hand);
 end;
 $$;
 
@@ -535,6 +611,414 @@ grant execute on function public.poker_leave() to authenticated;
 grant execute on function public.poker_back() to authenticated;
 grant execute on function public.poker_rebuy(int) to authenticated;
 grant execute on function public.games_board() to authenticated;
+
+-- ===== Mão =====
+-- aplica uma jogada de quem está na vez (já conferido por quem chama: dono do lugar ou relógio)
+create or replace function public.poker_apply(p_hand uuid, p_seat smallint, p_action text, p_amount int default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  h       public.poker_hands;
+  p       jsonb;
+  v_bb    int := (select big_blind from public.poker_tables where id = 1);
+  v_bet   int;
+  v_stack int;
+  v_call  int;
+  v_to    int;
+begin
+  select * into h from public.poker_hands where id = p_hand;
+  if h.status <> 'betting' or h.to_act is distinct from p_seat then
+    raise exception 'not_your_turn' using errcode = 'P0001';
+  end if;
+  p := h.players -> p_seat::text;
+  v_bet := (p ->> 'bet')::int;
+  select stack into v_stack from public.poker_seats where seat = p_seat;
+  v_stack := coalesce(v_stack, 0);
+  v_call := least(greatest(h.current_bet - v_bet, 0), v_stack);
+
+  if p_action = 'fold' then
+    perform public.poker_patch(p_hand, p_seat, '{"folded": true, "acted": true, "last": "fold"}');
+  elsif p_action = 'check' then
+    if v_bet < h.current_bet then
+      raise exception 'invalid_action' using errcode = 'P0001';
+    end if;
+    perform public.poker_patch(p_hand, p_seat, '{"acted": true, "last": "check"}');
+  elsif p_action = 'call' then
+    if v_bet >= h.current_bet then
+      raise exception 'invalid_action' using errcode = 'P0001';
+    end if;
+    perform public.poker_put(p_hand, p_seat, v_call);
+    perform public.poker_patch(p_hand, p_seat, jsonb_build_object('acted', true,
+      'last', case when v_call = v_stack then 'allin' else 'call' end));
+  elsif p_action in ('raise', 'allin') then
+    v_to := case when p_action = 'allin' then v_bet + v_stack else p_amount end;
+    if v_to is null or v_to > v_bet + v_stack then
+      raise exception 'raise_too_big' using errcode = 'P0001';
+    end if;
+    if v_to <= h.current_bet then
+      -- all-in que não cobre a aposta é um pagar
+      if p_action <> 'allin' then
+        raise exception 'raise_too_small' using errcode = 'P0001';
+      end if;
+      perform public.poker_put(p_hand, p_seat, v_stack);
+      perform public.poker_patch(p_hand, p_seat, '{"acted": true, "last": "allin"}');
+    else
+      if (p ->> 'capped')::boolean then
+        raise exception 'invalid_action' using errcode = 'P0001';
+      end if;
+      if v_to < v_bet + v_stack then
+        if v_to % 5 <> 0 then
+          raise exception 'invalid_action' using errcode = 'P0001';
+        end if;
+        if v_to < h.current_bet + greatest(h.last_raise, v_bb) then
+          raise exception 'raise_too_small' using errcode = 'P0001';
+        end if;
+      end if;
+      perform public.poker_put(p_hand, p_seat, v_to - v_bet);
+      if v_to - h.current_bet >= greatest(h.last_raise, v_bb) then
+        -- aumento completo: todo mundo volta a falar, podendo aumentar
+        update public.poker_hands
+           set last_raise = v_to - h.current_bet, current_bet = v_to,
+               players = (select jsonb_object_agg(e.key, case when e.key = p_seat::text then e.value
+                                                              else e.value || '{"acted": false, "capped": false}' end)
+                            from jsonb_each(players) e)
+         where id = p_hand;
+      else
+        -- all-in curto: quem já tinha falado só paga ou corre
+        update public.poker_hands
+           set current_bet = v_to,
+               players = (select jsonb_object_agg(e.key, case when e.key <> p_seat::text and (e.value ->> 'acted')::boolean
+                                                              then e.value || '{"acted": false, "capped": true}'
+                                                              else e.value end)
+                            from jsonb_each(players) e)
+         where id = p_hand;
+      end if;
+      perform public.poker_patch(p_hand, p_seat, jsonb_build_object('acted', true,
+        'last', case when v_to = v_bet + v_stack then 'allin' else 'raise' end));
+    end if;
+  else
+    raise exception 'invalid_action' using errcode = 'P0001';
+  end if;
+  update public.poker_hands set action_no = action_no + 1 where id = p_hand;
+end;
+$$;
+
+-- anda a mão: próxima vez, próxima rua, mesa revelada no all-in, ou fim
+create or replace function public.poker_advance(p_hand uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  h      public.poker_hands;
+  sec    public.poker_secrets;
+  s      public.poker_seats;
+  p      jsonb;
+  v_bb   int := (select big_blind from public.poker_tables where id = 1);
+  v_live int;
+  v_can  smallint[];
+  v_need smallint[];
+  v_next smallint;
+  v_n    int;
+begin
+  loop
+    select * into h from public.poker_hands where id = p_hand;
+    exit when h.status <> 'betting';
+    select count(*) filter (where not (e.value ->> 'folded')::boolean),
+           coalesce(array_agg(e.key::smallint order by e.key::smallint)
+                    filter (where not (e.value ->> 'folded')::boolean and not (e.value ->> 'all_in')::boolean), '{}'),
+           coalesce(array_agg(e.key::smallint order by e.key::smallint)
+                    filter (where not (e.value ->> 'folded')::boolean and not (e.value ->> 'all_in')::boolean
+                              and (not (e.value ->> 'acted')::boolean or (e.value ->> 'bet')::int < h.current_bet)), '{}')
+      into v_live, v_can, v_need
+      from jsonb_each(h.players) e;
+
+    if v_live <= 1 then
+      perform public.poker_finish(p_hand);
+      return;
+    end if;
+    -- só um ainda pode apostar e já cobriu: não tem contra quem
+    if cardinality(v_can) = 1 and (h.players -> v_can[1]::text ->> 'bet')::int >= h.current_bet then
+      v_need := '{}';
+    end if;
+
+    if cardinality(v_need) > 0 then
+      v_next := public.poker_next(h.to_act, v_need);
+      update public.poker_hands set to_act = v_next, deadline = now() + interval '30 seconds' where id = p_hand;
+      select * into s from public.poker_seats where seat = v_next;
+      p := h.players -> v_next::text;
+      -- ausente, saindo ou o lugar já não é dele: joga na hora (ausente: mesa se pode; saindo: corre)
+      if s.user_id is distinct from (p ->> 'user_id')::uuid or s.leaving or s.status = 'away' then
+        perform public.poker_apply(p_hand, v_next,
+          case when s.user_id = (p ->> 'user_id')::uuid and not s.leaving
+                    and (p ->> 'bet')::int >= h.current_bet then 'check' else 'fold' end);
+        continue;
+      end if;
+      return;
+    end if;
+
+    -- rodada fechada
+    v_n := (select count(*) from jsonb_object_keys(h.players));
+    select * into sec from public.poker_secrets where hand_id = p_hand;
+    if h.street = 'river' then
+      update public.poker_hands set street = 'showdown' where id = p_hand;
+      perform public.poker_finish(p_hand);
+      return;
+    end if;
+    if cardinality(v_can) <= 1 then
+      -- ninguém mais aposta: abre o resto da mesa de uma vez (a tela solta com pausa)
+      update public.poker_hands
+         set board = sec.deck[2 * v_n + 1 : 2 * v_n + 5], runout = cardinality(board) < 5, street = 'showdown'
+       where id = p_hand;
+      perform public.poker_finish(p_hand);
+      return;
+    end if;
+    update public.poker_hands
+       set street = case street when 'preflop' then 'flop' when 'flop' then 'turn' else 'river' end,
+           board = sec.deck[2 * v_n + 1 : 2 * v_n + (case street when 'preflop' then 3 when 'flop' then 4 else 5 end)],
+           players = (select jsonb_object_agg(e.key, e.value || jsonb_build_object('bet', 0, 'acted', false, 'capped', false,
+                        'last', case when (e.value ->> 'folded')::boolean then 'fold'
+                                     when (e.value ->> 'all_in')::boolean then 'allin' end))
+                        from jsonb_each(players) e),
+           current_bet = 0, last_raise = v_bb, to_act = button, deadline = null
+     where id = p_hand;
+  end loop;
+end;
+$$;
+
+-- fim: devolve a aposta não paga, mostra quem chegou, monta os potes, paga e marca a próxima mão
+create or replace function public.poker_finish(p_hand uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  h        public.poker_hands;
+  sec      public.poker_secrets;
+  v_top    text;
+  v_refund int;
+  v_live   smallint[];
+  v_show   boolean;
+  v_ranks  jsonb := '{}';
+  v_names  jsonb := '{}';
+  v_lvl    int;
+  v_prev   int := 0;
+  v_amount int;
+  v_total  int;
+  v_elig   smallint[];
+  v_best   int[];
+  v_r      int[];
+  v_win    smallint[];
+  v_share  int;
+  v_pots   jsonb := '[]';
+  v_pay    jsonb := '{}';
+  v_user   uuid;
+  w        smallint;
+  i        int;
+begin
+  select * into h from public.poker_hands where id = p_hand for update;
+  if h.status <> 'betting' then
+    return;
+  end if;
+  select * into sec from public.poker_secrets where hand_id = p_hand;
+
+  -- aposta que ninguém pagou volta para quem apostou (só o maior pode ter sobra)
+  select e.key, (e.value ->> 'total')::int
+           - coalesce((select max((f.value ->> 'total')::int) from jsonb_each(h.players) f where f.key <> e.key), 0)
+    into v_top, v_refund
+    from jsonb_each(h.players) e
+   order by (e.value ->> 'total')::int desc
+   limit 1;
+  if v_refund > 0 then
+    v_user := (h.players -> v_top ->> 'user_id')::uuid;
+    update public.poker_seats set stack = stack + v_refund where seat = v_top::smallint and user_id = v_user;
+    if not found then
+      perform public.games_ensure_wallet(v_user);
+      perform public.games_move(v_user, v_refund, 'cashout');
+    end if;
+    perform public.poker_patch(p_hand, v_top::smallint, jsonb_build_object(
+      'total', (h.players -> v_top ->> 'total')::int - v_refund,
+      'bet', greatest((h.players -> v_top ->> 'bet')::int - v_refund, 0)));
+    select * into h from public.poker_hands where id = p_hand;
+  end if;
+  select coalesce(sum((e.value ->> 'total')::int), 0) into v_total from jsonb_each(h.players) e;
+
+  select coalesce(array_agg(e.key::smallint order by e.key::smallint), '{}') into v_live
+    from jsonb_each(h.players) e where not (e.value ->> 'folded')::boolean;
+  v_show := cardinality(v_live) > 1;
+  if v_show then
+    foreach w in array v_live loop
+      v_r := public.poker_rank(h.board || array(select x::smallint from jsonb_array_elements_text(sec.holes -> w::text) x));
+      v_ranks := v_ranks || jsonb_build_object(w::text, to_jsonb(v_r));
+      v_names := v_names || jsonb_build_object(w::text, public.poker_rank_name(v_r));
+      h.shown := h.shown || jsonb_build_object(w::text, sec.holes -> w::text);
+    end loop;
+  end if;
+
+  -- um pote por nível de contribuição de quem chegou; cada um disputado por quem pôs até ali
+  for v_lvl in select distinct (e.value ->> 'total')::int from jsonb_each(h.players) e
+                where not (e.value ->> 'folded')::boolean order by 1 loop
+    select coalesce(sum(least((e.value ->> 'total')::int, v_lvl) - least((e.value ->> 'total')::int, v_prev)), 0)
+      into v_amount from jsonb_each(h.players) e;
+    v_elig := array(select x from unnest(v_live) x where (h.players -> x::text ->> 'total')::int >= v_lvl order by x);
+    v_prev := v_lvl;
+    continue when v_amount = 0;
+    if v_show then
+      v_best := null;
+      v_win := '{}';
+      foreach w in array v_elig loop
+        v_r := array(select x::int from jsonb_array_elements_text(v_ranks -> w::text) with ordinality a(x, n) order by n);
+        if v_best is null or v_r > v_best then
+          v_best := v_r;
+          v_win := array[w];
+        elsif v_r = v_best then
+          v_win := v_win || w;
+        end if;
+      end loop;
+    else
+      v_win := v_elig;
+    end if;
+    -- a ficha que sobra vai para o primeiro vencedor à esquerda do botão
+    v_win := array(select x from unnest(v_win) x order by (x - h.button + 5) % 6);
+    v_share := v_amount / cardinality(v_win);
+    for i in 1 .. cardinality(v_win) loop
+      v_pay := v_pay || jsonb_build_object(v_win[i]::text,
+        coalesce((v_pay ->> v_win[i]::text)::int, 0) + v_share
+        + case when i = 1 then v_amount - v_share * cardinality(v_win) else 0 end);
+    end loop;
+    v_pots := v_pots || jsonb_build_array(jsonb_build_object('amount', v_amount, 'winners', to_jsonb(v_win),
+      'name', case when v_show then public.poker_rank_name(v_best) end));
+  end loop;
+  -- trava de segurança: nada some (sobra, se houver, vai para o primeiro vencedor do último pote)
+  v_amount := v_total - coalesce((select sum(value::int) from jsonb_each_text(v_pay)), 0);
+  if v_amount > 0 then
+    v_pay := v_pay || jsonb_build_object(v_win[1]::text, (v_pay ->> v_win[1]::text)::int + v_amount);
+  end if;
+
+  for w in select x::smallint from jsonb_object_keys(v_pay) x loop
+    v_user := (h.players -> w::text ->> 'user_id')::uuid;
+    update public.poker_seats set stack = stack + (v_pay ->> w::text)::int where seat = w and user_id = v_user;
+    if not found then
+      perform public.games_ensure_wallet(v_user);
+      perform public.games_move(v_user, (v_pay ->> w::text)::int, 'cashout');
+    end if;
+  end loop;
+
+  update public.poker_hands
+     set status = 'done', street = case when v_show then 'showdown' else street end, to_act = null, deadline = null,
+         ended_at = now(), shown = h.shown,
+         results = jsonb_build_object('showdown', v_show, 'pots', v_pots, 'payouts', v_pay, 'hands', v_names)
+   where id = p_hand;
+  update public.poker_seats set busted_at = now() where stack = 0 and busted_at is null;
+  for w in select seat from public.poker_seats where leaving loop
+    perform public.poker_stand(w, true);
+  end loop;
+  update public.poker_tables
+     set next_hand_at = now() + case when h.runout then interval '8 seconds' else interval '5 seconds' end
+   where id = 1;
+end;
+$$;
+
+-- jogada de quem está na vez; p_action_no = número da mão que a tela viu (diferente: a mesa mudou)
+create or replace function public.poker_act(p_hand uuid, p_action_no int, p_action text, p_amount int default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  h      public.poker_hands;
+  v_seat smallint;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  perform 1 from public.poker_tables where id = 1 for update;
+  select seat into v_seat from public.poker_seats where user_id = auth.uid();
+  if v_seat is null then
+    raise exception 'not_seated' using errcode = 'P0001';
+  end if;
+  select * into h from public.poker_hands where id = p_hand;
+  if h.id is null or h.status <> 'betting' or h.action_no <> p_action_no then
+    raise exception 'stale_seq' using errcode = 'P0001';
+  end if;
+  if h.to_act is distinct from v_seat or (h.players -> v_seat::text ->> 'user_id')::uuid <> auth.uid() then
+    raise exception 'not_your_turn' using errcode = 'P0001';
+  end if;
+  if p_action is null or p_action not in ('fold', 'check', 'call', 'raise', 'allin') then
+    raise exception 'invalid_action' using errcode = 'P0001';
+  end if;
+  perform public.poker_apply(p_hand, v_seat, p_action, p_amount);
+  update public.poker_seats set timeouts = 0 where seat = v_seat;
+  perform public.poker_advance(p_hand);
+  perform public.poker_snapshot();
+  return public.poker_state();
+end;
+$$;
+
+-- mostra as minhas 2 cartas da última mão (correu ou levou sem showdown), até a próxima começar
+create or replace function public.poker_show()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  h       public.poker_hands;
+  v_key   text;
+  v_cards jsonb;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  perform 1 from public.poker_tables where id = 1 for update;
+  select * into h from public.poker_hands order by hand_no desc limit 1;
+  if h.id is null or h.status <> 'done' then
+    raise exception 'nothing_to_show' using errcode = 'P0001';
+  end if;
+  select e.key into v_key from jsonb_each(h.players) e where (e.value ->> 'user_id')::uuid = auth.uid();
+  select holes -> v_key into v_cards from public.poker_secrets where hand_id = h.id;
+  if v_key is null or v_cards is null or h.shown ? v_key then
+    raise exception 'nothing_to_show' using errcode = 'P0001';
+  end if;
+  update public.poker_hands set shown = shown || jsonb_build_object(v_key, v_cards) where id = h.id;
+  perform public.poker_snapshot();
+  return public.poker_state();
+end;
+$$;
+
+-- só as minhas cartas, da mão aberta ou da que acabou de acabar
+create or replace function public.poker_my_cards()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  h     public.poker_hands;
+  v_key text;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  select * into h from public.poker_hands order by hand_no desc limit 1;
+  select e.key into v_key from jsonb_each(h.players) e where (e.value ->> 'user_id')::uuid = auth.uid();
+  if v_key is null then
+    return null;
+  end if;
+  return (select jsonb_build_object('hand_id', h.id, 'cards', s.holes -> v_key)
+            from public.poker_secrets s where s.hand_id = h.id);
+end;
+$$;
+
+-- últimas 20 mãos que acabaram (o que foi público na hora)
+create or replace function public.poker_history()
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', x.id, 'no', x.hand_no, 'board', to_jsonb(x.board), 'results', x.results, 'shown', x.shown,
+             'players', (select jsonb_object_agg(e.key, e.value -> 'user_id') from jsonb_each(x.players) e),
+             'ended_at', x.ended_at) order by x.hand_no desc)
+      from (select * from public.poker_hands where status = 'done' order by hand_no desc limit 20) x), '[]');
+end;
+$$;
+
+revoke all on function public.poker_apply(uuid, smallint, text, int) from public, anon, authenticated;
+revoke all on function public.poker_advance(uuid) from public, anon, authenticated;
+revoke all on function public.poker_finish(uuid) from public, anon, authenticated;
+revoke all on function public.poker_act(uuid, int, text, int) from public, anon;
+revoke all on function public.poker_show() from public, anon;
+revoke all on function public.poker_my_cards() from public, anon;
+revoke all on function public.poker_history() from public, anon;
+grant execute on function public.poker_act(uuid, int, text, int) to authenticated;
+grant execute on function public.poker_show() to authenticated;
+grant execute on function public.poker_my_cards() to authenticated;
+grant execute on function public.poker_history() to authenticated;
 
 -- primeiro retrato (a mesa vazia)
 select public.poker_snapshot();
