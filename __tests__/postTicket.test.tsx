@@ -114,6 +114,31 @@ describe('PostTicket: música', () => {
     await render(<PostTicket media={{ ...track, live: false }} />);
     expect(screen.getByText('Ouvi')).toBeTruthy();
   });
+
+  it('vinil: a capa no envelope e no selo do disco, e o álbum embaixo do artista', async () => {
+    await render(<PostTicket media={track} />);
+    expect(screen.getByTestId('vinyl-sleeve', { includeHiddenElements: true }).props.source).toEqual({ uri: track.image });
+    expect(screen.getByTestId('vinyl-label', { includeHiddenElements: true }).props.source).toEqual({ uri: track.image });
+    expect(screen.getByText('Short n’ Sweet')).toBeTruthy();
+  });
+
+  it('o disco só gira tocando agora', async () => {
+    const { Animated } = require('react-native');
+    const loop = jest.spyOn(Animated, 'loop');
+    await render(<PostTicket media={{ ...track, live: false }} />);
+    expect(loop).not.toHaveBeenCalled();
+    await render(<PostTicket media={track} />);
+    // 3 barrinhas do equalizador + o disco
+    expect(loop).toHaveBeenCalledTimes(4);
+    loop.mockRestore();
+  });
+
+  it('sem capa nem álbum: disco sem foto, só música e artista', async () => {
+    await render(<PostTicket media={{ ...track, image: null, album: null }} />);
+    expect(screen.queryByTestId('vinyl-sleeve', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByText('Espresso')).toBeTruthy();
+    expect(screen.queryByText('Short n’ Sweet')).toBeNull();
+  });
 });
 
 describe('PostCard com ingresso', () => {

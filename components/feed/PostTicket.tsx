@@ -1,9 +1,10 @@
-import { useId, useState, type ReactNode } from 'react';
-import { Linking, Platform, Pressable, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { ClipPath, Defs, Image as SvgImage, Line, Path } from 'react-native-svg';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, Animated, Easing, Image, Linking, Platform, Pressable, View, type LayoutChangeEvent } from 'react-native';
+import Svg, { Circle, ClipPath, Defs, Image as SvgImage, Line, Path } from 'react-native-svg';
 
 import { dayLabel, ratingStars, type PostMedia, type ReviewMedia, type TrackMedia } from '../../lib/postMedia';
 import { useTheme } from '../../lib/theme';
+import { EqualizerBars } from '../music/EqualizerBars';
 import { Icon, IconButton, interactiveStyle, Text } from '../ui';
 
 type Props = {
@@ -39,7 +40,7 @@ function Ticket({
   minHeight: number;
   image: string | null;
   imageLabel: string;
-  fallbackIcon: 'film-outline' | 'musical-notes-outline';
+  fallbackIcon: 'film-outline';
   children: ReactNode;
 }) {
   const t = useTheme();
@@ -249,29 +250,121 @@ function ReviewTicket({ media, interactive }: { media: ReviewMedia; interactive:
   );
 }
 
+/** Gira enquanto `spinning`; parado com "reduzir movimento". */
+function useSpin(spinning: boolean, ms: number) {
+  const turn = useRef(new Animated.Value(0)).current;
+  const [still, setStill] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((reduce) => !cancelled && setStill(!!reduce))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!spinning || still) return;
+    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: ms, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [spinning, still, ms, turn]);
+  return turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+}
+
+/**
+ * A capa do álbum com o disco saindo dela pela direita; o selo do disco é a própria capa.
+ * Tocando agora, o disco gira. Sem capa: fundo `surfaceSunken` com a nota e selo `brand`.
+ */
+function Vinyl({ image, live }: { image: string | null; live: boolean }) {
+  const t = useTheme();
+  const v = t.layout.vinyl;
+  const rotate = useSpin(live, v.spinMs);
+  const r = v.disc / 2;
+  // sulcos: anéis finos entre o selo e a borda do disco
+  const grooves: number[] = [];
+  for (let g = v.label / 2 + 4; g < r - 2; g += 3) grooves.push(g);
+  // a capa: quadrada na capa do disco, redonda no selo
+  const cover = (size: number, round: boolean) => {
+    const radius = round ? size / 2 : t.radii.sm;
+    if (image) return <Image testID={round ? 'vinyl-label' : 'vinyl-sleeve'} source={{ uri: image }} style={{ width: size, height: size, borderRadius: radius }} />;
+    return (
+      <View style={{ width: size, height: size, borderRadius: radius, backgroundColor: round ? t.colors.brand : t.colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
+        {round ? null : <Icon name="musical-notes-outline" tone="muted" />}
+      </View>
+    );
+  };
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width: v.discOffset + v.disc, height: v.sleeve }}
+    >
+      <Animated.View
+        style={{
+          ...t.shadows.card,
+          position: 'absolute',
+          left: v.discOffset,
+          top: (v.sleeve - v.disc) / 2,
+          width: v.disc,
+          height: v.disc,
+          borderRadius: r,
+          backgroundColor: t.colors.vinyl,
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ rotate }],
+        }}
+      >
+        <Svg width={v.disc} height={v.disc} style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
+          {grooves.map((g) => (
+            <Circle key={g} cx={r} cy={r} r={g} stroke={t.colors.vinylGroove} strokeWidth={t.borders.hairline} fill="none" />
+          ))}
+        </Svg>
+        {cover(v.label, true)}
+        {/* furo do meio */}
+        <View style={{ position: 'absolute', width: t.spacing.xs, height: t.spacing.xs, borderRadius: t.spacing.xs / 2, backgroundColor: t.colors.vinyl }} />
+      </Animated.View>
+      <View style={{ ...t.shadows.card, position: 'absolute', left: 0, top: 0, borderRadius: t.radii.sm, backgroundColor: t.colors.surface }}>
+        {cover(v.sleeve, false)}
+      </View>
+    </View>
+  );
+}
+
 function TrackTicket({ media, interactive }: { media: TrackMedia; interactive: boolean }) {
   const t = useTheme();
   const label = `${media.live ? 'Tocando agora' : 'Ouviu'}: ${media.title}, de ${media.artist}`;
-  const ticket = (
-    <Ticket stub={t.layout.ticket.trackStub} minHeight={t.layout.ticket.trackMinHeight} image={media.image} imageLabel={`Capa de ${media.album ?? media.title}`} fallbackIcon="musical-notes-outline">
-      <Stub>{media.live ? 'Tocando agora' : 'Ouvi'}</Stub>
-      <Text variant="lead" bold numberOfLines={2}>
-        {media.title}
-      </Text>
-      <Text variant="small" tone="muted" numberOfLines={1}>
-        {media.artist}
-      </Text>
-    </Ticket>
+  const record = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
+      <Vinyl image={media.image} live={media.live} />
+      <View style={{ flex: 1, minWidth: 0, gap: t.spacing.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs + t.spacing.xs / 2 }}>
+          {media.live ? <EqualizerBars /> : null}
+          <Stub>{media.live ? 'Tocando agora' : 'Ouvi'}</Stub>
+        </View>
+        <Text variant="lead" bold numberOfLines={2}>
+          {media.title}
+        </Text>
+        <Text variant="small" tone="muted" numberOfLines={1}>
+          {media.artist}
+        </Text>
+        {media.album ? (
+          <Text variant="caption" tone="muted" numberOfLines={1}>
+            {media.album}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
   return (
     <>
       {interactive ? (
         <Pressable accessibilityRole="link" accessibilityLabel={`${label}. Abrir no Last.fm`} onPress={() => open(media.url)} style={{ cursor: 'pointer' as const }}>
-          {ticket}
+          {record}
         </Pressable>
       ) : (
         <View accessible accessibilityLabel={label}>
-          {ticket}
+          {record}
         </View>
       )}
       <OpenLink url={media.url} label="Abrir no Last.fm" enabled={interactive} />

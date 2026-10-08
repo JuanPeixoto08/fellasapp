@@ -32,6 +32,9 @@ export type Colors = {
   viewerBg: string;
   /** Bolinha da chave liga/desliga (`Switch`), sobre o trilho `brand` (ligada) ou `border` (desligada). */
   switchThumb: string;
+  /** Disco de vinil da música no post (`PostTicket`) e os sulcos dele: preto nos dois temas. */
+  vinyl: string;
+  vinylGroove: string;
 };
 
 export const colors: Record<ColorScheme, Colors> = {
@@ -58,6 +61,8 @@ export const colors: Record<ColorScheme, Colors> = {
     onOverlay: '#F4F1EA',
     viewerBg: '#0B0B0B',
     switchThumb: '#FFFFFF',
+    vinyl: '#151515',
+    vinylGroove: '#2A2A2A',
   },
   dark: {
     bg: '#121212',
@@ -82,6 +87,8 @@ export const colors: Record<ColorScheme, Colors> = {
     onOverlay: '#F4F1EA',
     viewerBg: '#0B0B0B',
     switchThumb: '#F4F1EA',
+    vinyl: '#050505',
+    vinylGroove: '#1C1C1C',
   },
 };
 
@@ -181,7 +188,9 @@ export const layout = {
    * Ingresso no post (review/música): largura do canhoto (pôster 2:3 na review, capa quadrada na música),
    * altura mínima, raio dos recortes redondos e o espaçamento das letras do rótulo do bilhete.
    */
-  ticket: { reviewStub: 92, reviewMinHeight: 138, trackStub: 96, trackMinHeight: 96, notch: 10, kickerTracking: 1.2 },
+  ticket: { reviewStub: 92, reviewMinHeight: 138, notch: 10, kickerTracking: 1.2 },
+  /** Música no post: capa (`sleeve`) com o disco saindo dela; o selo do disco (`label`) é a capa; uma volta em `spinMs`. */
+  vinyl: { sleeve: 88, disc: 84, discOffset: 50, label: 32, spinMs: 3200 },
   gutter: spacing.lg,
   minTouch: 44,
 } as const;

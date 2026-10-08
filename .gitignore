@@ -8,3 +8,6 @@ expo-env.d.ts
 !.env.example
 *.log
 .DS_Store
+
+# mockups do brainstorming (superpowers visual companion)
+.superpowers/
