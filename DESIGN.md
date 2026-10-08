@@ -27,7 +27,7 @@ Accent aparece sempre **invertido** (preenchimento `accent` + texto `onAccent`):
 `brand` (violeta `#5B3FD9` claro / `#B8A2FF` escuro) é o tint ativo da tab bar e destaques de UI sobre papel, com contraste ≥ 4.5:1 no `bg`. `brandSoft` (`#E6DFFB` claro / `#2B2347` escuro) é o fundo roxo suave do chip da minha reação.
 
 ## Tipografia
-- **Marca: "FELLAS" na Galaxia** (Mocha Frappuccino). Só a palavra, como desenho vetorial em `components/ui/Logo.tsx` (topo do feed, login, carregamento). A licença da fonte é pessoal: o arquivo da fonte **nunca** entra no projeto, só o contorno já desenhado. Cor = tinta do tema.
+- **Marca: "FELLAS" em maiúsculas na Monocraft Bold** (pixel, Idrees Hassan, SIL OFL 1.1: uso comercial liberado). Só a palavra, como desenho vetorial em `components/ui/Logo.tsx` (topo do feed, login, carregamento); o arquivo da fonte não entra no projeto, só o contorno já desenhado. Cor = tinta do tema. Substituiu a Galaxia em out/2026 (licença só pessoal, sem uso comercial). Nada de "Minecraft" no nome ou na divulgação: a fonte é inspirada, não oficial, e a marca é da Mojang/Microsoft.
 - **Todo o resto: Golos Text** (Regular/Medium/SemiBold/Bold), licença aberta (OFL). Substituiu Inter + Instrument Serif em out/2026 (a TT Interphases Pro, preferida, é paga).
 - Títulos em sans: hierarquia por tamanho + peso e tracking levemente negativo. display 48/700 · headline 32/700 · title 24/600.
 - Escala (pt): caption 12 · small 14 · body 16 · lead 18 · title 24 · headline 32 · display 48. Respeita escala de fonte do sistema.
@@ -97,4 +97,4 @@ Tela `/notifications` no padrão "sem caixa" (linhas com `Divider`). Linha: pont
 @usuario de fella em post/comentário: negrito na cor `brand`, toque abre o perfil (`MentionText`). Ao digitar @ no compositor ou no comentário aparece `MentionSuggestions` (até 5 fellas: avatar `sm`, nome em negrito, @usuario em `textMuted`, caixa `surface` com fio `border` e raio `md`). Horário de post/comentário/notificação: "agora", "há 5 min", "há 3 h", "ontem 14:32", "3 out 14:32" (`postTime`).
 
 ## Não fazer
-Embutir o arquivo .otf da Galaxia; usar a Galaxia em outro texto que não a marca; cartão dentro de cartão; eyebrow acima de título; texto em gradiente; borda lateral colorida; cinza puro; fonte de sistema como display.
+Usar a Galaxia (ou outra fonte sem licença comercial) em qualquer lugar; usar a Monocraft em outro texto que não a marca; cartão dentro de cartão; eyebrow acima de título; texto em gradiente; borda lateral colorida; cinza puro; fonte de sistema como display.
