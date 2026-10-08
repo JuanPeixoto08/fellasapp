@@ -198,8 +198,18 @@ export function createView(root: HTMLElement, h: ViewHandlers): View {
   acts.append(fold.b, call.b, raise.b, allin.b);
   const raiseBack = coin('back', '←', 'VOLTAR', 'Voltar aos botões', '', h.closeRaise);
   const raiseGo = coin('raise', '↑', 'AUMENTAR', 'Aumentar', '', h.confirmRaise);
+  // mesmas 4 vagas da fileira de cima: o confirmar fica onde estava o Aumentar e o Voltar onde estava o Correr,
+  // para um toque duplo no Aumentar confirmar o mínimo, nunca cair no All-in
+  const gap = () => {
+    const g = coin('gap', '', '', '', '', () => {});
+    g.b.disabled = true;
+    g.b.tabIndex = -1;
+    g.b.removeAttribute('aria-label');
+    g.b.setAttribute('aria-hidden', 'true');
+    return g.b;
+  };
   const raiseActs = el('div', 'acts');
-  raiseActs.append(raiseBack.b, raiseGo.b);
+  raiseActs.append(raiseBack.b, gap(), raiseGo.b, gap());
   const cta = el('div', 'cta');
   const backBtn = button('Voltar pra mesa', 'btn main', h.back);
   const standBtn = button('Levantar', 'btn', h.leave);

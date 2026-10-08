@@ -34,6 +34,7 @@
 .raise .b { background: var(--violet); }
 .allin .b { background: var(--orange); }
 .coin .b .v { font-weight: 800; font-size: 15px; color: #fff; }
+.coin.gap { visibility: hidden; }
 
 /* régua do aumento */
 .ruler { display: grid; gap: 8px; padding: 0 14px 12px; }

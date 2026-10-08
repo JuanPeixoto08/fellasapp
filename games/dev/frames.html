@@ -10,7 +10,11 @@
     </style>
   </head>
   <body>
-    <iframe id="phone" src="../blackjack/?mock&shot" width="390" height="844"></iframe>
-    <iframe id="pc" src="../blackjack/?mock&shot" width="1280" height="720"></iframe>
+    <iframe id="phone" width="390" height="844"></iframe>
+    <iframe id="pc" width="1280" height="720"></iframe>
+    <script>
+      const game = new URLSearchParams(location.search).get('game') || 'blackjack';
+      for (const id of ['phone', 'pc']) document.getElementById(id).src = `../${game}/?mock&shot`;
+    </script>
   </body>
 </html>

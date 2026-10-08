@@ -155,6 +155,16 @@ describe('poker view', () => {
     expect(h.closeRaise).toHaveBeenCalled();
   });
 
+  it('régua: o confirmar fica no lugar do Aumentar (toque duplo nunca vira all-in)', () => {
+    const v = createView(root, h);
+    v.render(ui({ raise: 50 }), anchors, extras());
+    const rows = [...root.querySelectorAll('.acts')];
+    const slot = (row: Element, label: string) =>
+      [...row.children].findIndex((c) => c.getAttribute('aria-label') === label);
+    expect(slot(rows[1], 'Aumentar para 50')).toBe(slot(rows[0], 'Aumentar'));
+    expect(slot(rows[1], 'Voltar aos botões')).toBe(slot(rows[0], 'Correr'));
+  });
+
   it('ausente: faixa e Voltar pra mesa', () => {
     const v = createView(root, h);
     v.render(ui({ table: table({ seats: [seat(0, 'me', { status: 'away' }), seat(1, 'bia')], hand: null }) }), anchors, extras());
