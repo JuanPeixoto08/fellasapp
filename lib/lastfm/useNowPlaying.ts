@@ -1,13 +1,15 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
-import { getNowPlaying } from './api';
+import { NOW_PLAYING_MS, subscribeNowPlaying } from './nowPlayingStore';
 import type { LastfmTrack } from './types';
 
-/** De quanto em quanto tempo o "ouvindo agora" pergunta de novo, com a tela à vista. */
-export const NOW_PLAYING_MS = 60_000;
+export { NOW_PLAYING_MS };
 
-/** Música que a pessoa está ouvindo agora (ou null). Só pergunta com a tela focada. */
+/**
+ * Música que a pessoa está ouvindo agora (ou null). Só pergunta com a tela focada. O dado é dividido com
+ * todo mundo que olha o mesmo usuário (posts dele no feed, cabeçalho do perfil): `nowPlayingStore`.
+ */
 export function useNowPlaying(user: string | null): LastfmTrack | null {
   const [track, setTrack] = useState<LastfmTrack | null>(null);
   useFocusEffect(
@@ -16,18 +18,7 @@ export function useNowPlaying(user: string | null): LastfmTrack | null {
         setTrack(null);
         return;
       }
-      let alive = true;
-      const check = () => {
-        getNowPlaying(user)
-          .then((t) => alive && setTrack(t))
-          .catch(() => alive && setTrack(null));
-      };
-      check();
-      const timer = setInterval(check, NOW_PLAYING_MS);
-      return () => {
-        alive = false;
-        clearInterval(timer);
-      };
+      return subscribeNowPlaying(user, setTrack);
     }, [user]),
   );
   return track;
