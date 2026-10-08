@@ -92,9 +92,10 @@ insert/update/delete para o app; funções `security definer`, `set search_path 
 `authenticated`/`anon`; só o cron/dono chama).
 1. `semana_nova = games_week_start(now())`; `semana_que_fecha = max(week_start)` das carteiras. Se não há
    carteira ou `semana_que_fecha >= semana_nova`, sai (idempotente: rodar duas vezes não faz nada).
-2. Fecha as mãos abertas com `bj_force_finish` (Parar automático, banca joga, paga). A 0027 cria o reset sem
-   este passo; a 0028 faz `create or replace` do reset já com ele (cada migração funciona sozinha, e o poker
-   depois faz o mesmo com as mesas dele).
+2. Fecha as mãos abertas chamando o gancho `games_close_open_rounds()` (Parar automático, banca joga, paga).
+   Ganchos da 0027, sem grant: `games_open_round(user) returns uuid` e `games_close_open_rounds()` — na 0027
+   não fazem nada (null / nada); a 0028 faz `create or replace` deles olhando `bj_rounds` (cada migração
+   funciona sozinha, e o poker depois estende os mesmos ganchos com as mesas dele).
 3. Pódio: top 3 de quem tem `last_played_at` não nulo, na ordem do placar; grava em `game_weeks`
    (`on conflict do nothing`).
 4. Selo: `badges = array_remove(badges, 'weekly_champion')` em quem tem; se houve campeão,
@@ -151,6 +152,8 @@ visíveis; `balance` = saldo da carteira depois da ação.
   estourou): revela a virada e compra enquanto o total < 17 (17 macio para). Acerto por mão: estourou →
   `bust`; banca estourou → `win`; maior → `win`; igual → `push`; menor → `lose`. 21 com 2 cartas depois de
   dividir conta como 21 comum (`win` 1:1). Paga `2 × aposta` em `win`, `1 ×` em `push`; ledger; fecha a mão.
+
+**`bj_current() returns jsonb`** — o estado da minha mão aberta (ou null), para a mesa retomar.
 
 **`bj_force_finish(p_round uuid)`** (interno, sem grant) — todas as mãos abertas viram `stand`, banca joga,
 acerta e paga. Usada pelo reset.
