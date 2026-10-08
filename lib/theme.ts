@@ -30,6 +30,8 @@ export type Colors = {
   onOverlay: string;
   /** Fundo do visualizador de fotos em tela cheia (escuro nos dois temas). */
   viewerBg: string;
+  /** Bolinha da chave liga/desliga (`Switch`), sobre o trilho `brand` (ligada) ou `border` (desligada). */
+  switchThumb: string;
 };
 
 export const colors: Record<ColorScheme, Colors> = {
@@ -55,6 +57,7 @@ export const colors: Record<ColorScheme, Colors> = {
     overlay: 'rgba(18, 18, 18, 0.45)',
     onOverlay: '#F4F1EA',
     viewerBg: '#0B0B0B',
+    switchThumb: '#FFFFFF',
   },
   dark: {
     bg: '#121212',
@@ -78,6 +81,7 @@ export const colors: Record<ColorScheme, Colors> = {
     overlay: 'rgba(0, 0, 0, 0.6)',
     onOverlay: '#F4F1EA',
     viewerBg: '#0B0B0B',
+    switchThumb: '#F4F1EA',
   },
 };
 

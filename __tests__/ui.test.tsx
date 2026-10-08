@@ -113,3 +113,22 @@ describe('marca e fontes', () => {
     for (const family of Object.values(fonts) as string[]) expect(family).toMatch(/^GolosText_/);
   });
 });
+
+describe('Switch', () => {
+  it('SwitchRow: chave com o rótulo como nome; mudar chama onChange', async () => {
+    const { SwitchRow } = require('../components/ui');
+    const onChange = jest.fn();
+    await render(<SwitchRow label="Mostrar o que estou ouvindo" help="Aparece do lado do nome." value onChange={onChange} />);
+    const toggle = screen.getByRole('switch', { name: 'Mostrar o que estou ouvindo' });
+    expect(toggle.props.value).toBe(true);
+    expect(screen.getByText('Aparece do lado do nome.')).toBeTruthy();
+    await fireEvent(toggle, 'valueChange', false);
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('SwitchRow desabilitado: chave desabilitada', async () => {
+    const { SwitchRow } = require('../components/ui');
+    await render(<SwitchRow label="Selo" value={false} onChange={jest.fn()} disabled />);
+    expect(screen.getByRole('switch', { name: 'Selo' }).props.disabled).toBe(true);
+  });
+});

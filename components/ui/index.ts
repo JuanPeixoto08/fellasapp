@@ -12,6 +12,7 @@ export { ImageThumbs, type ImageThumbsProps } from './ImageThumbs';
 export { interactiveStyle } from './interactive';
 export { Logo, type LogoProps } from './Logo';
 export { Slider, type SliderProps } from './Slider';
+export { Switch, SwitchRow, type SwitchProps, type SwitchRowProps } from './Switch';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { Screen, type ScreenProps } from './Screen';
 export { TextField, type TextFieldProps } from './TextField';
