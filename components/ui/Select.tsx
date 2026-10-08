@@ -78,7 +78,8 @@ export function Select<T extends string | number>({ label, value, options, onCha
           alignItems: 'center',
           gap: t.spacing.xs,
           minHeight: t.layout.minTouch + t.spacing.md,
-          paddingHorizontal: t.spacing.md,
+          // estreito: no celular cabem três lado a lado (Dias / Horas / Minutos)
+          paddingHorizontal: t.spacing.sm,
           paddingVertical: t.spacing.xs,
           borderWidth: t.borders.hairline,
           borderColor: open ? t.colors.primary : t.colors.border,
