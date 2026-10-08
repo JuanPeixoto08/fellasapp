@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarCropper } from '../../components/profile/AvatarCropper';
 import { stackHeader } from '../../components/profile/headerOptions';
-import { Avatar, Button, Divider, Screen, Text, TextField } from '../../components/ui';
+import { Avatar, Button, Divider, Heading, Screen, SwitchRow, Text, TextField } from '../../components/ui';
 import { useSession } from '../../lib/auth/SessionProvider';
+import { badgeLabel } from '../../lib/badges';
 import {
   getCurrentUserId,
   formatBirthday,
@@ -55,6 +56,10 @@ export default function EditProfileScreen() {
   /** O que está salvo: igual a isso, não pergunta de novo ao Last.fm. */
   const [savedLastfm, setSavedLastfm] = useState('');
   const [lastfmError, setLastfmError] = useState<string | undefined>();
+  /** "O que aparece no perfil": selos que a pessoa tem (só o banco dá) e os que ela escondeu. */
+  const [showNowPlaying, setShowNowPlaying] = useState(true);
+  const [badges, setBadges] = useState<string[]>([]);
+  const [hiddenBadges, setHiddenBadges] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -69,6 +74,9 @@ export default function EditProfileScreen() {
         setBio(p.bio ?? '');
         setLastfm(p.lastfm_user ?? '');
         setSavedLastfm(p.lastfm_user ?? '');
+        setShowNowPlaying(p.show_now_playing ?? true);
+        setBadges(p.badges ?? []);
+        setHiddenBadges(p.hidden_badges ?? []);
         // foto e banner são extras: se a assinatura falhar, a tela continua com a letra e a faixa lisa
         signPaths([p.avatar_url, p.banner_url])
           .then((signed) => {
@@ -140,6 +148,8 @@ export default function EditProfileScreen() {
         location,
         birthday: parsedBirthday,
         lastfmUser,
+        showNowPlaying,
+        hiddenBadges: hiddenBadges.filter((b) => badges.includes(b)),
       });
       // a cópia do perfil na sessão alimenta minha foto na lateral, no compositor e no comentário
       await refreshProfile();
@@ -271,6 +281,35 @@ export default function EditProfileScreen() {
           }}
           error={lastfmError}
         />
+        <View style={{ gap: t.spacing.sm, marginTop: t.spacing.sm }}>
+          <Heading level={3}>O que aparece no perfil</Heading>
+          <SwitchRow
+            label="Mostrar o que estou ouvindo"
+            help={
+              lastfm.trim()
+                ? 'Aparece do lado do seu nome nos posts e no seu perfil.'
+                : 'Conecte o Last.fm acima pra usar.'
+            }
+            value={showNowPlaying}
+            onChange={setShowNowPlaying}
+            disabled={!lastfm.trim()}
+          />
+          {badges.map((badge) => {
+            const label = badgeLabel(badge);
+            if (!label) return null;
+            return (
+              <SwitchRow
+                key={badge}
+                label={label}
+                help="Aparece do lado do seu nome."
+                value={!hiddenBadges.includes(badge)}
+                onChange={(show) =>
+                  setHiddenBadges((cur) => [...cur.filter((b) => b !== badge), ...(show ? [] : [badge])])
+                }
+              />
+            );
+          })}
+        </View>
         <TextField
           label="Aniversário"
           placeholder="DD/MM/AAAA"

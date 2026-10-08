@@ -270,3 +270,61 @@ describe('Editar perfil: Last.fm', () => {
     expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ lastfmUser: '' }));
   });
 });
+
+describe('Editar perfil: o que aparece no perfil', () => {
+  const base = { id: 'u1', username: 'ana', display_name: 'Ana', bio: '', birthday: null };
+  beforeEach(() => {
+    (updateMyProfile as jest.Mock).mockClear();
+    mockGetUserInfo.mockReset().mockResolvedValue({ name: 'anafm', playcount: 1, registeredAt: null });
+  });
+
+  it('sem Last.fm: a chave da música fica desabilitada e explica', async () => {
+    await renderScreen();
+    expect(screen.getByRole('switch', { name: 'Mostrar o que estou ouvindo' }).props.disabled).toBe(true);
+    expect(screen.getByText('Conecte o Last.fm acima pra usar.')).toBeTruthy();
+  });
+
+  it('com Last.fm: desligar e salvar manda showNowPlaying false', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, lastfm_user: 'anafm', show_now_playing: true });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Usuário no Last.fm').props.value).toBe('anafm'));
+    const toggle = screen.getByRole('switch', { name: 'Mostrar o que estou ouvindo' });
+    expect(toggle.props.value).toBe(true);
+    await fireEvent(toggle, 'valueChange', false);
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ showNowPlaying: false }));
+  });
+
+  it('chave salva desligada aparece desligada', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, lastfm_user: 'anafm', show_now_playing: false });
+    await renderScreen();
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Mostrar o que estou ouvindo' }).props.value).toBe(false),
+    );
+  });
+
+  it('quem tem selo: uma chave por selo; desligar e salvar esconde', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, badges: ['verified'], hidden_badges: [] });
+    await renderScreen();
+    const toggle = await screen.findByRole('switch', { name: 'Selo de verificado' });
+    expect(toggle.props.value).toBe(true);
+    await fireEvent(toggle, 'valueChange', false);
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ hiddenBadges: ['verified'] }));
+  });
+
+  it('selo escondido antes: aparece desligado; religar e salvar mostra de novo', async () => {
+    (getProfile as jest.Mock).mockResolvedValueOnce({ ...base, badges: ['verified'], hidden_badges: ['verified'] });
+    await renderScreen();
+    const toggle = await screen.findByRole('switch', { name: 'Selo de verificado' });
+    expect(toggle.props.value).toBe(false);
+    await fireEvent(toggle, 'valueChange', true);
+    await fireEvent.press(screen.getByLabelText('Salvar'));
+    expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ hiddenBadges: [] }));
+  });
+
+  it('sem selo: nenhuma chave de selo', async () => {
+    await renderScreen();
+    expect(screen.queryByRole('switch', { name: 'Selo de verificado' })).toBeNull();
+  });
+});

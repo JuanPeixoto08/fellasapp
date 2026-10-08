@@ -70,6 +70,9 @@ export type UpdateProfileInput = {
   location?: string | null;
   /** ISO `AAAA-MM-DD`. */
   birthday?: string | null;
+  /** "O que aparece no perfil": "ouvindo agora" e selos escondidos; undefined não altera. */
+  showNowPlaying?: boolean;
+  hiddenBadges?: string[];
 };
 
 /** Converte "DD/MM/AAAA" em "AAAA-MM-DD"; vazio -> null; inválido -> undefined. */
@@ -135,6 +138,8 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
   if (input.location !== undefined) fields.location = emptyToNull(input.location);
   if (input.birthday !== undefined) fields.birthday = emptyToNull(input.birthday);
   if (input.lastfmUser !== undefined) fields.lastfm_user = emptyToNull(input.lastfmUser);
+  if (input.showNowPlaying !== undefined) fields.show_now_playing = input.showNowPlaying;
+  if (input.hiddenBadges !== undefined) fields.hidden_badges = input.hiddenBadges;
 
   // as fotos salvas agora: as que forem trocadas (ou o banner tirado) somem do armazenamento depois
   const { data: before } = await supabase.from('profiles').select('avatar_url, banner_url').eq('id', userId).single();
