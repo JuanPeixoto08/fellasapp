@@ -111,7 +111,7 @@ Avatar que não carrega: iniciais.
 - Meio: a prévia é a própria imagem gerada (`<Image>` do object URL), 9:16, raio `lg`, maior que couber.
   Enquanto desenha: o quadro em `overlay` com um spinner. Trocar o fundo redesenha (o layout fica em cache;
   só o fundo e as cores da marca/fita mudam).
-- Bolinhas de fundo: 30 pt de diâmetro, toque de 44, anel `brand` (escuro) na escolhida, rótulo acessível
+- Bolinhas de fundo: 30 pt de diâmetro, toque de 44, anel `onOverlay` na escolhida (o `brand` claro some no palco escuro), rótulo acessível
   com o nome do fundo ("Fundo violeta"…); a da foto mostra a própria foto.
 - Botões (`Button` ganha `icon` e as variantes `overlay` — fundo `onOverlay`, texto `viewerBg` — e
   `overlayOutline` — fio e texto `onOverlay` —, para o palco escuro): à esquerda `overlayOutline` "Instagram" (ícone `logo-instagram`) — vira "Baixar imagem"
@@ -119,11 +119,10 @@ Avatar que não carrega: iniciais.
   (`add-circle-outline`) com loading enquanto sobe.
 - A imagem de cada fundo já fica pronta (Blob) quando a prévia aparece: o toque em "Instagram" chama
   `navigator.share` na hora (o Safari do iPhone só deixa compartilhar dentro do toque, sem espera antes).
-- Sucesso no Fellas: o botão mostra "Foi pro seu story" por ~1,2 s e o montador fecha. Erro: texto em
-  `danger` acima dos botões — `StoryUploadError` traz a mensagem pronta; o resto passa pelo `friendlyError(e,
+- Sucesso no Fellas: o botão mostra "Foi pro seu story" por ~1,2 s e o montador fecha. Erro: texto `onOverlay` acima dos botões (como no `StoryComposer`) — `StoryUploadError` traz a mensagem pronta; o resto passa pelo `friendlyError(e,
   'Não rolou postar o story. Tenta de novo.')`. Erro ao gerar a imagem: "Não rolou montar a imagem. Tenta de
   novo." com o botão de tentar de novo no lugar da prévia.
-- Esc fecha no computador; respeita "reduzir movimento" (sem animação de entrada).
+- Esc fecha no computador (menos enquanto sobe); entra com fade, como o `StoryComposer`.
 
 ### Botão no post (`components/feed/ShareButton.tsx`)
 - `ActionButton` (sem número) com `Icon` `share-outline`, rótulo "Compartilhar no story", entre o espaçador e o
@@ -132,7 +131,7 @@ Avatar que não carrega: iniciais.
 
 ### "Ver post" no story (`components/stories/StoryViewer.tsx`)
 - Story com `postId`: pílula "Ver post" (`arrow-forward-outline`) centrada embaixo, altura 44, fundo
-  `overlay`, fio `onOverlay` 40%, texto `onOverlay` SemiBold. Toque: fecha o viewer e `router.push('/post/<id>')`.
+  `overlay`, fio `onOverlay`, texto `onOverlay` negrito. Toque: fecha o viewer e `router.push('/post/<id>')`.
 - A pílula não conta como toque de "passar/voltar" e segurar nela não pausa.
 - No meu próprio story, convive com "Visto por N" (a pílula fica acima dele).
 
