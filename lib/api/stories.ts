@@ -8,7 +8,7 @@ import { getCurrentUserId } from './profiles';
 import { resolveUrl, signPaths } from './storage';
 
 export type StoryKind = 'photo' | 'video';
-export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; /** Original: toca enquanto a versão reduzida do vídeo ainda processa. */ originalUrl?: string; /** Miniatura dos cartões do carrossel (computador). */ thumbUrl?: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null };
+export type Story = { id: string; authorId: string; kind: StoryKind; mediaUrl: string; /** Original: toca enquanto a versão reduzida do vídeo ainda processa. */ originalUrl?: string; /** Miniatura dos cartões do carrossel (computador). */ thumbUrl?: string; durationMs: number; createdAt: string; seen: boolean; myReaction: string | null; /** Post de onde o story veio ("compartilhar no story"): mostra "Ver post". */ postId?: string | null };
 export type StoryAuthor = { id: string; name: string; username: string; avatarUrl: string | null };
 export type StoryGroup = { author: StoryAuthor; stories: Story[]; hasUnseen: boolean; latestAt: string };
 export type StoryViewer = { person: StoryAuthor; viewedAt: string; emoji: string | null };
@@ -95,16 +95,20 @@ export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ 
   }
 }
 
-export async function createStory(input: { kind: StoryKind; mediaId: string; durationMs: number }): Promise<void> {
+export async function createStory(input: { kind: StoryKind; mediaId: string; durationMs: number; postId?: string }): Promise<void> {
   const me = await getCurrentUserId();
-  const { error } = await supabase
-    .from('stories')
-    .insert({ author_id: me, kind: input.kind, media_id: input.mediaId, duration_ms: input.durationMs });
+  const { error } = await supabase.from('stories').insert({
+    author_id: me,
+    kind: input.kind,
+    media_id: input.mediaId,
+    duration_ms: input.durationMs,
+    ...(input.postId ? { post_id: input.postId } : {}),
+  });
   if (error) throw error;
 }
 
 type Row = {
-  id: string; author_id: string; kind: StoryKind; media_id: string; duration_ms: number; created_at: string;
+  id: string; author_id: string; kind: StoryKind; media_id: string; duration_ms: number; created_at: string; post_id?: string | null;
   author: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null;
 };
 
@@ -114,7 +118,7 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
   const since = new Date(now.getTime() - STORY_TTL_MS).toISOString();
   const { data, error } = await supabase
     .from('stories')
-    .select('id, author_id, kind, media_id, duration_ms, created_at, author:profiles!stories_author_id_fkey(id, username, display_name, avatar_url)')
+    .select('id, author_id, kind, media_id, duration_ms, created_at, post_id, author:profiles!stories_author_id_fkey(id, username, display_name, avatar_url)')
     .gt('created_at', since)
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -151,6 +155,7 @@ export async function listActiveStories(now: Date = new Date()): Promise<StoryGr
       mediaUrl: storyMediaUrl(r.media_id, r.kind), originalUrl: storyOriginalUrl(r.media_id, r.kind),
       thumbUrl: storyThumbUrl(r.media_id, r.kind),
       durationMs: r.duration_ms, createdAt: r.created_at, seen: seen.has(r.id), myReaction: mine.get(r.id) ?? null,
+      postId: r.post_id ?? null,
     };
     g.stories.push(story);
     g.latestAt = r.created_at;

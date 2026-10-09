@@ -174,6 +174,20 @@ describe('listActiveStories', () => {
     expect(select).toContain('author:profiles!stories_author_id_fkey(');
   });
 
+  it('lê o post de origem (null quando não veio de post)', async () => {
+    mockResults['stories.select'] = {
+      data: [
+        { id: 's1', author_id: 'ana', kind: 'photo', media_id: `stories/${'1'.repeat(64)}`, duration_ms: 5000, created_at: '2026-10-04T08:00:00Z', post_id: 'p9', author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
+        { id: 's2', author_id: 'ana', kind: 'photo', media_id: `stories/${'2'.repeat(64)}`, duration_ms: 5000, created_at: '2026-10-04T09:00:00Z', post_id: null, author: { id: 'ana', username: 'ana', display_name: 'Ana', avatar_url: null } },
+      ],
+      error: null,
+    };
+    const [ana] = await listActiveStories(new Date('2026-10-04T12:00:00Z'));
+    const select = mockCalls.find((c) => c.table === 'stories' && c.op === 'select')?.args[0] as string;
+    expect(select).toContain('post_id');
+    expect(ana.stories.map((s) => s.postId)).toEqual(['p9', null]);
+  });
+
   it('agrupa por autor (mais antigo primeiro), marca visto e minha reação; só últimas 24 h', async () => {
     const now = new Date('2026-10-04T12:00:00Z');
     mockResults['stories.select'] = {
@@ -207,6 +221,13 @@ describe('createStory e reactToStory', () => {
     await createStory({ kind: 'photo', mediaId: `stories/${'1'.repeat(64)}`, durationMs: 5000 });
     expect(mockCalls.find((c) => c.table === 'stories' && c.op === 'insert')?.args[0]).toEqual({
       author_id: 'me', kind: 'photo', media_id: `stories/${'1'.repeat(64)}`, duration_ms: 5000,
+    });
+  });
+
+  it('story que veio de um post grava o post_id', async () => {
+    await createStory({ kind: 'photo', mediaId: `stories/${'1'.repeat(64)}`, durationMs: 5000, postId: 'p9' });
+    expect(mockCalls.find((c) => c.table === 'stories' && c.op === 'insert')?.args[0]).toEqual({
+      author_id: 'me', kind: 'photo', media_id: `stories/${'1'.repeat(64)}`, duration_ms: 5000, post_id: 'p9',
     });
   });
 
