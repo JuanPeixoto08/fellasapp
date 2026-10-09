@@ -2,12 +2,15 @@ import { useRef } from 'react';
 import { ActivityIndicator, Animated, Pressable, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../../lib/theme';
+import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
 export type ButtonProps = {
   title: string;
+  /** Ícone antes do texto (some enquanto carrega). */
+  icon?: IconName;
   onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'overlay' | 'overlayOutline';
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
@@ -17,6 +20,7 @@ export type ButtonProps = {
 
 export function Button({
   title,
+  icon,
   onPress,
   variant = 'primary',
   loading,
@@ -34,13 +38,18 @@ export function Button({
     danger: t.colors.danger,
     secondary: t.colors.surface,
     ghost: 'transparent',
+    overlay: t.colors.onOverlay,
+    overlayOutline: 'transparent',
   }[variant];
   const fg = {
     primary: t.colors.onPrimary,
     danger: t.colors.onDanger,
     secondary: t.colors.text,
     ghost: t.colors.primary,
+    overlay: t.colors.viewerBg,
+    overlayOutline: t.colors.onOverlay,
   }[variant];
+  const outlined = variant === 'secondary' || variant === 'overlayOutline';
 
   const press = (to: number) =>
     Animated.timing(scale, { toValue: to, duration: t.motion.fast, useNativeDriver: true }).start();
@@ -63,8 +72,8 @@ export function Button({
             paddingHorizontal: t.spacing.xl,
             borderRadius: t.radii.md,
             backgroundColor: bg,
-            borderWidth: variant === 'secondary' ? 1 : 0,
-            borderColor: t.colors.border,
+            borderWidth: outlined ? t.borders.hairline : 0,
+            borderColor: variant === 'overlayOutline' ? t.colors.onOverlay : t.colors.border,
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
@@ -76,6 +85,7 @@ export function Button({
         ]}
       >
         {loading ? <ActivityIndicator color={fg} /> : null}
+        {icon && !loading ? <Icon name={icon} color={fg} /> : null}
         <Text bold style={{ color: fg }}>
           {title}
         </Text>
