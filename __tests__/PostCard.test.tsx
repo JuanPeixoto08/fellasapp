@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -6,6 +7,10 @@ import { PostCard } from '../components/PostCard';
 import type { FeedPost } from '../lib/api/posts';
 
 jest.mock('../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../components/share/StoryShareDialog', () => {
+  const { Text } = require('react-native');
+  return { StoryShareDialog: ({ visible }: { visible: boolean }) => (visible ? <Text>montador aberto</Text> : null) };
+});
 const metrics = { frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
 const post: FeedPost = {
@@ -207,5 +212,24 @@ describe('PostCard ouvindo agora', () => {
     await render(<PostCard post={{ ...post, author: { ...post.author, lastfm_user: 'anafm' } }} />);
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByText(/ouvindo/)).toBeNull();
+  });
+});
+
+describe('PostCard compartilhar no story', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('na web, o botão abre o montador sem abrir o post', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+    const onPress = jest.fn();
+    await render(<PostCard post={post} onPress={onPress} />);
+    await fireEvent.press(screen.getByLabelText('Compartilhar no story'));
+    expect(screen.getByText('montador aberto')).toBeTruthy();
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('fora da web não aparece', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    await render(<PostCard post={post} />);
+    expect(screen.queryByLabelText('Compartilhar no story')).toBeNull();
   });
 });

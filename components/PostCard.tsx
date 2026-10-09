@@ -5,6 +5,8 @@ import { CommentButton } from './feed/CommentButton';
 import { LikeButton } from './feed/LikeButton';
 import { PhotoViewer } from './feed/PhotoViewer';
 import { PostImages } from './feed/PostImages';
+import { ShareButton } from './feed/ShareButton';
+import { StoryShareDialog } from './share/StoryShareDialog';
 import { ReactButton, ReactionBar, ReactionPicker } from './reactions';
 import { Avatar, ConfirmDialog, Icon, IconButton, NameWithBadge, Text } from './ui';
 import { useTheme } from '../lib/theme';
@@ -57,6 +59,7 @@ export function PostCard({
   const reactAnchor = useRef<View>(null);
   const [confirming, setConfirming] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const react = (emoji: string) => onReact?.(post, nextReaction(post.myReaction, emoji));
   const name = post.author.display_name || post.author.username;
   const date = postTime(post.createdAt);
@@ -172,6 +175,7 @@ export function PostCard({
             <LikeButton liked={post.likedByMe} count={post.likeCount} onPress={() => onToggleLike?.(post)} />
             <CommentButton count={post.commentCount} onPress={() => onPress?.(post)} />
             <View style={{ flex: 1 }} />
+            {Platform.OS === 'web' ? <ShareButton onPress={() => setSharing(true)} /> : null}
             <View style={{ marginRight: -t.spacing.sm }}>
               <ReactButton myReaction={post.myReaction} onPress={() => setPicking(true)} anchorRef={reactAnchor} />
             </View>
@@ -182,6 +186,7 @@ export function PostCard({
       {viewing !== null ? (
         <PhotoViewer uris={post.images} index={viewing} alt={`Foto postada por ${name}`} onClose={() => setViewing(null)} />
       ) : null}
+      {sharing ? <StoryShareDialog post={post} visible onClose={() => setSharing(false)} /> : null}
       <ReactionPicker
         anchorRef={reactAnchor}
         visible={picking}
