@@ -34,6 +34,8 @@ jest.mock('../lib/api/stories', () => ({
   deleteStory: (id: string) => mockDelete(id),
   reactToStory: (id: string, e: string | null) => mockReact(id, e),
 }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ ...jest.requireActual('expo-router'), router: { push: (p: string) => mockPush(p) } }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
 let mockTier = 'compact';
 let mockSize = { width: 400, height: 800 };
@@ -49,7 +51,7 @@ import { closeStories, onStoriesChanged, openStories } from '../lib/storyViewerS
 import { loadVolume, saveVolume } from '../lib/storyVolume';
 
 const s = (id: string, kind: 'photo' | 'video' = 'photo') => ({ id, authorId: '', kind, mediaUrl: `https://w/m/${id}`, durationMs: 5000, createdAt: '2026-10-04T10:00:00Z', seen: false, myReaction: null });
-const g = (id: string, ...stories: ReturnType<typeof s>[]): StoryGroup => ({ author: { id, name: id.toUpperCase(), username: id, avatarUrl: null }, stories, hasUnseen: true, latestAt: '' });
+const g = (id: string, ...stories: (ReturnType<typeof s> & { postId?: string | null })[]): StoryGroup => ({ author: { id, name: id.toUpperCase(), username: id, avatarUrl: null }, stories, hasUnseen: true, latestAt: '' });
 const metrics = { frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
 async function open(groups: StoryGroup[], author: string) {
@@ -348,5 +350,19 @@ describe('StoryViewer: volume no computador', () => {
       await new Promise((r) => setTimeout(r, 10));
     });
     expect(screen.queryByLabelText('Volume')).toBeNull();
+  });
+});
+
+describe('StoryViewer: story que veio de um post', () => {
+  it('"Ver post" fecha o story e abre o post', async () => {
+    await open([g('ana', { ...s('a1'), postId: 'p9' })], 'ana');
+    await fireEvent.press(screen.getByLabelText('Ver post'));
+    expect(mockPush).toHaveBeenCalledWith('/post/p9');
+    expect(screen.queryByLabelText(/Story \d de/)).toBeNull();
+  });
+
+  it('story comum não tem "Ver post"', async () => {
+    await open([g('ana', s('a1'))], 'ana');
+    expect(screen.queryByLabelText('Ver post')).toBeNull();
   });
 });

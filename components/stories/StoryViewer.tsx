@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, PanResponder, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +21,7 @@ import { emitStoriesChanged } from '../../lib/storyViewerStore';
 import { loadVolume, saveVolume } from '../../lib/storyVolume';
 import { useTheme } from '../../lib/theme';
 import { ReactionPicker } from '../reactions';
-import { Avatar, ConfirmDialog, Emoji, IconButton, Slider, Text } from '../ui';
+import { Avatar, ConfirmDialog, Emoji, Icon, IconButton, Slider, Text } from '../ui';
 import { StoryCarouselCard } from './StoryCarouselCard';
 import { StoryVideo } from './StoryVideo';
 
@@ -161,6 +162,11 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
       ),
     );
     reactToStory(story.id, next).catch(() => {});
+  };
+
+  const openPost = (postId: string) => {
+    onClose();
+    router.push(`/post/${postId}`);
   };
 
   const remove = async () => {
@@ -400,6 +406,42 @@ export function StoryViewer({ groups: initial, authorId, storyId, onClose }: Pro
         </View>
       )}
     </View>
+
+    {/* story que veio de um post: pílula acima do rodapé (não conta como toque de passar/voltar) */}
+    {story.postId ? (
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: edge.bottom + t.spacing.md + t.layout.minTouch + t.spacing.sm,
+          alignItems: 'center',
+        }}
+      >
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Ver post"
+          onPress={() => openPost(story.postId!)}
+          style={{
+            minHeight: t.layout.minTouch,
+            paddingHorizontal: t.spacing.lg,
+            borderRadius: t.radii.pill,
+            backgroundColor: t.colors.overlay,
+            borderWidth: t.borders.hairline,
+            borderColor: t.colors.onOverlay,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: t.spacing.xs,
+          }}
+        >
+          <Icon name="arrow-forward-outline" size="sm" color={t.colors.onOverlay} />
+          <Text variant="small" bold style={onOverlay}>
+            Ver post
+          </Text>
+        </Pressable>
+      </View>
+    ) : null}
 
     <ReactionPicker
       visible={picking}
