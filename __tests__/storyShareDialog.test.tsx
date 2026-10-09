@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const mockPrepare = jest.fn();
@@ -140,5 +141,53 @@ describe('StoryShareDialog', () => {
     await fireEvent.press(screen.getByLabelText('Tentar de novo'));
     await screen.findByTestId('story-share-preview');
     expect(mockPrepare).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('StoryShareDialog: revisão final', () => {
+  it('trocar o fundo durante o envio não derruba o arquivo que está subindo', async () => {
+    let n = 0;
+    URL.createObjectURL = jest.fn(() => `blob:${++n}`);
+    let finish: (v: unknown) => void = () => {};
+    mockUpload.mockReturnValue(new Promise((r) => (finish = r)));
+    mockCreate.mockResolvedValue(undefined);
+    await open();
+    await fireEvent.press(screen.getByLabelText('Story do Fellas'));
+    const uploading = mockUpload.mock.calls[0][0];
+    await fireEvent.press(screen.getByLabelText('Fundo tinta'));
+    expect(mockBlob).not.toHaveBeenCalledWith(expect.anything(), 'tinta');
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(uploading);
+    finish({ mediaId: 'stories/x', durationMs: 5000 });
+    await screen.findByText('Foi pro seu story');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(uploading);
+  });
+
+  it('o post atualizado ao vivo (curtida, volta do Instagram) não remonta a imagem', async () => {
+    const onClose = jest.fn();
+    const ui = (p: FeedPost) => (
+      <SafeAreaProvider initialMetrics={metrics}>
+        <StoryShareDialog post={p} visible onClose={onClose} />
+      </SafeAreaProvider>
+    );
+    const r = await render(ui(post));
+    await screen.findByTestId('story-share-preview');
+    await fireEvent.press(screen.getByLabelText('Fundo tinta'));
+    await r.rerender(ui({ ...post, likeCount: 9 }));
+    await waitFor(() => expect(mockBlob).toHaveBeenLastCalledWith(expect.anything(), 'tinta'));
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Fundo tinta').props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it('a prévia cabe inteira na área (largura limitada, 9:16)', async () => {
+    mockTier = 'expanded';
+    await open();
+    await fireEvent(screen.getByTestId('story-share-area'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 700 } } });
+    const style = StyleSheet.flatten(screen.getByTestId('story-share-frame').props.style);
+    expect(style.width).toBe(300);
+    expect(style.height).toBeCloseTo((300 * 16) / 9);
+    await fireEvent(screen.getByTestId('story-share-area'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 600, height: 400 } } });
+    const wide = StyleSheet.flatten(screen.getByTestId('story-share-frame').props.style);
+    expect(wide.height).toBe(400);
+    expect(wide.width).toBeCloseTo((400 * 9) / 16);
   });
 });

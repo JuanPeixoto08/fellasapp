@@ -41,6 +41,16 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
   const urlRef = useRef<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const name = post.author.display_name || post.author.username;
+  // o post e a lista de fellas mudam de objeto ao vivo (curtida, volta do Instagram): a imagem usa os da abertura
+  const latest = useRef({ post, byUsername });
+  latest.current = { post, byUsername };
+  // área do meio: a prévia 9:16 cabe inteira nela (largura e altura)
+  const [area, setArea] = useState<{ width: number; height: number } | null>(null);
+  const frame = area
+    ? area.width / area.height < t.layout.storyAspect
+      ? { width: area.width, height: area.width / t.layout.storyAspect }
+      : { width: area.height * t.layout.storyAspect, height: area.height }
+    : { width: 0, height: 0 };
 
   const forget = () => {
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
@@ -63,7 +73,7 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
     setPreview(null);
     setError(null);
     setDone(false);
-    prepareCard(cardSource(post, byUsername))
+    prepareCard(cardSource(latest.current.post, latest.current.byUsername))
       .then((card) => {
         if (!active) return;
         setPrepared(card);
@@ -75,7 +85,7 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
     return () => {
       active = false;
     };
-  }, [visible, post, byUsername, attempt]);
+  }, [visible, post.id, attempt]);
 
   // a imagem do fundo escolhido; a anterior fica na tela até a nova chegar
   useEffect(() => {
@@ -108,8 +118,10 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
     if (!preview || sending) return;
     setSending(true);
     setError(null);
+    // endereço só deste envio: trocar a prévia no meio não pode revogar o arquivo que está subindo
+    const url = URL.createObjectURL(preview.blob);
     try {
-      const { mediaId, durationMs } = await uploadStoryMedia(preview.url, 'photo');
+      const { mediaId, durationMs } = await uploadStoryMedia(url, 'photo');
       await createStory({ kind: 'photo', mediaId, durationMs, postId: post.id });
       emitStoriesChanged();
       setDone(true);
@@ -117,6 +129,7 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
     } catch (e) {
       setError(e instanceof StoryUploadError ? e.message : friendlyError(e, 'Não rolou postar o story. Tenta de novo.'));
     } finally {
+      URL.revokeObjectURL(url);
       setSending(false);
     }
   };
@@ -142,7 +155,11 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
         </Text>
       </View>
 
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: t.spacing.md, gap: t.spacing.lg }}>
+      <View
+        testID="story-share-area"
+        onLayout={(e) => setArea({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        style={{ flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', margin: t.spacing.md, gap: t.spacing.lg }}
+      >
         {failed ? (
           <>
             <Text align="center" style={onOverlay}>
@@ -152,9 +169,9 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
           </>
         ) : (
           <View
+            testID="story-share-frame"
             style={{
-              height: '100%',
-              aspectRatio: t.layout.storyAspect,
+              ...frame,
               borderRadius: t.radii.lg,
               overflow: 'hidden',
               backgroundColor: t.colors.overlay,
@@ -179,7 +196,7 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
       {prepared && !failed ? (
         <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', justifyContent: 'center', gap: t.spacing.xs, paddingBottom: t.spacing.md }}>
           {options.map((b) => (
-            <BackgroundDot key={b} bg={b} photoUrl={post.images[0] ?? null} selected={b === bg} onPress={() => setBg(b)} />
+            <BackgroundDot key={b} bg={b} photoUrl={post.images[0] ?? null} selected={b === bg} disabled={sending || done} onPress={() => setBg(b)} />
           ))}
         </View>
       ) : null}
@@ -230,7 +247,7 @@ export function StoryShareDialog({ post, visible, onClose }: Props) {
 }
 
 /** Bolinha de um fundo: anel `onOverlay` na escolhida; a da foto mostra a própria foto. */
-function BackgroundDot({ bg, photoUrl, selected, onPress }: { bg: StoryBackground; photoUrl: string | null; selected: boolean; onPress: () => void }) {
+function BackgroundDot({ bg, photoUrl, selected, disabled, onPress }: { bg: StoryBackground; photoUrl: string | null; selected: boolean; disabled: boolean; onPress: () => void }) {
   const t = useTheme();
   const d = t.layout.storyShare.dot;
   const dot = { width: d, height: d, borderRadius: d / 2, borderWidth: t.borders.hairline, borderColor: t.colors.overlay };
@@ -238,7 +255,8 @@ function BackgroundDot({ bg, photoUrl, selected, onPress }: { bg: StoryBackgroun
     <Pressable
       accessibilityRole="radio"
       accessibilityLabel={BACKGROUND_LABEL[bg]}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={{
         width: t.layout.minTouch,
