@@ -63,9 +63,9 @@ desenho:
   girado −2,2°, papel `#F4F1EA`, padding 60, sombra suave (offset 0,28 · blur 72 · preto 30%). Duas fitas
   (248 × 68, papel 62%) nos cantos de cima, a −28° e +24°.
 - Fundo papel: recorte branco `#FFFFFF` e sombra mais leve (é o único fundo claro).
-- Marca FELLAS: o mesmo desenho de `components/ui/Logo.tsx` (path exportado de lá), altura 48, centrada, a
+- Marca FELLAS: o mesmo desenho de `components/ui/Logo.tsx` (o path sai para `lib/logoPath.ts` e os dois usam), altura 48, centrada, a
   384 da base, cor do `contrast.ts`.
-- Cabeçalho no recorte: avatar 120 (foto em círculo, ou iniciais em `brandSoft`/`brand` como o `Avatar`),
+- Cabeçalho no recorte: avatar 120 (foto em círculo, ou iniciais com as cores do `Avatar`: `avatarPalette` + `avatarInk`),
   nome Golos Bold 50, "@usuario · há 2 h" Golos Regular 42 a 62% (mesmo `postTime` do app), local (quando
   tem) em linha abaixo com o ícone de local.
 
@@ -80,8 +80,8 @@ desenho:
 - **Ingresso:** versão mini dentro do recorte: música = capa quadrada 200 + nome (bold, 2 linhas) + artista;
   filme = pôster 2:3 de 200 de largura + título (bold) + ano + estrelas (e coração quando tem). Sem a review
   nem o vinil girando.
-- **Fotos:** só a primeira, largura do recorte, proporção original limitada entre 4:5 e 16:9 (corta ao
-  centro), raio 24. Mais de uma: selo "+N" (pílula `overlay` + `onOverlay`) no canto de baixo à direita. GIF
+- **Fotos:** só a primeira, largura do recorte, proporção original limitada entre 4:5 e 16:9 e altura até 600
+  (corta ao centro), raio 24. Mais de uma: selo "+N" (pílula `overlay` + `onOverlay`) no canto de baixo à direita. GIF
   entra parado (o quadro que o navegador tiver).
 - Altura máxima do recorte: o que cabe entre as faixas reservadas (1920 − 250 − 340 − espaço da marca). O
   texto é o que encolhe/corta; foto, enquete e ingresso têm tamanho fixo.
@@ -100,8 +100,8 @@ As cores da imagem são fixas (não seguem o tema do aparelho): ficam num token 
 
 **Fontes e imagens:** antes de desenhar, `document.fonts.load` dos pesos da Golos usados (mesmas famílias
 registradas pelo `expo-font`). Imagens com `crossOrigin = 'anonymous'` (Supabase Storage e Cloudinary
-liberam CORS; Last.fm/Letterboxd: se o canvas ficar "sujo", a capa/pôster sai e entra o lugar vazio do
-ingresso, com ícone). Foto do post que não carrega: sai do recorte e o fundo "foto" some das bolinhas.
+liberam CORS; Last.fm/Letterboxd: imagem sem CORS nem carrega com `crossOrigin`, então a capa/pôster
+sai e entra um quadrado `surfaceSunken` — sem ícone, o canvas não desenha Ionicons). Foto do post que não carrega: sai do recorte e o fundo "foto" some das bolinhas.
 Avatar que não carrega: iniciais.
 
 ### Montador (`components/share/StoryShareDialog.tsx`)
@@ -113,9 +113,12 @@ Avatar que não carrega: iniciais.
   só o fundo e as cores da marca/fita mudam).
 - Bolinhas de fundo: 30 pt de diâmetro, toque de 44, anel `brand` (escuro) na escolhida, rótulo acessível
   com o nome do fundo ("Fundo violeta"…); a da foto mostra a própria foto.
-- Botões (`Button`): à esquerda `secondary` "Instagram" (ícone `logo-instagram`) — vira "Baixar imagem"
-  (`download-outline`) onde `navigator.canShare({ files })` é falso; à direita `primary` "Story do Fellas"
+- Botões (`Button` ganha `icon` e as variantes `overlay` — fundo `onOverlay`, texto `viewerBg` — e
+  `overlayOutline` — fio e texto `onOverlay` —, para o palco escuro): à esquerda `overlayOutline` "Instagram" (ícone `logo-instagram`) — vira "Baixar imagem"
+  (`download-outline`) onde `navigator.canShare({ files })` é falso; à direita `overlay` "Story do Fellas"
   (`add-circle-outline`) com loading enquanto sobe.
+- A imagem de cada fundo já fica pronta (Blob) quando a prévia aparece: o toque em "Instagram" chama
+  `navigator.share` na hora (o Safari do iPhone só deixa compartilhar dentro do toque, sem espera antes).
 - Sucesso no Fellas: o botão mostra "Foi pro seu story" por ~1,2 s e o montador fecha. Erro: texto em
   `danger` acima dos botões — `StoryUploadError` traz a mensagem pronta; o resto passa pelo `friendlyError(e,
   'Não rolou postar o story. Tenta de novo.')`. Erro ao gerar a imagem: "Não rolou montar a imagem. Tenta de
