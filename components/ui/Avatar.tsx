@@ -1,6 +1,7 @@
 import { Image, View } from 'react-native';
 
-import { avatarInk, avatarPalette, useTheme } from '../../lib/theme';
+import { avatarColor, initials, INITIALS_SCALE } from '../../lib/avatarLook';
+import { avatarInk, useTheme } from '../../lib/theme';
 import { Text } from './Text';
 
 export type AvatarProps = {
@@ -8,19 +9,6 @@ export type AvatarProps = {
   uri?: string | null;
   size?: number;
 };
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (parts[0][0] + last).toUpperCase();
-}
-
-function colorFor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return avatarPalette[h % avatarPalette.length];
-}
 
 export function Avatar({ name, uri, size = 40 }: AvatarProps) {
   const t = useTheme();
@@ -37,13 +25,13 @@ export function Avatar({ name, uri, size = 40 }: AvatarProps) {
   return (
     <View
       accessibilityLabel={`Avatar de ${name}`}
-      style={[box, { backgroundColor: colorFor(name), alignItems: 'center', justifyContent: 'center' }]}
+      style={[box, { backgroundColor: avatarColor(name), alignItems: 'center', justifyContent: 'center' }]}
     >
       <Text
         style={{
           color: avatarInk,
           fontFamily: t.fonts.display,
-          fontSize: Math.round(size * 0.4),
+          fontSize: Math.round(size * INITIALS_SCALE),
           lineHeight: Math.round(size * 0.5),
         }}
       >

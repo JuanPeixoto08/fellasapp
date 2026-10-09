@@ -195,6 +195,8 @@ export const layout = {
   ticket: { reviewStub: 92, reviewMinHeight: 138, notch: 10, kickerTracking: 1.2 },
   /** Música no post: capa (`sleeve`) com o disco saindo dela; o selo do disco (`label`) é a capa; uma volta em `spinMs`. */
   vinyl: { sleeve: 88, disc: 84, discOffset: 50, label: 32, spinMs: 3200 },
+  /** Montador "compartilhar no story": largura da janela no computador e bolinha de fundo. */
+  storyShare: { width: 340, dot: 30 },
   gutter: spacing.lg,
   minTouch: 44,
 } as const;
@@ -211,8 +213,49 @@ export const gameTable = {
   cardInk: '#121212',
 } as const;
 
-/** Durações em ms. */
-export const motion = { fast: 120, base: 180 } as const;
+/**
+ * Imagem do "compartilhar no story" (1080 × 1920, desenhada no canvas): cores fixas, iguais nos dois temas
+ * (a imagem é um objeto, como a mesa dos games), e medidas em px da imagem.
+ */
+export const storyCard = {
+  width: 1080,
+  height: 1920,
+  /** Faixas que o Instagram cobre (perfil no topo, resposta embaixo): sem conteúdo importante. */
+  safeTop: 250,
+  safeBottom: 340,
+  backgrounds: { violeta: '#5B3FD9', tinta: '#121212', vermelho: '#C81E3A', papel: '#EAE5D8' },
+  /** Fundo "foto": reduzida a 1/20 e esticada de volta (desfoque que funciona em qualquer navegador) + escurecido. */
+  photoBlurScale: 20,
+  photoDim: 'rgba(18, 18, 18, 0.38)',
+  paper: '#F4F1EA',
+  paperOnLight: '#FFFFFF',
+  ink: '#121212',
+  inkMuted: 'rgba(18, 18, 18, 0.62)',
+  brand: '#5B3FD9',
+  brandSoft: '#E6DFFB',
+  sunken: '#EAE5D8',
+  like: '#C81E3A',
+  tape: 'rgba(244, 241, 234, 0.62)',
+  tapeOnLight: 'rgba(255, 255, 255, 0.7)',
+  shadow: { color: 'rgba(0, 0, 0, 0.30)', blur: 72, offsetY: 28 },
+  shadowOnLight: { color: 'rgba(18, 18, 18, 0.16)', blur: 48, offsetY: 16 },
+  /** Selo "+N" sobre a foto. */
+  badge: { bg: 'rgba(18, 18, 18, 0.6)', fg: '#F4F1EA', height: 80, padX: 28, size: 44, inset: 24 },
+  /** Recorte: margem lateral, respiro interno, giro, quanto sobe do centro (fração da altura) e vão entre blocos. */
+  clip: { margin: 104, padding: 60, rotateDeg: -2.2, lift: 0.05, gap: 36 },
+  tapeSize: { width: 248, height: 68, leftDeg: -28, rightDeg: 24 },
+  header: { avatar: 120, gap: 32, name: 50, meta: 42, nameLine: 60, metaLine: 55 },
+  text: { big: 72, normal: 54, min: 40, step: 2, lineHeight: 1.4, bigMaxChars: 80 },
+  photo: { radius: 24, minAspect: 4 / 5, maxAspect: 16 / 9, maxHeight: 600, minHeight: 240 },
+  poll: { row: 132, gap: 16, radius: 16, stroke: 4, padX: 32, label: 46, footer: 40, footerLine: 56 },
+  ticket: { thumb: 200, posterRatio: 1.5, gap: 32, radius: 12, title: 50, titleLine: 62, meta: 40, metaLine: 54 },
+  /** Marca FELLAS: altura, distância da base e o vão mínimo até o recorte. */
+  mark: { height: 48, bottom: 384, gap: 64 },
+  jpegQuality: 0.92,
+} as const;
+
+/** Durações em ms. `confirm`: quanto um "deu certo" fica à vista antes de fechar. */
+export const motion = { fast: 120, base: 180, confirm: 1200 } as const;
 
 export type Shadow = {
   shadowColor: string;
