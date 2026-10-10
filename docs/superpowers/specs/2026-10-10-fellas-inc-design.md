@@ -115,7 +115,7 @@ para continuar comprando naquela era e não tem volta. Valores finais saem da si
 | 4 | **Abrir capital**: produção +30%, contratos custam ×2 · **Monopólio**: benefício das suas propriedades ×2, tomar custa ×1,5 pra você · **Cultura de startup**: +15% por contratado (no lugar de 10%) e seus contratados ganham ×3 |
 | 5 | **Expansão global**: geradores 25–30 +100% · **Holding**: +3% por gerador diferente que você tem · **Rolê eterno**: oportunidades duram 30 s e limite diário +5 |
 
-O placar mostra as estratégias de cada um.
+O placar mostra as estratégias de cada um e é ordenado pelo R$/s (mostra "+R$ X/s", sem o boost das oportunidades); o unicórnio da semana continua sendo o maior valuation.
 
 ## 5. Contratar amigos
 

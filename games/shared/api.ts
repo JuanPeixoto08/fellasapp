@@ -87,10 +87,10 @@ export async function weekBoard(): Promise<BoardRow[]> {
 }
 
 export async function idleBoard(): Promise<IdleBoardRow[]> {
-  const rows = await rpc<{ user_id: string; valuation: number; era: number; strategies: number[] }[]>('idle_board');
+  const rows = await rpc<{ user_id: string; valuation: number; rate: number; era: number; strategies: number[] }[]>('idle_board');
   const quem = await fellas(rows.map((r) => r.user_id));
   return rows.map((r) => ({
-    userId: r.user_id, valuation: r.valuation, era: r.era, strategies: r.strategies,
+    userId: r.user_id, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
     name: quem.find((f) => f.id === r.user_id)?.name ?? 'Alguém',
   }));
 }

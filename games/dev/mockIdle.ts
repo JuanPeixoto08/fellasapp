@@ -18,11 +18,11 @@ export const myId = async () => ME;
 
 export async function idleBoard(): Promise<IdleBoardRow[]> {
   await bots;
-  const rows = await call<{ user_id: string; valuation: number; era: number; strategies: number[] }[]>('select public.idle_board() as v');
+  const rows = await call<{ user_id: string; valuation: number; rate: number; era: number; strategies: number[] }[]>('select public.idle_board() as v');
   const names = await call<{ id: string; name: string }[]>(
     `select coalesce(jsonb_agg(jsonb_build_object('id', id, 'name', display_name)), '[]') as v from public.profiles`,
   );
-  return rows.map((r) => ({ userId: r.user_id, valuation: r.valuation, era: r.era, strategies: r.strategies, name: names.find((n) => n.id === r.user_id)?.name ?? 'Alguém' }));
+  return rows.map((r) => ({ userId: r.user_id, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies, name: names.find((n) => n.id === r.user_id)?.name ?? 'Alguém' }));
 }
 
 // console do dev: __rico(1e12) põe valuation na sua empresa para testar o resto do jogo

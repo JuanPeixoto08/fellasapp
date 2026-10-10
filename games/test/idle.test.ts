@@ -255,15 +255,27 @@ describe('oportunidades no banco', () => {
 const envelhecer = () => q('update public.idle_state set week_start = week_start - 7 where true');
 
 describe('placar', () => {
-  it('só quem abriu a empresa, do maior pro menor valuation', async () => {
+  it('só quem abriu a empresa, do maior pro menor R$/s (não pelo valuation)', async () => {
+    await t.rpc('idle_start');
+    await dar(A, 500);
+    await ter(A, 2, 5);
+    await t.as(B);
+    await t.rpc('idle_start');
+    await dar(B, 900);
+    const rows = await t.rpc<{ user_id: string; valuation: number; rate: number; era: number }[]>('idle_board');
+    expect(rows.map((r) => r.user_id)).toEqual([A, B]);
+    expect(rows[0].rate).toBeGreaterThan(rows[1].rate);
+    expect(rows[1].rate).toBe(0.5); // só o gerador 1 do Abrir CNPJ
+    expect(rows[1].valuation).toBeGreaterThanOrEqual(900);
+  });
+  it('R$/s empatado: desempata pelo valuation', async () => {
     await t.rpc('idle_start');
     await dar(A, 500);
     await t.as(B);
     await t.rpc('idle_start');
     await dar(B, 900);
-    const rows = await t.rpc<{ user_id: string; valuation: number; era: number }[]>('idle_board');
+    const rows = await t.rpc<{ user_id: string }[]>('idle_board');
     expect(rows.map((r) => r.user_id)).toEqual([B, A]);
-    expect(rows[0].valuation).toBeGreaterThanOrEqual(900);
   });
 });
 

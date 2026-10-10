@@ -224,7 +224,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
           .map((o, k) => catalogo.estrategias.find((e) => e.era === k + 2 && e.opcao === o)?.nome)
           .filter(Boolean)
           .join(' · ');
-        li.append(el('span', 'pos', `${i + 1}º`), el('span', 'nome', r.name), el('span', 'sub', `${ERAS[r.era - 1]}${est ? ` · ${est}` : ''}`), el('span', 'v', formatarValor(r.valuation)));
+        li.append(el('span', 'pos', `${i + 1}º`), el('span', 'nome', r.name), el('span', 'sub', `${ERAS[r.era - 1]}${est ? ` · ${est}` : ''}`), el('span', 'v', formatarTaxa(r.rate)));
         listaP.append(li);
       });
     }

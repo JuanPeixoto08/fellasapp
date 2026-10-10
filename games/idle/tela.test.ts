@@ -87,6 +87,13 @@ describe('tela da Fellas Inc.', () => {
     expect(prazo(40 * 60000)).toBe('some em 40 min');
     expect(prazo(30000)).toBe('some em menos de 1 min');
   });
+  it('placar mostra o R$/s de cada um, não o valuation', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1] }] }));
+    const v = root.querySelector('.lista-placar .v')!.textContent!;
+    expect(v).toContain('/s');
+    expect(v).not.toContain('bi');
+  });
   it('placar ainda não carregado: Carregando…', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: null }));

@@ -120,4 +120,4 @@ export type IdleState = {
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
 };
-export type IdleBoardRow = { userId: string; name: string; valuation: number; era: number; strategies: number[] };
+export type IdleBoardRow = { userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[] };
