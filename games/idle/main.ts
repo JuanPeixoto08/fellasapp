@@ -34,6 +34,7 @@ let fase: Fase = 'carregando';
 let ancora: Ancora | null = null;
 let aba: Aba = 'geradores';
 let placar: IdleBoardRow[] | null = null;
+let placarFalhou = false;
 let aviso: string | null = null;
 let ocupado = false;
 let caixaAberta = false;
@@ -55,10 +56,14 @@ const tela = criarTela(document.getElementById('app')!, {
   trocarAba: (nova) => {
     aba = nova;
     if (nova === 'placar' || nova === 'contratar') void carregarPlacar();
+    if (nova === 'contratar') void prepararDesenhista();
     render();
   },
   caixa: (aberta) => { caixaAberta = aberta; render(); },
-  tentarDeNovo: () => void guard(recarregar),
+  tentarDeNovo: () => {
+    if (placar === null) void carregarPlacar();
+    void guard(recarregar);
+  },
   contratar: (uid) => void guard(async () => {
     aplicar(await api.idleHire(uid));
     await carregarPlacar();
@@ -69,8 +74,10 @@ const tela = criarTela(document.getElementById('app')!, {
       if (v) void guard(() => salvarVisual(v));
       return;
     }
-    if (acao === 'abrir') rascunho = { ...(ancora?.estado.avatar ?? PADRAO) };
-    else if (acao === 'fechar') {
+    if (acao === 'abrir') {
+      rascunho = { ...(ancora?.estado.avatar ?? PADRAO) };
+      void prepararDesenhista();
+    } else if (acao === 'fechar') {
       rascunho = null;
       editorFechado = true;
     } else rascunho = sortear();
@@ -84,18 +91,35 @@ const tela = criarTela(document.getElementById('app')!, {
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
 // o palco recebe o kit como função (tenta de novo quando falha); o editor e as cartas esperam o mesmo kit
 const palco = criarPalco(tela.canvas, ativos.camadas, carregarKit);
-void (async () => {
-  const k = await carregarKit().catch(() => null); // já avisou no console; sem kit os bonecos ficam vazios
-  const url = ativos.cadeira();
-  const cadeira = url
-    ? await carregarImagem(url).catch((e) => {
-        console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
-        return null;
-      })
-    : null;
-  desenhar = criarDesenhista(k, cadeira);
-  render();
-})();
+// bonecos soltos: se o kit falhar, tenta de novo (30 s, ao voltar pra aba, ao abrir Contratar/editor) e recria o desenhista
+let desenhistaPronto = false;
+let desenhistaCarregando = false;
+let cadeiraImg: Awaited<ReturnType<typeof carregarImagem>> | null | undefined;
+async function prepararDesenhista() {
+  if (desenhistaPronto || desenhistaCarregando) return;
+  desenhistaCarregando = true;
+  try {
+    const k = await carregarKit(); // null = a arte ainda não existe (não é falha)
+    if (cadeiraImg === undefined) {
+      const url = ativos.cadeira();
+      cadeiraImg = url
+        ? await carregarImagem(url).catch((e) => {
+            console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
+            return null;
+          })
+        : null;
+    }
+    desenhar = criarDesenhista(k, cadeiraImg);
+    desenhistaPronto = true;
+    render();
+  } catch {
+    // o kit já avisou no console; os bonecos ficam vazios até a próxima tentativa
+    setTimeout(() => void prepararDesenhista(), 30_000);
+  } finally {
+    desenhistaCarregando = false;
+  }
+}
+void prepararDesenhista();
 
 function agoraSrv() {
   return ancora ? agoraServidor(ancora, Date.now()) : Date.now();
@@ -114,7 +138,7 @@ function render() {
   const agora = agoraSrv();
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
-  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
+  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
 
@@ -161,8 +185,10 @@ const ERRO_PLACAR = 'Não deu pra carregar o placar. Tenta de novo.';
 async function carregarPlacar() {
   try {
     placar = await api.idleBoard();
+    placarFalhou = false;
     if (aviso === ERRO_PLACAR) aviso = null;
   } catch {
+    placarFalhou = placar === null;
     aviso = ERRO_PLACAR;
   }
   render();
@@ -206,6 +232,7 @@ setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'contra
 
 // voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)
 document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void prepararDesenhista();
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
 });
 

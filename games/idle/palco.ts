@@ -52,10 +52,21 @@ export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) 
     const c = camadas(nome);
     const quem = gente;
     void (async () => {
-      const [fundo, frente, k2] = await Promise.all([carregarImagem(c.fundo), c.frente ? carregarImagem(c.frente) : null, typeof kit === 'function' ? kit() : kit]);
+      // o kit só é preciso quando a cena tem vagas (tira antiga, sem gente, não depende dele)
+      let kitFalhou: unknown = null;
+      const pedirKit = c.vagas ? (typeof kit === 'function' ? kit() : kit).catch((e) => { kitFalhou = e ?? new Error('kit'); return null; }) : null;
+      const [fundo, frente, k2] = await Promise.all([carregarImagem(c.fundo), c.frente ? carregarImagem(c.frente) : null, pedirKit]);
       const tira = c.vagas ? montarTira({ fundo, frente, vagas: c.vagas }, ocuparVagas(c.vagas, quem.dono, quem.equipe), k2) : fundo;
       const cv = document.createElement('canvas');
       pintar(cv, tira);
+      if (kitFalhou) {
+        // fundo + frente sem gente: toca, mas não guarda a tira, pra nova tentativa montar com gente
+        console.warn(`Fellas Inc.: o kit de personagens não carregou; a cena ${nome} vai sem gente por enquanto`, kitFalhou);
+        if (k === chaveDe(nome)) ultima.set(nome, cv);
+        falhas.add(k);
+        setTimeout(() => falhas.delete(k), 30_000);
+        return;
+      }
       tiras.set(k, cv);
       if (k === chaveDe(nome)) ultima.set(nome, cv);
     })()

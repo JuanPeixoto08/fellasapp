@@ -19,6 +19,8 @@ export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
 export type Modelo = {
   fase: Fase; estado: IdleState | null; aba: Aba; placar: IdleBoardRow[] | null; aviso: string | null;
   ocupado: boolean; pendentes: number[]; aoVivo: number | null; caixaAberta: boolean;
+  /** O último pedido do placar falhou (e ainda não há placar pra mostrar). */
+  placarFalhou: boolean;
   /** Rascunho do editor de personagem (null = fechado). */
   editor: IdleVisual | null;
 };
@@ -30,6 +32,7 @@ export type Acoes = {
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
 
 const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidden') : n.setAttribute('hidden', ''));
+const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
 
 /** "some em 3h12" / "some em 40 min": quanto falta pra oportunidade guardada sumir. */
@@ -322,7 +325,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       );
       topoC.append(boneco(s.avatar, 'Seu personagem'), texto, button('Mudar visual', 'btn', () => a.editor('abrir')));
       listaC.append(topoC);
-      if (!m.placar) listaC.append(el('p', 'vazio', 'Carregando…'));
+      if (!m.placar) listaC.append(el('p', 'vazio', m.placarFalhou ? ERRO_GALERA : 'Carregando…'));
       else {
         const outros = m.placar.filter((r) => r.userId !== s.user_id);
         if (!outros.length) listaC.append(el('p', 'vazio', 'Ninguém mais abriu a empresa ainda. Chama a galera.'));
@@ -346,7 +349,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     }
 
     listaP.replaceChildren();
-    if (!m.placar) listaP.append(el('li', 'vazio', 'Carregando…'));
+    if (!m.placar) listaP.append(el('li', 'vazio', m.placarFalhou ? ERRO_GALERA : 'Carregando…'));
     else {
       if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda.'));
       m.placar.forEach((r, i) => {

@@ -15,7 +15,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
   ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
-  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, ...x,
+  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -218,6 +218,18 @@ describe('contratar', () => {
     expect(restam(30 * 3600_000)).toBe('por mais 1 dia');
     expect(restam(5.5 * 3600_000)).toBe('por mais 5 h');
     expect(restam(20 * 60_000)).toBe('por menos de 1 h');
+  });
+});
+
+describe('placar que falhou', () => {
+  it('Contratar e Placar mostram o erro em vez de Carregando… pra sempre', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'contratar', placar: null }));
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Carregando…');
+    tela.renderizar(modelo({ aba: 'contratar', placar: null, placarFalhou: true }));
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
+    tela.renderizar(modelo({ aba: 'placar', placar: null, placarFalhou: true }));
+    expect(root.querySelector('.lista-placar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
   });
 });
 
