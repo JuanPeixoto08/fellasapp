@@ -30,3 +30,49 @@ describe('catálogo no banco', () => {
     await expect(t.asRole('anon', 'select * from public.idle_cat_gen')).rejects.toThrow();
   });
 });
+
+type Estado = {
+  user_id: string; week_start: string; started: boolean; valuation: number; rate: number; generators: number[];
+  upgrades: number[]; strategies: number[]; era: number; boost_until: string | null; half_price: boolean;
+  opp_claimed: number[]; opp_left: number; server_now: string;
+};
+const recuar = (uid: string, segundos: number) =>
+  q(`update public.idle_state set settled_at = settled_at - make_interval(secs => $2) where user_id = $1`, [uid, segundos]);
+
+describe('idle_open / idle_start', () => {
+  it('primeira vez cria o estado da semana sem empresa aberta', async () => {
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s).toMatchObject({ user_id: A, started: false, valuation: 0, rate: 0, era: 1, strategies: [-1, -1, -1, -1], upgrades: [], half_price: false });
+    expect(s.generators).toEqual(Array(30).fill(0));
+  });
+  it('não membro é barrado', async () => {
+    await t.as(OUT);
+    await expect(t.rpc('idle_open')).rejects.toThrow(/not_member/);
+  });
+  it('Abrir CNPJ: 1 notebook e R$ 10; abrir de novo é erro', async () => {
+    const s = await t.rpc<Estado>('idle_start');
+    expect(s).toMatchObject({ started: true, valuation: 10, rate: 0.5 });
+    expect(s.generators[0]).toBe(1);
+    await expect(t.rpc('idle_start')).rejects.toThrow(/idle_started/);
+  });
+  it('bater o ponto acumula taxa × tempo', async () => {
+    await t.rpc('idle_start');
+    await recuar(A, 100);
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.valuation).toBeCloseTo(60, 0);
+  });
+  it('teto de 8 horas', async () => {
+    await t.rpc('idle_start');
+    await recuar(A, 10 * 3600);
+    expect((await t.rpc<Estado>('idle_open')).valuation).toBeCloseTo(10 + 0.5 * 8 * 3600, 0);
+  });
+  it('quem não abriu a empresa não acumula', async () => {
+    await t.rpc('idle_open');
+    await recuar(A, 3600);
+    expect((await t.rpc<Estado>('idle_open')).valuation).toBe(0);
+  });
+  it('ninguém escreve direto no estado', async () => {
+    await t.rpc('idle_start');
+    await expect(t.asRole('authenticated', `update public.idle_state set valuation = 1e9 where user_id = '${A}'`)).rejects.toThrow();
+  });
+});
