@@ -1,6 +1,6 @@
 # Fellas Inc., entrega 3: prestígio e conquistas
 
-Data: 10/10/2026. Status: desenho aprovado em conversa (10/10); esta spec aguarda revisão.
+Data: 10/10/2026. Status: aprovada pelo Juan (10/10).
 Base: `docs/superpowers/specs/2026-10-10-fellas-inc-design.md` (o jogo, sem reset) e a entrega 2 (contratos de 7 dias,
 personagem). Esta spec só acrescenta; o que não está aqui segue a base.
 
@@ -84,7 +84,7 @@ A simulação de hoje ganha um jogador que vende. Alvos:
 
 ### 3.3 Escondidas (zoeira; só aparecem quando alguém consegue)
 
-Ideias do Juan e da pesquisa (outubro de 2026). A lista final é o Juan que aprova:
+Ideias do Juan e da pesquisa (outubro de 2026), aprovadas. A do "Vitor" (boneco do jogo BBB) entra depois, quando o Juan explicar a piada (migração nova de catálogo):
 
 | Nome | Condição | Frase |
 |---|---|---|
@@ -92,7 +92,6 @@ Ideias do Juan e da pesquisa (outubro de 2026). A lista final é o Juan que apro
 | **Farmou aura** | ficar em 1º no placar (R$/s) | "+1000 de aura." |
 | **Aura negativa** | vender a startup e ganhar só 1 ponto | "Vendeu por um real e um abraço." |
 | **limaumdoc** | contratar o limaumdoc (pelo nome de usuário) | a combinar com o grupo |
-| **Vitor** | a combinar: o Juan explica a piada do "boneco do jogo BBB" | a combinar |
 | **Tá saindo da jaula** | comprar "Máx" de um gerador e levar 100+ unidades de uma vez | "Birl! O monstro tá saindo da jaula." |
 | **Guiana Brasileira** | comprar a melhoria "Filial em Portugal" (a de 25 unidades da "Filial em Dubai", que hoje se chama "Visto de negócios" e muda de nome nesta entrega, por migração nova de catálogo) | "Fala galera! A Guiana Brasileira agora tem sede." |
 | **Fez o L** | ter 50 estagiários (o do Luis) | "L de Luis, que fique claro." |
@@ -101,7 +100,7 @@ Ideias do Juan e da pesquisa (outubro de 2026). A lista final é o Juan que apro
 | **Pai tá on** | ser o unicórnio da semana | "O pai tá on." |
 | **Brainrot** | pegar 3 oportunidades em menos de 1 minuto | "Tung tung tung empreendedor." |
 
-Nomes de membros (limaumdoc) e do Luis aparecem no código, que é público: o Juan confirma que tudo bem para cada um.
+Nomes de membros (limaumdoc) e do Luis aparecem no código público: aprovado pelo Juan (10/10).
 
 ## 4. Telas (`games/idle/`)
 
@@ -136,5 +135,5 @@ Nomes de membros (limaumdoc) e do Luis aparecem no código, que é público: o J
 
 ## Pendências
 
-- O Juan aprova a lista de escondidas e explica a do "Vitor"; confirma nomes de membros no código público.
+- A conquista do "Vitor" (o Juan explica a piada).
 - Ícones das conquistas (arte por código, fora do repositório).
