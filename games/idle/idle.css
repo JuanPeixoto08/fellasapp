@@ -1,0 +1,47 @@
+/* Fellas Inc.: em cima do hud.css. Pixel art sempre ampliada por inteiro e sem borrar. */
+.idle { background: #121212; grid-template-rows: auto auto auto 1fr; }
+.idle .palco { position: relative; display: flex; justify-content: center; padding: 8px; }
+.idle .cena { width: 320px; height: 192px; image-rendering: pixelated; border-radius: 8px; }
+@media (min-width: 900px) { .idle .cena { width: 640px; height: 384px; } }
+.idle .vivo {
+  position: absolute; top: 40%; left: 0; width: 48px; height: 48px; border: 0; padding: 0; cursor: pointer;
+  background: transparent no-repeat 0 0 / 192px 48px; image-rendering: pixelated;
+  animation: atravessar linear forwards, quadros4 0.6s steps(4) infinite;
+}
+@keyframes atravessar { from { transform: translateX(0); } to { transform: translateX(calc(100vw - 48px)); } }
+@keyframes quadros4 { from { background-position-x: 0; } to { background-position-x: -192px; } }
+.idle .valor { text-align: center; padding: 4px 16px 8px; }
+.idle .numero { font: 800 32px var(--font); color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .taxa { color: var(--mint); font-weight: 600; }
+.idle .bonus { color: var(--gold); min-height: 1.2em; }
+.idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 24px; color: var(--paper); }
+.idle .abas { display: flex; gap: 8px; padding: 0 16px; }
+.idle .aba { flex: 1; min-height: 44px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); font: 700 15px var(--font); }
+.idle .aba.ativa { background: #5B3FD9; border-color: #B8A2FF; }
+.idle .painel { overflow: auto; padding-bottom: 24px; }
+.idle .lista { display: grid; gap: 8px; padding: 12px 16px; margin: 0; list-style: none; }
+.idle .gerador, .idle .melhoria { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; background: #1B1A22; color: var(--paper); }
+.idle .gerador.trancado { opacity: 0.5; }
+.idle .sprite { flex: none; width: 64px; height: 64px; background: no-repeat 0 0 / 256px 64px; image-rendering: pixelated; animation: quadros64 0.8s steps(4) infinite; }
+@keyframes quadros64 { from { background-position-x: 0; } to { background-position-x: -256px; } }
+.idle .meio { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.idle .sub { color: #A8A398; font-size: 13px; }
+.idle .compra { display: flex; gap: 6px; }
+.idle .compra .btn, .idle .melhoria .btn { min-height: 44px; min-width: 44px; }
+.idle .btn:disabled { opacity: 0.4; }
+.idle .icone { flex: none; width: 48px; height: 48px; border-radius: 6px; border: 3px solid #6B6874; background: #121212 no-repeat 0 0 / 192px 48px; image-rendering: pixelated; }
+.idle .icone.geral { background-size: 42px 42px; }
+.idle .icone.bronze { border-color: #C98A4B; } .idle .icone.prata { border-color: #B4B0BC; } .idle .icone.ouro { border-color: #FFD25E; }
+.idle .icone.roxo { border-color: #B8A2FF; } .idle .icone.diamante { border-color: #5EC8FF; }
+.idle .icone.sinergia { display: flex; }
+.idle .icone .mini { flex: 1; background: no-repeat 0 0 / 84px 21px; image-rendering: pixelated; }
+.idle .lista-placar li { display: grid; grid-template-columns: 32px 1fr auto; gap: 2px 8px; padding: 8px; border-radius: 8px; background: #1B1A22; color: var(--paper); }
+.idle .lista-placar li.eu { outline: 2px solid #B8A2FF; }
+.idle .lista-placar .sub { grid-column: 2; }
+.idle .lista-placar .v { grid-row: 1; grid-column: 3; font-weight: 700; }
+.idle .vazio { color: #A8A398; text-align: center; }
+.idle .modal { position: fixed; inset: 0; display: grid; align-content: center; gap: 12px; padding: 24px; background: rgba(11, 10, 14, 0.92); color: var(--paper); overflow: auto; z-index: 10; }
+.idle .cartao { display: grid; gap: 6px; padding: 12px; border-radius: 8px; background: #1B1A22; border: 1px solid #34323F; }
+.idle .cartao.off { opacity: 0.55; }
+.idle .caixinha { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo { animation: none; } }

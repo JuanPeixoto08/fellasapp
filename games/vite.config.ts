@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         blackjack: resolve(import.meta.dirname, 'blackjack/index.html'),
         poker: resolve(import.meta.dirname, 'poker/index.html'),
+        idle: resolve(import.meta.dirname, 'idle/index.html'),
       },
     },
   },

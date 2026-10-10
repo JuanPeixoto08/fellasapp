@@ -42,7 +42,7 @@ export function criarPalco(canvas: HTMLCanvasElement, urls: Record<NomeCena, str
   const quadro = (agora: number) => {
     raf = 0;
     if (!atual) return;
-    const q = quadroEm(atual.nome, agora - atual.inicio, atual.umaVez);
+    const q = quadroEm(atual.nome, Math.max(0, agora - atual.inicio), atual.umaVez);
     if (q === null) {
       const fim = atual.aoTerminar;
       atual = null;
