@@ -87,6 +87,17 @@ describe('tela da Fellas Inc.', () => {
     expect(prazo(40 * 60000)).toBe('some em 40 min');
     expect(prazo(30000)).toBe('some em menos de 1 min');
   });
+  it('melhorias: Compradas mostra as que você já tem, da mais recente pra mais antiga, sem botão de compra', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'melhorias', estado: estado({ upgrades: [1001, 1002] }) }));
+    porTexto('Compradas (2)').click();
+    const itens = [...root.querySelectorAll('.lista-melhorias .melhoria')];
+    expect(itens.map((x) => x.querySelector('strong')!.textContent)).toEqual(['Wi-Fi do vizinho', 'Café coado na hora']);
+    expect(itens.every((x) => !x.querySelector('.btn'))).toBe(true);
+    expect(porTexto('Compradas (2)').getAttribute('aria-pressed')).toBe('true');
+    porTexto(root.querySelector('.seg button')!.textContent!).click();
+    expect(root.querySelector('.lista-melhorias')!.textContent).not.toContain('Wi-Fi do vizinho');
+  });
   it('placar mostra o R$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1] }] }));

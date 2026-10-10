@@ -83,3 +83,8 @@
 /* o aviso fica por cima dos modais (z-index 10): erro ao escolher estratégia ou pegar na caixinha precisa aparecer */
 .idle .notice { position: fixed; z-index: 11; }
 @media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo, .idle .boneco { animation: none; } }
+/* aba Melhorias: À venda | Compradas */
+.idle .seg { display: flex; gap: 4px; padding: 4px; background: #121212; border: 1px solid #34323F; border-radius: 10px; }
+.idle .seg button { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: #A8A398; font: 600 14px var(--font); cursor: pointer; }
+.idle .seg button.ativo { background: #262431; color: var(--paper); }
+.idle .seg button:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }

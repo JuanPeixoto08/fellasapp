@@ -116,6 +116,9 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   let precos: { botao: HTMLButtonElement; preco: number; maximo?: { custo: number; n: number; cm: number } }[] = [];
   // "some em ..." das oportunidades guardadas (atualizado em atualizarValor)
   let prazos: { texto: HTMLElement; fim: number }[] = [];
+  // aba Melhorias: à venda ou as já compradas (só apresentação; refaz com o último modelo)
+  let verCompradas = false;
+  let ultimo: Modelo | null = null;
 
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
@@ -170,6 +173,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   }
 
   function renderizar(m: Modelo) {
+    ultimo = m;
     const s = m.estado;
     const jogando = m.fase === 'jogando' || m.fase === 'abrindo';
     precos = [];
@@ -201,8 +205,34 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
       const disponiveis = catalogo.melhorias
         .filter((x) => !s.upgrades.includes(x.id) && liberada(catalogo, x, s))
         .sort((x, y) => x.preco - y.preco);
-      if (!disponiveis.length) listaM.append(el('p', 'vazio', 'Nenhuma melhoria liberada agora. Compra mais geradores.'));
-      for (const x of disponiveis) {
+      const compradas = s.upgrades
+        .map((id) => catalogo.melhorias.find((x) => x.id === id))
+        .filter((x): x is Melhoria => !!x)
+        .reverse();
+      const seg = el('div', 'seg');
+      seg.setAttribute('role', 'group');
+      seg.setAttribute('aria-label', 'Melhorias');
+      for (const [compradasAba, texto] of [[false, `À venda (${disponiveis.length})`], [true, `Compradas (${compradas.length})`]] as const) {
+        const b = button(texto, verCompradas === compradasAba ? 'ativo' : '', () => {
+          verCompradas = compradasAba;
+          if (ultimo) renderizar(ultimo);
+        });
+        b.setAttribute('aria-pressed', String(verCompradas === compradasAba));
+        seg.append(b);
+      }
+      listaM.append(seg);
+      if (verCompradas) {
+        if (!compradas.length) listaM.append(el('p', 'vazio', 'Nenhuma melhoria comprada ainda.'));
+        for (const x of compradas) {
+          const item = el('div', 'melhoria comprada');
+          const meio = el('div', 'meio');
+          meio.append(el('strong', undefined, x.nome), el('span', 'sub', x.frase));
+          item.append(iconeMelhoria(x), meio);
+          listaM.append(item);
+        }
+      }
+      if (!verCompradas && !disponiveis.length) listaM.append(el('p', 'vazio', 'Nenhuma melhoria liberada agora. Compra mais geradores.'));
+      for (const x of verCompradas ? [] : disponiveis) {
         const item = el('div', 'melhoria');
         const meio = el('div', 'meio');
         meio.append(el('strong', undefined, x.nome), el('span', 'sub', x.frase));
