@@ -1,75 +1,84 @@
-# Fellas Inc., entrega 3 (prestígio e conquistas): plano de implementação
+# Fellas Inc., entrega 3 (prestígio, árvore de habilidades e conquistas): plano de implementação
 
 > **Para agentes:** SUB-SKILL OBRIGATÓRIA: use superpowers:subagent-driven-development (recomendado) ou
 > superpowers:executing-plans para executar este plano tarefa por tarefa. Os passos usam checkbox (`- [ ]`).
 
-> **Pendente do Juan antes de executar (alvo 2 da seção 1.4 da spec):** "depois de vender com 10 pontos, voltar à era
-> em que estava leva menos da metade do tempo da primeira vez" **não é alcançável com +1% por ponto**. Medido na
-> simulação ao planejar: a venda chega a 10 pontos com 5,5 dias (sai com 11, na era 5) e, recomeçando com 11 pontos, a
-> era 5 chega nos mesmos 3,0 dias da primeira vez (com 20 a 30 conquistas a mais, 2,7 dias). Para chegar à metade a
-> produção teria de ser ×5 desde o começo (uns +40% por ponto). Este plano segue a decisão "+1% por ponto" e trava o
-> que é verdade hoje ("voltar não fica mais lento"). Se o Juan quiser outro efeito por ponto, muda `POR_PONTO`
-> (`economia.ts`) e o `0.01` de `idle_bonus_mult` (0041) juntos, e o teste do alvo 2 volta a ser o da spec.
+> **Revisão de 10/10 (depois de o Juan ler a 1ª versão):** pontos de prestígio não mexem mais na produção: são moeda
+> de uma **árvore de habilidades** (raiz + 5 ramos de 5 nós), e os nós comprados é que dão os efeitos, pra sempre. A
+> venda rende `floor(cbrt(r/K)) − pontos ganhos na vida`; a aba nova é **Legado** (card + árvore + conquistas); 17
+> conquistas mudaram de nome. O alvo "metade do tempo" saiu da spec: agora é "voltar é mais rápido que da 1ª vez".
 
-**Objetivo:** "Vender a startup" troca a empresa por pontos de prestígio (+1% de produção cada, pra sempre) e 73
-conquistas (62 visíveis e 11 escondidas, de zoeira) dão +1% cada, pra sempre; aba Conquistas com o card de prestígio, a grade e
-o aviso de conquista na cena; pontos no placar.
+**Objetivo:** "Vender a startup" troca a empresa por pontos de prestígio, que se gastam numa árvore de habilidades
+(26 nós: produção, recomeço, oportunidades, teto do offline e contratos); 73 conquistas (62 visíveis e 11 escondidas, de
+zoeira) dão +1% cada, pra sempre; aba Legado com o card de prestígio, a árvore e a grade de conquistas; aviso de
+conquista na cena; pontos ganhos na vida no placar.
 
-**Arquitetura:** o banco continua a autoridade. A **0040** é o catálogo gerado de novo por `catalogoSql()` (conquistas +
-a melhoria 283 renomeada para "Filial em Portugal"). A **0041** acrescenta colunas permanentes em `idle_state`
-(pontos, vendas, recorde, contadores), a tabela `idle_conquistas`, o multiplicador `idle_bonus_mult` dentro de
-`idle_rate_at` (paridade com `economia.ts`), a conferência das conquistas dentro de `idle_save` (o último passo de toda
-função que muda o jogo, sempre depois de fechar a conta) e `idle_prestige()`. A página ganha a aba Conquistas, a folha
-de venda e o aviso de 3 s; os ícones são arte por código fora do repositório e a página funciona sem eles.
+**Arquitetura:** o banco continua a autoridade. A **0040** é o catálogo gerado de novo por `catalogoSql()`
+(conquistas, a árvore em `idle_cat_no` e a melhoria 283 renomeada para "Filial em Portugal"). A **0041** acrescenta
+colunas permanentes em `idle_state` (pontos ganhos e gastos, vendas, recorde, contadores), as tabelas `idle_conquistas`
+e `idle_arvore`, os efeitos da árvore (`idle_arv`/`idle_arvore_efeitos`) dentro de cada conta que eles mexem (taxa,
+contratos, teto do offline, caixinha, limite e bônus das oportunidades, preço e duração do contrato, "Abrir CNPJ"), a
+conferência das conquistas dentro de `idle_save` (o último passo de toda função que muda o jogo, sempre depois de fechar
+a conta), `idle_buy_node` e `idle_prestige`. Cada efeito existe igual em `economia.ts`/`oportunidades.ts`
+(`efeitosArvore`, paridade). A página ganha a aba Legado, a folha de venda e o aviso de 3 s; os ícones (conquistas e
+nós) são arte por código fora do repositório e a página funciona sem eles.
 
 **Tecnologias:** Postgres/Supabase (plpgsql, RLS), Vite + TypeScript + Vitest + PGlite (`games/`), Jest (travas das
 migrações no app), Node (script da arte em `../fellas-inc-esbocos`).
 
-**Spec:** `docs/superpowers/specs/2026-10-10-fellas-inc-prestigio-conquistas-design.md` (aprovada 10/10), sobre a base
-`docs/superpowers/specs/2026-10-10-fellas-inc-design.md`. Plano anterior: `docs/superpowers/plans/2026-10-10-fellas-inc-gente.md`.
+**Spec:** `docs/superpowers/specs/2026-10-10-fellas-inc-prestigio-conquistas-design.md` (aprovada e revista em 10/10),
+sobre a base `docs/superpowers/specs/2026-10-10-fellas-inc-design.md`. Plano anterior:
+`docs/superpowers/plans/2026-10-10-fellas-inc-gente.md`.
 
 **Ajustes de implementação em relação à spec** (decisões tomadas; o comportamento pedido não muda):
-- **Numeração:** `0040_fellas_inc_catalogo_conquistas.sql` (catálogo GERADO, Task 1) vem antes da lógica
-  `0041_fellas_inc_prestigio.sql` (Tasks 3–5), porque as funções `language sql` da lógica citam `idle_cat_conquista` e o
-  Postgres confere a tabela ao criar a função (mesma ordem da 0037/0038). 0033–0039 não se editam.
-- **K = 1 milhão** (medido na simulação; Task 2): `pontos_totais(r) = floor(cbrt(r / 1e6))`. Os dois lados acertam o
-  inteiro com `n³ ≤ x < (n+1)³` depois do `cbrt`, para o banco e a página nunca discordarem perto de um cubo (um ulp de
-  diferença no `cbrt` viraria 1 ponto de diferença).
+- **Numeração:** `0040_fellas_inc_catalogo_conquistas.sql` (catálogo GERADO: conquistas + árvore, Task 1) vem antes da
+  lógica `0041_fellas_inc_prestigio.sql` (Tasks 3–6), porque as funções `language sql` da lógica citam
+  `idle_cat_conquista`/`idle_cat_no` e o Postgres confere a tabela ao criar a função (mesma ordem da 0037/0038).
+- **K = 1 milhão** (medido; Task 2): `pontos_totais(r) = floor(cbrt(r / 1e6))`. Os dois lados acertam o inteiro com
+  `n³ ≤ x < (n+1)³` depois do `cbrt`, para o banco e a página nunca discordarem perto de um cubo.
+- **Pontos:** `prestige_earned` (ganhos na vida) e `prestige_spent` (gastos na árvore); livres = ganhos − gastos. A venda
+  rende `pontos_totais(r) − prestige_earned` (mínimo 1) e põe `prestige_earned = pontos_totais(r)`.
+- **Árvore:** ids `ramo·10 + posição` (a raiz é 1; Produção 11–15, Recomeço 21–25, Oportunidades 31–35, Tempo 41–45,
+  Gente 51–55); custos 1 (raiz) e 2 · 4 · 8 · 15 · 30 (296 pontos a árvore toda); cada nó exige o anterior do ramo (o 1º
+  exige a raiz). Valores da spec 1.3, com estas leituras: Produção multiplica (×1,05 × 1,1 × 1,25 × 1,5 × 2 × 2);
+  "contratar 50% mais barato" substitui o de 25% (vale o menor preço, não 0,75 × 0,5); "rendem 15%" é o mesmo 15% da
+  Cultura de startup (não soma); "quem te contrata rende o dobro" dobra o 2% × o que cada empresa paga, não o piso de
+  freela; "contrato dura 10 dias" vale para os contratos que a pessoa com o nó faz; "a venda mantém as melhorias gerais"
+  mantém as gerais que você tinha (não dá as 20); nó comprado com a empresa fechada vale no próximo "Abrir CNPJ".
+  Nomes dos nós escritos aqui (`nomes.ts`), revisáveis como texto.
 - **Onde as conquistas são conferidas:** `idle_check_conquistas(uid)` roda dentro de `idle_save` (troca da 0036). Toda
-  RPC que muda o jogo termina em `idle_save` depois de `idle_settle`, então a conquista nova só vale dali pra frente
-  (nada retroativo) e quem é contratado também é conferido (o `idle_save` dele roda no `idle_hire`). As "novas" que a
-  tela avisa são as gravadas nesta transação (`ganhou_em = now()`). Conquistas de evento (venda de 1 ponto, venda sem
-  nunca ter contratado, contratar o limaumdoc, Máx ≥ 100, abrir às 3h, unicórnio da foto) são dadas por
-  `idle_ganhar(uid, tipo, valor, texto)` na função que vê o evento, também depois de fechar a conta.
-- **Sem chave estrangeira de `idle_conquistas` para o catálogo:** a migração de catálogo faz `delete from
-  public.idle_cat_conquista where true` e regrava; uma FK bloquearia isso (ou, com cascade, apagaria conquistas).
-- **Contadores pra sempre** (não zeram na venda): `upg_total` (melhorias compradas), `opp_total` (oportunidades pegas),
-  `hire_total` (contratos que fez), `hired_total` (vezes que foi contratado), `est_usadas` (estratégias já usadas, código
-  era·10+opção), `opp_recent` (hora das 3 últimas pegas, para o "Brainrot"). As conquistas "10, 50, 150 melhorias" e "1,
-  25, 100, 500 oportunidades" contam a vida toda, somando todas as empresas. A 0041 preenche o que dá para saber do
-  passado (melhorias de agora, contratos, estratégias de agora, quem já foi unicórnio); oportunidades começam do zero.
-- **Venda:** `started = false` (a tela volta para a cena "antes" e o "Abrir CNPJ"); quem vendeu sai do placar até abrir
-  de novo (o placar é de quem tem empresa aberta, regra da 0036). O recorde de R$/s é guardado em todo `idle_save`.
+  RPC que muda o jogo termina em `idle_save` depois de `idle_settle`, então a conquista nova só vale dali pra frente e
+  quem é contratado também é conferido. As "novas" que a tela avisa são as gravadas nesta transação (`ganhou_em =
+  now()`). Conquistas de evento (venda de 1 ponto, venda sem nunca ter contratado, contratar o limaumdoc, Máx ≥ 100,
+  abrir às 3h, unicórnio da foto) são dadas por `idle_ganhar` na função que vê o evento, também depois de fechar a conta.
+- **Sem chave estrangeira** de `idle_conquistas`/`idle_arvore` para o catálogo: a migração de catálogo apaga e regrava
+  os catálogos; uma FK bloquearia isso (ou, com cascade, apagaria conquistas e nós).
+- **Contadores pra sempre** (spec: contam a vida toda): `upg_total`, `opp_total`, `hire_total`, `hired_total`,
+  `est_usadas` (código era·10+opção), `opp_recent` (hora das 3 últimas pegas, para o "Brainrot"). A 0041 preenche o que
+  dá para saber do passado (melhorias de agora, contratos, estratégias de agora, quem já foi unicórnio); oportunidades
+  começam do zero. `idle_save` guarda as janelas de oportunidade pegas das últimas 10h (eram 5h; a validade vai a 6h).
+- **Venda:** `started = false` (a tela volta para a cena "antes" e o "Abrir CNPJ"); quem vendeu sai do placar até
+  abrir de novo (o placar é de quem tem empresa aberta, regra da 0036). O recorde de R$/s é guardado em todo `idle_save`.
   Vencer os contratos feitos = `ends_at = now()` só nos ativos com `created_at < now()` (o check da tabela exige
   `ends_at > created_at`).
-- **"Farmou aura":** 1º estrito em R$/s entre quem tem empresa aberta, com mais alguém com empresa aberta (sozinho ou
-  empatado não conta). "Indeciso profissional": as 3 opções de uma era (eras com opção desligada, 3 e 4, só contam
-  quando a entrega 4 ligar a opção). "Conhece todos os caminhos": todas as opções ligadas.
-- **Contagem "N/total"** conta todas as conquistas do catálogo, escondidas inclusive (73 hoje). Na grade, a bloqueada
-  aparece apagada com o nome; a condição aparece ao tocar (no mesmo lugar onde a ganha mostra a frase e a data), para a
-  grade caber no celular.
-- **Testes antigos:** `freshDb({ conquistas: false })` esvazia o catálogo das conquistas para `idle.test.ts` e
-  `idleGente.test.ts`, que conferem a conta exata sem o +1% das conquistas que as ações vão ganhando.
-- **Frase do limaumdoc** ("a combinar com o grupo" na spec): provisória "Contratou o limaumdoc. Agora é com ele."; trocar
-  é só texto (`nomes.ts`) + migração nova de catálogo.
+- **"Farmou aura":** 1º estrito em R$/s entre quem tem empresa aberta, com mais alguém com empresa aberta. "Indeciso
+  profissional": as 3 opções de uma era (eras com opção desligada só contam quando a entrega 4 ligar). "Conhece todos os
+  caminhos": todas as opções ligadas.
+- **Contagem "N/total"** conta todas as conquistas, escondidas inclusive (73). Na grade, a bloqueada aparece apagada com
+  o nome; a condição aparece ao tocar (no mesmo lugar onde a ganha mostra a frase e a data), para caber no celular.
+- **Simulação:** o jogador que vende gasta "o nó mais barato já liberado que acelera" (o ramo Gente e a validade das
+  oportunidades não aceleram quem joga sozinho e pega na hora).
+- **Testes antigos:** `freshDb({ conquistas: false })` esvazia o catálogo das conquistas para `idle.test.ts`,
+  `idleGente.test.ts` e o teste da árvore, que conferem a conta exata sem o +1% das conquistas que as ações vão ganhando.
+- **Frase do limaumdoc** ("a combinar com o grupo"): provisória "Contratou o limaumdoc. Agora é com ele.".
 - A conquista do "Vitor" fica para depois (migração nova de catálogo quando o Juan explicar a piada).
 
 ## Restrições globais
 
-- **Sem reset:** nada apaga estado, contratos, pontos ou conquistas (`delete from public.idle_state`,
-  `delete from public.idle_contracts` e `delete from public.idle_conquistas` não aparecem na 0041) e nada filtra o jogo ou
-  o placar pela semana. A semana só existe na foto de segunda (que só tira foto) e no limite diário de oportunidades. A
-  venda é escolha do jogador e só zera a empresa dele.
+- **Sem reset:** nada apaga estado, contratos, pontos, nós ou conquistas (`delete from public.idle_state`,
+  `idle_contracts`, `idle_conquistas` e `idle_arvore` não aparecem na 0041) e nada filtra o jogo ou o placar pela
+  semana. A semana só existe na foto de segunda (que só tira foto) e no limite diário de oportunidades. A venda é
+  escolha do jogador e só zera a empresa dele.
 - Fellas Inc. **não toca nos créditos do cassino**: nada de `game_wallets`, `game_ledger`, `games_move`, Blackjack,
   Poker, fiado ou `weekly_champion` no código novo.
 - Migrações novas: `0040_fellas_inc_catalogo_conquistas.sql` (gerada por `catalogoSql()`, regra do cabeçalho da 0033:
@@ -77,25 +86,27 @@ migrações no app), Node (script da arte em `../fellas-inc-esbocos`).
   As duas listadas em `games/test/db.ts` e `games/dev/mockDb.ts`. **0033 a 0039 não se editam.** Todo arquivo em UTF-8
   sem BOM (`games/test/migracoesUtf8.test.ts`).
 - Função que já existe muda com `create or replace` mantendo a assinatura, copiada da versão mais nova (0034 para
-  `idle_open`, `idle_buy`, `idle_claim_opportunity`; 0036 para `idle_save`; 0038 para `idle_rate_at`, `idle_json`,
-  `idle_hire`, `idle_board`, `idle_weekly_reset`).
+  `idle_open`, `idle_start`, `idle_buy`, `idle_claim_opportunity`, `idle_opp_list`, `idle_opp_cap`; 0036 para
+  `idle_save`; 0038 para `idle_rate_at`, `idle_social_mult`, `idle_settle`, `idle_hire_price`, `idle_json`, `idle_hire`,
+  `idle_board`, `idle_weekly_reset`).
 - Toda tabela com RLS e leitura para membros (`public.is_member()`); escrita só por funções `security definer
   set search_path = public`; funções internas com `revoke all ... from public, anon, authenticated`; RPCs com
   `revoke all ... from public, anon` + `grant execute ... to authenticated`. Erros de usuário `raise exception '<codigo>'
-  using errcode = 'P0001'` (código novo: `idle_prestige_low`); não membro `not_member` com `42501`. Todo
-  `update public.`/`delete from public.` com `where` (`__tests__/safeUpdateMigrations.test.ts`). Migrações idempotentes.
-- Paridade: toda conta de produção, agora com `× (1 + 0,01·pontos) × (1 + 0,01·conquistas)`, é igual em SQL e em
-  `games/idle/economia.ts`, com erro relativo < 1e-9 em `games/test/idleParidade.test.ts`, inclusive atravessando
-  vencimento de contrato e o teto de 8h.
+  using errcode = 'P0001'` (códigos novos: `idle_prestige_low`, `idle_points_low`, `idle_node_owned`); não membro
+  `not_member` com `42501`. Todo `update public.`/`delete from public.` com `where`
+  (`__tests__/safeUpdateMigrations.test.ts`). Migrações idempotentes.
+- Paridade: tudo que a árvore e as conquistas mexem (taxa `× nós de produção × (1 + 0,01·conquistas)`, contratos,
+  teto do offline, caixinha/validade/limite/bônus das oportunidades, preço e duração do contrato, "Abrir CNPJ") existe
+  igual em SQL e em `games/idle/economia.ts`/`oportunidades.ts`; `games/test/idleParidade.test.ts` exige erro relativo
+  < 1e-9, inclusive atravessando vencimento de contrato e o teto do offline.
 - Página do jogo: pt-BR no tom do `PRODUCT.md` (informal, "você", botão diz a ação, sem emoji como ícone; "★" é
   caractere de texto); CSS em `games/idle/idle.css` com as cores que ele já usa; alvo de toque ≥ 44px; foco visível;
   texto vindo do banco por `textContent`. Edições pontuais em `tela.ts` e `main.ts`: o que já existe fica (aba Melhorias
   "À venda | Compradas", placar "+R$ X/s" com "Era N · nome", folhas, `vigiarVersao`, editor de personagem, aba Contratar).
   Frontend usa a skill `impeccable` (modo Operate), lendo `PRODUCT.md` e `DESIGN.md` antes.
 - Arte feita por código fora do repositório (`C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`, padrão do
-  `BRIEF-SPRITES.md` e do `gerais.js`) e copiada para `games/idle/assets/conquistas/`. Sem o ícone, a célula mostra só
-  a moldura.
-- `?mock`: bots com pontos e conquistas de exemplo (uma escondida); `__vendavel()` no console deixa a sua empresa
+  `BRIEF-SPRITES.md` e do `gerais.js`) e copiada para `games/idle/assets/`. Sem o ícone, a célula mostra só a moldura.
+- `?mock`: bots com pontos, nós e conquistas de exemplo (uma escondida); `__vendavel()` no console deixa a sua empresa
   vendável.
 - Commits sem `Co-Authored-By` nem qualquer marca de IA. Branch `fellas-inc-prestigio`; no fim, merge local na `main` e
   push (sem PR), só depois de o Juan aplicar as migrações e as colunas serem conferidas.
@@ -105,67 +116,76 @@ migrações no app), Node (script da arte em `../fellas-inc-esbocos`).
 ## Foco da revisão
 
 1. **Toque duplo em "Vender"** (ou dois aparelhos): a segunda chamada espera a trava da linha e encontra a empresa já
-   vendida: `idle_not_started`, pontos e vendas contados uma vez só. Teste no banco (Task 5).
+   vendida: `idle_not_started`, pontos e vendas contados uma vez só. Toque duplo em "Comprar" um nó: a segunda vira
+   `idle_node_owned` e o custo sai uma vez só (a trava é a mesma `idle_lock`). Testes no banco (Tasks 5 e 6).
 2. **Venda com contratados que não abrem o jogo há horas**, com contrato ativo ou já vencido sem a conta fechada: eles
    fecham a conta com o triplo da Cultura de startup antes de as estratégias de quem vendeu zerarem. Testes no banco
-   (Task 5); a ordem das travas (`idle_lock_all`, por `user_id`) fica para a revisão de código.
-3. **Conquista não vale pra trás**: quem ganha numa ação já teve a conta fechada; o "Pai tá on", dado pela foto de
-   segunda sem ação do jogador, fecha a conta do unicórnio antes. Testes no banco (Tasks 4 e 5).
-4. **Página velha depois da venda** (outra aba, outro aparelho): a compra volta `idle_not_started` e a página recarrega
-   (já está em `RECARREGA`); a folha "Vender a startup?" some quando a venda deixou de compensar (`idle_prestige_low`
-   recarrega). Teste da tela para a folha (Task 8); o resto na conferência real com dois aparelhos (Task 11; no `?mock`
-   cada aba tem o seu banco).
-5. **Celular estreito**: as 5 abas rolam de lado e o aviso de conquista não tapa nenhum toque (`pointer-events: none`).
-   Teste das 5 abas (Task 8); a rolagem e o aviso entram na conferência no `?mock` a 360 px (Task 8).
+   (Task 6); a ordem das travas (`idle_lock_all`, por `user_id`) fica para a revisão de código.
+3. **Nada vale pra trás**: conquista nova e nó novo (produção, teto do offline) só valem depois de fechar a conta; o
+   "Pai tá on", dado pela foto de segunda sem ação do jogador, fecha a conta do unicórnio antes. Testes no banco (Tasks
+   4, 5 e 6) e de paridade com o teto atravessando vencimento (Task 3).
+4. **Página velha depois da venda ou de comprar nó** (outra aba, outro aparelho): o banco recusa com `idle_not_started`,
+   `idle_points_low` ou `idle_node_owned` e a página recarrega (`RECARREGA`); a folha de venda some quando a venda deixou
+   de compensar. Teste da tela para a folha (Task 9); o resto na conferência real com dois aparelhos (Task 12).
+5. **Celular estreito**: 5 abas rolando de lado, ramos empilhados, aviso de conquista sem tapar toque
+   (`pointer-events: none`). Teste das 5 abas e dos ramos (Task 9); a rolagem e o aviso na conferência no `?mock` a
+   360 px (Task 9).
 
 ---
 
 ## Estrutura de arquivos
 
 ```
-supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql   GERADO por catalogo.ts: + conquistas; 283 = "Filial em Portugal"
-supabase/migrations/0041_fellas_inc_prestigio.sql             colunas, idle_conquistas, conta com bônus, conquistas, venda,
-                                                              placar, foto de segunda, o que já aconteceu
+supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql   GERADO por catalogo.ts: + conquistas, + árvore (idle_cat_no), 283 renomeada
+supabase/migrations/0041_fellas_inc_prestigio.sql             colunas, tabelas, efeitos da árvore nas contas, conquistas, idle_buy_node,
+                                                              Abrir CNPJ, venda, placar, foto de segunda, o que já aconteceu
 games/idle/
-  nomes.ts             + TipoConquista, CONQUISTAS_GERADOR, ConquistaTexto, CONQUISTAS; 283 renomeada
-  catalogo.ts          + Conquista, catalogo.conquistas, idle_cat_conquista no SQL gerado
-  economia.ts          + Bonus, SEM_BONUS, POR_PONTO, POR_CONQUISTA, K_PRESTIGIO, multBonus, pontosTotais
-  simulacao.ts         + amostras, bonus, primeiraVenda, volta
-  conquistas.ts        (novo) grade, avisos, textos da venda, fila de avisos
-  ativos.ts            + conquista(id)
-  tela.ts, idle.css    aba Conquistas, folha de venda, aviso na cena, ★ no placar, abas roláveis (edições pontuais)
-  main.ts              vender, fila de avisos (edições pontuais)
-  assets/conquistas/   (Task 10) conquista-001.png … conquista-062.png, conquista-101.png … conquista-111.png
-games/shared/types.ts, api.ts, errors.ts      IdleState/IdleBoardRow novos, idlePrestige, idle_prestige_low
-games/dev/mockIdle.ts, mockDb.ts             bots com pontos e conquistas, idlePrestige, __vendavel, dono(); 0040 e 0041
+  nomes.ts             + TipoConquista, CONQUISTAS_GERADOR, CONQUISTAS, RAMOS, TipoNo, ARVORE; 283 renomeada
+  catalogo.ts          + Conquista, No, CUSTO_NO, RAIZ; catalogo.conquistas e catalogo.arvore no SQL gerado
+  economia.ts          + Bonus, EfeitosArvore, efeitosArvore, efeitosDe, multBonus, pontosTotais, abertura, precoContrato,
+                       teto em acumular/acumularTrechos, árvore em multContratos
+  oportunidades.ts     + Caixa, CAIXA_PADRAO; pendentes com a caixinha da árvore
+  simulacao.ts         + amostras, bonus/gerais, primeiraVenda, gastar, volta
+  store.ts             + efeitos, caixa; valuationAgora com o teto da árvore
+  legado.ts            (novo) grade de conquistas, situação dos nós, textos, fila de avisos
+  ativos.ts            + conquista(id), no(id)
+  tela.ts, idle.css    aba Legado, folha de venda, aviso na cena, ★ no placar, abas roláveis (edições pontuais)
+  main.ts              vender, comprar nó, caixinha da árvore, fila de avisos (edições pontuais)
+  assets/conquistas/   (Task 11) conquista-001.png … conquista-062.png, conquista-101.png … conquista-111.png
+  assets/arvore/       (Task 11) no-01.png, no-11.png … no-55.png
+games/shared/types.ts, api.ts, errors.ts      IdleState/IdleBoardRow novos, idlePrestige, idleBuyNode, erros novos
+games/dev/mockIdle.ts, mockDb.ts             bots com pontos, nós e conquistas, __vendavel, dono(); 0040 e 0041
 games/test/db.ts                             0040 e 0041; freshDb({ conquistas: false })
 games/test/idleConquistas.test.ts            (novo) banco: conquistas
+games/test/idleArvore.test.ts                (novo) banco: comprar nós e o efeito de cada ramo
 games/test/idlePrestigio.test.ts             (novo) banco: venda, placar, a migração contando o passado
 games/test/idle.test.ts, idleGente.test.ts   freshDb({ conquistas: false })
-games/test/idleParidade.test.ts              paridade com pontos e conquistas; pontos totais
+games/test/idleParidade.test.ts              paridade com a árvore e as conquistas; pontos totais
 __tests__/fellasIncMigration.test.ts         travas da 0040/0041
-../fellas-inc-esbocos/ (fora do repo)        BRIEF-CONQUISTAS.md e conquistas.js
+../fellas-inc-esbocos/ (fora do repo)        BRIEF-LEGADO.md e legado-icones.js
 ```
 
-**Ordem:** Tasks 1–8 em sequência. A Task 9 (arte, fora do repositório) pode correr em paralelo com o código. Task 10
-depois de 8 e 9. Task 11 por último.
+**Ordem:** Tasks 1–9 em sequência. A Task 10 (arte, fora do repositório) pode correr em paralelo com o código. Task 11
+depois de 9 e 10. Task 12 por último.
 
 ---
 
 ## Contrato de formato da arte (vale para o código e para a arte)
 
-- Um PNG por conquista: `games/idle/assets/conquistas/conquista-NNN.png`, NNN = id com 3 dígitos (`conquista-001.png`
-  … `conquista-062.png`, `conquista-101.png` … `conquista-111.png`; 73 arquivos). O jogo acha o arquivo por
-  `ativos.conquista(id)`; arquivo de id que não existe no catálogo é erro (teste da Task 10).
-- **16×16**, fundo transparente, **1 quadro** (estático), pixel duro (sem semitransparência), contorno preto de 1px de
-  `cv.contornar()` com 1px de margem, 2 a 4 cores mais o contorno, como os ícones das melhorias gerais (`gerais.js`).
-- Na tela aparece a 48×48 (3×, `image-rendering: pixelated`) num quadradinho escuro (`#1B1A22`). Bloqueada, a tela
-  aplica `grayscale(1)` e opacidade 0,35: a silhueta tem de ler sem cor.
-- Sem o arquivo, a célula mostra só a moldura (`.icone-conquista.sem-arte`); nada quebra.
+- Conquistas: `games/idle/assets/conquistas/conquista-NNN.png`, NNN = id com 3 dígitos (001 … 062, 101 … 111; 73
+  arquivos), achados por `ativos.conquista(id)`.
+- Nós da árvore: `games/idle/assets/arvore/no-NN.png`, NN = id com 2 dígitos (`no-01.png` a raiz, `no-11.png` …
+  `no-55.png`; 26 arquivos), achados por `ativos.no(id)`.
+- Todos: **16×16**, fundo transparente, **1 quadro** (estático), pixel duro (sem semitransparência), contorno preto de
+  1px de `cv.contornar()` com 1px de margem, 2 a 4 cores mais o contorno, como os ícones das melhorias gerais
+  (`gerais.js`). Na tela aparecem a 48×48 (3×, `image-rendering: pixelated`) num quadradinho escuro (`#1B1A22`).
+  Bloqueado (conquista não ganha, nó trancado), a tela aplica `grayscale(1)` e opacidade 0,35: a silhueta tem de ler
+  sem cor. Arquivo de id que não existe no catálogo é erro (teste da Task 11).
+- Sem o arquivo, a célula mostra só a moldura (`.icone-legado.sem-arte`); nada quebra.
 
 ---
 
-### Task 1: Catálogo das conquistas e a "Filial em Portugal" (0040)
+### Task 1: Catálogo: conquistas, a árvore e a "Filial em Portugal" (0040)
 
 **Files:**
 - Modify: `games/idle/nomes.ts`, `games/idle/catalogo.ts`, `games/idle/catalogo.test.ts`, `games/test/db.ts`,
@@ -173,10 +193,12 @@ depois de 8 e 9. Task 11 por último.
 - Create (gerado): `supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql`
 
 **Interfaces:**
-- Produz: `TipoConquista` (re-exportado de `catalogo.ts`), `Conquista = { id, nome, frase, condicao, tipo, alvo: number |
-  null, valor: number | null, texto: string | null, escondida }`, `catalogo.conquistas` (ids 1–62 visíveis, 101–111
-  escondidas), `Catalogo.conquistas`; a tabela `public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor,
-  texto, escondida)`.
+- Produz: `TipoConquista`, `TipoNo` (re-exportados de `catalogo.ts`); `Conquista = { id, nome, frase, condicao, tipo,
+  alvo: number | null, valor: number | null, texto: string | null, escondida }`; `No = { id, ramo, posicao, nome,
+  efeito, custo, tipo: TipoNo, valor: number, requer: number | null }`; `CUSTO_NO = [2, 4, 8, 15, 30]`, `CUSTO_RAIZ = 1`,
+  `RAIZ = 1`; `RAMOS` (nomes, índice = ramo); `catalogo.conquistas` (1–62 visíveis, 101–111 escondidas),
+  `catalogo.arvore` (26 nós); tabelas `public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, texto,
+  escondida)` e `public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer)`.
 
 - [ ] **Step 1: Testes (`games/idle/catalogo.test.ts`)**
 
@@ -206,6 +228,20 @@ No `describe('catálogo', ...)`, antes de `it('montarCatalogo usa os parâmetros
     expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });
     expect(catalogo.conquistas.find((x) => x.tipo === 'contratar_usuario')!.texto).toBe('limaumdoc');
   });
+  it('árvore: a raiz e 5 ramos de 5 nós; custos 1 · 2 · 4 · 8 · 15 · 30; cada nó exige o anterior (o 1º, a raiz)', () => {
+    const a = catalogo.arvore;
+    expect(a).toHaveLength(26);
+    expect(a[0]).toMatchObject({ id: 1, ramo: 0, nome: 'Fundador', custo: 1, requer: null, tipo: 'producao', valor: 1.05 });
+    for (let r = 1; r <= 5; r++) {
+      const ramo = a.filter((n) => n.ramo === r);
+      expect(ramo.map((n) => n.id)).toEqual([1, 2, 3, 4, 5].map((p) => r * 10 + p));
+      expect(ramo.map((n) => n.custo)).toEqual([2, 4, 8, 15, 30]);
+      expect(ramo.map((n) => n.requer)).toEqual([1, r * 10 + 1, r * 10 + 2, r * 10 + 3, r * 10 + 4]);
+    }
+    expect(a.reduce((t, n) => t + n.custo, 0)).toBe(296);
+    expect(a.filter((n) => n.ramo === 4).map((n) => n.valor)).toEqual([12, 16, 24, 36, 48]);
+    for (const n of a) expect(n.nome.length, n.nome).toBeLessThanOrEqual(26);
+  });
 ```
 
 No `describe('catálogo no banco (migração mais recente)', ...)`, troque a linha do teste das aspas
@@ -217,7 +253,7 @@ No `describe('catálogo no banco (migração mais recente)', ...)`, troque a lin
 por
 
 ```ts
-    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [], cargos: [], conquistas: [] }))
+    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [], cargos: [], conquistas: [], arvore: [] }))
 ```
 
 e, antes de `it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', ...)`, acrescente:
@@ -227,12 +263,16 @@ e, antes de `it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', ...)`, ac
     expect(catalogoSql()).toContain('insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, texto, escondida) values');
     expect(catalogoSql()).toContain("(101, '6-7', 'Seis sete. Ninguém sabe por quê.', 'Ter exatamente 67 de algum gerador', 'gerador_exato', null, 67, null, true)");
   });
+  it('a árvore entra no SQL gerado', () => {
+    expect(catalogoSql()).toContain('insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values');
+    expect(catalogoSql()).toContain("(41, 4, 1, 'Soneca longa', 'A empresa rende até 12h com o jogo fechado.', 2, 'teto', 12, 1)");
+  });
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/catalogo.test.ts`
-Expected: FAIL (`catalogo.conquistas` não existe; a 283 ainda é "Visto de negócios").
+Expected: FAIL (`catalogo.conquistas`/`catalogo.arvore` não existem; a 283 ainda é "Visto de negócios").
 
 - [ ] **Step 3: Textos (`games/idle/nomes.ts`)**
 
@@ -245,7 +285,6 @@ Na lista `MELHORIAS_GERADOR`, na linha do gerador 28, troque `'Visto de negócio
 No fim do arquivo, acrescente:
 
 ```ts
-
 /** Tipos de condição das conquistas. As "de estado" o banco confere em idle_check_conquistas (no idle_save, o último
  *  passo de toda função que muda o jogo); as "de evento" (aura_negativa, sigma, contratar_usuario, jaula, madrugada,
  *  unicornio) quem vê o evento dá na hora (idle_ganhar). */
@@ -298,34 +337,34 @@ export type ConquistaTexto = {
  *  quem ganhou pelo id). */
 export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 31, tipo: 'taxa', valor: 1, nome: 'Primeiro real', frase: 'R$ 1 por segundo. Já dá um chiclete.', condicao: 'Produzir R$ 1 por segundo' },
-  { id: 32, tipo: 'taxa', valor: 100, nome: 'Cem por segundo', frase: 'Já paga o iFood.', condicao: 'Produzir R$ 100 por segundo' },
-  { id: 33, tipo: 'taxa', valor: 1e4, nome: 'Dez mil por segundo', frase: 'O contador começou a te ligar.', condicao: 'Produzir R$ 10 mil por segundo' },
-  { id: 34, tipo: 'taxa', valor: 1e6, nome: 'Milhão por segundo', frase: 'Um prêmio da Mega a cada segundo.', condicao: 'Produzir R$ 1 mi por segundo' },
-  { id: 35, tipo: 'taxa', valor: 1e9, nome: 'Bilhão por segundo', frase: 'A Forbes mandou e-mail.', condicao: 'Produzir R$ 1 bi por segundo' },
+  { id: 32, tipo: 'taxa', valor: 100, nome: 'Pix caindo', frase: 'Já paga o iFood.', condicao: 'Produzir R$ 100 por segundo' },
+  { id: 33, tipo: 'taxa', valor: 1e4, nome: 'O leão acordou', frase: 'O contador começou a te ligar.', condicao: 'Produzir R$ 10 mil por segundo' },
+  { id: 34, tipo: 'taxa', valor: 1e6, nome: 'Acumulou!', frase: 'Uma Mega da Virada a cada segundo.', condicao: 'Produzir R$ 1 mi por segundo' },
+  { id: 35, tipo: 'taxa', valor: 1e9, nome: 'Bilionário de LinkedIn', frase: 'A Forbes mandou e-mail.', condicao: 'Produzir R$ 1 bi por segundo' },
   { id: 36, tipo: 'taxa', valor: 1e12, nome: 'Trilhão por segundo', frase: 'Maior que o PIB, menor que o ego.', condicao: 'Produzir R$ 1 tri por segundo' },
   { id: 37, tipo: 'taxa', valor: 1e15, nome: 'Quatrilhão por segundo', frase: 'Ninguém sabe escrever esse número.', condicao: 'Produzir R$ 1 quatri por segundo' },
-  { id: 38, tipo: 'taxa', valor: 1e18, nome: 'Quintilhão por segundo', frase: 'O dinheiro do mundo acabou. Você imprimiu mais.', condicao: 'Produzir R$ 1 quinti por segundo' },
-  { id: 39, tipo: 'era', valor: 2, nome: 'Saiu do quarto', frase: 'A garagem é o novo quarto.', condicao: 'Chegar na era 2 (Garagem)' },
-  { id: 40, tipo: 'era', valor: 3, nome: 'Escritório de verdade', frase: 'Tem até catraca.', condicao: 'Chegar na era 3 (Escritório)' },
+  { id: 38, tipo: 'taxa', valor: 1e18, nome: 'Casa da Moeda', frase: 'O dinheiro do mundo acabou. Você imprimiu mais.', condicao: 'Produzir R$ 1 quinti por segundo' },
+  { id: 39, tipo: 'era', valor: 2, nome: 'Saiu da casa dos pais', frase: 'A garagem é o novo quarto.', condicao: 'Chegar na era 2 (Garagem)' },
+  { id: 40, tipo: 'era', valor: 3, nome: 'Tem até catraca', frase: 'E crachá com foto ruim.', condicao: 'Chegar na era 3 (Escritório)' },
   { id: 41, tipo: 'era', valor: 4, nome: 'Andar inteiro', frase: 'O elevador para só pra você.', condicao: 'Chegar na era 4 (Andar inteiro)' },
   { id: 42, tipo: 'era', valor: 5, nome: 'Sede própria', frase: 'O prédio tem o seu logo.', condicao: 'Chegar na era 5 (Sede)' },
-  { id: 43, tipo: 'gerador', alvo: 30, valor: 1, nome: 'Rumo a Marte', frase: 'Do quarto pra Marte.', condicao: 'Ter 1 "Foguete pra Marte"' },
-  { id: 44, tipo: 'melhorias', valor: 10, nome: 'Upgrade', frase: 'Dez melhorias e o notebook ainda esquenta.', condicao: 'Comprar 10 melhorias' },
-  { id: 45, tipo: 'melhorias', valor: 50, nome: 'Otimizador', frase: 'Cinquenta melhorias, zero reuniões.', condicao: 'Comprar 50 melhorias' },
-  { id: 46, tipo: 'melhorias', valor: 150, nome: 'Tudo turbinado', frase: 'Não tem mais o que melhorar. Ou tem.', condicao: 'Comprar 150 melhorias' },
-  { id: 47, tipo: 'oportunidades', valor: 1, nome: 'Olho vivo', frase: 'Pegou a primeira.', condicao: 'Pegar 1 oportunidade' },
-  { id: 48, tipo: 'oportunidades', valor: 25, nome: 'Caçador de oportunidade', frase: 'Vê promoção de longe.', condicao: 'Pegar 25 oportunidades' },
+  { id: 43, tipo: 'gerador', alvo: 30, valor: 1, nome: 'Ao infinito e além', frase: 'Do quarto pra Marte.', condicao: 'Ter 1 "Foguete pra Marte"' },
+  { id: 44, tipo: 'melhorias', valor: 10, nome: 'Placa de vídeo nova', frase: 'Dez melhorias e o notebook ainda esquenta.', condicao: 'Comprar 10 melhorias' },
+  { id: 45, tipo: 'melhorias', valor: 50, nome: 'Coach de produtividade', frase: 'Cinquenta melhorias, zero reuniões.', condicao: 'Comprar 50 melhorias' },
+  { id: 46, tipo: 'melhorias', valor: 150, nome: 'Tudo pela família', frase: 'Não tem mais o que melhorar. Ou tem.', condicao: 'Comprar 150 melhorias' },
+  { id: 47, tipo: 'oportunidades', valor: 1, nome: 'Black Friday', frase: 'Pegou a primeira.', condicao: 'Pegar 1 oportunidade' },
+  { id: 48, tipo: 'oportunidades', valor: 25, nome: 'Caça-promoção', frase: 'Vê desconto de longe.', condicao: 'Pegar 25 oportunidades' },
   { id: 49, tipo: 'oportunidades', valor: 100, nome: 'Oportunista', frase: 'No bom sentido.', condicao: 'Pegar 100 oportunidades' },
-  { id: 50, tipo: 'oportunidades', valor: 500, nome: 'Não deixa passar nada', frase: 'Quinhentas. Você dorme?', condicao: 'Pegar 500 oportunidades' },
+  { id: 50, tipo: 'oportunidades', valor: 500, nome: 'Sniper', frase: 'Quinhentas. Você dorme?', condicao: 'Pegar 500 oportunidades' },
   { id: 51, tipo: 'vendas', valor: 1, nome: 'Exit', frase: 'Vendeu a primeira startup.', condicao: 'Vender a startup 1 vez' },
   { id: 52, tipo: 'vendas', valor: 5, nome: 'Empreendedor serial', frase: 'Abre, cresce, vende, repete.', condicao: 'Vender a startup 5 vezes' },
-  { id: 53, tipo: 'vendas', valor: 10, nome: 'Fábrica de startup', frase: 'Dez exits no currículo.', condicao: 'Vender a startup 10 vezes' },
-  { id: 54, tipo: 'vendas', valor: 25, nome: 'Lenda do Vale', frase: 'Vinte e cinco vendas. Já vira palestra.', condicao: 'Vender a startup 25 vezes' },
+  { id: 53, tipo: 'vendas', valor: 10, nome: 'Unicórnio em série', frase: 'Dez exits no currículo.', condicao: 'Vender a startup 10 vezes' },
+  { id: 54, tipo: 'vendas', valor: 25, nome: 'Virou jurado do Shark Tank', frase: 'Vinte e cinco vendas. Já vira palestra.', condicao: 'Vender a startup 25 vezes' },
   { id: 55, tipo: 'contratei', valor: 1, nome: 'Primeira contratação', frase: 'Agora você é chefe.', condicao: 'Contratar 1 vez' },
   { id: 56, tipo: 'contratei', valor: 10, nome: 'O RH sou eu', frase: 'Dez contratos assinados.', condicao: 'Contratar 10 vezes' },
   { id: 57, tipo: 'contratei', valor: 50, nome: 'Headhunter', frase: 'Cinquenta contratações e nenhuma entrevista.', condicao: 'Contratar 50 vezes' },
   { id: 58, tipo: 'contratado', valor: 1, nome: 'Primeiro emprego', frase: 'Carteira assinada (de mentira).', condicao: 'Ser contratado 1 vez' },
-  { id: 59, tipo: 'contratado', valor: 10, nome: 'Disputado', frase: 'Dez empresas te quiseram.', condicao: 'Ser contratado 10 vezes' },
+  { id: 59, tipo: 'contratado', valor: 10, nome: 'Passe valorizado', frase: 'Dez empresas te quiseram.', condicao: 'Ser contratado 10 vezes' },
   { id: 60, tipo: 'contratado', valor: 50, nome: 'Funcionário do mês, todo mês', frase: 'Cinquenta contratos. Você trabalha?', condicao: 'Ser contratado 50 vezes' },
   { id: 61, tipo: 'estrategia_era', nome: 'Indeciso profissional', frase: 'Já foi de tudo um pouco.', condicao: 'Usar as 3 estratégias de uma era (uma em cada empresa)' },
   { id: 62, tipo: 'estrategia_todas', nome: 'Conhece todos os caminhos', frase: 'Não tem estratégia que você não testou.', condicao: 'Usar todas as estratégias liberadas' },
@@ -341,31 +380,125 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 110, escondida: true, tipo: 'unicornio', nome: 'Pai tá on', frase: 'O pai tá on.', condicao: 'Ser o unicórnio da semana' },
   { id: 111, escondida: true, tipo: 'brainrot', valor: 60, nome: 'Brainrot', frase: 'Tung tung tung empreendedor.', condicao: 'Pegar 3 oportunidades em menos de 1 minuto' },
 ];
+
+/** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
+export const RAMOS: readonly string[] = ['Fundador', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'];
+
+/** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult), horas (teto, validade),
+ *  quantidade (caixinha, opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado)
+ *  ou 1 (inicio_era1, manter_gerais: só ter o nó). */
+export type TipoNo =
+  | 'producao' | 'inicio_valuation' | 'inicio_notebooks' | 'manter_gerais' | 'inicio_era1'
+  | 'caixinha' | 'validade' | 'opp_extra' | 'opp_bonus' | 'teto'
+  | 'contrato_preco' | 'por_contratado' | 'contrato_dias' | 'emprego_mult';
+
+export type NoTexto = { ramo: number; posicao: number; nome: string; efeito: string; tipo: TipoNo; valor: number };
+
+/** A árvore de habilidades, na ordem: a raiz e os 5 ramos de 5 nós. id = ramo·10 + posição (a raiz é 1). Nó novo ou
+ *  efeito mudado = migração nova do catálogo; id nunca muda (o banco guarda quem comprou pelo id). */
+export const ARVORE: readonly NoTexto[] = [
+  { ramo: 0, posicao: 1, tipo: 'producao', valor: 1.05, nome: 'Fundador', efeito: 'Abre a árvore. Produção +5%.' },
+  { ramo: 1, posicao: 1, tipo: 'producao', valor: 1.1, nome: 'Café sem açúcar', efeito: 'Produção +10%.' },
+  { ramo: 1, posicao: 2, tipo: 'producao', valor: 1.25, nome: 'Planilha de metas', efeito: 'Produção +25%.' },
+  { ramo: 1, posicao: 3, tipo: 'producao', valor: 1.5, nome: 'Alta performance', efeito: 'Produção +50%.' },
+  { ramo: 1, posicao: 4, tipo: 'producao', valor: 2, nome: 'Escala', efeito: 'Produção +100%.' },
+  { ramo: 1, posicao: 5, tipo: 'producao', valor: 2, nome: 'Modo turbo', efeito: 'Produção ×2 em tudo.' },
+  { ramo: 2, posicao: 1, tipo: 'inicio_valuation', valor: 1000, nome: 'Pé-de-meia', efeito: 'O Abrir CNPJ começa com R$ 1 mil.' },
+  { ramo: 2, posicao: 2, tipo: 'inicio_notebooks', valor: 10, nome: 'Notebooks usados', efeito: 'O Abrir CNPJ começa com 10 notebooks.' },
+  { ramo: 2, posicao: 3, tipo: 'manter_gerais', valor: 1, nome: 'Leva a cultura junto', efeito: 'Vender a startup mantém as melhorias gerais.' },
+  { ramo: 2, posicao: 4, tipo: 'inicio_valuation', valor: 1e6, nome: 'Herança', efeito: 'O Abrir CNPJ começa com R$ 1 mi.' },
+  { ramo: 2, posicao: 5, tipo: 'inicio_era1', valor: 1, nome: 'Kit startup', efeito: 'O Abrir CNPJ começa com 1 de cada gerador da era 1.' },
+  { ramo: 3, posicao: 1, tipo: 'caixinha', valor: 4, nome: 'Caixinha maior', efeito: 'A caixinha guarda 4 oportunidades.' },
+  { ramo: 3, posicao: 2, tipo: 'validade', valor: 6, nome: 'Lembrete no celular', efeito: 'Oportunidade guardada dura 6h.' },
+  { ramo: 3, posicao: 3, tipo: 'opp_extra', valor: 3, nome: 'Faro de negócio', efeito: '+3 oportunidades por dia.' },
+  { ramo: 3, posicao: 4, tipo: 'opp_bonus', valor: 2, nome: 'Negociador', efeito: 'Oportunidades rendem o dobro.' },
+  { ramo: 3, posicao: 5, tipo: 'caixinha', valor: 5, nome: 'Caixinha gigante', efeito: 'A caixinha guarda 5 oportunidades.' },
+  { ramo: 4, posicao: 1, tipo: 'teto', valor: 12, nome: 'Soneca longa', efeito: 'A empresa rende até 12h com o jogo fechado.' },
+  { ramo: 4, posicao: 2, tipo: 'teto', valor: 16, nome: 'Gerente da madrugada', efeito: 'Rende até 16h com o jogo fechado.' },
+  { ramo: 4, posicao: 3, tipo: 'teto', valor: 24, nome: 'Piloto automático', efeito: 'Rende até 24h com o jogo fechado.' },
+  { ramo: 4, posicao: 4, tipo: 'teto', valor: 36, nome: 'Empresa que anda sozinha', efeito: 'Rende até 36h com o jogo fechado.' },
+  { ramo: 4, posicao: 5, tipo: 'teto', valor: 48, nome: 'Fim de semana prolongado', efeito: 'Rende até 48h com o jogo fechado.' },
+  { ramo: 5, posicao: 1, tipo: 'contrato_preco', valor: 0.75, nome: 'Vaga no LinkedIn', efeito: 'Contratar custa 25% menos.' },
+  { ramo: 5, posicao: 2, tipo: 'por_contratado', valor: 0.15, nome: 'Treinamento', efeito: 'Seus contratados rendem 15% (no lugar de 10%).' },
+  { ramo: 5, posicao: 3, tipo: 'contrato_dias', valor: 10, nome: 'Contrato longo', efeito: 'Os contratos que você faz duram 10 dias.' },
+  { ramo: 5, posicao: 4, tipo: 'emprego_mult', valor: 2, nome: 'Passe em alta', efeito: 'Quem te contrata rende o dobro pra você.' },
+  { ramo: 5, posicao: 5, tipo: 'contrato_preco', valor: 0.5, nome: 'RH terceirizado', efeito: 'Contratar custa 50% menos.' },
+];
 ```
 
-- [ ] **Step 4: Catálogo (`games/idle/catalogo.ts`)**
+- [ ] **Step 4: Catálogo (`games/idle/catalogo.ts`)** — troque cada trecho, na ordem:
 
-Troque a linha do import de `./nomes` por:
+1. Trecho:
 
 ```ts
-import { CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista } from './nomes';
-
-export type { TipoConquista } from './nomes';
+// É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
+import { CARGOS, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS } from './nomes';
 ```
 
-Troque `export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[] };` por:
+   vira:
 
 ```ts
+// É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
+import {
+  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista,
+  type TipoNo,
+} from './nomes';
+
+export type { TipoConquista, TipoNo } from './nomes';
+```
+
+2. Trecho:
+
+```ts
+export const REQUER_SINERGIA = 15;
+```
+
+   vira:
+
+```ts
+export const REQUER_SINERGIA = 15;
+/** Árvore de habilidades: custo em pontos de prestígio por posição no ramo (1 a 5); a raiz custa 1. */
+export const CUSTO_NO = [2, 4, 8, 15, 30] as const;
+export const CUSTO_RAIZ = 1;
+export const RAIZ = 1;
+```
+
+3. Trecho:
+
+```ts
+};
+export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[] };
+```
+
+   vira:
+
+```ts
+};
 export type Conquista = {
   id: number; nome: string; frase: string; condicao: string; tipo: TipoConquista;
   alvo: number | null; valor: number | null; texto: string | null; escondida: boolean;
 };
-export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[]; conquistas: Conquista[] };
+/** Nó da árvore. requer = o nó anterior do ramo (a raiz, para o 1º; null na raiz). */
+export type No = {
+  id: number; ramo: number; posicao: number; nome: string; efeito: string; custo: number; tipo: TipoNo; valor: number;
+  requer: number | null;
+};
+export type Catalogo = {
+  geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[]; conquistas: Conquista[]; arvore: No[];
+};
 ```
 
-Em `montarCatalogo`, troque `  return { geradores, melhorias, estrategias, cargos: [...CARGOS] };` por:
+4. Trecho:
 
 ```ts
+  }));
+  return { geradores, melhorias, estrategias, cargos: [...CARGOS] };
+```
+
+   vira:
+
+```ts
+  }));
   const conquistas: Conquista[] = [
     ...CONQUISTAS_GERADOR.map(([nome, frase], i): Conquista => ({
       id: i + 1, nome, frase, condicao: `Ter 100 "${geradores[i].nome}"`, tipo: 'gerador', alvo: i + 1, valor: 100,
@@ -376,55 +509,132 @@ Em `montarCatalogo`, troque `  return { geradores, melhorias, estrategias, cargo
       valor: c.valor ?? null, texto: c.texto ?? null, escondida: c.escondida ?? false,
     })),
   ];
-  return { geradores, melhorias, estrategias, cargos: [...CARGOS], conquistas };
+  const arvore: No[] = ARVORE.map((n) => ({
+    id: n.ramo * 10 + n.posicao, ramo: n.ramo, posicao: n.posicao, nome: n.nome, efeito: n.efeito,
+    custo: n.ramo === 0 ? CUSTO_RAIZ : CUSTO_NO[n.posicao - 1], tipo: n.tipo, valor: n.valor,
+    requer: n.ramo === 0 ? null : n.posicao === 1 ? RAIZ : n.ramo * 10 + n.posicao - 1,
+  }));
+  return { geradores, melhorias, estrategias, cargos: [...CARGOS], conquistas, arvore };
 ```
 
-Em `catalogoSql`, logo depois da linha que monta `car` (`const car = cat.cargos.map(...)`), acrescente:
+5. Trecho:
 
 ```ts
+  const car = cat.cargos.map((nome, i) => `  (${i + 1}, ${txt(nome)})`);
+```
+
+   vira:
+
+```ts
+  const car = cat.cargos.map((nome, i) => `  (${i + 1}, ${txt(nome)})`);
   const con = cat.conquistas.map(
     (c) =>
       `  (${c.id}, ${txt(c.nome)}, ${txt(c.frase)}, ${txt(c.condicao)}, ${txt(c.tipo)}, ${num(c.alvo)}, ${num(c.valor)}, ${c.texto === null ? 'null' : txt(c.texto)}, ${c.escondida})`,
   );
+  const nos = cat.arvore.map(
+    (n) =>
+      `  (${n.id}, ${n.ramo}, ${n.posicao}, ${txt(n.nome)}, ${txt(n.efeito)}, ${n.custo}, ${txt(n.tipo)}, ${num(n.valor)}, ${num(n.requer)})`,
+  );
 ```
 
-E, dentro do texto devolvido por `catalogoSql` (o template string), faça cinco trocas:
+6. Trecho:
 
-1. Primeira linha: `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias e cargos. Idempotente.` vira
-   `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias, cargos e conquistas. Idempotente.`
-2. Depois de `create table if not exists public.idle_cat_cargo (id int primary key, nome text not null);` acrescente:
+```ts
+  const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
+  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias e cargos. Idempotente.
+```
 
-```sql
+   vira:
+
+```ts
+  const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
+  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias, cargos, conquistas e a árvore. Idempotente.
+```
+
+7. Trecho:
+
+```ts
+create table if not exists public.idle_cat_cargo (id int primary key, nome text not null);
+```
+
+   vira:
+
+```ts
+create table if not exists public.idle_cat_cargo (id int primary key, nome text not null);
 create table if not exists public.idle_cat_conquista (
   id int primary key, nome text not null, frase text not null, condicao text not null, tipo text not null,
   alvo int, valor double precision, texto text, escondida boolean not null
 );
+create table if not exists public.idle_cat_no (
+  id int primary key, ramo int not null, posicao int not null, nome text not null, efeito text not null, custo int not null,
+  tipo text not null, valor double precision not null, requer int
+);
 ```
 
-3. As três linhas de RLS/permissão do catálogo ficam:
+8. Trecho:
 
-```sql
+```ts
+alter table public.idle_cat_cargo enable row level security;
+revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo from anon, authenticated;
+grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo to authenticated;
+```
+
+   vira:
+
+```ts
 alter table public.idle_cat_cargo enable row level security;
 alter table public.idle_cat_conquista enable row level security;
-revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista from anon, authenticated;
-grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista to authenticated;
+alter table public.idle_cat_no enable row level security;
+revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista, public.idle_cat_no from anon, authenticated;
+grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista, public.idle_cat_no to authenticated;
 ```
 
-   e depois do `create policy "idle_cat_cargo_select_members" ...;` acrescente:
+9. Trecho:
 
-```sql
+```ts
+create policy "idle_cat_cargo_select_members" on public.idle_cat_cargo for select to authenticated using (public.is_member());
+```
+
+   vira:
+
+```ts
+create policy "idle_cat_cargo_select_members" on public.idle_cat_cargo for select to authenticated using (public.is_member());
 drop policy if exists "idle_cat_conquista_select_members" on public.idle_cat_conquista;
 create policy "idle_cat_conquista_select_members" on public.idle_cat_conquista for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_no_select_members" on public.idle_cat_no;
+create policy "idle_cat_no_select_members" on public.idle_cat_no for select to authenticated using (public.is_member());
 ```
 
-4. Depois de `delete from public.idle_cat_cargo where true;` acrescente `delete from public.idle_cat_conquista where true;`.
-5. O fim do template fica:
+10. Trecho:
+
+```ts
+delete from public.idle_cat_cargo where true;
+```
+
+   vira:
+
+```ts
+delete from public.idle_cat_cargo where true;
+delete from public.idle_cat_conquista where true;
+delete from public.idle_cat_no where true;
+```
+
+11. Trecho:
+
+```ts
+insert into public.idle_cat_cargo (id, nome) values
+${lista(car)}`;
+```
+
+   vira:
 
 ```ts
 insert into public.idle_cat_cargo (id, nome) values
 ${lista(car)}
 insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, texto, escondida) values
-${lista(con)}`;
+${lista(con)}
+insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values
+${lista(nos)}`;
 ```
 
 - [ ] **Step 5: Gerar a migração nova e listar nos dois bancos de teste**
@@ -436,33 +646,43 @@ Em `games/test/db.ts`, na lista `MIGRATIONS`, depois de `'0038_fellas_inc_gente.
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && ATUALIZAR_CATALOGO=0040_fellas_inc_catalogo_conquistas.sql npx vitest run idle/catalogo.test.ts`
 Expected: PASS, e o arquivo `supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql` criado (confira que tem
-`(283, 'gerador', 'Filial em Portugal'` e `insert into public.idle_cat_conquista`).
+`(283, 'gerador', 'Filial em Portugal'`, `insert into public.idle_cat_conquista` e `insert into public.idle_cat_no`).
 
 - [ ] **Step 6: Tudo verde**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx tsc --noEmit && npx vitest run`
-Expected: PASS (a 0040 só cria e enche o catálogo; ninguém usa ainda).
+Expected: PASS (a 0040 só cria e enche os catálogos; ninguém usa ainda).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/nomes.ts games/idle/catalogo.ts games/idle/catalogo.test.ts games/test/db.ts games/dev/mockDb.ts supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql && git commit -m "Fellas Inc.: catálogo das conquistas e a Filial em Portugal (0040)"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/nomes.ts games/idle/catalogo.ts games/idle/catalogo.test.ts games/test/db.ts games/dev/mockDb.ts supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql && git commit -m "Fellas Inc.: catálogo das conquistas, a árvore e a Filial em Portugal (0040)"
 ```
 
 ---
 
-### Task 2: A conta com prestígio e conquistas em `economia.ts`, e o K pela simulação
+### Task 2: A árvore e as conquistas em `economia.ts`/`oportunidades.ts`, e o K pela simulação
 
 **Files:**
-- Modify: `games/idle/economia.ts`, `games/idle/economia.test.ts`, `games/idle/simulacao.ts`, `games/idle/simulacao.test.ts`
+- Modify: `games/idle/economia.ts`, `games/idle/economia.test.ts`, `games/idle/oportunidades.ts`,
+  `games/idle/simulacao.ts`, `games/idle/simulacao.test.ts`
 
 **Interfaces:**
-- Produz (`economia.ts`): `Bonus = { pontos: number; conquistas: number }`, `SEM_BONUS`, `Estado.bonus?: Bonus`,
-  `POR_PONTO = 0.01`, `POR_CONQUISTA = 0.01`, `K_PRESTIGIO = 1e6`, `multBonus(s: Estado): number`,
-  `pontosTotais(r: number): number`; `fatores`/`taxa`/`taxaPorUnidade` passam a multiplicar por `multBonus`.
-- Produz (`simulacao.ts`): `Amostra = { t: number; taxa: number; era: number }`, `Marcos.amostras: Amostra[]`,
-  `simular(cat?, dias?, bonus?: Bonus)`, `primeiraVenda(m: Marcos, minimo: number): Amostra | null`,
-  `volta(cat?, pontos?, dias?): { era: number; primeira: number; segunda: number } | null`.
+- Consome: `catalogo.arvore`, `No` (Task 1).
+- Produz (`economia.ts`): `Bonus = { arvore: number[]; conquistas: number }`, `SEM_BONUS`, `Estado.bonus?: Bonus`,
+  `POR_CONQUISTA = 0.01`, `K_PRESTIGIO = 1e6`, `EfeitosArvore = { producao, tetoS, caixinha, validadeS, oppExtra,
+  oppBonus, contratoPreco, porContratado, contratoDias, empregoMult, inicioValuation, inicioNotebooks: number;
+  inicioEra1, manterGerais: boolean }`, `efeitosArvore(cat, nos: readonly number[]): EfeitosArvore`,
+  `efeitosDe(cat, s: Estado)`, `multBonus(cat, s): number`, `pontosTotais(r): number`,
+  `abertura(cat, ef, gerais?) → { valuation, generators, upgrades }`, `precoContrato(cat, s, ativos): number`,
+  `acumular(..., tetoS = TETO_SEGUNDOS)`, `acumularTrechos(..., tetoS = TETO_SEGUNDOS)`; `multContratos` e `fatores`
+  passam a contar a árvore e as conquistas.
+- Produz (`oportunidades.ts`): `Caixa = { tamanho: number; validadeS: number }`, `CAIXA_PADRAO`,
+  `pendentes(uid, agoraMs, pegas, inicioSemanaMs = 0, caixa = CAIXA_PADRAO)`.
+- Produz (`simulacao.ts`): `Amostra = { t, taxa, era, gerais: number[] }`, `Marcos.amostras`,
+  `simular(cat?, dias?, bonus?: Bonus, gerais?: number[])`, `primeiraVenda(m, minimo): Amostra | null`,
+  `gastar(cat, pontos, ja?) → { arvore: number[]; sobra: number }`,
+  `volta(cat?, pontos?, dias?) → { era, primeira, segunda, arvore, gastos } | null`.
 
 - [ ] **Step 1: Testes**
 
@@ -470,22 +690,57 @@ Em `games/idle/economia.test.ts`, troque o import de `./economia` por:
 
 ```ts
 import {
-  acumular, acumularTrechos, custoMult, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador, pontosTotais, preco, taxa,
-  taxaPorUnidade, type Estado,
+  abertura, acumular, acumularTrechos, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
 } from './economia';
 ```
 
 e acrescente no fim do arquivo:
 
 ```ts
-
-describe('prestígio e conquistas', () => {
-  it('cada ponto e cada conquista: +1% na produção toda', () => {
+describe('árvore de habilidades e conquistas', () => {
+  const comArvore = (s: Estado, arvore: number[], conquistas = 0): Estado => ({ ...s, bonus: { arvore, conquistas } });
+  it('sem nó: o jogo de sempre', () => {
+    expect(efeitosArvore(cat, [])).toEqual({
+      producao: 1, tetoS: 8 * 3600, caixinha: 3, validadeS: 4 * 3600, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
+      porContratado: 0.1, contratoDias: 7, empregoMult: 1, inicioValuation: 10, inicioNotebooks: 1, inicioEra1: false,
+      manterGerais: false,
+    });
+  });
+  it('nós do mesmo tipo: produção multiplica, teto e caixinha ficam o maior, +por dia soma, preço do contrato fica o menor', () => {
+    const e = efeitosArvore(cat, [1, 11, 12, 13, 14, 15, 31, 33, 35, 41, 43, 51, 55]);
+    expect(e.producao).toBeCloseTo(1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 12);
+    expect(e).toMatchObject({ tetoS: 24 * 3600, caixinha: 5, oppExtra: 3, contratoPreco: 0.5 });
+    expect(efeitosArvore(cat, [999]).producao).toBe(1); // nó que a página não conhece não faz nada
+  });
+  it('produção: nós de produção × (1 + 1% por conquista); ponto guardado não conta', () => {
     const s = com([[1, 2]]);
-    expect(multBonus(s)).toBe(1);
-    expect(taxa(cat, { ...s, bonus: { pontos: 10, conquistas: 0 } })).toBeCloseTo(1 * PISO * 1.1, 10);
-    expect(taxa(cat, { ...s, bonus: { pontos: 10, conquistas: 5 } })).toBeCloseTo(1 * PISO * 1.1 * 1.05, 10);
-    expect(taxaPorUnidade(cat, { ...s, bonus: { pontos: 0, conquistas: 3 } }, 1)).toBeCloseTo(0.5 * PISO * 1.03, 10);
+    expect(multBonus(cat, s)).toBe(1);
+    expect(taxa(cat, comArvore(s, [1, 11]))).toBeCloseTo(1 * PISO * 1.05 * 1.1, 10);
+    expect(taxa(cat, comArvore(s, [1, 11], 5))).toBeCloseTo(1 * PISO * 1.05 * 1.1 * 1.05, 10);
+    expect(taxaPorUnidade(cat, comArvore(s, [], 3), 1)).toBeCloseTo(0.5 * PISO * 1.03, 10);
+  });
+  it('Gente: Treinamento paga 15% por contratado (sem somar com a Cultura); Passe em alta dobra cada emprego, não o piso', () => {
+    const s = com([[1, 1]]);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52]), social: { contratei: 2, empregos: [] } })).toBeCloseTo(1 + 0.15 * 2 + 0.02, 12);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [1, 3] } })).toBeCloseTo(1 + 0.02 * 2 * 4, 12);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [] } })).toBeCloseTo(1.02, 12);
+  });
+  it('preço do contrato: 30 min de produção × 1,5 por contrato ativo × o desconto da árvore', () => {
+    const s = { ...comArvore(com([[1, 2]]), [1, 51]), social: { contratei: 1, empregos: [] } };
+    expect(precoContrato(cat, s, 1)).toBeCloseTo(taxa(cat, s) * 1800 * 1.5 * 0.75, 6);
+  });
+  it('Abrir CNPJ com o Recomeço: dinheiro, notebooks, a era 1 inteira e as gerais mantidas', () => {
+    expect(abertura(cat, efeitosArvore(cat, []))).toEqual({ valuation: 10, generators: [1, ...Array(29).fill(0)], upgrades: [] });
+    const a = abertura(cat, efeitosArvore(cat, [1, 21, 22, 23, 24, 25]), [1001, 1003]);
+    expect(a.valuation).toBe(1e6);
+    expect(a.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
+    expect(a.upgrades).toEqual([1001, 1003]);
+    expect(abertura(cat, efeitosArvore(cat, [1, 21]), [1001]).upgrades).toEqual([]);
+  });
+  it('teto do offline: 8h, ou o que o ramo Tempo der', () => {
+    expect(acumular(0, 1, 0, 30 * 3600_000, null, 12 * 3600)).toBeCloseTo(12 * 3600, 6);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null, 24 * 3600)).toBeCloseTo(24 * 3600, 6);
   });
   it('pontos totais: floor(cbrt(R$/s ÷ 1 milhão)), sem errar nos cubos', () => {
     for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {
@@ -504,17 +759,17 @@ Em `games/idle/simulacao.test.ts`, troque `import { simular } from './simulacao'
 ```ts
 import { catalogo } from './catalogo';
 import { K_PRESTIGIO, pontosTotais } from './economia';
-import { primeiraVenda, simular, volta } from './simulacao';
+import { gastar, primeiraVenda, simular, volta } from './simulacao';
 ```
 
 e acrescente no fim do arquivo:
 
 ```ts
-
 // Prestígio (spec da entrega 3, seção 1.4). Medido ao planejar, com K = 1 milhão: a venda vale 1 ponto já no dia 1
-// (0,7 d, era 3), 5 pontos com 2,7 d (era 4), 10 pontos com 5,5 d (11 pontos, era 5) e 15 pontos no fim da semana.
-// Voltar à era 5 depois de vender com 11 pontos leva os mesmos 3,0 d (+11% não adianta uma sessão sequer: o ritmo é o
-// das 3 aberturas por dia). Se algum número sair do alvo, NÃO mexa em PARAMETROS nem em K: pare e avise.
+// (0,7 d, era 3), 5 pontos com 2,7 d (era 4), 10 pontos com 5,5 d (11 pontos, era 5) e 15 no fim da semana.
+// Vendendo com 11 e gastando 9 na árvore (Fundador, Café sem açúcar, Pé-de-meia, Caixinha maior, Soneca longa), a era 5
+// chega com 2,7 d (era 3,0 d) e a era 2 com 520 s (era 895 s). Se algum número sair do alvo, NÃO mexa em PARAMETROS
+// nem em K: pare e avise.
 describe('ritmo do prestígio', () => {
   const m = simular(catalogo, 14);
   it('K é 1 milhão (o mesmo de idle_prestige_total na 0041)', () => expect(K_PRESTIGIO).toBe(1e6));
@@ -528,11 +783,17 @@ describe('ritmo do prestígio', () => {
   it('5 pontos não saem antes do dia 3 (a primeira venda não compensa cedo demais)', () => {
     expect(pontosTotais(m.amostras.filter((a) => a.t < 2 * DIA).at(-1)!.taxa)).toBeLessThan(5);
   });
-  it('depois de vender com 10 pontos, voltar à era em que estava não fica mais lento', () => {
+  it('a primeira semana rende uns 15 pontos', () => {
+    expect(pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa)).toBe(15);
+  });
+  it('quem gasta compra o mais barato que acelera: com 11 pontos, a raiz e o 1º de quatro ramos', () => {
+    expect(gastar(catalogo, 11)).toEqual({ arvore: [1, 11, 21, 31, 41], sobra: 2 });
+  });
+  it('depois de vender e gastar ~10 pontos, voltar à era em que estava é mais rápido que da primeira vez', () => {
     const r = volta(catalogo, 10)!;
-    expect(r).not.toBeNull();
-    expect(r.era).toBe(5);
-    expect(r.segunda).toBeLessThanOrEqual(r.primeira);
+    expect(r).toMatchObject({ era: 5, gastos: 9 });
+    expect(r.segunda).toBeLessThan(r.primeira);
+    expect(r.segunda / r.primeira).toBeLessThan(0.91); // 234000 / 259200 = 0,90
   });
 });
 ```
@@ -540,38 +801,123 @@ describe('ritmo do prestígio', () => {
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/economia.test.ts idle/simulacao.test.ts`
-Expected: FAIL (`multBonus`, `pontosTotais`, `K_PRESTIGIO`, `primeiraVenda`, `volta` não existem).
+Expected: FAIL (`efeitosArvore`, `multBonus`, `pontosTotais`, `abertura`, `gastar`, `volta`… não existem).
 
-- [ ] **Step 3: `games/idle/economia.ts`**
+- [ ] **Step 3: `games/idle/economia.ts`** — troque cada trecho, na ordem:
 
-Na primeira linha do comentário do topo, troque `Iguais às do banco (0034)` por `Iguais às do banco (0034, 0038, 0041)`.
-Troque `export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social };` por:
+1. Trecho:
 
 ```ts
-/** Prestígio e conquistas (entrega 3): quantos pontos de prestígio e quantas conquistas você tem; cada um vale +1% de
- *  produção, pra sempre. Sem isso (simulação, testes) = nenhum. */
-export type Bonus = { pontos: number; conquistas: number };
-export const SEM_BONUS: Bonus = { pontos: 0, conquistas: 0 };
+// Fórmulas da Fellas Inc. Iguais às do banco (0034): o banco decide, a tela só anima. Um teste de paridade
+// (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
+```
+
+   vira:
+
+```ts
+// Fórmulas da Fellas Inc. Iguais às do banco (0034, 0038, 0041): o banco decide, a tela só anima. Um teste de paridade
+// (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
+```
+
+2. Trecho:
+
+```ts
+// (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
+import type { Catalogo, Estrategia, Melhoria } from './catalogo';
+```
+
+   vira:
+
+```ts
+// (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
+import type { Catalogo, Estrategia, Melhoria, No } from './catalogo';
+```
+
+3. Trecho:
+
+```ts
+export const SOLO: Social = { contratei: 0, empregos: [] };
+export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social };
+```
+
+   vira:
+
+```ts
+export const SOLO: Social = { contratei: 0, empregos: [] };
+/** O que é pra sempre (entrega 3): os nós da árvore que você comprou e quantas conquistas você tem (+1% cada). Sem
+ *  isso (simulação, testes) = nenhum. */
+export type Bonus = { arvore: number[]; conquistas: number };
+export const SEM_BONUS: Bonus = { arvore: [], conquistas: 0 };
 export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social; bonus?: Bonus };
 ```
 
-Antes de `export const CRESCIMENTO = 1.15;` acrescente:
+4. Trecho:
 
 ```ts
-export const POR_PONTO = 0.01;
+export const POR_EMPREGO = 0.02;
+```
+
+   vira:
+
+```ts
+export const POR_EMPREGO = 0.02;
+
 export const POR_CONQUISTA = 0.01;
 /** K do prestígio (medido em simulacao.test.ts): pontos totais = floor(cbrt(R$/s ÷ K)). Igual a idle_prestige_total. */
 export const K_PRESTIGIO = 1e6;
+```
+
+5. Trecho:
+
+```ts
+  return e;
+}
 
 ```
 
-Antes de `const porId = new WeakMap<Catalogo, Map<number, Melhoria>>();` acrescente:
+   vira:
 
 ```ts
-/** Multiplicador do prestígio e das conquistas (igual a idle_bonus_mult na 0041): (1 + 1%·pontos) × (1 + 1%·conquistas). */
-export function multBonus(s: Estado): number {
-  const b = s.bonus ?? SEM_BONUS;
-  return (1 + POR_PONTO * b.pontos) * (1 + POR_CONQUISTA * b.conquistas);
+  return e;
+}
+
+/** O que os nós comprados fazem (igual a idle_arvore_efeitos na 0041). Sem nó: o jogo de sempre. Juntando nós do
+ *  mesmo tipo: produção e bônus das oportunidades multiplicam, +por dia soma, preço do contrato fica o menor e o resto
+ *  fica o maior. */
+export type EfeitosArvore = {
+  producao: number; tetoS: number; caixinha: number; validadeS: number; oppExtra: number; oppBonus: number;
+  contratoPreco: number; porContratado: number; contratoDias: number; empregoMult: number;
+  inicioValuation: number; inicioNotebooks: number; inicioEra1: boolean; manterGerais: boolean;
+};
+const porNo = new WeakMap<Catalogo, Map<number, No>>();
+export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArvore {
+  let mapa = porNo.get(cat);
+  if (!mapa) porNo.set(cat, (mapa = new Map(cat.arvore.map((n) => [n.id, n]))));
+  const valores = (tipo: No['tipo']) => nos.map((id) => mapa.get(id)).filter((n): n is No => n?.tipo === tipo).map((n) => n.valor);
+  const mult = (tipo: No['tipo']) => valores(tipo).reduce((a, v) => a * v, 1);
+  const max = (tipo: No['tipo'], padrao: number) => Math.max(padrao, ...valores(tipo));
+  return {
+    producao: mult('producao'),
+    tetoS: 3600 * max('teto', 8),
+    caixinha: max('caixinha', 3),
+    validadeS: 3600 * max('validade', 4),
+    oppExtra: valores('opp_extra').reduce((a, v) => a + v, 0),
+    oppBonus: mult('opp_bonus'),
+    contratoPreco: Math.min(1, ...valores('contrato_preco')),
+    porContratado: max('por_contratado', POR_CONTRATADO),
+    contratoDias: max('contrato_dias', 7),
+    empregoMult: max('emprego_mult', 1),
+    inicioValuation: max('inicio_valuation', 10),
+    inicioNotebooks: max('inicio_notebooks', 1),
+    inicioEra1: valores('inicio_era1').length > 0,
+    manterGerais: valores('manter_gerais').length > 0,
+  };
+}
+export const efeitosDe = (cat: Catalogo, s: Estado) => efeitosArvore(cat, s.bonus?.arvore ?? []);
+
+/** Árvore e conquistas (igual a idle_bonus_mult na 0041): nós de produção × (1 + 1% por conquista). */
+export function multBonus(cat: Catalogo, s: Estado): number {
+  return efeitosDe(cat, s).producao * (1 + POR_CONQUISTA * (s.bonus?.conquistas ?? 0));
 }
 
 /** Quantos pontos de prestígio um R$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
@@ -583,72 +929,396 @@ export function pontosTotais(r: number): number {
   return n;
 }
 
+/** A empresa do "Abrir CNPJ" com os nós do Recomeço (igual a idle_start na 0041). `gerais`: as melhorias gerais que a
+ *  venda manteve (só com "Leva a cultura junto"). */
+export function abertura(cat: Catalogo, ef: EfeitosArvore, gerais: readonly number[] = []): { valuation: number; generators: number[]; upgrades: number[] } {
+  const generators = Array(30).fill(0);
+  generators[0] = ef.inicioNotebooks;
+  if (ef.inicioEra1) for (const g of cat.geradores) if (g.era === 1) generators[g.id - 1] = Math.max(generators[g.id - 1], 1);
+  return { valuation: ef.inicioValuation, generators, upgrades: ef.manterGerais ? [...gerais] : [] };
+}
+
+/** Preço do próximo contrato (igual a idle_hire_price): 30 min da produção × 1,5^(contratos ativos que você fez) × 2 com
+ *  Abrir capital × o desconto da árvore. */
+export function precoContrato(cat: Catalogo, s: Estado, ativos: number): number {
+  const custo = estrategiasAtivas(cat, s).reduce((a, e) => a * (e.sociais.contratoCustoMult ?? 1), 1);
+  return taxa(cat, s) * 1800 * 1.5 ** ativos * custo * efeitosDe(cat, s).contratoPreco;
+}
+
 ```
 
-Em `fatores`, troque `  global *= multContratos(cat, s);` por:
+6. Trecho:
+
+```ts
+/**
+ * Multiplicador dos contratos ativos (igual a idle_social_mult na 0038):
+ * 1 + efeito × (porContratado × contratei + Σ 2% × o que cada empresa paga). Ninguém te contratou = piso de freela
+ * (2%, como 1 contrato). efeito = ×2 com Networking; porContratado = 10% (15% com Cultura de startup).
+```
+
+   vira:
+
+```ts
+/**
+ * Multiplicador dos contratos ativos (igual a idle_social_mult na 0041):
+ * 1 + efeito × (porContratado × contratei + Σ 2% × o que cada empresa paga × emprego). Ninguém te contratou = piso de
+ * freela (2%, como 1 contrato). efeito = ×2 com Networking; porContratado = 10% (15% com Cultura de startup ou com o nó
+ * Treinamento); emprego = ×2 com o nó Passe em alta.
+```
+
+7. Trecho:
+
+```ts
+  const soc = s.social ?? SOLO;
+```
+
+   vira:
+
+```ts
+  const soc = s.social ?? SOLO;
+  const ef = efeitosDe(cat, s);
+```
+
+8. Trecho:
+
+```ts
+  const pors = est.map((e) => e.sociais.porContratado).filter((x) => x !== undefined);
+  const por = pors.length ? Math.max(...pors) : POR_CONTRATADO;
+```
+
+   vira:
+
+```ts
+  const pors = est.map((e) => e.sociais.porContratado).filter((x) => x !== undefined);
+  const por = Math.max(pors.length ? Math.max(...pors) : POR_CONTRATADO, ef.porContratado);
+```
+
+9. Trecho:
+
+```ts
+  const efeito = est.reduce((a, e) => a * (e.sociais.contratoEfeitoMult ?? 1), 1);
+  const empregos = soc.empregos.length ? soc.empregos.reduce((a, m) => a + POR_EMPREGO * m, 0) : POR_EMPREGO;
+```
+
+   vira:
+
+```ts
+  const efeito = est.reduce((a, e) => a * (e.sociais.contratoEfeitoMult ?? 1), 1);
+  const empregos = soc.empregos.length ? soc.empregos.reduce((a, m) => a + POR_EMPREGO * m * ef.empregoMult, 0) : POR_EMPREGO;
+```
+
+10. Trecho:
 
 ```ts
   global *= multContratos(cat, s);
-  global *= multBonus(s);
 ```
 
-- [ ] **Step 4: `games/idle/simulacao.ts`**
-
-Troque o import de `./economia` e o tipo `Marcos` por:
+   vira:
 
 ```ts
-import {
-  acumular, custoMult, era, liberada, podeComprarGerador, pontosTotais, preco, SEM_BONUS, SOLO, taxa, taxaPorUnidade,
-  type Bonus, type Estado,
-} from './economia';
+  global *= multContratos(cat, s);
+  global *= multBonus(cat, s);
+```
 
-/** R$/s e era no fim de cada sessão (t em segundos de jogo). */
-export type Amostra = { t: number; taxa: number; era: number };
+11. Trecho:
+
+```ts
+
+/** Valuation depois de render de `desdeMs` até `ateMs` (teto de 8h; ×5 dentro do bônus que vai até `boostAteMs`). */
+export function acumular(v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null): number {
+  const dt = Math.min(Math.max((ateMs - desdeMs) / 1000, 0), TETO_SEGUNDOS);
+```
+
+   vira:
+
+```ts
+
+/** Valuation depois de render de `desdeMs` até `ateMs` (teto de `tetoS`, 8h sem a árvore; ×5 dentro do bônus que vai
+ *  até `boostAteMs`). */
+export function acumular(
+  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null, tetoS = TETO_SEGUNDOS,
+): number {
+  const dt = Math.min(Math.max((ateMs - desdeMs) / 1000, 0), tetoS);
+```
+
+12. Trecho:
+
+```ts
+ * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
+ * começando em `desdeMs`. Igual a idle_settle na 0038: teto de 8h contado de `desdeMs`, ×5 dentro do bônus.
+```
+
+   vira:
+
+```ts
+ * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
+ * começando em `desdeMs`. Igual a idle_settle na 0041: teto de `tetoS` contado de `desdeMs`, ×5 dentro do bônus.
+```
+
+13. Trecho:
+
+```ts
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
+```
+
+   vira:
+
+```ts
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
+  tetoS = TETO_SEGUNDOS,
+```
+
+14. Trecho:
+
+```ts
+): number {
+  const fim = Math.min(ateMs, desdeMs + TETO_SEGUNDOS * 1000);
+```
+
+   vira:
+
+```ts
+): number {
+  const fim = Math.min(ateMs, desdeMs + tetoS * 1000);
+```
+
+- [ ] **Step 4: `games/idle/oportunidades.ts`** — troque o comentário e o começo de `pendentes`:
+
+1. Trecho:
+
+```ts
+};
+
+```
+
+   vira:
+
+```ts
+};
+
+/** Quantas a caixinha guarda e quanto tempo (s) uma guardada dura: 3 e 4h sem a árvore (ramo Oportunidades). */
+export type Caixa = { tamanho: number; validadeS: number };
+export const CAIXA_PADRAO: Caixa = { tamanho: 3, validadeS: VALIDADE_S };
+
+```
+
+2. Trecho:
+
+```ts
+/**
+ * Caixinha (igual a idle_opp_list): as 3 mais recentes que já apareceram, têm menos de 4h e não são de antes do
+ * início da semana; só depois tira as pegas. Pegar uma não puxa outra mais velha.
+```
+
+   vira:
+
+```ts
+/**
+ * Caixinha (igual a idle_opp_list na 0041): as `tamanho` mais recentes que já apareceram, têm menos de `validadeS` e
+ * não são de antes do início da semana; só depois tira as pegas. Pegar uma não puxa outra mais velha.
+```
+
+3. Trecho:
+
+```ts
+ */
+export function pendentes(uid: string, agoraMs: number, pegas: number[], inicioSemanaMs = 0): number[] {
+```
+
+   vira:
+
+```ts
+ */
+export function pendentes(uid: string, agoraMs: number, pegas: number[], inicioSemanaMs = 0, caixa: Caixa = CAIXA_PADRAO): number[] {
+```
+
+4. Trecho:
+
+```ts
+  const ate = Math.floor(agoraMs / 1000 / JANELA_S);
+  const de = Math.floor((agoraMs / 1000 - VALIDADE_S) / JANELA_S);
+```
+
+   vira:
+
+```ts
+  const ate = Math.floor(agoraMs / 1000 / JANELA_S);
+  const de = Math.floor((agoraMs / 1000 - caixa.validadeS) / JANELA_S);
+```
+
+5. Trecho:
+
+```ts
+  const recentes: number[] = [];
+  for (let w = ate; w >= de && recentes.length < 3; w--) {
+```
+
+   vira:
+
+```ts
+  const recentes: number[] = [];
+  for (let w = ate; w >= de && recentes.length < caixa.tamanho; w--) {
+```
+
+6. Trecho:
+
+```ts
+    const t = instante(uid, w);
+    if (t <= agoraMs && t >= agoraMs - VALIDADE_S * 1000 && t >= inicioSemanaMs) recentes.push(w);
+```
+
+   vira:
+
+```ts
+    const t = instante(uid, w);
+    if (t <= agoraMs && t >= agoraMs - caixa.validadeS * 1000 && t >= inicioSemanaMs) recentes.push(w);
+```
+
+- [ ] **Step 5: `games/idle/simulacao.ts`** — troque cada trecho, na ordem:
+
+1. Trecho:
+
+```ts
+// sempre o que tem o melhor ganho de taxa por real.
+import { catalogo as padrao, type Catalogo } from './catalogo';
+import { acumular, custoMult, era, liberada, podeComprarGerador, preco, SOLO, taxa, taxaPorUnidade, type Estado } from './economia';
+```
+
+   vira:
+
+```ts
+// sempre o que tem o melhor ganho de taxa por real.
+import { catalogo as padrao, type Catalogo, type No } from './catalogo';
+import {
+  abertura, acumular, custoMult, efeitosArvore, era, liberada, podeComprarGerador, pontosTotais, preco, SEM_BONUS, SOLO, taxa,
+  taxaPorUnidade, type Bonus, type Estado,
+} from './economia';
+```
+
+2. Trecho:
+
+```ts
+
+export type Marcos = { segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null };
+```
+
+   vira:
+
+```ts
+
+/** No fim de cada sessão (t em segundos de jogo): R$/s, era e as melhorias gerais que a empresa tem. */
+export type Amostra = { t: number; taxa: number; era: number; gerais: number[] };
 export type Marcos = {
   segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null;
   amostras: Amostra[];
 };
 ```
 
-Troque o começo de `simular`:
+3. Trecho:
 
 ```ts
+
 export function simular(cat: Catalogo = padrao, dias = 7): Marcos {
+```
+
+   vira:
+
+```ts
+
+/** `bonus`: os nós da árvore e as conquistas de quem já vendeu; `gerais`: as melhorias gerais que a venda manteve. */
+export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BONUS, gerais: number[] = []): Marcos {
+  const ef = efeitosArvore(cat, bonus.arvore);
+  const ini = abertura(cat, ef, gerais);
+```
+
+4. Trecho:
+
+```ts
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
   const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1], social: SOLO };
+  s.generators[0] = 1;
+  let v = 10;
 ```
 
-por:
+   vira:
 
 ```ts
-/** `bonus`: pontos de prestígio e conquistas com que a empresa começa (o jogador que já vendeu). */
-export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BONUS): Marcos {
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
-  const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1], social: SOLO, bonus };
+  const s: Estado = { generators: ini.generators, upgrades: ini.upgrades, strategies: [-1, -1, -1, -1], social: SOLO, bonus };
+  let v = ini.valuation;
 ```
 
-Na criação de `marcos`, troque `compras1h: 0, gerador30: null };` por `compras1h: 0, gerador30: null, amostras: [] };`.
-Troque o fim do arquivo:
+5. Trecho:
 
 ```ts
-    for (let t = ini; t < fim; t += PASSO) {
-      avancar(t);
+  let relogio = 0;
+  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null };
+```
+
+   vira:
+
+```ts
+  let relogio = 0;
+  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null, amostras: [] };
+```
+
+6. Trecho:
+
+```ts
+  const avancar = (ate: number) => {
+    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null);
+```
+
+   vira:
+
+```ts
+  const avancar = (ate: number) => {
+    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null, ef.tetoS);
+```
+
+7. Trecho:
+
+```ts
+    if (ini > 0) {
+      const pegar = Math.min(3, 10 - oppHoje);
+      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900;
+```
+
+   vira:
+
+```ts
+    if (ini > 0) {
+      const pegar = Math.min(ef.caixinha, 10 + ef.oppExtra - oppHoje);
+      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900 * ef.oppBonus;
+```
+
+8. Trecho:
+
+```ts
       comprar();
     }
-  }
+```
+
+   vira:
+
+```ts
+      comprar();
+    }
+    const gerais = s.upgrades.filter((id) => cat.melhorias.find((m) => m.id === id)?.tipo === 'geral');
+    marcos.amostras.push({ t: fim, taxa: taxa(cat, s), era: era(cat, s.generators), gerais });
+```
+
+9. Trecho:
+
+```ts
   return marcos;
 }
+
 ```
 
-por:
+   vira:
 
 ```ts
-    for (let t = ini; t < fim; t += PASSO) {
-      avancar(t);
-      comprar();
-    }
-    marcos.amostras.push({ t: fim, taxa: taxa(cat, s), era: era(cat, s.generators) });
-  }
   return marcos;
 }
 
@@ -657,50 +1327,85 @@ export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
   return m.amostras.find((a) => pontosTotais(a.taxa) >= minimo) ?? null;
 }
 
-/** O jogador que vende: joga até a venda valer `pontos`, vende e recomeça com os pontos que ganhou (sem contar as
- *  conquistas, que só ajudariam). Quanto tempo levou pra chegar na era em que estava da primeira vez e depois de vender
- *  (Infinity = não chegou em `dias`). null = a venda nunca chegou a `pontos`. */
-export function volta(cat: Catalogo = padrao, pontos = 10, dias = 14): { era: number; primeira: number; segunda: number } | null {
+// o que não acelera o jogador sozinho da simulação: o ramo Gente e a validade das oportunidades (ele pega na hora)
+const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'validade'];
+
+/** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */
+export function gastar(cat: Catalogo, pontos: number, ja: readonly number[] = []): { arvore: number[]; sobra: number } {
+  const arvore = [...ja];
+  let sobra = pontos;
+  for (;;) {
+    const opcoes = cat.arvore.filter(
+      (n) => !arvore.includes(n.id) && (n.requer === null || arvore.includes(n.requer)) && !NAO_ACELERA.includes(n.tipo) && n.custo <= sobra,
+    );
+    if (!opcoes.length) return { arvore, sobra };
+    const n = opcoes.reduce((a, b) => (b.custo < a.custo || (b.custo === a.custo && b.id < a.id) ? b : a));
+    arvore.push(n.id);
+    sobra -= n.custo;
+  }
+}
+
+/** O jogador que vende: joga até a venda valer `pontos`, vende, gasta tudo na árvore (`gastar`) e recomeça (sem contar
+ *  as conquistas, que só ajudariam). Quanto tempo levou pra chegar na era em que estava da primeira vez e depois de
+ *  vender (Infinity = não chegou em `dias`). null = a venda nunca chegou a `pontos`. */
+export function volta(
+  cat: Catalogo = padrao, pontos = 10, dias = 14,
+): { era: number; primeira: number; segunda: number; arvore: number[]; gastos: number } | null {
   const m1 = simular(cat, dias);
   const venda = primeiraVenda(m1, pontos);
   if (!venda || venda.era < 2) return null;
-  const m2 = simular(cat, dias, { pontos: pontosTotais(venda.taxa), conquistas: 0 });
-  return { era: venda.era, primeira: m1.era[venda.era]!, segunda: m2.era[venda.era] ?? Infinity };
+  const ganhos = pontosTotais(venda.taxa);
+  const { arvore, sobra } = gastar(cat, ganhos);
+  const m2 = simular(cat, dias, { arvore, conquistas: 0 }, venda.gerais);
+  return { era: venda.era, primeira: m1.era[venda.era]!, segunda: m2.era[venda.era] ?? Infinity, arvore, gastos: ganhos - sobra };
 }
+
 ```
 
-- [ ] **Step 5: Rodar e ver passar (os marcos antigos não mudam: sem bônus, `multBonus` é 1)**
+- [ ] **Step 6: Rodar e ver passar (os marcos antigos não mudam: sem nó, os efeitos são os de sempre)**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx tsc --noEmit && npx vitest run idle/`
 Expected: PASS. Se "ritmo da semana" ou "ritmo do prestígio" falhar, NÃO mexa em `PARAMETROS` nem em `K_PRESTIGIO`:
 pare e avise.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/economia.ts games/idle/economia.test.ts games/idle/simulacao.ts games/idle/simulacao.test.ts && git commit -m "Fellas Inc.: prestígio e conquistas na conta (economia.ts) e o K pela simulação"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/economia.ts games/idle/economia.test.ts games/idle/oportunidades.ts games/idle/simulacao.ts games/idle/simulacao.test.ts && git commit -m "Fellas Inc.: árvore e conquistas na conta (economia.ts) e o K pela simulação"
 ```
 
 ---
 
-### Task 3: A conta com prestígio e conquistas no banco (0041, parte 1)
+### Task 3: A árvore e as conquistas nas contas do banco (0041, parte 1)
 
 **Files:**
-- Create: `supabase/migrations/0041_fellas_inc_prestigio.sql` (começo; as Tasks 4 e 5 acrescentam no fim)
+- Create: `supabase/migrations/0041_fellas_inc_prestigio.sql` (começo; as Tasks 4, 5 e 6 acrescentam no fim)
 - Modify: `games/test/db.ts`, `games/dev/mockDb.ts`, `games/test/idleParidade.test.ts`
 
 **Interfaces:**
-- Consome: `Bonus`, `taxa`, `pontosTotais` (Task 2); `idle_social_mult` (0038); `idle_cat_conquista` (Task 1).
-- Produz: colunas novas de `idle_state` (`prestige_points int`, `prestige_count int`, `best_rate double precision`,
-  `upg_total int`, `opp_total int`, `hire_total int`, `hired_total int`, `est_usadas int[]`, `opp_recent timestamptz[]`,
-  todas `not null` com default); tabela `idle_conquistas (user_id, conquista_id, ganhou_em)`; funções internas
-  `idle_est_codigos(smallint[]) → int[]`, `idle_bonus_mult(idle_state) → double precision`,
-  `idle_rate_at(idle_state, timestamptz)` (a da 0038 × `idle_bonus_mult`), `idle_prestige_total(double precision) → int`.
+- Consome: `efeitosArvore`, `taxa`, `acumularTrechos`, `precoContrato`, `pontosTotais` (Task 2); `pendentes` com `Caixa`
+  (Task 2); `idle_employee_mult` (0038); `idle_cat_no` (Task 1).
+- Produz: colunas novas de `idle_state` (`prestige_earned int`, `prestige_spent int`, `prestige_count int`,
+  `best_rate double precision`, `upg_total int`, `opp_total int`, `hire_total int`, `hired_total int`,
+  `est_usadas int[]`, `opp_recent timestamptz[]`, todas `not null` com default); tabelas `idle_conquistas (user_id,
+  conquista_id, ganhou_em)` e `idle_arvore (user_id, no_id, comprado_em)`; funções internas
+  `idle_est_codigos(smallint[]) → int[]`, `idle_arv(uuid, text, text, double precision) → double precision` (valor dos
+  nós de um tipo: `'mult'`, `'max'`, `'min'` ou `'soma'`, com padrão), `idle_arvore_efeitos(uuid) → jsonb` (as chaves de
+  `EfeitosArvore`), `idle_bonus_mult(idle_state)`, `idle_prestige_total(double precision) → int`; trocadas:
+  `idle_rate_at`, `idle_social_mult`, `idle_settle` (teto da árvore), `idle_opp_list` (caixinha e validade),
+  `idle_opp_cap` (+ por dia), `idle_hire_price` (desconto).
 
 - [ ] **Step 1: Testes de paridade (`games/test/idleParidade.test.ts`)**
 
-No import de `../idle/economia`, acrescente `pontosTotais` (fica
-`import { acumular, acumularTrechos, custoMult, maxCompra, pontosTotais, preco, taxa, type Estado } from '../idle/economia';`).
+Troque o import de `../idle/economia` por:
+
+```ts
+import {
+  acumular, acumularTrechos, custoMult, efeitosArvore, maxCompra, pontosTotais, precoContrato, preco, taxa, type Estado,
+} from '../idle/economia';
+import { pendentes } from '../idle/oportunidades';
+```
+
 Logo depois de `const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;`, acrescente:
 
 ```ts
@@ -709,44 +1414,113 @@ async function conquistas(n: number) {
   await q('delete from public.idle_conquistas where true');
   if (n) await q('insert into public.idle_conquistas (user_id, conquista_id) select $1, g from generate_series(1, $2) g', [A, n]);
 }
+/** A fica com exatamente esses nós da árvore (a conta não confere a ordem dos ramos: isso é do idle_buy_node). */
+async function arvore(nos: number[]) {
+  await q('delete from public.idle_arvore where true');
+  for (const n of nos) await q('insert into public.idle_arvore (user_id, no_id) values ($1, $2)', [A, n]);
+}
+/** Um pedaço sorteado da árvore. */
+const nosAoAcaso = (r: () => number) => catalogo.arvore.filter(() => r() < 0.4).map((n) => n.id);
 ```
 
 No fim do `describe('paridade', ...)` (antes do `});` final), acrescente:
 
 ```ts
-  it('taxa com prestígio e conquistas', async () => {
-    const r = rng(5);
-    for (const s of estados(20)) {
-      const bonus = { pontos: Math.floor(r() * 300), conquistas: Math.floor(r() * 60) };
-      await preparar(s, 'prestige_points', [bonus.pontos]);
-      await conquistas(bonus.conquistas);
-      const [db] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]);
-      expect(rel(db.r, taxa(catalogo, { ...s, bonus }))).toBeLessThan(1e-9);
+  it('o que a árvore faz é igual no banco e em economia.ts (cada nó sozinho e pedaços sorteados)', async () => {
+    const r = rng(3);
+    const casos = [[], ...catalogo.arvore.map((n) => [n.id]), ...Array.from({ length: 30 }, () => nosAoAcaso(r))];
+    for (const nos of casos) {
+      await arvore(nos);
+      const [{ e }] = await q<{ e: Record<string, number | boolean> }>('select public.idle_arvore_efeitos($1) as e', [A]);
+      const ts = efeitosArvore(catalogo, nos);
+      expect(Object.keys(e).sort(), String(nos)).toEqual(Object.keys(ts).sort());
+      for (const [k, v] of Object.entries(ts)) {
+        if (typeof v === 'boolean') expect(e[k], `${nos} ${k}`).toBe(v);
+        else expect(rel(e[k] as number, v), `${nos} ${k}`).toBeLessThan(1e-12);
+      }
     }
+    await arvore([]);
+  });
+  it('taxa com a árvore, as conquistas e os contratos (Treinamento e Passe em alta)', async () => {
+    const r = rng(5);
+    for (const s of estados(30)) {
+      const bonus = { arvore: nosAoAcaso(r), conquistas: Math.floor(r() * 60) };
+      await preparar(s);
+      await arvore(bonus.arvore);
+      await conquistas(bonus.conquistas);
+      const contratei = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      const chefes = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      for (const u of contratei) await contrato(A, u);
+      for (const u of chefes) await contrato(u, A);
+      const social = { contratei: contratei.length, empregos: chefes.map((u) => (u === C ? 3 : 1)) };
+      const [db] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]);
+      expect(rel(db.r, taxa(catalogo, { ...s, bonus, social }))).toBeLessThan(1e-9);
+    }
+    await arvore([]);
     await conquistas(0);
   });
-  it('fechar a conta com prestígio e conquistas, atravessando vencimento e teto de 8h', async () => {
+  it('fechar a conta com a árvore: teto do ramo Tempo, vencimento no meio e bônus', async () => {
     const T0 = Date.parse('2026-10-12T10:00:00Z');
     const iso = (ms: number) => `'${new Date(ms).toISOString()}'::timestamptz`;
     const s = estados(4)[3];
-    const bonus = { pontos: 17, conquistas: 9 };
-    await preparar(s, 'valuation, settled_at, boost_until, prestige_points',
-      [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString(), bonus.pontos]);
-    await conquistas(bonus.conquistas);
-    await contrato(C, A, iso(T0 - 86400_000), iso(T0 + 300_000)); // C (Cultura) contratou A: vence 300 s depois
-    const trechos = [
-      { desdeMs: T0, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [3] } }) },
-      { desdeMs: T0 + 300_000, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [] } }) },
-    ];
-    for (const ate of [T0 + 50_000, T0 + 1000_000, T0 + 10 * 3600_000]) {
-      const [db] = await q<{ v: number }>(
-        `select (public.idle_settle(s, $2::timestamptz)).valuation as v from public.idle_state s where user_id = $1`,
-        [A, new Date(ate).toISOString()],
-      );
-      expect(rel(db.v, acumularTrechos(1000, trechos, T0, ate, T0 + 200_000))).toBeLessThan(1e-9);
+    for (const nos of [[], [1, 41], [1, 41, 42, 43], [1, 11, 41, 42, 43, 44, 45]]) {
+      const bonus = { arvore: nos, conquistas: 9 };
+      const tetoS = efeitosArvore(catalogo, nos).tetoS;
+      await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
+      await arvore(nos);
+      await conquistas(bonus.conquistas);
+      await contrato(C, A, iso(T0 - 86400_000), iso(T0 + 300_000)); // C (Cultura) contratou A: vence 300 s depois
+      const trechos = [
+        { desdeMs: T0, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [3] } }) },
+        { desdeMs: T0 + 300_000, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [] } }) },
+      ];
+      for (const ate of [T0 + 50_000, T0 + 1000_000, T0 + 10 * 3600_000, T0 + 30 * 3600_000, T0 + 60 * 3600_000]) {
+        const [db] = await q<{ v: number }>(
+          `select (public.idle_settle(s, $2::timestamptz)).valuation as v from public.idle_state s where user_id = $1`,
+          [A, new Date(ate).toISOString()],
+        );
+        expect(rel(db.v, acumularTrechos(1000, trechos, T0, ate, T0 + 200_000, tetoS)), `${nos} ${ate}`).toBeLessThan(1e-9);
+      }
     }
     await q('delete from public.idle_contracts where true');
+    await arvore([]);
     await conquistas(0);
+  });
+  it('caixinha e validade com a árvore: banco e oportunidades.ts concordam', async () => {
+    const s = estados(1)[0];
+    await preparar(s);
+    const [{ agora, semana }] = await q<{ agora: string; semana: string }>(
+      `select now()::text as agora, (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')::text as semana`,
+    );
+    for (const nos of [[], [1, 31], [1, 31, 32], [1, 31, 32, 33, 34, 35]]) {
+      await arvore(nos);
+      const ef = efeitosArvore(catalogo, nos);
+      for (const horas of [0, 3, 5, 7]) {
+        const ts = Date.parse(agora) + horas * 3600_000;
+        const [db] = await q<{ l: string[] }>(
+          'select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1',
+          [A, new Date(ts).toISOString()],
+        );
+        expect(db.l.map(Number), `${nos} +${horas}h`).toEqual(
+          pendentes(A, ts, [], Date.parse(semana), { tamanho: ef.caixinha, validadeS: ef.validadeS }),
+        );
+      }
+    }
+    await arvore([]);
+  });
+  it('preço do contrato com a árvore (e Abrir capital)', async () => {
+    const r = rng(8);
+    for (const s of estados(10)) {
+      const nos = nosAoAcaso(r);
+      await preparar(s);
+      await arvore(nos);
+      const contratei = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      for (const u of contratei) await contrato(A, u);
+      const [db] = await q<{ p: number }>('select public.idle_hire_price(s) as p from public.idle_state s where user_id = $1', [A]);
+      const est = { ...s, bonus: { arvore: nos, conquistas: 0 }, social: { contratei: contratei.length, empregos: [] } };
+      expect(rel(db.p, precoContrato(catalogo, est, contratei.length))).toBeLessThan(1e-9);
+    }
+    await arvore([]);
   });
   it('pontos de prestígio iguais no banco e em economia.ts, inclusive em cima dos cubos', async () => {
     const r = rng(11);
@@ -777,16 +1551,18 @@ Expected: FAIL (o arquivo `0041_fellas_inc_prestigio.sql` não existe).
 
 ```sql
 -- fellasapp: Fellas Inc., entrega 3 (prestígio e conquistas). "Vender a startup" troca a empresa por pontos de
--- prestígio (+1% de produção cada, pra sempre) e as conquistas dão +1% cada, pra sempre. A Fellas Inc. continua sem
--- reset (0036): só o jogador zera a própria empresa, vendendo; nada aqui apaga estado, contrato, ponto ou conquista.
--- As funções que mudam são trocadas com create or replace a partir da versão mais nova (0034, 0036 ou 0038, já em
--- produção). As contas existem iguais em games/idle/economia.ts (teste de paridade). Depende da 0040 (catálogo das
--- conquistas). Não toca nos créditos do cassino. Idempotente.
+-- prestígio, que se gastam numa árvore de habilidades (os nós comprados é que dão efeito, pra sempre); as conquistas
+-- dão +1% cada, pra sempre. A Fellas Inc. continua sem reset (0036): só o jogador zera a própria empresa, vendendo;
+-- nada aqui apaga estado, contrato, ponto, nó ou conquista. As funções que mudam são trocadas com create or replace a
+-- partir da versão mais nova (0034, 0036 ou 0038, já em produção). As contas existem iguais em games/idle/economia.ts
+-- e oportunidades.ts (teste de paridade). Depende da 0040 (catálogo das conquistas e da árvore). Não toca nos créditos
+-- do cassino. Idempotente.
 
 -- ===== o que fica pra sempre (a venda não zera) =====
 
 alter table public.idle_state
-  add column if not exists prestige_points int not null default 0 check (prestige_points >= 0),
+  add column if not exists prestige_earned int not null default 0 check (prestige_earned >= 0),
+  add column if not exists prestige_spent  int not null default 0 check (prestige_spent >= 0),
   add column if not exists prestige_count  int not null default 0,
   add column if not exists best_rate       double precision not null default 0,
   add column if not exists upg_total       int not null default 0,
@@ -810,7 +1586,21 @@ grant select on public.idle_conquistas to authenticated;
 drop policy if exists "idle_conquistas_select_members" on public.idle_conquistas;
 create policy "idle_conquistas_select_members" on public.idle_conquistas for select to authenticated using (public.is_member());
 
--- ===== a conta com prestígio e conquistas =====
+-- os nós da árvore que cada um comprou (sem chave estrangeira pro catálogo, pelo mesmo motivo)
+create table if not exists public.idle_arvore (
+  user_id     uuid not null references public.profiles (id) on delete cascade,
+  no_id       int not null,
+  comprado_em timestamptz not null default now(),
+  primary key (user_id, no_id)
+);
+
+alter table public.idle_arvore enable row level security;
+revoke all on public.idle_arvore from anon, authenticated;
+grant select on public.idle_arvore to authenticated;
+drop policy if exists "idle_arvore_select_members" on public.idle_arvore;
+create policy "idle_arvore_select_members" on public.idle_arvore for select to authenticated using (public.is_member());
+
+-- ===== a conta com a árvore e as conquistas =====
 
 -- as estratégias escolhidas agora, como códigos era·10 + opção (a 2 da era 4 = 42)
 create or replace function public.idle_est_codigos(p smallint[])
@@ -818,14 +1608,49 @@ returns int[] language sql immutable as $$
   select coalesce(array_agg((k + 1) * 10 + p[k] order by k), '{}') from generate_subscripts(p, 1) k where p[k] >= 0
 $$;
 
--- +1% por ponto de prestígio e +1% por conquista (igual a economia.ts multBonus)
+-- o valor dos nós de um tipo que alguém comprou, juntados por p_agg ('mult', 'max', 'min' ou 'soma'); sem nó desse
+-- tipo, p_padrao (igual a economia.ts efeitosArvore)
+create or replace function public.idle_arv(u uuid, p_tipo text, p_agg text, p_padrao double precision)
+returns double precision language sql stable set search_path = public as $$
+  select coalesce(case p_agg
+                    when 'mult' then exp(sum(ln(c.valor)))
+                    when 'max' then max(c.valor)
+                    when 'min' then min(c.valor)
+                    else sum(c.valor)
+                  end, p_padrao)
+    from public.idle_arvore a
+    join public.idle_cat_no c on c.id = a.no_id
+   where a.user_id = u and c.tipo = p_tipo
+$$;
+
+-- tudo que a árvore de alguém faz, com os nomes de economia.ts efeitosArvore (teste de paridade)
+create or replace function public.idle_arvore_efeitos(u uuid)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'producao', public.idle_arv(u, 'producao', 'mult', 1),
+    'tetoS', 3600 * public.idle_arv(u, 'teto', 'max', 8),
+    'caixinha', public.idle_arv(u, 'caixinha', 'max', 3),
+    'validadeS', 3600 * public.idle_arv(u, 'validade', 'max', 4),
+    'oppExtra', public.idle_arv(u, 'opp_extra', 'soma', 0),
+    'oppBonus', public.idle_arv(u, 'opp_bonus', 'mult', 1),
+    'contratoPreco', least(1, public.idle_arv(u, 'contrato_preco', 'min', 1)),
+    'porContratado', greatest(0.1, public.idle_arv(u, 'por_contratado', 'max', 0.1)),
+    'contratoDias', greatest(7, public.idle_arv(u, 'contrato_dias', 'max', 7)),
+    'empregoMult', greatest(1, public.idle_arv(u, 'emprego_mult', 'max', 1)),
+    'inicioValuation', greatest(10, public.idle_arv(u, 'inicio_valuation', 'max', 10)),
+    'inicioNotebooks', greatest(1, public.idle_arv(u, 'inicio_notebooks', 'max', 1)),
+    'inicioEra1', public.idle_arv(u, 'inicio_era1', 'max', 0) > 0,
+    'manterGerais', public.idle_arv(u, 'manter_gerais', 'max', 0) > 0)
+$$;
+
+-- nós de produção da árvore × (1 + 1% por conquista) (igual a economia.ts multBonus)
 create or replace function public.idle_bonus_mult(s public.idle_state)
 returns double precision language sql stable set search_path = public as $$
-  select (1 + 0.01::double precision * s.prestige_points)
+  select public.idle_arv(s.user_id, 'producao', 'mult', 1)
        * (1 + 0.01::double precision * (select count(*) from public.idle_conquistas c where c.user_id = s.user_id))
 $$;
 
--- produção por segundo em t (a da 0038 × prestígio e conquistas; igual a economia.ts taxa)
+-- produção por segundo em t (a da 0038 × árvore e conquistas; igual a economia.ts taxa)
 create or replace function public.idle_rate_at(s public.idle_state, t timestamptz)
 returns double precision language sql stable set search_path = public as $$
   with est as (
@@ -867,13 +1692,118 @@ begin
 end;
 $$;
 
+-- multiplicador dos contratos ativos em t (o da 0038 + a árvore: o nó Treinamento paga 15% por contratado, como a
+-- Cultura de startup, sem somar; o nó Passe em alta dobra o que cada empresa que te contratou rende pra você; o piso
+-- de freela não muda). Igual a economia.ts multContratos.
+create or replace function public.idle_social_mult(s public.idle_state, t timestamptz)
+returns double precision language sql stable set search_path = public as $$
+  with est as (
+    select e.sociais from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
+  )
+  select 1 + coalesce((select exp(sum(ln((x.sociais ->> 'contratoEfeitoMult')::double precision))) from est x
+                        where (x.sociais ->> 'contratoEfeitoMult') is not null), 1)
+           * (greatest(coalesce((select max((x.sociais ->> 'porContratado')::double precision) from est x
+                                  where (x.sociais ->> 'porContratado') is not null), 0.1),
+                       public.idle_arv(s.user_id, 'por_contratado', 'max', 0.1))
+                * (select count(*) from public.idle_contracts c
+                    where c.employer_id = s.user_id and c.created_at <= t and c.ends_at > t)
+              + coalesce((select sum(0.02 * public.idle_employee_mult(c.employer_id)
+                                     * public.idle_arv(s.user_id, 'emprego_mult', 'max', 1))
+                            from public.idle_contracts c
+                           where c.employee_id = s.user_id and c.created_at <= t and c.ends_at > t), 0.02))
+$$;
+
+-- fecha a conta até ts (a da 0038), com o teto do offline da árvore (8h sem o ramo Tempo; igual a economia.ts
+-- acumularTrechos)
+create or replace function public.idle_settle(s public.idle_state, ts timestamptz default now())
+returns public.idle_state language plpgsql stable set search_path = public as $$
+declare
+  v_fim   timestamptz;
+  v_a     timestamptz;
+  v_b     timestamptz;
+  v_rate  double precision;
+  v_boost double precision;
+begin
+  if not s.started or ts <= s.settled_at then
+    s.settled_at := greatest(s.settled_at, ts);
+    return s;
+  end if;
+  v_fim := least(ts, s.settled_at + make_interval(secs => 3600 * public.idle_arv(s.user_id, 'teto', 'max', 8)));
+  v_a := s.settled_at;
+  for v_b in
+    select x from (select c.ends_at as x from public.idle_contracts c
+                    where (c.employer_id = s.user_id or c.employee_id = s.user_id)
+                      and c.ends_at > s.settled_at and c.ends_at < v_fim
+                   union
+                   select v_fim) y
+     order by x
+  loop
+    v_rate := public.idle_rate_at(s, v_a);
+    v_boost := 0;
+    if s.boost_until is not null and s.boost_until > v_a then
+      v_boost := greatest(0, extract(epoch from least(v_b, s.boost_until) - v_a));
+    end if;
+    s.valuation := s.valuation + v_rate * extract(epoch from v_b - v_a) + v_rate * 4 * v_boost;
+    v_a := v_b;
+  end loop;
+  s.settled_at := ts;
+  return s;
+end;
+$$;
+
+-- caixinha (a da 0034) com a árvore: guarda as `caixinha` mais recentes (3 sem o ramo Oportunidades) que têm menos
+-- de `validade` (4h) e são desta semana; só depois tira as pegas (igual a oportunidades.ts pendentes)
+create or replace function public.idle_opp_list(s public.idle_state, ts timestamptz default now())
+returns bigint[] language sql stable set search_path = public as $$
+  with v as (
+    select make_interval(secs => 3600 * public.idle_arv(s.user_id, 'validade', 'max', 4)) as validade
+  )
+  select coalesce(array_agg(w order by w desc), '{}') from (
+    select w
+      from v, generate_series(floor(extract(epoch from ts - v.validade) / 600)::bigint,
+                              floor(extract(epoch from ts) / 600)::bigint) w
+     where public.idle_opp_at(s.user_id, w) <= ts
+       and public.idle_opp_at(s.user_id, w) >= ts - v.validade
+       and public.idle_opp_at(s.user_id, w) >= (s.week_start::timestamp at time zone 'America/Sao_Paulo')
+     order by w desc
+     limit public.idle_arv(s.user_id, 'caixinha', 'max', 3)::int
+  ) x
+  where not coalesce(w = any (s.opp_claimed), false)
+$$;
+
+-- limite de oportunidades por dia (o da 0034) + o nó Faro de negócio
+create or replace function public.idle_opp_cap(s public.idle_state)
+returns int language sql stable set search_path = public as $$
+  select 10 + coalesce((select sum(e.opp_extra)::int from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 0)
+            + public.idle_arv(s.user_id, 'opp_extra', 'soma', 0)::int
+$$;
+
+-- preço do próximo contrato (o da 0038) × o desconto da árvore (igual a economia.ts precoContrato)
+create or replace function public.idle_hire_price(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_rate(s) * 1800
+       * power(1.5::double precision, (select count(*) from public.idle_contracts c
+                                        where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()))
+       * coalesce((select exp(sum(ln((e.sociais ->> 'contratoCustoMult')::double precision)))
+                     from public.idle_cat_est e
+                    where e.opcao = s.strategies[e.era - 1] and (e.sociais ->> 'contratoCustoMult') is not null), 1)
+       * least(1, public.idle_arv(s.user_id, 'contrato_preco', 'min', 1))
+$$;
+
 revoke all on function public.idle_est_codigos(smallint[]) from public, anon, authenticated;
+revoke all on function public.idle_arv(uuid, text, text, double precision) from public, anon, authenticated;
+revoke all on function public.idle_arvore_efeitos(uuid) from public, anon, authenticated;
 revoke all on function public.idle_bonus_mult(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_social_mult(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_opp_list(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_opp_cap(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_hire_price(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_prestige_total(double precision) from public, anon, authenticated;
 ```
 
-- [ ] **Step 4: Rodar e ver passar; nada antigo muda (ninguém tem ponto nem conquista ainda: o bônus é 1)**
+- [ ] **Step 4: Rodar e ver passar; nada antigo muda (ninguém tem nó nem conquista ainda: tudo fica no padrão)**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run test/ && npx tsc --noEmit`
 Expected: PASS (paridade nova e todos os testes de banco de antes).
@@ -881,7 +1811,7 @@ Expected: PASS (paridade nova e todos os testes de banco de antes).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/migrations/0041_fellas_inc_prestigio.sql games/test/db.ts games/dev/mockDb.ts games/test/idleParidade.test.ts && git commit -m "Fellas Inc.: pontos e conquistas na conta do banco (0041, parte 1)"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/migrations/0041_fellas_inc_prestigio.sql games/test/db.ts games/dev/mockDb.ts games/test/idleParidade.test.ts && git commit -m "Fellas Inc.: árvore e conquistas nas contas do banco (0041, parte 1)"
 ```
 
 ---
@@ -894,14 +1824,14 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/m
 - Create: `games/test/idleConquistas.test.ts`
 
 **Interfaces:**
-- Consome: Task 3; `pendentes` (`games/idle/oportunidades.ts`); `catalogo.conquistas` (Task 1).
+- Consome: Task 3; `pendentes` (`oportunidades.ts`); `catalogo.conquistas` (Task 1).
 - Produz: `idle_ganhar(p_user uuid, p_tipo text, p_valor double precision default null, p_texto text default null)`,
-  `idle_madrugada(ts timestamptz default now()) → boolean`, `idle_check_conquistas(p_user uuid) → int[]` (as gravadas
-  agora), `idle_save` que confere as conquistas e guarda o recorde, e o estado de toda RPC com os campos novos:
-  `bonus: { pontos, conquistas }`, `vendas`, `recorde`, `pontos_venda`, `conquistas: [{ id, em }]` (da mais antiga à mais
-  nova), `novas: int[]` (as desta chamada), `descobertas: int[]` (escondidas que alguém tem). `idle_open` (3h06),
-  `idle_buy` (`upg_total`, jaula), `idle_claim_opportunity` (`opp_total`, `opp_recent`), `idle_hire` (`hire_total`,
-  `hired_total`, limaumdoc). `freshDb({ conquistas: false })`.
+  `idle_madrugada(ts timestamptz default now()) → boolean`, `idle_check_conquistas(p_user uuid) → int[]`, `idle_save`
+  que confere as conquistas e guarda o recorde, e o estado de toda RPC com os campos novos: `bonus: { arvore: int[],
+  conquistas }`, `pontos` (livres), `pontos_vida`, `vendas`, `recorde`, `pontos_venda`, `conquistas: [{ id, em }]`,
+  `novas: int[]`, `descobertas: int[]`. `idle_open` (3h06), `idle_buy` (`upg_total`, jaula), `idle_claim_opportunity`
+  (bônus da árvore, `opp_total`, `opp_recent`), `idle_hire` (10 dias com o nó, `hire_total`, `hired_total`,
+  limaumdoc). `freshDb({ conquistas: false })`.
 
 - [ ] **Step 1: Testes**
 
@@ -924,7 +1854,7 @@ const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql,
 
 type Estado = {
   user_id: string; week_start: string; valuation: number; rate: number; server_now: string;
-  bonus: { pontos: number; conquistas: number }; conquistas: { id: number; em: string }[]; novas: number[]; descobertas: number[];
+  bonus: { arvore: number[]; conquistas: number }; conquistas: { id: number; em: string }[]; novas: number[]; descobertas: number[];
 };
 
 beforeEach(async () => {
@@ -955,7 +1885,7 @@ describe('conquistas de estado', () => {
     const s = await abrirJogo();
     expect(s.novas).toEqual([1, 31]);
     expect(ids(s)).toEqual([1, 31]);
-    expect(s.bonus).toEqual({ pontos: 0, conquistas: 2 });
+    expect(s.bonus).toEqual({ arvore: [], conquistas: 2 });
     expect(s.rate).toBeCloseTo(base * 1.02, 9);
     expect((s.valuation - 10) / (base * 1000)).toBeCloseTo(1, 3); // as 1000 s de antes rendem sem o bônus
     const outra = await abrirJogo();
@@ -1070,16 +2000,18 @@ Em `games/test/idleParidade.test.ts`, no fim do `describe('paridade', ...)`, acr
 ```ts
   it('o estado devolve o bônus que a conta usa', async () => {
     const s = estados(5)[4];
-    const bonus = { pontos: 23, conquistas: 7 };
-    await preparar(s, 'prestige_points', [bonus.pontos]);
+    const bonus = { arvore: [1, 11, 12, 41], conquistas: 7 };
+    await preparar(s);
+    await arvore(bonus.arvore);
     await conquistas(bonus.conquistas);
-    const [db] = await q<{ r: number; b: { pontos: number; conquistas: number } }>(
+    const [db] = await q<{ r: number; b: { arvore: number[]; conquistas: number } }>(
       `select (public.idle_json(s) ->> 'rate')::double precision as r, public.idle_json(s) -> 'bonus' as b
          from public.idle_state s where user_id = $1`,
       [A],
     );
     expect(db.b).toEqual(bonus);
     expect(rel(db.r, taxa(catalogo, { ...s, bonus }))).toBeLessThan(1e-9);
+    await arvore([]);
     await conquistas(0);
   });
 ```
@@ -1190,7 +2122,8 @@ end;
 $$;
 
 -- gravar o estado (o da 0036 + o que é permanente e as estratégias já usadas), conferir as conquistas e guardar o
--- recorde de R$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta.
+-- recorde de R$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta. As janelas de oportunidade já
+-- pegas valem até 6h com a árvore: guarda as das últimas 10h.
 create or replace function public.idle_save(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$
 begin
@@ -1198,10 +2131,10 @@ begin
      set started = s.started, valuation = s.valuation, generators = s.generators, upgrades = s.upgrades,
          strategies = s.strategies, boost_until = s.boost_until, half_price = s.half_price,
          opp_claimed = array(select w from unnest(s.opp_claimed) w
-                              where w >= floor(extract(epoch from now()) / 600)::bigint - 30),
+                              where w >= floor(extract(epoch from now()) / 600)::bigint - 60),
          opp_day = s.opp_day, opp_count = s.opp_count,
          settled_at = s.settled_at, updated_at = now(),
-         prestige_points = s.prestige_points, prestige_count = s.prestige_count,
+         prestige_earned = s.prestige_earned, prestige_spent = s.prestige_spent, prestige_count = s.prestige_count,
          upg_total = s.upg_total, opp_total = s.opp_total, hire_total = s.hire_total, hired_total = s.hired_total,
          est_usadas = array(select distinct x from unnest(s.est_usadas || public.idle_est_codigos(s.strategies)) x order by x),
          opp_recent = s.opp_recent
@@ -1212,9 +2145,9 @@ begin
 end;
 $$;
 
--- o estado que toda função do jogo devolve: o da 0038 + bônus (pontos e quantas conquistas), vendas, recorde de R$/s,
--- quantos pontos a venda daria agora, suas conquistas, as ganhas nesta chamada (a tela avisa) e as escondidas que
--- alguém do grupo já tem (a tela mostra "???").
+-- o estado que toda função do jogo devolve: o da 0038 + bônus (os nós comprados e quantas conquistas), pontos livres
+-- e ganhos na vida, vendas, recorde de R$/s, quantos pontos a venda daria agora, suas conquistas, as ganhas nesta
+-- chamada (a tela avisa) e as escondidas que alguém do grupo já tem (a tela mostra "???").
 create or replace function public.idle_json(s public.idle_state)
 returns jsonb language plpgsql stable set search_path = public as $$
 declare v_rate double precision := public.idle_rate(s);
@@ -1247,11 +2180,13 @@ begin
     'hire_price', public.idle_hire_price(s),
     'muda_em', public.idle_next_change(s),
     'bonus', jsonb_build_object(
-      'pontos', s.prestige_points,
+      'arvore', coalesce((select jsonb_agg(a.no_id order by a.no_id) from public.idle_arvore a where a.user_id = s.user_id), '[]'::jsonb),
       'conquistas', (select count(*) from public.idle_conquistas c where c.user_id = s.user_id)),
+    'pontos', s.prestige_earned - s.prestige_spent,
+    'pontos_vida', s.prestige_earned,
     'vendas', s.prestige_count,
     'recorde', greatest(s.best_rate, v_rate),
-    'pontos_venda', case when s.started then greatest(0, public.idle_prestige_total(v_rate) - s.prestige_points) else 0 end,
+    'pontos_venda', case when s.started then greatest(0, public.idle_prestige_total(v_rate) - s.prestige_earned) else 0 end,
     'conquistas', coalesce((select jsonb_agg(jsonb_build_object('id', c.conquista_id, 'em', c.ganhou_em)
                                              order by c.ganhou_em, c.conquista_id)
                               from public.idle_conquistas c where c.user_id = s.user_id), '[]'::jsonb),
@@ -1385,7 +2320,8 @@ begin
 end;
 $$;
 
--- pegar oportunidade (a da 0034) + conta as pegas e guarda a hora das 3 últimas ("Brainrot")
+-- pegar oportunidade (a da 0034) + o bônus da árvore (Negociador) + conta as pegas e guarda a hora das 3 últimas
+-- ("Brainrot")
 create or replace function public.idle_claim_opportunity(p_window bigint)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -1411,7 +2347,8 @@ begin
     raise exception 'idle_opp_cap' using errcode = 'P0001';
   end if;
   s := public.idle_settle(s);
-  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1);
+  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1)
+            * public.idle_arv(s.user_id, 'opp_bonus', 'mult', 1);
   v_rate := public.idle_rate(s);
   case public.idle_opp_kind(s.user_id, p_window)
     when 0 then s.valuation := s.valuation + v_rate * 900 * v_mult;
@@ -1428,7 +2365,8 @@ begin
 end;
 $$;
 
--- contratar (a da 0038) + conta os contratos dos dois lados e o "limaumdoc" (pelo nome de usuário)
+-- contratar (a da 0038) + o contrato dura 10 dias com o nó Contrato longo de quem contrata + conta os contratos dos
+-- dois lados e o "limaumdoc" (pelo nome de usuário)
 create or replace function public.idle_hire(p_user uuid)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -1476,7 +2414,8 @@ begin
   perform public.idle_save(o);
   select k.nome into v_cargo from public.idle_cat_cargo k order by random() limit 1;
   insert into public.idle_contracts (employer_id, employee_id, cargo, created_at, ends_at)
-  values (v_me, p_user, coalesce(v_cargo, 'freela'), now(), now() + interval '7 days');
+  values (v_me, p_user, coalesce(v_cargo, 'freela'), now(),
+          now() + make_interval(days => greatest(7, public.idle_arv(v_me, 'contrato_dias', 'max', 7))::int));
   s.hire_total := s.hire_total + 1;
   perform public.idle_ganhar(v_me, 'contratar_usuario', null, (select p.username from public.profiles p where p.id = p_user));
   perform public.idle_save(s);
@@ -1510,7 +2449,282 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/m
 
 ---
 
-### Task 5: Vender a startup, placar com pontos e a foto de segunda (0041, parte 3)
+### Task 5: Comprar nós da árvore e o "Abrir CNPJ" com o Recomeço (0041, parte 3)
+
+**Files:**
+- Modify: `supabase/migrations/0041_fellas_inc_prestigio.sql` (acrescentar no fim)
+- Create: `games/test/idleArvore.test.ts`
+
+**Interfaces:**
+- Consome: Tasks 3 e 4; `catalogo.arvore`, `pendentes`, `tipo` (oportunidades.ts).
+- Produz: RPC `idle_buy_node(p_no int) → jsonb` (o estado; erros `idle_bad_choice`, `idle_node_owned`, `idle_locked`,
+  `idle_points_low`, `not_member`); `idle_start()` com o ramo Recomeço.
+
+- [ ] **Step 1: Testes** — crie `games/test/idleArvore.test.ts`:
+
+```ts
+// Banco da entrega 3 da Fellas Inc.: a árvore de habilidades (comprar nós e o que cada ramo faz), com as migrações
+// reais no PGlite. A conta da produção, do teto, da caixinha e do preço do contrato com a árvore está na paridade.
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { catalogo } from '../idle/catalogo';
+import { pendentes, tipo } from '../idle/oportunidades';
+import { freshDb, type TestDb } from './db';
+
+const A = '00000000-0000-0000-0000-00000000000a';
+const B = '00000000-0000-0000-0000-00000000000b';
+const OUT = '00000000-0000-0000-0000-0000000000ff';
+
+let t: TestDb;
+const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
+
+type Estado = {
+  user_id: string; week_start: string; started: boolean; valuation: number; rate: number; generators: number[];
+  upgrades: number[]; server_now: string; opp_left: number; boost_until: string | null;
+  bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number;
+  equipe: { user_id: string; ate: string }[];
+};
+
+// sem o catálogo das conquistas: a conta exata não muda com o +1% de cada uma
+beforeEach(async () => {
+  t = await freshDb({ conquistas: false });
+  for (const u of [A, B]) await t.member(u);
+  await t.member(OUT, { isMember: false });
+  await t.as(A);
+});
+
+const abrir = async (...us: string[]) => {
+  for (const u of us) {
+    await t.as(u);
+    await t.rpc('idle_start');
+  }
+  await t.as(A);
+};
+const comprar = (no: number) => t.rpc<Estado>('idle_buy_node', { p_no: no });
+const pontos = (u: string, ganhos: number, gastos = 0) =>
+  q('update public.idle_state set prestige_earned = $2, prestige_spent = $3 where user_id = $1', [u, ganhos, gastos]);
+/** Põe os nós direto (sem pagar), para testar o efeito. */
+const ter = (u: string, nos: number[]) =>
+  q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [u, nos]);
+
+describe('comprar nós', () => {
+  it('a raiz primeiro; cada nó exige o anterior do ramo; paga com os pontos livres e fica com o nó', async () => {
+    await abrir(A);
+    await pontos(A, 10);
+    await expect(comprar(11)).rejects.toThrow(/idle_locked/);
+    expect(await comprar(1)).toMatchObject({ pontos: 9, pontos_vida: 10, bonus: { arvore: [1] } });
+    await expect(comprar(12)).rejects.toThrow(/idle_locked/);
+    const s = await comprar(11);
+    expect(s).toMatchObject({ pontos: 7, bonus: { arvore: [1, 11] } });
+    expect(await q('select prestige_earned, prestige_spent from public.idle_state where user_id = $1', [A]))
+      .toEqual([{ prestige_earned: 10, prestige_spent: 3 }]);
+  });
+  it('sem pontos livres que cubram o custo: idle_points_low; de novo: idle_node_owned; nó que não existe: idle_bad_choice', async () => {
+    await abrir(A);
+    await pontos(A, 2);
+    await comprar(1);
+    await expect(comprar(11)).rejects.toThrow(/idle_points_low/); // custa 2, sobrou 1
+    await pontos(A, 10, 1);
+    await expect(comprar(1)).rejects.toThrow(/idle_node_owned/);
+    await expect(comprar(99)).rejects.toThrow(/idle_bad_choice/);
+    await expect(comprar(null as unknown as number)).rejects.toThrow(/idle_bad_choice/);
+  });
+  it('fecha a conta antes: o tempo parado rende sem o nó novo, e dali pra frente com ele', async () => {
+    await abrir(A);
+    await pontos(A, 1);
+    await q(`update public.idle_state set settled_at = settled_at - interval '1000 seconds' where user_id = $1`, [A]);
+    const s = await comprar(1);
+    expect((s.valuation - 10) / (0.5 * 1.02 * 1000)).toBeCloseTo(1, 3);
+    expect(s.rate).toBeCloseTo(0.5 * 1.02 * 1.05, 12);
+  });
+  it('dá pra comprar com a empresa fechada (entre a venda e o Abrir CNPJ)', async () => {
+    await t.rpc('idle_open');
+    await pontos(A, 1);
+    expect(await comprar(1)).toMatchObject({ started: false, bonus: { arvore: [1] } });
+  });
+  it('não membro é barrado; ninguém escreve direto na árvore; membro lê a dos outros', async () => {
+    await abrir(A);
+    await pontos(A, 1);
+    await comprar(1);
+    await expect(t.asRole('authenticated', `insert into public.idle_arvore (user_id, no_id) values ('${B}', 1)`)).rejects.toThrow();
+    await expect(t.asRole('authenticated', `delete from public.idle_arvore where user_id = '${A}'`)).rejects.toThrow();
+    await t.as(B);
+    expect(await t.asRole('authenticated', 'select no_id from public.idle_arvore')).toEqual([{ no_id: 1 }]);
+    await expect(t.asRole('anon', 'select * from public.idle_arvore')).rejects.toThrow();
+    await t.as(OUT);
+    await expect(comprar(1)).rejects.toThrow(/not_member/);
+  });
+});
+
+describe('o que cada ramo faz', () => {
+  it('Produção: os nós multiplicam entre si (raiz ×1,05, depois ×1,1 ×1,25 ×1,5 ×2 ×2)', async () => {
+    await abrir(A);
+    await ter(A, [1, 11, 12, 13, 14, 15]);
+    expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.02 * 1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 10);
+  });
+  it('Recomeço: o Abrir CNPJ começa com R$ 1 mil, 10 notebooks, 1 de cada gerador da era 1 e depois R$ 1 mi', async () => {
+    await ter(A, [1, 21, 22]);
+    let s = await t.rpc<Estado>('idle_start');
+    expect(s.valuation).toBe(1000);
+    expect(s.generators.slice(0, 7)).toEqual([10, 0, 0, 0, 0, 0, 0]);
+    await q('update public.idle_state set started = false where user_id = $1', [A]);
+    await ter(A, [23, 24, 25]);
+    s = await t.rpc<Estado>('idle_start');
+    expect(s.valuation).toBe(1e6);
+    expect(s.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
+  });
+  it('Oportunidades: caixinha de 4 (e 5), validade de 6h, +3 por dia e bônus em dobro', async () => {
+    await abrir(A);
+    const sem = await t.rpc<Estado>('idle_open');
+    const agora = Date.parse(sem.server_now);
+    const semana = Date.parse(sem.week_start + 'T00:00:00-03:00');
+    await ter(A, [1, 31, 32, 33, 34]);
+    const com = await t.rpc<Estado>('idle_open');
+    expect(com.opp_left).toBe(sem.opp_left + 3);
+    const lista = pendentes(A, agora, [], semana, { tamanho: 4, validadeS: 6 * 3600 });
+    expect(lista).toHaveLength(4);
+    const [{ l }] = await q<{ l: string[] }>('select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1', [A, sem.server_now]);
+    expect(l.map(Number)).toEqual(lista);
+    // bônus em dobro: a de 15 minutos de produção rende 30
+    await q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
+    const w = lista.find((x) => tipo(A, x) === 0)!;
+    const depois = await t.rpc<Estado>('idle_claim_opportunity', { p_window: w });
+    expect((depois.valuation - com.valuation) / (com.rate * 1800)).toBeCloseTo(1, 6);
+  });
+  it('Tempo: com o jogo fechado a empresa rende até 12h (e não 8h)', async () => {
+    await abrir(A);
+    await ter(A, [1, 41]);
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '20 hours' where user_id = $1`, [A]);
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.valuation).toBeCloseTo(0.5 * 1.02 * 1.05 * 12 * 3600, 3);
+  });
+  it('Gente: contratar 25% (e 50%) mais barato, contrato de 10 dias pra quem contrata', async () => {
+    await abrir(A, B);
+    await q('update public.idle_state set valuation = 1e6 where user_id = $1', [A]);
+    const sem = await t.rpc<Estado & { hire_price: number }>('idle_open');
+    await ter(A, [1, 51, 52, 53]);
+    const com = await t.rpc<Estado & { hire_price: number }>('idle_open');
+    expect(com.hire_price / (com.rate * 1800)).toBeCloseTo(0.75, 12);
+    expect(com.hire_price).toBeLessThan(sem.hire_price);
+    const s = await t.rpc<Estado>('idle_hire', { p_user: B });
+    expect(Date.parse(s.equipe[0].ate) - Date.parse(s.server_now)).toBeCloseTo(10 * 86400_000, -4);
+    await ter(A, [54, 55]);
+    const mais = await t.rpc<Estado & { hire_price: number }>('idle_open');
+    expect(mais.hire_price / (mais.rate * 1800 * 1.5)).toBeCloseTo(0.5, 12);
+  });
+  it('Gente: Treinamento paga 15% por contratado; Passe em alta dobra o que quem te contratou rende pra você', async () => {
+    await abrir(A, B);
+    await q('update public.idle_state set valuation = 1e6 where user_id = $1', [A]);
+    await ter(A, [1, 51, 52]);
+    expect((await t.rpc<Estado>('idle_hire', { p_user: B })).rate).toBeCloseTo(0.5 * 1.05 * (1 + 0.15 + 0.02), 10);
+    await t.as(B);
+    expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.02, 10);
+    await ter(B, [1, 51, 52, 53, 54]);
+    expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.05 * 1.04, 10);
+  });
+  it('o catálogo no banco é o da página', async () => {
+    const nos = await q<{ id: number; custo: number; requer: number | null; tipo: string; valor: number }>(
+      'select id, custo, requer, tipo, valor from public.idle_cat_no order by id',
+    );
+    expect(nos).toEqual(catalogo.arvore.map((n) => ({ id: n.id, custo: n.custo, requer: n.requer, tipo: n.tipo, valor: n.valor })));
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run test/idleArvore.test.ts`
+Expected: FAIL (`idle_buy_node` não existe; o "Abrir CNPJ" ainda dá R$ 10 e 1 notebook).
+
+- [ ] **Step 3: Acrescentar no fim de `supabase/migrations/0041_fellas_inc_prestigio.sql`** (uma linha em branco antes):
+
+```sql
+-- ===== a árvore e o "Abrir CNPJ" =====
+
+-- comprar um nó: com pontos livres (ganhos na vida − gastos), o anterior do ramo comprado (o 1º de cada ramo pede a
+-- raiz) e sem repetir. Fecha a conta antes (o nó pode mudar a taxa, o teto e a caixinha dali pra frente). Dá pra
+-- comprar com a empresa fechada (entre a venda e o novo "Abrir CNPJ").
+create or replace function public.idle_buy_node(p_no int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  n public.idle_cat_no;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  select * into n from public.idle_cat_no where id = p_no;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.idle_arvore a where a.user_id = s.user_id and a.no_id = p_no) then
+    raise exception 'idle_node_owned' using errcode = 'P0001';
+  end if;
+  if n.requer is not null
+     and not exists (select 1 from public.idle_arvore a where a.user_id = s.user_id and a.no_id = n.requer) then
+    raise exception 'idle_locked' using errcode = 'P0001';
+  end if;
+  if s.prestige_earned - s.prestige_spent < n.custo then
+    raise exception 'idle_points_low' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s); -- o tempo até agora rende sem o nó
+  insert into public.idle_arvore (user_id, no_id) values (s.user_id, p_no);
+  s.prestige_spent := s.prestige_spent + n.custo;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+-- "Abrir CNPJ" (o da 0034) com o ramo Recomeço: R$ 10 (R$ 1 mil, R$ 1 mi), 1 notebook (10), 1 de cada gerador da
+-- era 1 (Kit startup). As melhorias gerais mantidas pela venda já estão no estado. Igual a economia.ts abertura.
+create or replace function public.idle_start()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  g int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if s.started then
+    raise exception 'idle_started' using errcode = 'P0001';
+  end if;
+  s.started := true;
+  s.valuation := greatest(10, public.idle_arv(s.user_id, 'inicio_valuation', 'max', 10));
+  s.generators[1] := greatest(1, public.idle_arv(s.user_id, 'inicio_notebooks', 'max', 1))::int;
+  if public.idle_arv(s.user_id, 'inicio_era1', 'max', 0) > 0 then
+    for g in select c.id from public.idle_cat_gen c where c.era = 1 loop
+      s.generators[g] := greatest(s.generators[g], 1);
+    end loop;
+  end if;
+  s.settled_at := now();
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+revoke all on function public.idle_buy_node(int) from public, anon;
+grant execute on function public.idle_buy_node(int) to authenticated;
+revoke all on function public.idle_start() from public, anon;
+grant execute on function public.idle_start() to authenticated;
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run test/idleArvore.test.ts test/idle.test.ts && npx tsc --noEmit`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/migrations/0041_fellas_inc_prestigio.sql games/test/idleArvore.test.ts && git commit -m "Fellas Inc.: comprar nós da árvore e o Abrir CNPJ com o Recomeço (0041, parte 3)"
+```
+
+---
+
+### Task 6: Vender a startup, placar com pontos e a foto de segunda (0041, parte 4)
 
 **Files:**
 - Modify: `supabase/migrations/0041_fellas_inc_prestigio.sql` (acrescentar no fim), `games/test/idleConquistas.test.ts`,
@@ -1518,10 +2732,11 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/m
 - Create: `games/test/idlePrestigio.test.ts`
 
 **Interfaces:**
-- Consome: Tasks 3 e 4; `idle_lock_all`, `idle_most_hired`, `idle_employee_mult` (0038).
+- Consome: Tasks 3–5; `idle_lock_all`, `idle_most_hired`, `idle_employee_mult` (0038).
 - Produz: RPC `idle_prestige() → jsonb` (o estado, já vendido; erros `idle_not_started`, `idle_prestige_low`,
-  `not_member`); linhas de `idle_board` com `pontos` e `conquistas` (quantas); `idle_weekly_reset` dando o "Pai tá on"
-  ao unicórnio (com a conta dele fechada antes); a parte da 0041 que conta o que já aconteceu (idempotente).
+  `not_member`); linhas de `idle_board` com `pontos` (ganhos na vida) e `conquistas` (quantas); `idle_weekly_reset` dando
+  o "Pai tá on" ao unicórnio (com a conta dele fechada antes); a parte da 0041 que conta o que já aconteceu
+  (idempotente).
 
 - [ ] **Step 1: Testes**
 
@@ -1549,7 +2764,8 @@ type Estado = {
   user_id: string; started: boolean; valuation: number; rate: number; era: number; generators: number[]; upgrades: number[];
   strategies: number[]; boost_until: string | null; half_price: boolean; opp_left: number; server_now: string;
   avatar: Record<string, number> | null; equipe: { user_id: string }[]; chefes: { user_id: string; ate: string }[];
-  bonus: { pontos: number; conquistas: number }; vendas: number; recorde: number; pontos_venda: number;
+  bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
+  pontos_venda: number;
   conquistas: { id: number; em: string }[]; novas: number[]; descobertas: number[];
 };
 
@@ -1590,17 +2806,25 @@ describe('pontos de prestígio', () => {
     expect(await q('select started, generators[1] as g, prestige_count from public.idle_state where user_id = $1', [A]))
       .toEqual([{ started: true, g: 1, prestige_count: 0 }]);
   });
-  it('quem já tem os pontos que o R$/s vale não ganha nada; com menos, ganha só a diferença', async () => {
+  it('conta os ganhos na vida (gastos ou não): no mesmo ritmo não rende; com menos, ganha só a diferença', async () => {
     await abrir(A);
     await enriquecer(A);
     const total = pontosTotais((await t.rpc<Estado>('idle_open')).rate);
-    await q('update public.idle_state set prestige_points = $2 where user_id = $1', [A, total + 50]);
+    // já ganhou tudo isso na vida e gastou tudo: vender no mesmo ritmo não rende nada
+    await q('update public.idle_state set prestige_earned = $2, prestige_spent = $2 where user_id = $1', [A, total]);
     expect((await t.rpc<Estado>('idle_open')).pontos_venda).toBe(0);
     await expect(vender()).rejects.toThrow(/idle_prestige_low/);
-    await q('update public.idle_state set prestige_points = 2 where user_id = $1', [A]);
+    // ganhou 2 na vida e gastou 1: ganha o resto e os livres somam
+    await q('update public.idle_state set prestige_earned = 2, prestige_spent = 1 where user_id = $1', [A]);
     const antes = await t.rpc<Estado>('idle_open');
-    expect(antes.pontos_venda).toBe(pontosTotais(antes.rate) - 2);
-    expect((await vender()).bonus.pontos).toBe(pontosTotais(antes.rate));
+    expect(antes).toMatchObject({ pontos: 1, pontos_vida: 2, pontos_venda: total - 2 });
+    expect(await vender()).toMatchObject({ pontos: total - 1, pontos_vida: total });
+  });
+  it('pontos não mexem na produção: só os nós comprados', async () => {
+    await abrir(A);
+    const antes = await t.rpc<Estado>('idle_open');
+    await q('update public.idle_state set prestige_earned = 50 where user_id = $1', [A]);
+    expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(antes.rate, 12);
   });
   it('toque duplo em Vender: a segunda recebe idle_not_started e os pontos entram uma vez só', async () => {
     // em produção a segunda chamada espera a trava da linha (idle_lock_all) e já encontra a empresa vendida
@@ -1608,8 +2832,8 @@ describe('pontos de prestígio', () => {
     await enriquecer(A);
     const s = await vender();
     await expect(vender()).rejects.toThrow(/idle_not_started/);
-    expect(await q('select prestige_points, prestige_count from public.idle_state where user_id = $1', [A]))
-      .toEqual([{ prestige_points: s.bonus.pontos, prestige_count: 1 }]);
+    expect(await q('select prestige_earned, prestige_count from public.idle_state where user_id = $1', [A]))
+      .toEqual([{ prestige_earned: s.pontos_vida, prestige_count: 1 }]);
   });
   it('sem empresa aberta: idle_not_started; não membro é barrado', async () => {
     await expect(vender()).rejects.toThrow(/idle_not_started/);
@@ -1619,13 +2843,14 @@ describe('pontos de prestígio', () => {
 });
 
 describe('vender a startup', () => {
-  it('zera a empresa e volta pro Abrir CNPJ; ficam pontos, vendas, conquistas, personagem, a cota do dia e o recorde', async () => {
+  it('zera a empresa e volta pro Abrir CNPJ; ficam pontos, nós, vendas, conquistas, personagem, a cota do dia e o recorde', async () => {
     await abrir(A);
     await t.rpc('idle_set_avatar', {
       p_pele: V.pele, p_cabelo: V.cabelo, p_cor_cabelo: V.cor_cabelo, p_roupa: V.roupa, p_cor_roupa: V.cor_roupa,
       p_acessorio: V.acessorio, p_cor_acessorio: V.cor_acessorio,
     });
     await enriquecer(A);
+    await q('insert into public.idle_arvore (user_id, no_id) values ($1, 1), ($1, 11)', [A]); // Fundador e Café sem açúcar
     await q(
       `update public.idle_state
           set valuation = 5e9, upgrades = '{11,1001}', boost_until = now() + interval '1 hour', half_price = true,
@@ -1644,7 +2869,7 @@ describe('vender a startup', () => {
       era: 1, vendas: 1, pontos_venda: 0, avatar: V,
     });
     expect(s.generators).toEqual(Array(30).fill(0));
-    expect(s.bonus.pontos).toBe(P);
+    expect(s).toMatchObject({ pontos: P, pontos_vida: P, bonus: { arvore: [1, 11] } });
     expect(s.recorde).toBeCloseTo(antes.rate, 6);
     expect(s.opp_left).toBe(6); // 10 por dia sem estratégia, 4 já pegas hoje: a cota não reabre
     expect(s.conquistas.map((c) => c.id)).toEqual(expect.arrayContaining(antes.conquistas.map((c) => c.id)));
@@ -1653,7 +2878,7 @@ describe('vender a startup', () => {
     const r = await t.rpc<Estado>('idle_start');
     expect(r).toMatchObject({ started: true, valuation: 10, vendas: 1 });
     expect(r.generators[0]).toBe(1);
-    expect(r.rate).toBeCloseTo(0.5 * 1.02 * (1 + 0.01 * P) * (1 + 0.01 * r.bonus.conquistas), 10);
+    expect(r.rate).toBeCloseTo(0.5 * 1.02 * 1.05 * 1.1 * (1 + 0.01 * r.bonus.conquistas), 10); // os nós continuam valendo
   });
   it('os contratos que você fez vencem na hora, com a conta dos contratados fechada antes; quem te contratou continua', async () => {
     await abrir(A, B, C);
@@ -1693,18 +2918,26 @@ describe('vender a startup', () => {
     const [{ valuation }] = await q<{ valuation: number }>('select valuation from public.idle_state where user_id = $1', [B]);
     expect(valuation / esperado).toBeCloseTo(1, 4);
   });
+  it('Recomeço: com Leva a cultura junto a venda mantém as melhorias gerais (e só elas)', async () => {
+    await abrir(A);
+    await q('insert into public.idle_arvore (user_id, no_id) values ($1, 1), ($1, 21), ($1, 22), ($1, 23)', [A]);
+    await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,0,0}', upgrades = '{11,1001,1002,2001}' where user_id = $1`, [A]);
+    const s = await vender();
+    expect(s.upgrades.map(Number).sort()).toEqual([1001, 1002]);
+  });
   it('ninguém escreve nos pontos nem nas conquistas (nem nos próprios); as funções internas estão fechadas', async () => {
     await abrir(A);
-    await expect(t.asRole('authenticated', `update public.idle_state set prestige_points = 99 where user_id = '${A}'`)).rejects.toThrow();
+    await expect(t.asRole('authenticated', `update public.idle_state set prestige_earned = 99 where user_id = '${A}'`)).rejects.toThrow();
+    await expect(t.asRole('authenticated', `insert into public.idle_arvore (user_id, no_id) values ('${A}', 1)`)).rejects.toThrow();
     await expect(t.asRole('authenticated', `insert into public.idle_conquistas (user_id, conquista_id) values ('${A}', 1)`)).rejects.toThrow();
     await expect(t.asRole('authenticated', `delete from public.idle_conquistas where user_id = '${A}'`)).rejects.toThrow();
     await expect(t.rpc('idle_ganhar', { p_user: B, p_tipo: 'unicornio' })).rejects.toThrow();
     await expect(t.rpc('idle_check_conquistas', { p_user: B })).rejects.toThrow();
     await expect(t.asRole('anon', 'select public.idle_prestige()')).rejects.toThrow();
   });
-  it('placar: pontos e quantas conquistas cada um tem', async () => {
+  it('placar: pontos ganhos na vida (gastos ou não) e quantas conquistas cada um tem', async () => {
     await abrir(A, B);
-    await q('update public.idle_state set prestige_points = 12 where user_id = $1', [B]);
+    await q('update public.idle_state set prestige_earned = 12, prestige_spent = 9 where user_id = $1', [B]);
     await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 1), ($1, 2)', [B]);
     const rows = await t.rpc<{ user_id: string; pontos: number; conquistas: number }[]>('idle_board');
     expect(rows.find((r) => r.user_id === B)).toMatchObject({ pontos: 12, conquistas: 2 });
@@ -1785,29 +3018,35 @@ describe('Fellas Inc., entrega 3 (0040–0041)', () => {
     for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(prestigioSemComentarios).not.toContain(proibido);
   });
   it('sem reset: nada apaga estado, contrato ou conquista', () => {
-    for (const proibido of ['delete from public.idle_state', 'delete from public.idle_contracts', 'delete from public.idle_conquistas'])
+    for (const proibido of ['delete from public.idle_state', 'delete from public.idle_contracts', 'delete from public.idle_conquistas', 'delete from public.idle_arvore'])
       expect(prestigioSemComentarios).not.toContain(proibido);
     expect(prestigioSemComentarios).not.toContain('games_week_start() and');
   });
   it('funções internas fechadas; as do jogo só para quem está logado', () => {
     for (const f of [
-      'idle_est_codigos(smallint[])', 'idle_bonus_mult(public.idle_state)', 'idle_rate_at(public.idle_state, timestamptz)',
+      'idle_est_codigos(smallint[])', 'idle_arv(uuid, text, text, double precision)', 'idle_arvore_efeitos(uuid)',
+      'idle_bonus_mult(public.idle_state)', 'idle_rate_at(public.idle_state, timestamptz)', 'idle_social_mult(public.idle_state, timestamptz)',
+      'idle_settle(public.idle_state, timestamptz)', 'idle_opp_list(public.idle_state, timestamptz)', 'idle_opp_cap(public.idle_state)',
+      'idle_hire_price(public.idle_state)',
       'idle_prestige_total(double precision)', 'idle_ganhar(uuid, text, double precision, text)', 'idle_madrugada(timestamptz)',
       'idle_check_conquistas(uuid)', 'idle_save(public.idle_state)', 'idle_json(public.idle_state)', 'idle_weekly_reset()',
     ])
       expect(prestigio).toContain(`revoke all on function public.${f} from public, anon, authenticated;`);
-    for (const f of ['idle_open()', 'idle_buy(text, int, int)', 'idle_claim_opportunity(bigint)', 'idle_hire(uuid)', 'idle_prestige()', 'idle_board()'])
+    for (const f of ['idle_open()', 'idle_start()', 'idle_buy(text, int, int)', 'idle_claim_opportunity(bigint)', 'idle_hire(uuid)', 'idle_buy_node(int)', 'idle_prestige()', 'idle_board()'])
       expect(prestigio).toContain(`grant execute on function public.${f} to authenticated;`);
   });
-  it('conquistas com RLS e leitura só para membros; sem chave estrangeira pro catálogo (que é regravado)', () => {
-    expect(prestigio).toContain('alter table public.idle_conquistas enable row level security;');
-    expect(prestigio).toContain('create policy "idle_conquistas_select_members" on public.idle_conquistas for select to authenticated using (public.is_member());');
-    expect(prestigioSemComentarios).not.toMatch(/references public\.idle_cat_conquista/);
+  it('conquistas e árvore com RLS e leitura só para membros; sem chave estrangeira pro catálogo (que é regravado)', () => {
+    for (const t of ['idle_conquistas', 'idle_arvore']) {
+      expect(prestigio).toContain(`alter table public.${t} enable row level security;`);
+      expect(prestigio).toContain(`create policy "${t}_select_members" on public.${t} for select to authenticated using (public.is_member());`);
+    }
+    expect(prestigioSemComentarios).not.toMatch(/references public\.idle_cat_(conquista|no)/);
   });
-  it('o catálogo novo é o gerado, com as conquistas e a Filial em Portugal', () => {
+  it('o catálogo novo é o gerado, com as conquistas, a árvore e a Filial em Portugal', () => {
     const cat = ler('0040_fellas_inc_catalogo_conquistas.sql');
     expect(cat).toContain('GERADO por games/idle/catalogo.ts');
     expect(cat).toContain('insert into public.idle_cat_conquista');
+    expect(cat).toContain('insert into public.idle_cat_no');
     expect(cat).toContain("(283, 'gerador', 'Filial em Portugal'");
   });
 });
@@ -1823,11 +3062,12 @@ Expected: FAIL (`idle_prestige` não existe; o placar não tem `pontos`; a foto 
 ```sql
 -- ===== vender a startup =====
 
--- troca a empresa por pontos: ganha a diferença entre os pontos que o R$/s de agora vale e os que você já tem (pelo
--- menos 1, senão idle_prestige_low). Fecha a conta; quem você contratou fecha a conta antes (o que você paga a eles
--- muda: suas estratégias zeram) e os contratos que você fez vencem agora (quem te contratou continua). Zera
--- valuation, geradores, melhorias, estratégias, boost e meia-preço e volta pro "Abrir CNPJ". Ficam pontos, vendas,
--- conquistas, personagem, contadores, o limite de oportunidades do dia e o recorde de R$/s.
+-- troca a empresa por pontos: ganha a diferença entre os pontos que o R$/s de agora vale e os que você já ganhou na
+-- vida (gastos ou não; pelo menos 1, senão idle_prestige_low). Fecha a conta; quem você contratou fecha a conta antes
+-- (o que você paga a eles muda: suas estratégias zeram) e os contratos que você fez vencem agora (quem te contratou
+-- continua). Zera valuation, geradores, melhorias (as gerais ficam com o nó Leva a cultura junto), estratégias, boost
+-- e meia-preço e volta pro "Abrir CNPJ". Ficam pontos, nós, vendas, conquistas, personagem, contadores, o limite de
+-- oportunidades do dia e o recorde de R$/s.
 -- Trava você e os contratados na ordem de user_id (como idle_pick_strategy).
 create or replace function public.idle_prestige()
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
@@ -1855,7 +3095,7 @@ begin
   s := public.idle_settle(s);
   v_rate := public.idle_rate(s);
   v_total := public.idle_prestige_total(v_rate);
-  v_ganho := v_total - s.prestige_points;
+  v_ganho := v_total - s.prestige_earned;
   if v_ganho < 1 then
     raise exception 'idle_prestige_low' using errcode = 'P0001';
   end if;
@@ -1872,12 +3112,15 @@ begin
     perform public.idle_ganhar(v_me, 'sigma');
   end if;
   s.best_rate := greatest(s.best_rate, v_rate);
-  s.prestige_points := v_total;
+  s.prestige_earned := v_total;
   s.prestige_count := s.prestige_count + 1;
   s.started := false;
   s.valuation := 0;
   s.generators := array_fill(0, array[30]);
-  s.upgrades := '{}';
+  s.upgrades := case when public.idle_arv(v_me, 'manter_gerais', 'max', 0) > 0
+                     then array(select u from unnest(s.upgrades) u
+                                 where u in (select g.id from public.idle_cat_upg g where g.tipo = 'geral'))
+                     else '{}' end;
   s.strategies := '{-1,-1,-1,-1}';
   s.boost_until := null;
   s.half_price := false;
@@ -1891,7 +3134,7 @@ grant execute on function public.idle_prestige() to authenticated;
 
 -- ===== placar e foto de segunda =====
 
--- placar (o da 0038) + pontos de prestígio e quantas conquistas cada um tem
+-- placar (o da 0038) + pontos de prestígio ganhos na vida ("★ N") e quantas conquistas cada um tem
 create or replace function public.idle_board()
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v_mais uuid;
@@ -1907,7 +3150,7 @@ begin
              'most_hired', coalesce(x.user_id = v_mais, false), 'pontos', x.pontos, 'conquistas', x.nc)
              order by x.rate desc, x.v desc, x.user_id), '[]'::jsonb)
       from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_rate(s) as rate,
-                   public.idle_era(s.generators) as era, s.strategies, s.prestige_points as pontos,
+                   public.idle_era(s.generators) as era, s.strategies, s.prestige_earned as pontos,
                    (select count(*) from public.idle_conquistas c where c.user_id = s.user_id)::int as nc,
                    (select count(*) from public.idle_contracts c
                      where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now())::int as n,
@@ -2013,25 +3256,27 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/migrations/0041_fellas_inc_prestigio.sql games/test/idlePrestigio.test.ts games/test/idleConquistas.test.ts __tests__/fellasIncMigration.test.ts && git commit -m "Fellas Inc.: vender a startup, pontos no placar e Pai tá on na foto (0041, parte 3)"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add supabase/migrations/0041_fellas_inc_prestigio.sql games/test/idlePrestigio.test.ts games/test/idleConquistas.test.ts __tests__/fellasIncMigration.test.ts && git commit -m "Fellas Inc.: vender a startup, pontos no placar e Pai tá on na foto (0041, parte 4)"
 ```
 
 ---
 
-### Task 6: Chamadas, formatos, erros e o `?mock`
+### Task 7: Chamadas, formatos, erros e o `?mock`
 
 **Files:**
 - Modify: `games/shared/types.ts`, `games/shared/api.ts`, `games/shared/errors.ts`, `games/shared/types.test.ts`,
-  `games/shared/errors.test.ts`, `games/dev/mockDb.ts`, `games/dev/mockIdle.ts`, `games/idle/store.test.ts`,
-  `games/idle/tela.test.ts` (só a fixture `estado`)
+  `games/shared/errors.test.ts`, `games/dev/mockDb.ts`, `games/dev/mockIdle.ts`, `games/idle/store.test.ts` e
+  `games/idle/tela.test.ts` (só as fixtures)
 
 **Interfaces:**
-- Consome: o formato do estado e do placar das Tasks 4 e 5.
-- Produz: `IdleState` + `bonus: { pontos: number; conquistas: number }`, `vendas: number`, `recorde: number`,
-  `pontos_venda: number`, `conquistas: IdleConquista[]`, `novas: number[]`, `descobertas: number[]`;
+- Consome: o formato do estado e do placar das Tasks 4–6.
+- Produz: `IdleState` + `bonus: { arvore: number[]; conquistas: number }`, `pontos`, `pontos_vida`, `vendas`,
+  `recorde`, `pontos_venda: number`, `conquistas: IdleConquista[]`, `novas: number[]`, `descobertas: number[]`;
   `IdleConquista = { id: number; em: string }`; `IdleBoardRow`/`LinhaPlacar` + `pontos: number; conquistas: number`;
-  `idlePrestige(): Promise<IdleState>` (em `shared/api.ts` e em `dev/mockIdle.ts`); erro `idle_prestige_low` ("Ainda não
-  compensa vender"); `dono(sql, params)` em `dev/mockDb.ts`; `__vendavel(foguetes = 150)` no console do `?mock`.
+  `idlePrestige(): Promise<IdleState>` e `idleBuyNode(no: number): Promise<IdleState>` (em `shared/api.ts` e em
+  `dev/mockIdle.ts`); erros `idle_prestige_low` ("Ainda não compensa vender"), `idle_points_low` ("Faltam pontos de
+  prestígio pra esse nó"), `idle_node_owned` ("Você já tem esse nó"); `dono(sql, params)` em `dev/mockDb.ts`;
+  `__vendavel(foguetes = 150)` no console do `?mock`.
 
 - [ ] **Step 1: Testes**
 
@@ -2046,13 +3291,20 @@ Em `games/shared/types.test.ts`, a linha do banco ganha `pontos: 12, conquistas:
 ```
 
 Em `games/shared/errors.test.ts`, no `it.each` de `'erros da Fellas Inc.'`, depois de
-`['idle_bad_avatar', 'Esse visual não existe'],` acrescente `['idle_prestige_low', 'Ainda não compensa vender'],`.
+`['idle_bad_avatar', 'Esse visual não existe'],` acrescente:
+
+```ts
+    ['idle_prestige_low', 'Ainda não compensa vender'],
+    ['idle_points_low', 'Faltam pontos de prestígio pra esse nó'],
+    ['idle_node_owned', 'Você já tem esse nó'],
+```
 
 Em `games/idle/store.test.ts` (fixture `base`) e em `games/idle/tela.test.ts` (fixture `estado`), depois da linha
 `  avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,` acrescente:
 
 ```ts
-  bonus: { pontos: 0, conquistas: 0 }, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [], descobertas: [],
+  bonus: { arvore: [], conquistas: 0 }, pontos: 0, pontos_vida: 0, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [],
+  descobertas: [],
 ```
 
 Em `games/idle/tela.test.ts`, as duas linhas de placar montadas à mão ganham os campos novos: no teste
@@ -2065,81 +3317,146 @@ Em `games/idle/tela.test.ts`, as duas linhas de placar montadas à mão ganham o
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run shared/ && npx tsc --noEmit`
-Expected: FAIL (`linhaPlacar` não copia `pontos`; `idle_prestige_low` vira `unknown`; o `tsc` reclama dos campos que o
-tipo ainda não tem).
+Expected: FAIL (`linhaPlacar` não copia `pontos`; os erros novos viram `unknown`; o `tsc` reclama dos campos que o tipo
+ainda não tem).
 
-- [ ] **Step 3: `games/shared/types.ts`**
+- [ ] **Step 3: `games/shared/types.ts`** — troque cada trecho, na ordem:
 
-Troque o fim do tipo `IdleState`:
+1. Trecho:
 
 ```ts
   social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
+```
+
+   vira:
+
+```ts
+  social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
+  /** Entrega 3 (0041): os nós da árvore que você comprou e quantas conquistas você tem (o que entra na conta), pontos de
+   *  prestígio livres e ganhos na vida, quantas vezes vendeu, o recorde de R$/s, quantos pontos vender agora daria, suas
+   *  conquistas, as ganhas nesta chamada (a tela avisa) e as escondidas que alguém do grupo já tem. */
+  bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
+  pontos_venda: number;
+  conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
+```
+
+2. Trecho:
+
+```ts
+  conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
 };
 ```
 
-por:
+   vira:
 
 ```ts
-  social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
-  /** Entrega 3 (0041): pontos de prestígio e quantas conquistas você tem (cada um +1% de produção), quantas vezes vendeu,
-   *  o recorde de R$/s, quantos pontos vender agora daria, suas conquistas, as ganhas nesta chamada (a tela avisa) e as
-   *  escondidas que alguém do grupo já tem. */
-  bonus: { pontos: number; conquistas: number }; vendas: number; recorde: number; pontos_venda: number;
   conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
 };
 export type IdleConquista = { id: number; em: string };
 ```
 
-E troque o fim de `IdleBoardRow`, o `LinhaPlacar` e o `linhaPlacar`:
+3. Trecho:
 
 ```ts
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
-};
-/** Linha de idle_board como o banco devolve. */
-export type LinhaPlacar = {
-  user_id: string; valuation: number; rate: number; era: number; strategies: number[];
-  avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean;
-};
-export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
-  userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
-  avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired,
-});
 ```
 
-por:
+   vira:
 
 ```ts
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
-  /** Pontos de prestígio e quantas conquistas (0041). */
+  /** Pontos de prestígio ganhos na vida e quantas conquistas (0041). */
   pontos: number; conquistas: number;
-};
-/** Linha de idle_board como o banco devolve. */
-export type LinhaPlacar = {
+```
+
+4. Trecho:
+
+```ts
+  user_id: string; valuation: number; rate: number; era: number; strategies: number[];
+  avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean;
+```
+
+   vira:
+
+```ts
   user_id: string; valuation: number; rate: number; era: number; strategies: number[];
   avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean; pontos: number; conquistas: number;
-};
-export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
+```
+
+5. Trecho:
+
+```ts
+  userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
+  avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired,
+```
+
+   vira:
+
+```ts
   userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
   avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired, pontos: r.pontos, conquistas: r.conquistas,
-});
 ```
 
 - [ ] **Step 4: `games/shared/api.ts` e `games/shared/errors.ts`**
 
-Em `api.ts`, depois de `export const idleHire = ...`, acrescente:
+1. Trecho:
 
 ```ts
-export const idlePrestige = () => rpc<IdleState>('idle_prestige');
+export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
 ```
 
-Em `errors.ts`: no tipo `GameErrorCode`, depois da linha `  | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'`
-acrescente `  | 'idle_prestige_low'`; em `ERROR_TEXT`, depois de `idle_bad_avatar: 'Esse visual não existe',` acrescente
-`  idle_prestige_low: 'Ainda não compensa vender',`; em `FROM_DB`, depois de
-`  'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',` acrescente `  'idle_prestige_low',`.
+   vira:
 
-- [ ] **Step 5: `?mock` (`games/dev/mockDb.ts` e `games/dev/mockIdle.ts`)**
+```ts
+export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
+export const idlePrestige = () => rpc<IdleState>('idle_prestige');
+export const idleBuyNode = (no: number) => rpc<IdleState>('idle_buy_node', { p_no: no });
+```
 
-Em `mockDb.ts`, logo antes de `export function call<T>(...)` (e do comentário dele), acrescente:
+1. Trecho:
+
+```ts
+  | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
+```
+
+   vira:
+
+```ts
+  | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
+  | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
+```
+
+2. Trecho:
+
+```ts
+  idle_bad_avatar: 'Esse visual não existe',
+```
+
+   vira:
+
+```ts
+  idle_bad_avatar: 'Esse visual não existe',
+  idle_prestige_low: 'Ainda não compensa vender',
+  idle_points_low: 'Faltam pontos de prestígio pra esse nó',
+  idle_node_owned: 'Você já tem esse nó',
+```
+
+3. Trecho:
+
+```ts
+  'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
+```
+
+   vira:
+
+```ts
+  'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
+  'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
+```
+
+- [ ] **Step 5: `?mock`**
+
+Em `games/dev/mockDb.ts`, logo antes do comentário de `export function call<T>(...)` (`/** Roda ... como authenticated ... */`), acrescente:
 
 ```ts
 /** Roda `sql` como dono do banco (bots e atalhos do dev), na mesma fila das chamadas. */
@@ -2152,47 +3469,105 @@ export function dono(sql: string, params: unknown[] = []): Promise<void> {
   return run;
 }
 
+/** Roda `sql` (que devolve uma coluna `v`) como `authenticated`, no papel de `as`. */
 ```
 
-Em `mockIdle.ts`:
+Em `games/dev/mockIdle.ts`, troque cada trecho, na ordem:
 
-1. As duas primeiras linhas do comentário do topo ficam:
+1. Trecho:
 
 ```ts
 // Só no dev (?mock): a Fellas Inc. contra as migrações rodando no navegador (dev/mockDb.ts). Mesmos nomes e
-// formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio e
-// conquistas (uma escondida, pra aba Conquistas mostrar o "???"). Nunca entra no build.
+// formatos de shared/api.ts. Os bots abrem a empresa e têm personagem (dá pra contratar). Nunca entra no build.
 ```
 
-2. `import { call, FRIENDS, ME } from './mockDb';` vira `import { call, dono, FRIENDS, ME } from './mockDb';`.
-3. O bloco `const bots = ...` vira:
+   vira:
 
 ```ts
-// pontos de prestígio e conquistas dos bots: Oliveira já vendeu e tem a 6-7 (escondida)
-const BONUS: [number, number[]][] = [[12, [1, 31, 39, 47, 51, 101]], [3, [31, 47]], [0, []]];
+// Só no dev (?mock): a Fellas Inc. contra as migrações rodando no navegador (dev/mockDb.ts). Mesmos nomes e
+// formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio, nós da
+// árvore e conquistas (uma escondida, pra aba Legado mostrar o "???"). Nunca entra no build.
+```
 
-const bots = (async () => {
-  for (const [i, [id]] of FRIENDS.entries()) {
-    await call('select public.idle_start() as v', [], id).catch(() => undefined);
+2. Trecho:
+
+```ts
+import { linhaPlacar, type IdleBoardRow, type IdleState, type IdleVisual, type LinhaPlacar } from '../shared/types';
+import { call, FRIENDS, ME } from './mockDb';
+```
+
+   vira:
+
+```ts
+import { linhaPlacar, type IdleBoardRow, type IdleState, type IdleVisual, type LinhaPlacar } from '../shared/types';
+import { call, dono, FRIENDS, ME } from './mockDb';
+```
+
+3. Trecho:
+
+```ts
+    as,
+  );
+
+```
+
+   vira:
+
+```ts
+    as,
+  );
+
+// prestígio dos bots: [pontos ganhos na vida, nós da árvore, conquistas]. Oliveira já vendeu e tem a 6-7 (escondida)
+const LEGADO: [number, number[], number[]][] = [[12, [1, 11, 21, 41], [1, 31, 39, 47, 51, 101]], [3, [1], [31, 47]], [0, [], []]];
+
+```
+
+4. Trecho:
+
+```ts
     await avatar(VISUAIS[i % VISUAIS.length], id).catch(() => undefined);
-    const [pontos, conquistas] = BONUS[i % BONUS.length];
-    await dono('update public.idle_state set prestige_points = $2, prestige_count = $3 where user_id = $1', [id, pontos, pontos ? 1 : 0]);
+```
+
+   vira:
+
+```ts
+    await avatar(VISUAIS[i % VISUAIS.length], id).catch(() => undefined);
+    const [ganhos, nos, conquistas] = LEGADO[i % LEGADO.length];
+    const gastos = nos.reduce((a, n) => a + (n === 1 ? 1 : 2), 0); // a raiz custa 1; o 1º de cada ramo, 2
+    await dono('update public.idle_state set prestige_earned = $2, prestige_spent = $3, prestige_count = $4 where user_id = $1',
+      [id, ganhos, gastos, ganhos ? 1 : 0]);
+    for (const n of nos) await dono('insert into public.idle_arvore (user_id, no_id) values ($1, $2) on conflict do nothing', [id, n]);
     for (const c of conquistas) {
       await dono('insert into public.idle_conquistas (user_id, conquista_id) values ($1, $2) on conflict do nothing', [id, c]);
     }
-  }
-})();
 ```
 
-4. Depois de `export const idleSetAvatar = (v: IdleVisual) => avatar(v);` acrescente:
+5. Trecho:
 
 ```ts
+export const idleSetAvatar = (v: IdleVisual) => avatar(v);
+```
+
+   vira:
+
+```ts
+export const idleSetAvatar = (v: IdleVisual) => avatar(v);
 export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');
+export const idleBuyNode = (no: number) => call<IdleState>('select public.idle_buy_node($1) as v', [no]);
 ```
 
-5. O comentário e o tipo do `window` dos atalhos ficam:
+6. Trecho:
 
 ```ts
+
+// console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar
+const w = window as unknown as { __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void> };
+```
+
+   vira:
+
+```ts
+
 // console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
 // __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas)
 const w = window as unknown as {
@@ -2200,9 +3575,18 @@ const w = window as unknown as {
 };
 ```
 
-6. No fim do arquivo, acrescente:
+7. Trecho:
 
 ```ts
+  await call('select public.idle_hire($1) as v', [ME], bot);
+};
+```
+
+   vira:
+
+```ts
+  await call('select public.idle_hire($1) as v', [ME], bot);
+};
 w.__vendavel = async (foguetes = 150) => {
   await dono(`update public.idle_state set generators[30] = $2, strategies = '{0,0,0,0}' where user_id = $1`, [ME, foguetes]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
@@ -2217,41 +3601,45 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/shared games/dev games/idle/store.test.ts games/idle/tela.test.ts && git commit -m "Fellas Inc.: formatos, idlePrestige, erro de venda e o ?mock com pontos e conquistas"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/shared games/dev games/idle/store.test.ts games/idle/tela.test.ts && git commit -m "Fellas Inc.: formatos, idlePrestige, idleBuyNode, erros novos e o ?mock com o legado"
 ```
 
 ---
 
-### Task 7: O que a aba Conquistas mostra (`conquistas.ts`) e o ícone em `ativos.ts`
+### Task 8: O que a aba Legado mostra (`legado.ts`), o teto e a caixinha na página (`store.ts`) e os ícones (`ativos.ts`)
 
 **Files:**
-- Create: `games/idle/conquistas.ts`, `games/idle/conquistas.test.ts`
-- Modify: `games/idle/ativos.ts`, `games/idle/ativos.test.ts`
+- Create: `games/idle/legado.ts`, `games/idle/legado.test.ts`
+- Modify: `games/idle/store.ts`, `games/idle/store.test.ts`, `games/idle/ativos.ts`, `games/idle/ativos.test.ts`
 
 **Interfaces:**
-- Consome: `IdleState` (Task 6), `catalogo.conquistas`, `Conquista` (Task 1).
-- Produz: `Celula = { conquista: Conquista; ganhou: boolean; nome: string; texto: string; em: string | null }`,
-  `TOTAL_CONQUISTAS`, `grade(estado): Celula[]`, `ganhouEm(iso): string`, `avisos(ids: number[]): string[]`,
-  `pontos(n): string`, `textoVenda(n): string`, `criarFilaAvisos(mostrar: (t: string | null) => void, ms = 3000):
-  { adicionar(textos: string[]): void }`; `ativos.conquista(id): string | null`.
+- Consome: `IdleState` (Task 7); `catalogo.conquistas`, `catalogo.arvore`, `No`, `Conquista`, `RAMOS` (Task 1);
+  `efeitosDe`, `acumular(..., tetoS)` (Task 2); `Caixa` (Task 2).
+- Produz (`legado.ts`): `Celula = { conquista, ganhou, nome, texto, em }`, `TOTAL_CONQUISTAS`, `grade(estado)`,
+  `ganhouEm(iso)`, `avisos(ids)`, `pontos(n)`, `textoVenda(n)`, `criarFilaAvisos(mostrar, ms = 3000)`,
+  `SituacaoNo = 'comprado' | 'disponivel' | 'trancado'`, `situacao(no, arvore)`, `RAMOS_ARVORE: { ramo, nome, nos }[]`,
+  `falta(no)`.
+- Produz (`store.ts`): `efeitos(estado): EfeitosArvore`, `caixa(estado): Caixa`; `valuationAgora` com o teto da árvore.
+- Produz (`ativos.ts`): `ativos.conquista(id): string | null`, `ativos.no(id): string | null`.
 
 - [ ] **Step 1: Testes**
 
-Crie `games/idle/conquistas.test.ts`:
+Crie `games/idle/legado.test.ts`:
 
 ```ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { avisos, criarFilaAvisos, ganhouEm, grade, pontos, textoVenda, TOTAL_CONQUISTAS } from './conquistas';
+import { avisos, criarFilaAvisos, falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS } from './legado';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
   server_now: '2026-10-12T12:00:00.000Z',
   avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
-  bonus: { pontos: 0, conquistas: 0 }, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [], descobertas: [],
+  bonus: { arvore: [], conquistas: 0 }, pontos: 0, pontos_vida: 0, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [],
+  descobertas: [],
   ...x,
 });
 const EM = '2026-10-12T15:00:00.000Z';
@@ -2288,8 +3676,8 @@ describe('textos', () => {
   it('venda e pontos no singular e no plural', () => {
     expect(pontos(1)).toBe('1 ponto');
     expect(pontos(5)).toBe('5 pontos');
-    expect(textoVenda(1)).toBe('Você ganha 1 ponto (+1% pra sempre) e recomeça do zero.');
-    expect(textoVenda(12)).toBe('Você ganha 12 pontos (+12% pra sempre) e recomeça do zero.');
+    expect(textoVenda(1)).toBe('Você ganha 1 ponto pra gastar na árvore e recomeça do zero.');
+    expect(textoVenda(12)).toBe('Você ganha 12 pontos pra gastar na árvore e recomeça do zero.');
   });
   it('data no dia de Brasília', () => {
     expect(ganhouEm('2026-10-13T02:30:00.000Z')).toBe('Ganhou em 12/10/2026');
@@ -2304,41 +3692,76 @@ describe('fila de avisos', () => {
     const fila = criarFilaAvisos((t) => vistos.push(t));
     fila.adicionar(['Conquista: 6-7', 'Conquista: Exit']);
     expect(vistos).toEqual(['Conquista: 6-7']);
-    fila.adicionar(['Conquista: Olho vivo']);
+    fila.adicionar(['Conquista: Black Friday']);
     vi.advanceTimersByTime(2999);
     expect(vistos).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(vistos.at(-1)).toBe('Conquista: Exit');
     vi.advanceTimersByTime(3000);
-    expect(vistos.at(-1)).toBe('Conquista: Olho vivo');
+    expect(vistos.at(-1)).toBe('Conquista: Black Friday');
     vi.advanceTimersByTime(3000);
     expect(vistos.at(-1)).toBeNull();
     fila.adicionar([]);
     expect(vistos.at(-1)).toBeNull();
   });
 });
+
+describe('árvore', () => {
+  it('a raiz e os 5 ramos, na ordem, com 5 nós cada', () => {
+    expect(RAMOS_ARVORE.map((r) => [r.nome, r.nos.length])).toEqual([
+      ['Fundador', 1], ['Produção', 5], ['Recomeço', 5], ['Oportunidades', 5], ['Tempo', 5], ['Gente', 5],
+    ]);
+  });
+  it('comprado, disponível (o anterior é seu) ou trancado (falta o anterior)', () => {
+    const no = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
+    expect(situacao(no(1), [])).toBe('disponivel');
+    expect(situacao(no(11), [])).toBe('trancado');
+    expect(situacao(no(11), [1])).toBe('disponivel');
+    expect(situacao(no(12), [1])).toBe('trancado');
+    expect(situacao(no(11), [1, 11])).toBe('comprado');
+    expect(falta(no(12))).toBe('Precisa de Café sem açúcar');
+    expect(falta(no(11))).toBe('Precisa de Fundador');
+    expect(falta(no(1))).toBe('');
+  });
+});
+```
+
+Em `games/idle/store.test.ts`, no import de `./store`, acrescente `caixa` (logo depois de `ancorar,`) e, no
+`describe('âncora no relógio do banco', ...)`, antes de `it('início da semana: segunda 00:00 de Brasília', ...)`, acrescente:
+
+```ts
+  it('teto do offline: 8h, ou o do ramo Tempo da árvore', () => {
+    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 8 * 3600, 6);
+    expect(valuationAgora(ancorar(base({ bonus: { arvore: [1, 41], conquistas: 0 } }), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 12 * 3600, 6);
+  });
+  it('caixinha: 3 por 4h, ou o que o ramo Oportunidades der', () => {
+    expect(caixa(base())).toEqual({ tamanho: 3, validadeS: 4 * 3600 });
+    expect(caixa(base({ bonus: { arvore: [1, 31, 32], conquistas: 0 } }))).toEqual({ tamanho: 4, validadeS: 6 * 3600 });
+  });
 ```
 
 Em `games/idle/ativos.test.ts`, no `describe('ativos da Fellas Inc.', ...)`, acrescente:
 
 ```ts
-  it('ícone de conquista que não existe: null (a célula mostra só a moldura)', () => {
+  it('ícone de conquista ou de nó que não existe: null (a célula mostra só a moldura)', () => {
     expect(ativos.conquista(999)).toBeNull();
+    expect(ativos.no(99)).toBeNull();
   });
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/conquistas.test.ts idle/ativos.test.ts`
-Expected: FAIL (`./conquistas` não existe; `ativos.conquista` não existe).
+Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/legado.test.ts idle/store.test.ts idle/ativos.test.ts`
+Expected: FAIL (`./legado` não existe; `caixa`, `ativos.conquista`, `ativos.no` não existem; o teto é sempre 8h).
 
-- [ ] **Step 3: Criar `games/idle/conquistas.ts`**
+- [ ] **Step 3: Criar `games/idle/legado.ts`**
 
 ```ts
-// Aba Conquistas e o aviso de conquista da Fellas Inc. (puro: a tela só desenha o que sai daqui). Quem ganhou o quê
-// é o banco que decide; aqui só se decide o que cada quadradinho mostra.
+// Aba Legado da Fellas Inc. (a árvore de habilidades e as conquistas) e o aviso de conquista. Puro: a tela só desenha
+// o que sai daqui. Quem comprou ou ganhou o quê é o banco que decide; aqui só se decide o que cada quadradinho mostra.
 import type { IdleState } from '../shared/types';
-import { catalogo, type Conquista } from './catalogo';
+import { catalogo, type Conquista, type No } from './catalogo';
+import { RAMOS } from './nomes';
 
 /** Um quadradinho da grade. `texto` = a frase (ganhou), a condição (bloqueada) ou "Alguém do grupo conseguiu". */
 export type Celula = { conquista: Conquista; ganhou: boolean; nome: string; texto: string; em: string | null };
@@ -2378,7 +3801,7 @@ export function avisos(ids: number[]): string[] {
 export const pontos = (n: number): string => `${n} ${n === 1 ? 'ponto' : 'pontos'}`;
 
 /** O texto da folha de confirmação da venda. */
-export const textoVenda = (n: number): string => `Você ganha ${pontos(n)} (+${n}% pra sempre) e recomeça do zero.`;
+export const textoVenda = (n: number): string => `Você ganha ${pontos(n)} pra gastar na árvore e recomeça do zero.`;
 
 /** Fila dos avisos de conquista: um de cada vez, `ms` cada. `mostrar(null)` = nenhum na tela. */
 export function criarFilaAvisos(mostrar: (texto: string | null) => void, ms = 3000) {
@@ -2397,21 +3820,106 @@ export function criarFilaAvisos(mostrar: (texto: string | null) => void, ms = 30
     },
   };
 }
+
+/** Como um nó aparece: comprado (aceso), disponível (o anterior do ramo já é seu) ou trancado (falta o anterior). */
+export type SituacaoNo = 'comprado' | 'disponivel' | 'trancado';
+export function situacao(no: No, arvore: readonly number[]): SituacaoNo {
+  if (arvore.includes(no.id)) return 'comprado';
+  return no.requer === null || arvore.includes(no.requer) ? 'disponivel' : 'trancado';
+}
+
+/** A raiz e os 5 ramos, na ordem, cada um com os seus nós. */
+export const RAMOS_ARVORE: { ramo: number; nome: string; nos: No[] }[] = RAMOS.map((nome, ramo) => ({
+  ramo, nome, nos: catalogo.arvore.filter((n) => n.ramo === ramo),
+}));
+
+/** O que falta pra um nó trancado: "Precisa de Café sem açúcar". */
+export function falta(no: No): string {
+  const antes = catalogo.arvore.find((n) => n.id === no.requer);
+  return antes ? `Precisa de ${antes.nome}` : '';
+}
 ```
 
-- [ ] **Step 4: `games/idle/ativos.ts`**
+- [ ] **Step 4: `games/idle/store.ts` e `games/idle/ativos.ts`** — troque cada trecho, na ordem:
 
-Depois da linha `const gerais = pegar(...)`, acrescente:
+1. Trecho:
 
 ```ts
+import { catalogo } from './catalogo';
+import { acumular, estrategiasAtivas } from './economia';
+```
+
+   vira:
+
+```ts
+import { catalogo } from './catalogo';
+import { acumular, efeitosDe, estrategiasAtivas } from './economia';
+import type { Caixa } from './oportunidades';
+```
+
+2. Trecho:
+
+```ts
+export const inicioSemana = (estado: IdleState): number => Date.parse(estado.week_start + 'T00:00:00-03:00');
+
+```
+
+   vira:
+
+```ts
+export const inicioSemana = (estado: IdleState): number => Date.parse(estado.week_start + 'T00:00:00-03:00');
+
+/** O que a árvore do estado faz (teto do offline, caixinha, validade…): a mesma conta do banco. */
+export const efeitos = (estado: IdleState) => efeitosDe(catalogo, estado);
+export function caixa(estado: IdleState): Caixa {
+  const e = efeitos(estado);
+  return { tamanho: e.caixinha, validadeS: e.validadeS };
+}
+
+```
+
+3. Trecho:
+
+```ts
+  const boost = a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
+  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost);
+```
+
+   vira:
+
+```ts
+  const boost = a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
+  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, efeitos(a.estado).tetoS);
+```
+
+1. Trecho:
+
+```ts
+const gerais = pegar(import.meta.glob('./assets/gerais/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
+```
+
+   vira:
+
+```ts
+const gerais = pegar(import.meta.glob('./assets/gerais/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const conquistas = pegar(import.meta.glob('./assets/conquistas/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
+const arvore = pegar(import.meta.glob('./assets/arvore/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 ```
 
-E no objeto `ativos`, depois de `geral: ...`, acrescente:
+2. Trecho:
 
 ```ts
+  geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
+```
+
+   vira:
+
+```ts
+  geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
   /** Ícone 16x16 da conquista (null = a arte ainda não chegou). */
   conquista: (id: number): string | null => conquistas[`conquista-${String(id).padStart(3, '0')}`] ?? null,
+  /** Ícone 16x16 do nó da árvore (null = a arte ainda não chegou). */
+  no: (id: number): string | null => arvore[`no-${String(id).padStart(2, '0')}`] ?? null,
 ```
 
 - [ ] **Step 5: Rodar e ver passar**
@@ -2422,12 +3930,12 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/conquistas.ts games/idle/conquistas.test.ts games/idle/ativos.ts games/idle/ativos.test.ts && git commit -m "Fellas Inc.: grade de conquistas, textos da venda e fila de avisos"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/legado.ts games/idle/legado.test.ts games/idle/store.ts games/idle/store.test.ts games/idle/ativos.ts games/idle/ativos.test.ts && git commit -m "Fellas Inc.: grade de conquistas, situação dos nós, teto e caixinha da árvore na página"
 ```
 
 ---
 
-### Task 8: A página: aba Conquistas, vender a startup, aviso na cena e ★ no placar
+### Task 9: A página: aba Legado, vender a startup, comprar nós, aviso na cena e ★ no placar
 
 **REQUIRED:** skill `impeccable` (modo Operate, plataforma adaptive); leia `PRODUCT.md` e `DESIGN.md` antes. O código
 abaixo é a base aprovada no plano; ajustes de apresentação que a skill pedir não mudam texto, dado nem comportamento
@@ -2439,10 +3947,12 @@ testado.
 - Test: `games/idle/tela.test.ts`
 
 **Interfaces:**
-- Consome: `grade`, `ganhouEm`, `pontos`, `textoVenda`, `TOTAL_CONQUISTAS`, `Celula`, `avisos`, `criarFilaAvisos`,
-  `ativos.conquista` (Task 7); `idlePrestige`, `IdleState` novo, `IdleBoardRow.pontos` (Task 6).
-- Produz: `Aba` + `'conquistas'`; `Modelo.vendaAberta: boolean`, `Modelo.conquistaAviso: string | null`;
-  `Acoes.vender(acao: 'abrir' | 'fechar' | 'confirmar')`.
+- Consome: `legado.ts` e `caixa` (Task 8); `idlePrestige`, `idleBuyNode`, `IdleState` novo, `IdleBoardRow.pontos`
+  (Task 7); `pendentes(..., caixa)` (Task 2).
+- Produz: `Aba` + `'legado'`; `Modelo.vendaAberta: boolean`, `Modelo.conquistaAviso: string | null`;
+  `Acoes.vender(acao: 'abrir' | 'fechar' | 'confirmar')`, `Acoes.comprarNo(id: number)`.
+  O Legado aparece na aba e também embaixo do "Abrir CNPJ" de quem já vendeu (`pontos_vida > 0`), para gastar os
+  pontos (Recomeço inclusive) antes de reabrir.
 
 - [ ] **Step 1: Testes (`games/idle/tela.test.ts`)**
 
@@ -2461,7 +3971,7 @@ pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: fal
 ```
 
 No `beforeEach`, o objeto `acoes` ganha, depois de `mudarVisual: vi.fn<Acoes['mudarVisual']>(),`, a linha
-`    vender: vi.fn<Acoes['vender']>(),`.
+`    vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),`.
 
 No teste `'modais com aria-modal e título'`, troque o `renderizar` e a lista de seletores por:
 
@@ -2476,47 +3986,66 @@ No teste `'modais com aria-modal e título'`, troque o `renderizar` e a lista de
 No fim do arquivo, acrescente:
 
 ```ts
-describe('conquistas e prestígio', () => {
+describe('legado: prestígio, árvore e conquistas', () => {
   const EM = '2026-10-12T15:00:00.000Z';
-  it('card: pontos, bônus e recorde; sem ponto a ganhar, o botão fica apagado com "Ainda não compensa"', () => {
+  it('card: pontos pra gastar, ganhos na vida e recorde; sem ponto a ganhar, "Ainda não compensa" apagado', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'conquistas', estado: estado({ bonus: { pontos: 12, conquistas: 3 }, vendas: 2, recorde: 1234.5 }) }));
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, pontos_vida: 12, vendas: 2, recorde: 1234.5 }) }));
     const card = root.querySelector('.prestigio')!;
-    expect(card.textContent).toContain('★ 12 pontos · +12% de produção');
-    expect(card.textContent).toContain('Recorde: +R$ 1,23 mil/s · vendeu 2 vezes');
+    expect(card.textContent).toContain('★ 3 pontos pra gastar');
+    expect(card.textContent).toContain('12 ganhos na vida · recorde +R$ 1,23 mil/s · vendeu 2 vezes');
     const b = card.querySelector('button')!;
     expect(b.textContent).toBe('Ainda não compensa');
     expect(b.disabled).toBe(true);
   });
   it('vender: o botão diz quantos pontos e abre a folha; a folha confirma ou fecha', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'conquistas', estado: estado({ pontos_venda: 5 }) }));
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }) }));
     const b = root.querySelector<HTMLButtonElement>('.prestigio button')!;
     expect(b.textContent).toBe('Vender a startup · +5 pontos');
     b.click();
     expect(acoes.vender).toHaveBeenCalledWith('abrir');
     expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
-    tela.renderizar(modelo({ aba: 'conquistas', estado: estado({ pontos_venda: 5 }), vendaAberta: true }));
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true }));
     const folha = root.querySelector('.modal-venda')!;
     expect(folha.hasAttribute('hidden')).toBe(false);
     expect(folha.textContent).toContain('Vender a startup?');
-    expect(folha.textContent).toContain('Você ganha 5 pontos (+5% pra sempre) e recomeça do zero.');
+    expect(folha.textContent).toContain('Você ganha 5 pontos pra gastar na árvore e recomeça do zero.');
     [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Vender')!.click();
     [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Deixa quieto')!.click();
     expect(acoes.vender.mock.calls.map((c) => c[0])).toEqual(['abrir', 'confirmar', 'fechar']);
-    tela.renderizar(modelo({ aba: 'conquistas', estado: estado({ pontos_venda: 5 }), vendaAberta: true, ocupado: true }));
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true, ocupado: true }));
     expect([...root.querySelectorAll<HTMLButtonElement>('.modal-venda button')].find((x) => x.textContent === 'Vender')!.disabled).toBe(true);
     // não compensa mais (o banco recusou e a tela recarregou): a folha some
-    tela.renderizar(modelo({ aba: 'conquistas', estado: estado({ pontos_venda: 0 }), vendaAberta: true }));
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 0 }), vendaAberta: true }));
     expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
   });
-  it('grade: N/total; tocar mostra a condição (bloqueada) ou a frase e a data (ganha); escondida só quando alguém conseguiu', () => {
+  it('árvore: raiz e 5 ramos; comprado aceso, disponível com "Comprar · N ★" (apagado sem pontos), trancado com o que falta', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }) }));
+    expect([...root.querySelectorAll('.ramo .ramo-nome')].map((h) => h.textContent)).toEqual(
+      ['Fundador', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'],
+    );
+    const no = (nome: string) => [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === nome)!;
+    expect(no('Café sem açúcar').classList.contains('comprado')).toBe(true);
+    expect(no('Café sem açúcar').textContent).toContain('Comprado');
+    expect(no('Planilha de metas').querySelector('button')!.textContent).toBe('Comprar · 4 ★');
+    expect(no('Planilha de metas').querySelector('button')!.disabled).toBe(true); // custa 4, tem 3
+    const pe = no('Pé-de-meia').querySelector('button')!;
+    expect(pe.disabled).toBe(false);
+    pe.click();
+    expect(acoes.comprarNo).toHaveBeenCalledWith(21);
+    expect(no('Alta performance').classList.contains('trancado')).toBe(true);
+    expect(no('Alta performance').textContent).toContain('Precisa de Planilha de metas');
+    expect(no('Alta performance').querySelector('button')).toBeNull();
+  });
+  it('conquistas: N/total; tocar mostra a condição ou a frase e a data; escondida só quando alguém conseguiu', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({
-      aba: 'conquistas',
-      estado: estado({ conquistas: [{ id: 7, em: EM }], descobertas: [102], bonus: { pontos: 0, conquistas: 1 } }),
+      aba: 'legado',
+      estado: estado({ conquistas: [{ id: 7, em: EM }], descobertas: [102], bonus: { arvore: [], conquistas: 1 } }),
     }));
-    const lista = root.querySelector('.lista-conquistas')!;
+    const lista = root.querySelector('.lista-legado')!;
     expect(lista.hasAttribute('hidden')).toBe(false);
     expect(lista.textContent).toContain(`Conquistas 1/${catalogo.conquistas.length} · +1% de produção`);
     const celulas = [...lista.querySelectorAll<HTMLButtonElement>('.conquista')];
@@ -2531,11 +4060,13 @@ describe('conquistas e prestígio', () => {
     expect(det.textContent).toContain('Ter 100 "Você, no notebook da faculdade"');
     expect(det.textContent).not.toContain('Ganhou em');
   });
-  it('sem a arte do ícone, a célula mostra só a moldura', () => {
+  it('sem a arte dos ícones, nó e conquista mostram só a moldura', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'conquistas' }));
-    const icone = root.querySelector<HTMLElement>('.conquista .icone-conquista')!;
-    expect(icone.classList.contains('sem-arte') || icone.style.backgroundImage.includes('url(')).toBe(true);
+    tela.renderizar(modelo({ aba: 'legado' }));
+    for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
+      const icone = root.querySelector<HTMLElement>(sel)!;
+      expect(icone.classList.contains('sem-arte') || icone.style.backgroundImage.includes('url('), sel).toBe(true);
+    }
   });
   it('aviso de conquista por cima da cena', () => {
     const tela = criarTela(root, acoes);
@@ -2546,7 +4077,7 @@ describe('conquistas e prestígio', () => {
     tela.renderizar(modelo());
     expect(root.querySelector('.palco .conquista-aviso')!.hasAttribute('hidden')).toBe(true);
   });
-  it('placar: ★ N ao lado do R$/s de quem tem pontos', () => {
+  it('placar: ★ N (ganhos na vida) ao lado do R$/s de quem tem', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: [linha({ pontos: 12 }), linha({ userId: 'c', name: 'Teteu' })] }));
     const itens = root.querySelectorAll('.lista-placar li');
@@ -2554,12 +4085,31 @@ describe('conquistas e prestígio', () => {
     expect(itens[1].querySelector('.pontos')).toBeNull();
     expect(itens[0].querySelector('.v')!.textContent).toContain('/s');
   });
-  it('cinco abas, Conquistas por último', () => {
+  it('depois de vender, antes do Abrir CNPJ: o Legado aparece embaixo pra gastar os pontos', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(true); // nunca vendeu
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false, pontos: 5, pontos_vida: 5 }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(false);
+    const fundador = [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === 'Fundador')!;
+    fundador.querySelector('button')!.click();
+    expect(acoes.comprarNo).toHaveBeenCalledWith(1);
+  });
+  it('cinco abas, Legado por último', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());
-    expect([...root.querySelectorAll('.abas .aba')].map((b) => b.textContent)).toEqual(['Geradores', 'Melhorias', 'Contratar', 'Placar', 'Conquistas']);
-    porTexto('Conquistas').click();
-    expect(acoes.trocarAba).toHaveBeenCalledWith('conquistas');
+    expect([...root.querySelectorAll('.abas .aba')].map((b) => b.textContent)).toEqual(['Geradores', 'Melhorias', 'Contratar', 'Placar', 'Legado']);
+    porTexto('Legado').click();
+    expect(acoes.trocarAba).toHaveBeenCalledWith('legado');
+  });
+  it('caixinha: o prazo usa a validade da árvore (6h com Lembrete no celular)', () => {
+    vi.useFakeTimers();
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    vi.setSystemTime(instante(uid, 50) + 60 * 60 * 1000);
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid, bonus: { arvore: [1, 31, 32], conquistas: 0 } }) }));
+    expect(root.querySelector('.modal-caixa .prazo')!.textContent).toBe('some em 5h00');
+    vi.useRealTimers();
   });
 });
 ```
@@ -2567,9 +4117,9 @@ describe('conquistas e prestígio', () => {
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/tela.test.ts`
-Expected: FAIL (sem aba Conquistas, sem `.modal-venda`, sem aviso, sem `★`).
+Expected: FAIL (sem aba Legado, sem árvore, sem `.modal-venda`, sem aviso, sem `★`).
 
-- [ ] **Step 3: `games/idle/tela.ts` (troque cada trecho, na ordem)**
+- [ ] **Step 3: `games/idle/tela.ts`** — troque cada trecho, na ordem:
 
 1. Trecho:
 
@@ -2581,57 +4131,81 @@ import { catalogo, type Melhoria } from './catalogo';
 
 ```ts
 import { catalogo, type Melhoria } from './catalogo';
-import { ganhouEm, grade, pontos, textoVenda, TOTAL_CONQUISTAS, type Celula } from './conquistas';
+import { falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
 ```
 
 2. Trecho:
 
 ```ts
+import { ERAS, VISUAL_NOMES } from './nomes';
+import { instante, TEXTO_TIPO, tipo as tipoOportunidade, VALIDADE_S } from './oportunidades';
+```
+
+   vira:
+
+```ts
+import { ERAS, VISUAL_NOMES } from './nomes';
+import { instante, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
+```
+
+3. Trecho:
+
+```ts
+import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
+import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
+```
+
+   vira:
+
+```ts
+import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
+import { caixa, estrategiaPendente, segundosOportunidade, type Fase } from './store';
+```
+
+4. Trecho:
+
+```ts
+
 export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar';
 ```
 
    vira:
 
 ```ts
-export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquistas';
+
+export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'legado';
 ```
 
-3. Trecho:
+5. Trecho:
 
 ```ts
-  /** Rascunho do editor de personagem (null = fechado). */
   editor: IdleVisual | null;
-};
 ```
 
    vira:
 
 ```ts
-  /** Rascunho do editor de personagem (null = fechado). */
   editor: IdleVisual | null;
   /** Folha "Vender a startup?" aberta. */
   vendaAberta: boolean;
   /** O aviso de conquista na cena agora ("Conquista: 6-7"); null = nenhum. */
   conquistaAviso: string | null;
-};
 ```
 
-4. Trecho:
+6. Trecho:
 
 ```ts
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
-};
 ```
 
    vira:
 
 ```ts
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
-  vender(acao: 'abrir' | 'fechar' | 'confirmar'): void;
-};
+  vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
 ```
 
-5. Trecho:
+7. Trecho:
 
 ```ts
   const vivo = button('', 'vivo', () => undefined);
@@ -2647,10 +4221,22 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
   palco.append(canvas, vivo, avisoConquista);
 ```
 
-6. Trecho:
+8. Trecho:
 
 ```ts
     placar: button('Placar', 'aba', () => a.trocarAba('placar')),
+```
+
+   vira:
+
+```ts
+    placar: button('Placar', 'aba', () => a.trocarAba('placar')),
+    legado: button('Legado', 'aba', () => a.trocarAba('legado')),
+```
+
+9. Trecho:
+
+```ts
   };
   abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar);
 ```
@@ -2658,16 +4244,26 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
    vira:
 
 ```ts
-    placar: button('Placar', 'aba', () => a.trocarAba('placar')),
-    conquistas: button('Conquistas', 'aba', () => a.trocarAba('conquistas')),
   };
-  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar, botoesAba.conquistas);
+  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar, botoesAba.legado);
 ```
 
-7. Trecho:
+10. Trecho:
 
 ```ts
   const listaP = el('ol', 'lista lista-placar');
+```
+
+   vira:
+
+```ts
+  const listaP = el('ol', 'lista lista-placar');
+  const listaL = el('div', 'lista lista-legado');
+```
+
+11. Trecho:
+
+```ts
   const painel = el('main', 'painel');
   painel.append(abrir, abas, listaG, listaM, listaC, listaP);
 ```
@@ -2675,13 +4271,11 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
    vira:
 
 ```ts
-  const listaP = el('ol', 'lista lista-placar');
-  const listaQ = el('div', 'lista lista-conquistas');
   const painel = el('main', 'painel');
-  painel.append(abrir, abas, listaG, listaM, listaC, listaP, listaQ);
+  painel.append(abrir, abas, listaG, listaM, listaC, listaP, listaL);
 ```
 
-8. Trecho:
+12. Trecho:
 
 ```ts
   const modalV = el('div', 'modal modal-visual');
@@ -2698,59 +4292,64 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
   ] as const) {
 ```
 
-9. Trecho:
+13. Trecho:
 
 ```ts
+
   app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV);
 ```
 
    vira:
 
 ```ts
+
   app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV, modalP);
 ```
 
-10. Trecho:
+14. Trecho:
 
 ```ts
   let verCompradas = false;
-  let ultimo: Modelo | null = null;
 ```
 
    vira:
 
 ```ts
   let verCompradas = false;
-  // aba Conquistas: o quadradinho tocado (mostra a frase e a data); só apresentação
+  // aba Legado: a conquista tocada (mostra a frase e a data); só apresentação
   let conquistaAberta: number | null = null;
-  let ultimo: Modelo | null = null;
 ```
 
-11. Trecho:
+15. Trecho:
 
 ```ts
-  function renderizar(m: Modelo) {
-```
-
-   vira:
-
-```ts
-  function iconeConquista(c: Celula) {
-    const box = el('div', 'icone-conquista');
-    const url = ativos.conquista(c.conquista.id);
-    if (url) box.style.backgroundImage = `url(${url})`;
-    else box.classList.add('sem-arte'); // a arte ainda não chegou: só a moldura
     return box;
   }
 
-  /** Aba Conquistas: o card de prestígio e a grade (tocar mostra a frase e a data). */
-  function conquistas(s: IdleState, ocupado: boolean) {
+```
+
+   vira:
+
+```ts
+    return box;
+  }
+
+  /** Ícone 16x16 ampliado; sem a arte, só a moldura. */
+  function iconeLegado(url: string | null) {
+    const box = el('div', 'icone-legado');
+    if (url) box.style.backgroundImage = `url(${url})`;
+    else box.classList.add('sem-arte');
+    return box;
+  }
+
+  /** Aba Legado: o card de prestígio, a árvore (raiz e 5 ramos) e a grade de conquistas (tocar mostra a frase e a data). */
+  function legado(s: IdleState, ocupado: boolean) {
     const card = el('div', 'prestigio');
     const meio = el('div', 'meio');
     const vezes = s.vendas === 1 ? 'vendeu 1 vez' : `vendeu ${s.vendas} vezes`;
     meio.append(
-      el('strong', undefined, `★ ${pontos(s.bonus.pontos)} · +${s.bonus.pontos}% de produção`),
-      el('span', 'sub', s.vendas ? `Recorde: ${formatarTaxa(s.recorde)} · ${vezes}` : `Recorde: ${formatarTaxa(s.recorde)}`),
+      el('strong', undefined, `★ ${pontos(s.pontos)} pra gastar`),
+      el('span', 'sub', `${s.pontos_vida} ganhos na vida · recorde ${formatarTaxa(s.recorde)}${s.vendas ? ` · ${vezes}` : ''}`),
     );
     const vender = button(
       s.pontos_venda >= 1 ? `Vender a startup · +${pontos(s.pontos_venda)}` : 'Ainda não compensa',
@@ -2758,8 +4357,31 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
     );
     vender.disabled = s.pontos_venda < 1 || ocupado;
     card.append(meio, vender);
+
+    const arvore = el('div', 'arvore');
+    for (const r of RAMOS_ARVORE) {
+      const ramo = el('section', r.ramo === 0 ? 'ramo raiz' : 'ramo');
+      ramo.append(el('h3', 'ramo-nome', r.nome));
+      for (const n of r.nos) {
+        const sit = situacao(n, s.bonus.arvore);
+        const no = el('div', `no ${sit}`);
+        const texto = el('div', 'meio');
+        texto.append(el('strong', undefined, n.nome), el('span', 'sub', n.efeito));
+        no.append(iconeLegado(ativos.no(n.id)), texto);
+        if (sit === 'comprado') no.append(el('span', 'no-status', 'Comprado'));
+        else if (sit === 'trancado') no.append(el('span', 'no-status', falta(n)));
+        else {
+          const b = button(`Comprar · ${n.custo} ★`, 'btn compacto', () => a.comprarNo(n.id));
+          b.disabled = ocupado || s.pontos < n.custo;
+          no.append(b);
+        }
+        ramo.append(no);
+      }
+      arvore.append(ramo);
+    }
+
     const celulas = grade(s);
-    const topoQ = el('p', 'conquistas-topo', `Conquistas ${s.conquistas.length}/${TOTAL_CONQUISTAS} · +${s.bonus.conquistas}% de produção`);
+    const topoQ = el('h3', 'legado-titulo', `Conquistas ${s.conquistas.length}/${TOTAL_CONQUISTAS} · +${s.bonus.conquistas}% de produção`);
     const grid = el('div', 'grade-conquistas');
     for (const c of celulas) {
       const b = button('', c.ganhou ? 'conquista ganha' : 'conquista', () => {
@@ -2767,24 +4389,23 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
         if (ultimo) renderizar(ultimo);
       });
       b.setAttribute('aria-pressed', String(conquistaAberta === c.conquista.id));
-      b.append(iconeConquista(c), el('span', 'conquista-nome', c.nome));
+      b.append(iconeLegado(ativos.conquista(c.conquista.id)), el('span', 'conquista-nome', c.nome));
       grid.append(b);
     }
-    listaQ.append(card, topoQ);
-    const aberta = celulas.find((c) => c.conquista.id === conquistaAberta);
+    listaL.append(card, el('h3', 'legado-titulo', 'Árvore de habilidades'), arvore, topoQ);
+    const aberta = celulas.find((c: Celula) => c.conquista.id === conquistaAberta);
     if (aberta) {
       const det = el('div', 'conquista-detalhe');
       det.append(el('strong', undefined, aberta.nome), el('span', 'sub', aberta.texto));
       if (aberta.em) det.append(el('span', 'sub', ganhouEm(aberta.em)));
-      listaQ.append(det);
+      listaL.append(det);
     }
-    listaQ.append(grid);
+    listaL.append(grid);
   }
 
-  function renderizar(m: Modelo) {
 ```
 
-12. Trecho:
+16. Trecho:
 
 ```ts
     mostrar(listaP, jogando && m.aba === 'placar');
@@ -2794,48 +4415,73 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
 
 ```ts
     mostrar(listaP, jogando && m.aba === 'placar');
-    mostrar(listaQ, jogando && m.aba === 'conquistas');
+    // Legado: na aba, ou embaixo do "Abrir CNPJ" de quem já vendeu (dá pra gastar os pontos antes de reabrir)
+    const verLegado = !!s && ((jogando && m.aba === 'legado') || (m.fase === 'antes' && s.pontos_vida > 0));
+    mostrar(listaL, verLegado);
 ```
 
-13. Trecho:
+17. Trecho:
 
 ```ts
-    listaP.replaceChildren();
-    if (!m.placar)
-```
+        }
+      }
+    }
 
-   vira:
-
-```ts
-    listaQ.replaceChildren();
-    if (s && jogando && m.aba === 'conquistas') conquistas(s, m.ocupado);
-
-    listaP.replaceChildren();
-    if (!m.placar)
-```
-
-14. Trecho:
-
-```ts
-        if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
 ```
 
    vira:
 
 ```ts
+        }
+      }
+    }
+
+    listaL.replaceChildren();
+    if (s && verLegado) legado(s, m.ocupado);
+
+```
+
+18. Trecho:
+
+```ts
+        );
+```
+
+   vira:
+
+```ts
+        );
         if (r.pontos > 0) li.append(el('span', 'pontos', `★ ${r.pontos}`));
-        if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
 ```
 
-15. Trecho:
+19. Trecho:
 
 ```ts
-    noticeTxt.textContent = m.aviso ?? '';
+        texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+        prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
 ```
 
    vira:
 
 ```ts
+        texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+        prazos.push({ texto: quando, fim: instante(s.user_id, w) + caixa(s).validadeS * 1000 });
+```
+
+20. Trecho:
+
+```ts
+      modalV.append(folha);
+    }
+
+```
+
+   vira:
+
+```ts
+      modalV.append(folha);
+    }
+
     // vender a startup: confirmação (só com pelo menos 1 ponto a ganhar)
     modalP.replaceChildren();
     const ganho = s && m.vendaAberta && jogando ? s.pontos_venda : 0;
@@ -2858,7 +4504,6 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
     avisoConquista.textContent = m.conquistaAviso ?? '';
     mostrar(avisoConquista, m.conquistaAviso !== null);
 
-    noticeTxt.textContent = m.aviso ?? '';
 ```
 
 - [ ] **Step 4: `games/idle/idle.css`** — acrescente no fim:
@@ -2870,18 +4515,34 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
   .idle .abas::-webkit-scrollbar { display: none; }
   .idle .aba { flex: 1 0 auto; padding: 0 14px; }
 }
-/* aba Conquistas: card de prestígio, grade e o detalhe do quadradinho tocado */
+/* aba Legado: card de prestígio, árvore (ramos empilhados no celular, lado a lado no tablet e no PC) e conquistas */
 .idle .prestigio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); }
 .idle .prestigio .btn { flex: 1 1 100%; min-height: 44px; height: auto; white-space: nowrap; }
 @media (min-width: 600px) { .idle .prestigio .btn { flex: none; padding: 0 16px; } }
-.idle .conquistas-topo { margin: 8px 0 0; font-weight: 700; color: var(--paper); }
+.idle .legado-titulo { margin: 12px 0 0; font: 700 15px var(--font); color: var(--paper); }
+.idle .arvore { display: grid; gap: 12px; }
+.idle .ramo { display: grid; gap: 6px; align-content: start; }
+.idle .ramo-nome { margin: 0; font: 700 13px var(--font); color: #A8A398; }
+.idle .no { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); }
+.idle .no.comprado { border-color: #5B3FD9; background: #262431; }
+.idle .no.trancado { opacity: 0.5; }
+.idle .no .btn { flex: none; min-height: 44px; }
+.idle .no-status { flex: none; max-width: 40%; text-align: right; font-size: 12px; color: #A8A398; }
+.idle .no.comprado .no-status { color: var(--mint); }
+@media (min-width: 700px) {
+  .idle .arvore { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .idle .ramo.raiz { grid-column: 1 / -1; justify-self: center; width: min(100%, 320px); }
+  .idle .ramo:not(.raiz) .no { flex-direction: column; text-align: center; }
+  .idle .ramo:not(.raiz) .no .btn { width: 100%; padding: 0 6px; white-space: normal; }
+  .idle .ramo:not(.raiz) .no-status { max-width: none; text-align: center; }
+}
 .idle .grade-conquistas { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
 .idle .conquista { display: grid; justify-items: center; align-content: start; gap: 6px; min-height: 44px; padding: 8px 4px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: #A8A398; font: 600 12px/1.25 var(--font); text-align: center; cursor: pointer; }
 .idle .conquista.ganha { color: var(--paper); border-color: #5B3FD9; }
-.idle .conquista:not(.ganha) .icone-conquista { opacity: 0.35; filter: grayscale(1); }
+.idle .conquista:not(.ganha) .icone-legado, .idle .no.trancado .icone-legado { opacity: 0.35; filter: grayscale(1); }
 .idle .conquista[aria-pressed='true'], .idle .conquista:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
-.idle .icone-conquista { width: 48px; height: 48px; background: no-repeat 0 0 / 48px 48px; image-rendering: pixelated; }
-.idle .icone-conquista.sem-arte { border-radius: 6px; border: 3px solid #6B6874; }
+.idle .icone-legado { flex: none; width: 48px; height: 48px; background: no-repeat 0 0 / 48px 48px; image-rendering: pixelated; }
+.idle .icone-legado.sem-arte { border-radius: 6px; border: 3px solid #6B6874; }
 .idle .conquista-detalhe { display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; background: #262431; color: var(--paper); }
 /* aviso de conquista: pílula por cima da cena, 3 s (main.ts) */
 .idle .conquista-aviso { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 999px; border: 1px solid #B8A2FF; background: #3A2A66; color: #DDD2FF; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; animation: conquista-entra 0.25s ease-out; }
@@ -2890,15 +4551,77 @@ export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'conquist
 .idle .lista-placar .pontos { grid-row: 2; grid-column: 4; justify-self: end; color: var(--gold); font-size: 13px; font-weight: 700; }
 ```
 
-- [ ] **Step 5: `games/idle/main.ts` (edições pontuais)**
+- [ ] **Step 5: `games/idle/main.ts`** — troque cada trecho, na ordem:
 
-1. Depois de `import { ativos } from './ativos';` acrescente `import { avisos, criarFilaAvisos } from './conquistas';`.
-2. No tipo `Api`, acrescente `'idlePrestige'` (fica
-   `type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'hasSession'>;`).
-3. Em `RECARREGA`, a segunda linha fica `  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open', 'idle_prestige_low',`.
-4. Depois de `let vencimentoPedido: string | null = null;` acrescente:
+1. Trecho:
 
 ```ts
+import { ativos } from './ativos';
+```
+
+   vira:
+
+```ts
+import { ativos } from './ativos';
+import { avisos, criarFilaAvisos } from './legado';
+```
+
+2. Trecho:
+
+```ts
+import {
+  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+```
+
+   vira:
+
+```ts
+import {
+  agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+```
+
+3. Trecho:
+
+```ts
+
+type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'hasSession'>;
+```
+
+   vira:
+
+```ts
+
+type Api = Pick<
+  typeof realApi,
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'hasSession'
+>;
+```
+
+4. Trecho:
+
+```ts
+  'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
+  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open',
+```
+
+   vira:
+
+```ts
+  'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
+  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open', 'idle_prestige_low', 'idle_points_low',
+  'idle_node_owned',
+```
+
+5. Trecho:
+
+```ts
+let vencimentoPedido: string | null = null;
+```
+
+   vira:
+
+```ts
+let vencimentoPedido: string | null = null;
 // folha "Vender a startup?" aberta; aviso de conquista na cena (um de cada vez, 3 s cada)
 let vendaAberta = false;
 let conquistaAviso: string | null = null;
@@ -2908,9 +4631,20 @@ const filaAvisos = criarFilaAvisos((texto) => {
 });
 ```
 
-5. Nas ações passadas a `criarTela`, depois de `mudarVisual: (campo, valor) => { ... },` acrescente:
+6. Trecho:
 
 ```ts
+    rascunho = { ...rascunho, [campo]: valor };
+    render();
+  },
+```
+
+   vira:
+
+```ts
+    rascunho = { ...rascunho, [campo]: valor };
+    render();
+  },
   vender: (acao) => {
     if (acao === 'confirmar') {
       vendaAberta = false; // fecha já: deu certo, a cena volta pro "antes"; deu errado, o aviso diz por quê
@@ -2924,74 +4658,116 @@ const filaAvisos = criarFilaAvisos((texto) => {
     vendaAberta = acao === 'abrir';
     render();
   },
+  comprarNo: (id) => void guard(async () => aplicar(await api.idleBuyNode(id))),
 ```
 
-6. Em `render()`, troque a chamada `tela.renderizar({ fase, estado: s, aba, ... aoVivo: vivoAtual });` por:
+7. Trecho:
 
 ```ts
+  const agora = agoraSrv();
+  const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s)) : [];
+```
+
+   vira:
+
+```ts
+  const agora = agoraSrv();
+  const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
+```
+
+8. Trecho:
+
+```ts
+  vivoAtual = s ? vivoAgora(s, agora) : null;
+  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
+```
+
+   vira:
+
+```ts
+  vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
     fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso,
   });
 ```
 
-7. No fim de `aplicar(estado)`, depois do `render();`, acrescente `  filaAvisos.adicionar(avisos(estado.novas));`.
+9. Trecho:
+
+```ts
+  if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
+  render();
+```
+
+   vira:
+
+```ts
+  if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
+  render();
+  filaAvisos.adicionar(avisos(estado.novas));
+```
 
 - [ ] **Step 6: Rodar e ver passar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx tsc --noEmit && npx vitest run && npm run build`
 Expected: PASS e build sem erro.
 
-- [ ] **Step 7: Conferência no `?mock`** (`cd games && npm run dev`, abrir `/games/idle/?mock` no endereço que o Vite mostrar; no DevTools,
-  celular de 360 px e depois PC):
-  - as 5 abas cabem rolando de lado no celular; no PC, lado a lado; a aba ativa fica marcada;
-  - aba Conquistas: card "★ 0 pontos · +0% de produção", "Recorde: …", botão apagado "Ainda não compensa"; grade com
-    "N/73"; o "???" da 6-7 (o bot Oliveira tem); tocar numa ganha mostra frase e data, numa bloqueada a condição;
-  - abrir o jogo já dá conquistas (ex.: "Conquista: Primeiro real" aparece por 3 s em cima da cena, um aviso de cada
-    vez, sem tapar a oportunidade que passa);
+- [ ] **Step 7: Conferência no `?mock`** (`cd games && npm run dev`, abrir `/games/idle/?mock` no endereço que o Vite
+  mostrar; no DevTools, celular de 360 px, depois tablet e PC):
+  - as 5 abas cabem rolando de lado no celular; a aba ativa fica marcada;
+  - aba Legado: card "★ 0 pontos pra gastar", "0 ganhos na vida · recorde …", botão apagado "Ainda não compensa";
+    árvore com a raiz e os 5 ramos (empilhados no celular, lado a lado a partir do tablet), Fundador com "Comprar · 1 ★"
+    apagado, o resto trancado com "Precisa de …"; conquistas "N/73" com o "???" da 6-7 (o bot Oliveira tem); tocar numa
+    ganha mostra frase e data, numa bloqueada a condição;
+  - abrir o jogo já dá conquistas ("Conquista: Primeiro real" por 3 s em cima da cena, um aviso de cada vez, sem tapar a
+    oportunidade que passa);
   - placar: "★ 12" ao lado do R$/s do Oliveira, "★ 3" da Bia, nada no Teteu;
-  - console: `__vendavel()`; a página bate o ponto e o botão vira "Vender a startup · +7 pontos" (o número exato
-    depende das conquistas); tocar abre a folha "Vender a startup?" com "Você ganha N pontos (+N% pra sempre) e
-    recomeça do zero."; "Deixa quieto" fecha; "Vender" volta pra cena "antes" com "Abrir CNPJ"; reabrir mostra a produção
-    com o bônus e o card com os pontos; o placar some com você até reabrir.
+  - console: `__vendavel()`; a página bate o ponto e o botão vira "Vender a startup · +N pontos"; tocar abre a folha
+    "Vender a startup?" com "Você ganha N pontos pra gastar na árvore e recomeça do zero."; "Deixa quieto" fecha;
+    "Vender" volta pra cena "antes" com "Abrir CNPJ" e o Legado embaixo; comprar Fundador, Pé-de-meia e Soneca longa ali
+    mesmo; "Abrir CNPJ": começa com R$ 1 mil e a produção com os +5%; o placar some com você até reabrir.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/tela.ts games/idle/tela.test.ts games/idle/idle.css games/idle/main.ts && git commit -m "Fellas Inc.: aba Conquistas, vender a startup, aviso de conquista e pontos no placar"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/tela.ts games/idle/tela.test.ts games/idle/idle.css games/idle/main.ts && git commit -m "Fellas Inc.: aba Legado (prestígio, árvore e conquistas), venda, aviso de conquista e pontos no placar"
 ```
 
 ---
 
-### Task 9: Arte: os 73 ícones das conquistas (fora do repositório)
+### Task 10: Arte: os 73 ícones das conquistas e os 26 da árvore (fora do repositório)
 
 **Files (em `C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`; sem commit):**
-- Create: `BRIEF-CONQUISTAS.md`, `conquistas.js`
-- Produz: `png/conquista-NNN.png` (73 arquivos), `sprites/conquista-NNN-8x.png`, `conferencia/conquista-NNN-quadros.png`
-  (o que `salvarSprite` gera) e `conferencia/conquistas-folha.png`
+- Create: `BRIEF-LEGADO.md`, `legado-icones.js`
+- Produz: `png/conquista-NNN.png` (73), `png/no-NN.png` (26), as prévias de `salvarSprite`
+  (`sprites/<nome>-8x.png`, `conferencia/<nome>-quadros.png`) e `conferencia/legado-folha.png`
 
 **Interfaces:**
-- Produz: os arquivos do "Contrato de formato da arte". A Task 10 copia e trava o formato.
+- Produz: os arquivos do "Contrato de formato da arte". A Task 11 copia e trava o formato.
 
-- [ ] **Step 1: Salvar o brief** como `C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos/BRIEF-CONQUISTAS.md`:
+- [ ] **Step 1: Salvar o brief** como `C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos/BRIEF-LEGADO.md`:
 
 ```markdown
-# Brief: ícones das conquistas da Fellas Inc. (entrega 3)
+# Brief: ícones do Legado da Fellas Inc. (conquistas e árvore de habilidades, entrega 3)
 
 Leia antes `BRIEF-SPRITES.md` (estilo, contorno, paleta, processo) e veja com Read `conferencia/gerais-folha.png` (os
 20 ícones das melhorias gerais): estes são da mesma família. Copie de `gerais.js` a função `mapa` (mapa de texto 16x16,
 cada letra = cor e objeto) e o fim do arquivo (desenha, salva e monta a folha). Não edite nenhum arquivo existente:
-crie só `conquistas.js` e o que ele gera. Pasta: `C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`.
+crie só `legado-icones.js` e o que ele gera. Pasta: `C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`.
 
 ## Formato (o jogo depende disto exatamente)
-- Um ícone por conquista, nome `conquista-NNN` (NNN = id com 3 dígitos), salvo com `salvarSprite(nome, [cv], 15, 8)`:
-  `png/conquista-NNN.png` 16x16, transparente, 1 quadro, pixel duro, 1px de margem (o contorno de `cv.contornar()`).
-- 2 a 4 cores mais o contorno. No jogo aparece a 48x48 (3x) num quadradinho escuro; bloqueada, o jogo pinta de cinza
-  e apaga (35%): a silhueta tem que ler sem cor. Nada de texto além de números grandes (só onde dito).
+- Conquistas: `conquista-NNN` (NNN = id com 3 dígitos); árvore: `no-NN` (NN = id com 2 dígitos). Cada um salvo com
+  `salvarSprite(nome, [cv], 15, 8)`: `png/<nome>.png` 16x16, transparente, 1 quadro, pixel duro, 1px de margem (o
+  contorno de `cv.contornar()`).
+- 2 a 4 cores mais o contorno. No jogo aparece a 48x48 (3x) num quadradinho escuro; bloqueado (conquista não ganha,
+  nó trancado), o jogo pinta de cinza e apaga (35%): a silhueta tem que ler sem cor. Nada de texto além de números
+  grandes (só onde dito).
 - Grupos com marca comum: os 30 de gerador levam uma estrela dourada 4x4 no canto de cima à direita; os de R$/s sobem
-  em "riqueza" do 31 ao 38; os de melhorias, gente e vendas vão de bronze (1º) a prata (2º) e ouro (3º e 4º).
+  em "riqueza" do 31 ao 38; os de melhorias, gente e vendas vão de bronze (1º) a prata (2º) e ouro (3º e 4º); os nós de
+  cada ramo da árvore dividem uma cor de fundo (Produção verde, Recomeço dourado, Oportunidades roxo, Tempo azul, Gente
+  laranja) e o Fundador é roxo da marca.
 
-## Os ícones
+## Conquistas
 Geradores (ter 100; o objeto do gerador, simplificado do `gerador-NN` de 32x32, + a estrela dourada):
 001 notebook com adesivos · 002 balão de post azul com joinha · 003 planilha verde com grade · 004 celular com balão
 de áudio · 005 notebook com estrela de avaliação · 006 webcam roxa com o ponto vermelho de "ao vivo" · 007 boné
@@ -3002,16 +4778,18 @@ vidro com pufe colorido na porta · 019 gráfico de velas verdes subindo · 020 
 servidor com LEDs · 022 cheque gigante com "A" · 023 lâmpada com post-it · 024 dois prédios unidos por uma ponte ·
 025 globo de festa · 026 bola de futebol na frente de um escudo · 027 ilha com coqueiro · 028 arranha-céu de Dubai ·
 029 sino da bolsa · 030 foguete.
-R$/s: 031 uma moeda · 032 três moedas · 033 pilha de moedas · 034 saco de dinheiro · 035 cofre · 036 barras de ouro ·
-037 diamante · 038 planeta dourado.
-Eras: 039 porta de garagem · 040 catraca com crachá · 041 elevador com seta pra cima · 042 torre com a coroa roxa (a
-sede) · 043 Marte com bandeirinha.
-Melhorias (10, 50, 150): 044 chave inglesa bronze · 045 prata · 046 ouro.
-Oportunidades (1, 25, 100, 500): 047 olho · 048 binóculo · 049 lupa com cifrão · 050 radar.
-Vendas (1, 5, 10, 25): 051 etiqueta de "vendido" · 052 etiqueta com seta circular · 053 fábrica com etiqueta ·
-054 troféu dourado.
-Gente: 055–057 crachá roxo de contratado com 1, 2 e 3 estrelas (bronze, prata, ouro) · 058–060 carteira de trabalho
-azul com 1, 2 e 3 estrelas.
+R$/s: 031 uma moeda · 032 celular com o símbolo do Pix (Pix caindo) · 033 juba de leão (O leão acordou) · 034 bilhete
+de loteria (Acumulou!) · 035 cartão de visita com gravata (Bilionário de LinkedIn) · 036 barras de ouro · 037 diamante
+· 038 prensa de moedas (Casa da Moeda).
+Eras: 039 porta de garagem com uma mochila (Saiu da casa dos pais) · 040 catraca com crachá · 041 elevador com seta pra
+cima · 042 torre com a coroa roxa (a sede) · 043 foguete rumo a uma estrela (Ao infinito e além).
+Melhorias (10, 50, 150): 044 placa de vídeo · 045 apito de coach · 046 casinha com coração (Tudo pela família).
+Oportunidades (1, 25, 100, 500): 047 etiqueta "%" de Black Friday · 048 tesoura cortando cupom · 049 lupa com cifrão ·
+050 mira de sniper.
+Vendas (1, 5, 10, 25): 051 etiqueta de "vendido" · 052 etiqueta com seta circular · 053 unicórnio pequeno com cifrão ·
+054 barbatana de tubarão (Shark Tank).
+Gente: 055–057 crachá roxo de contratado com 1, 2 e 3 estrelas (bronze, prata, ouro) · 058 carteira de trabalho azul ·
+059 seta pra cima sobre uma camisa de time (Passe valorizado) · 060 carteira de trabalho com 3 estrelas douradas.
 Estratégias: 061 três setas saindo do mesmo ponto · 062 bússola.
 Escondidas (zoeira do grupo; podem ser mais caprichadas):
 101 "67" em números grandes dourados (pode usar a área toda) · 102 boneco (silhueta) com brilho roxo em volta (aura) ·
@@ -3020,52 +4798,73 @@ Escondidas (zoeira do grupo; podem ser mais caprichadas):
 3h06 com uma lua · 109 lobo uivando · 110 unicórnio (cabeça, chifre dourado, crina roxa; como o `selo-unicornio`) ·
 111 tambor de madeira com duas baquetas (o "tung tung").
 
+## Árvore de habilidades
+no-01 Fundador: broto de duas folhas num vasinho roxo.
+Produção (verde): no-11 xícara de café · no-12 alvo com seta (metas) · no-13 raio · no-14 seta grossa pra cima ·
+no-15 turbina com chama ("turbo").
+Recomeço (dourado): no-21 cofrinho · no-22 pilha de notebooks · no-23 mala com o logo roxo (leva a cultura junto) ·
+no-24 saco de dinheiro grande (herança) · no-25 caixa aberta com peças (kit startup).
+Oportunidades (roxo): no-31 caixinha de presente · no-32 celular com despertador · no-33 nariz farejando um cifrão ·
+no-34 aperto de mão com "×2" pequeno · no-35 baú aberto.
+Tempo (azul): no-41 travesseiro com "z" · no-42 lua com coruja · no-43 volante (piloto automático) · no-44 relógio com
+engrenagem · no-45 rede de praia entre dois coqueiros.
+Gente (laranja): no-51 placa de "VAGA" · no-52 lousa com gráfico (treinamento) · no-53 pergaminho comprido com selo ·
+no-54 bola dourada (passe em alta) · no-55 headset de atendimento (RH terceirizado).
+
 ## Processo
-`node conquistas.js`; veja `conferencia/conquistas-folha.png` (todos em 1x, 2x e 6x, nos temas escuro `#121212` e claro
-`#F4F1EA`) e `sprites/conquista-NNN-8x.png` com Read. Pelo menos 2 rodadas de revisão por ícone; confira cada um
-também em cinza (bloqueado). No fim, um relatório curto: o que tem em cada grupo e o que ficou fraco.
+`node legado-icones.js`; veja `conferencia/legado-folha.png` (todos em 1x, 2x e 6x, nos temas escuro `#121212` e claro
+`#F4F1EA`) e `sprites/<nome>-8x.png` com Read. Pelo menos 2 rodadas de revisão por ícone; confira cada um também em
+cinza (bloqueado). No fim, um relatório curto: o que tem em cada grupo e o que ficou fraco.
 ```
 
 - [ ] **Step 2: Fazer a arte** — despachar um agente de arte com o brief (ou seguir o brief à mão). O script
-  `conquistas.js` segue o `gerais.js`: `const ICONES = {}`, um `ICONES['conquista-001'] = (cv) => mapa(cv, [...16
-  linhas...], {legenda}, '001')` por ícone, e no fim o mesmo laço `telaComObjetos(16, 16)` → `desenha(cv)` →
-  `cv.contornar()` → `salvarSprite(nome, [cv], 15, 8)` e a folha `conferencia/conquistas-folha.png` (fileiras de 10).
+  `legado-icones.js` segue o `gerais.js`: `const ICONES = {}`, um `ICONES['conquista-001'] = (cv) => mapa(cv, [...16
+  linhas...], {legenda}, '001')` por ícone (e `ICONES['no-11'] = ...` para a árvore), e no fim o mesmo laço
+  `telaComObjetos(16, 16)` → `desenha(cv)` → `cv.contornar()` → `salvarSprite(nome, [cv], 15, 8)` e a folha
+  `conferencia/legado-folha.png` (fileiras de 10).
 
-- [ ] **Step 3: Conferir o formato antes de passar para a Task 10**
+- [ ] **Step 3: Conferir o formato antes de passar para a Task 11**
 
-Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos && node -e "const fs=require('fs');const ids=[...Array(62)].map((_,i)=>i+1).concat([...Array(11)].map((_,i)=>101+i));let ok=0;for(const id of ids){const f='png/conquista-'+String(id).padStart(3,'0')+'.png';const b=fs.readFileSync(f);if(b.readUInt32BE(16)!==16||b.readUInt32BE(20)!==16)throw new Error(f);ok++}console.log('ok',ok)"`
-Expected: `ok 73`.
+Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos && node -e "const fs=require('fs');const c=[...Array(62)].map((_,i)=>i+1).concat([...Array(11)].map((_,i)=>101+i)).map(i=>'conquista-'+String(i).padStart(3,'0'));const n=[1].concat([1,2,3,4,5].flatMap(r=>[1,2,3,4,5].map(p=>r*10+p))).map(i=>'no-'+String(i).padStart(2,'0'));let ok=0;for(const x of c.concat(n)){const b=fs.readFileSync('png/'+x+'.png');if(b.readUInt32BE(16)!==16||b.readUInt32BE(20)!==16)throw new Error(x);ok++}console.log('ok',ok)"`
+Expected: `ok 99`.
 
-- [ ] **Step 4: Mostrar a folha ao Juan** (`conferencia/conquistas-folha.png`) e ajustar o que ele pedir antes da Task 10.
+- [ ] **Step 4: Mostrar a folha ao Juan** (`conferencia/legado-folha.png`) e ajustar o que ele pedir antes da Task 11.
 
 ---
 
-### Task 10: Copiar os ícones para `games/idle/assets/conquistas/` e travar o formato
+### Task 11: Copiar os ícones para `games/idle/assets/` e travar o formato
 
 **Files:**
-- Create: `games/idle/assets/conquistas/conquista-NNN.png` (73)
+- Create: `games/idle/assets/conquistas/conquista-NNN.png` (73), `games/idle/assets/arvore/no-NN.png` (26)
 - Modify: `games/idle/ativos.test.ts`
 
 **Interfaces:**
-- Consome: a arte da Task 9; `catalogo.conquistas` (Task 1); `ativos.conquista` (Task 7).
+- Consome: a arte da Task 10; `catalogo.conquistas`, `catalogo.arvore` (Task 1); `ativos.conquista`, `ativos.no` (Task 8).
 
-- [ ] **Step 1: Teste do formato (acrescentar no fim de `games/idle/ativos.test.ts`)**
+- [ ] **Step 1: Teste do formato (acrescentar em `games/idle/ativos.test.ts`)**
 
 No topo, acrescente o import `import { catalogo } from './catalogo';` (os de `node:fs` e `node:path` já existem). No fim:
 
 ```ts
 
-describe('arte da entrega 3 (ícones das conquistas)', () => {
-  const arquivo = (id: number) => `conquista-${String(id).padStart(3, '0')}.png`;
-  it('toda conquista do catálogo tem ícone 16x16', () => {
+describe('arte da entrega 3 (ícones das conquistas e da árvore)', () => {
+  const conquista = (id: number) => `conquista-${String(id).padStart(3, '0')}.png`;
+  const no = (id: number) => `no-${String(id).padStart(2, '0')}.png`;
+  it('toda conquista e todo nó do catálogo têm ícone 16x16', () => {
     for (const c of catalogo.conquistas) {
-      expect(dim(`conquistas/${arquivo(c.id)}`), arquivo(c.id)).toEqual([16, 16]);
-      expect(ativos.conquista(c.id), arquivo(c.id)).not.toBeNull();
+      expect(dim(`conquistas/${conquista(c.id)}`), conquista(c.id)).toEqual([16, 16]);
+      expect(ativos.conquista(c.id), conquista(c.id)).not.toBeNull();
+    }
+    for (const n of catalogo.arvore) {
+      expect(dim(`arvore/${no(n.id)}`), no(n.id)).toEqual([16, 16]);
+      expect(ativos.no(n.id), no(n.id)).not.toBeNull();
     }
   });
   it('nenhum ícone sobrando (de id que não existe no catálogo)', () => {
-    const nomes = new Set(catalogo.conquistas.map((c) => arquivo(c.id)));
-    expect(readdirSync(resolve(pasta, 'conquistas')).filter((f) => !nomes.has(f))).toEqual([]);
+    const conquistas = new Set(catalogo.conquistas.map((c) => conquista(c.id)));
+    const nos = new Set(catalogo.arvore.map((n) => no(n.id)));
+    expect(readdirSync(resolve(pasta, 'conquistas')).filter((f) => !conquistas.has(f))).toEqual([]);
+    expect(readdirSync(resolve(pasta, 'arvore')).filter((f) => !nos.has(f))).toEqual([]);
   });
 });
 ```
@@ -3073,16 +4872,16 @@ describe('arte da entrega 3 (ícones das conquistas)', () => {
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/ativos.test.ts`
-Expected: FAIL (a pasta `assets/conquistas` não existe).
+Expected: FAIL (as pastas `assets/conquistas` e `assets/arvore` não existem).
 
 - [ ] **Step 3: Copiar**
 
 ```bash
-mkdir -p C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games/idle/assets/conquistas && cp C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos/png/conquista-*.png C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games/idle/assets/conquistas/
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games/idle/assets && mkdir -p conquistas arvore && cp C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos/png/conquista-*.png conquistas/ && cp C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos/png/no-*.png arvore/
 ```
 
-- [ ] **Step 4: Rodar e ver passar; conferir no `?mock`** que a grade mostra os ícones (ganhos coloridos, bloqueados em
-  cinza) a 48 px sem borrar.
+- [ ] **Step 4: Rodar e ver passar; conferir no `?mock`** que a árvore e a grade mostram os ícones (comprados e ganhos
+  coloridos, trancados e bloqueados em cinza) a 48 px sem borrar.
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run idle/ && npm run build`
 Expected: PASS.
@@ -3090,12 +4889,12 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/assets/conquistas games/idle/ativos.test.ts && git commit -m "Fellas Inc.: ícones das conquistas"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio && git add games/idle/assets/conquistas games/idle/assets/arvore games/idle/ativos.test.ts && git commit -m "Fellas Inc.: ícones das conquistas e da árvore"
 ```
 
 ---
 
-### Task 11: Conferência final, banco e publicação
+### Task 12: Conferência final, banco e publicação
 
 - [ ] **Step 1: Tudo verde no branch**
 
@@ -3109,7 +4908,7 @@ Expected: tudo passa.
   ligado (`supabase/.temp`); o worktree não tem.
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git checkout main && git pull --ff-only && git merge --no-ff fellas-inc-prestigio -m "Merge da entrega 3 da Fellas Inc. (prestígio e conquistas)" && npx tsc --noEmit && npm test && npm test --prefix games
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git checkout main && git pull --ff-only && git merge --no-ff fellas-inc-prestigio -m "Merge da entrega 3 da Fellas Inc. (prestígio, árvore e conquistas)" && npx tsc --noEmit && npm test && npm test --prefix games
 ```
 
 - [ ] **Step 3: Banco de produção (o Juan roda)** — pedir ao Juan, no terminal dele, em
@@ -3119,8 +4918,7 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git checkout main && git pul
 - [ ] **Step 4: Conferir pela REST que entrou e só então publicar** (o deploy roda os testes e builda `dist/games/idle/`):
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && set -a && . ./.env && set +a && for q in "idle_state?select=prestige_points,prestige_count,best_rate,upg_total,opp_total,hire_total,hired_total,est_usadas,opp_recent" "idle_conquistas?select=ganhou_em" "idle_cat_conquista?select=escondida" "idle_cat_upg?select=nome&id=eq.283"; do curl -s -o /dev/null -w "$q %{http_code}
-" "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/$q&limit=1" -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY"; done
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && set -a && . ./.env && set +a && for q in "idle_state?select=prestige_earned,prestige_spent,prestige_count,best_rate,upg_total,opp_total,hire_total,hired_total,est_usadas,opp_recent" "idle_conquistas?select=ganhou_em" "idle_arvore?select=comprado_em" "idle_cat_conquista?select=escondida" "idle_cat_no?select=requer" "idle_cat_upg?select=nome&id=eq.283"; do curl -s -o /dev/null -w "$q %{http_code}\n" "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/$q&limit=1" -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY"; done
 ```
 
 Expected: 200 ou 401 (existe; anônimo não tem permissão) em todos; 400 ("column ... does not exist") ou 404 = a
@@ -3133,45 +4931,50 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git push origin main
 
 - [ ] **Step 5: Conferência real (com o Juan e mais um fella)** — `https://fellasapp.pages.dev/games` no celular:
   abrir a Fellas Inc. (aparece "Conquista: …" por 3 s para as que a pessoa já cumpria; o R$/s sobe 1% por conquista);
-  aba Conquistas com o card, a grade "N/73" e as escondidas que alguém do grupo já tem como "???"; placar com "★ N" de
-  quem tem pontos; quem tiver R$/s ≥ 1 mi vê "Vender a startup · +N pontos": vender (folha, "Vender"), ver a cena voltar
-  para o "Abrir CNPJ", reabrir e conferir a produção com o bônus; quem tinha contratado alguém: o contratado continua com
-  o que já rendeu e perde o bônus dali pra frente; quem te contratou continua; com o jogo aberto em dois aparelhos,
-  vender num e tocar em comprar no outro: recarrega e mostra o "Abrir CNPJ". Na segunda seguinte, conferir que o
-  unicórnio ganhou o "Pai tá on" e que nada sumiu.
+  aba Legado com o card, a árvore (ramos empilhados no celular) e a grade "N/73" com as escondidas que alguém do grupo
+  já tem como "???"; placar com "★ N" de quem já vendeu; quem tiver R$/s ≥ 1 mi vê "Vender a startup · +N pontos":
+  vender (folha, "Vender"), ver a cena voltar para o "Abrir CNPJ" com o Legado embaixo, comprar o Fundador e um nó de
+  Recomeço, reabrir e conferir o dinheiro inicial e a produção com os +5%; quem tinha contratado alguém: o contratado
+  continua com o que já rendeu e perde o bônus dali pra frente; quem te contratou continua; com o jogo aberto em dois
+  aparelhos, vender num e tocar em comprar no outro: recarrega e mostra o "Abrir CNPJ". Na segunda seguinte, conferir
+  que o unicórnio ganhou o "Pai tá on" e que nada sumiu.
 
 ---
 
 ## Autorrevisão
 
-- **Cobertura da spec (entrega 3):** 1.1 pontos (`floor(cbrt(r/K))`, diferença, "não compensa") → Tasks 2, 3, 5, 8;
-  1.2 venda (zera, volta pro Abrir CNPJ com R$ 10, contratos feitos vencem com a conta dos contratados fechada antes,
-  quem te contratou continua, ficam pontos/vendas/conquistas/personagem/cota do dia/recorde, confirmação) → Tasks 5, 8;
-  1.3 efeito e paridade → Tasks 2, 3; 1.4 ritmo → Task 2 (alvo 1 com K = 1e6; alvo 2 pendente do Juan, ver o topo);
-  2 bônus juntos (a foto usa a taxa da meia-noite) → Task 3 (`idle_rate_at`); 3.1 regras (catálogo com id, nome, frase,
-  ícone, condição, escondida; banco confere em toda ação e ao abrir; ganhou não perde; +1%) → Tasks 1, 4, 5, 9, 10;
-  3.2 lista visível (30 geradores, 8 R$/s, 5 eras, 3 melhorias, 4 oportunidades, 4 vendas, 6 gente, 2 estratégias = 62)
-  → Task 1; 3.3 escondidas (11, sem a do Vitor; limaumdoc pelo `username`; Guiana = comprar a 283 renomeada) → Tasks 1,
-  4, 5; 4 telas (aba Conquistas, card, grade com "???", contagem, abas roláveis, aviso de 3 s, "★ N" no placar) → Tasks
-  7, 8; 5 dados (colunas, `idle_cat_conquista` gerado em migração nova, `idle_conquistas` com PK dupla e RLS,
-  `idle_prestige`, `idle_check_conquistas`, `idle_json`/`idle_board`, contadores em colunas, nada apaga) → Tasks 1, 3–5;
-  6 testes (pontos, recorde, não compensa, o que zera e o que fica, contratos sem retroativo, cada tipo de conquista,
-  horário, nome de usuário, conquista não some, ninguém escreve nos dos outros, paridade, simulação, tela) → Tasks 2–8.
-- **Nomes conferidos entre tasks:** `TipoConquista`, `Conquista`, `catalogo.conquistas`, `CONQUISTAS_GERADOR`,
-  `CONQUISTAS`; `Bonus`, `SEM_BONUS`, `POR_PONTO`, `POR_CONQUISTA`, `K_PRESTIGIO`, `multBonus`, `pontosTotais`;
-  `Amostra`, `Marcos.amostras`, `primeiraVenda`, `volta`; `idle_est_codigos`, `idle_bonus_mult`, `idle_rate_at`,
-  `idle_prestige_total`, `idle_ganhar`, `idle_madrugada`, `idle_check_conquistas`, `idle_save`, `idle_json`,
-  `idle_prestige`, `idle_board`, `idle_weekly_reset`; colunas `prestige_points`, `prestige_count`, `best_rate`,
-  `upg_total`, `opp_total`, `hire_total`, `hired_total`, `est_usadas`, `opp_recent`; campos `bonus`, `vendas`, `recorde`,
+- **Cobertura da spec (entrega 3, revista):** 1.1 pontos (`floor(cbrt(r/K)) − ganhos na vida`, "não compensa") →
+  Tasks 2, 3, 6, 9; 1.2 venda (zera, volta pro Abrir CNPJ, contratos feitos vencem com a conta dos contratados fechada
+  antes, quem te contratou continua, ficam pontos/nós/vendas/conquistas/personagem/cota do dia/recorde, Recomeço no
+  novo Abrir CNPJ, confirmação com o texto novo) → Tasks 5, 6, 9; 1.3 árvore (raiz + 5 ramos, custos, nó anterior,
+  comprado pra sempre, efeitos de cada ramo, paridade, "★ N" = ganhos na vida) → Tasks 1, 2, 3, 5, 9; 1.4 ritmo (K,
+  primeira venda no dia 3/4, quem gasta ~10 pontos volta mais rápido) → Task 2; 2 bônus juntos (a foto usa a taxa da
+  meia-noite) → Task 3; 3 conquistas (catálogo, banco confere em toda ação e ao abrir, ganhou não perde, +1%, 62
+  visíveis com os nomes revistos, 11 escondidas) → Tasks 1, 4, 6, 10, 11; 4 telas (aba Legado: card, árvore empilhada
+  no celular e lado a lado maior, grade com "???" e "N/73"; abas roláveis; aviso de 3 s; placar) → Tasks 8, 9; 5 dados
+  (`prestige_earned/spent/count`, `best_rate`, `idle_cat_no`, `idle_arvore`, `idle_buy_node` fechando a conta antes,
+  `idle_cat_conquista` na migração nova, `idle_conquistas`, `idle_prestige`, `idle_check_conquistas`, `idle_json`/
+  `idle_board`, contadores em colunas, nada apaga) → Tasks 1, 3–6; 6 testes (pontos, árvore e cada efeito, o que zera
+  e o que fica, contratos sem retroativo, cada tipo de conquista, horário, nome de usuário, conquista não some, ninguém
+  escreve nos dos outros, paridade, simulação, tela) → Tasks 2–9.
+- **Nomes conferidos entre tasks:** `TipoConquista`, `TipoNo`, `Conquista`, `No`, `CUSTO_NO`, `RAIZ`, `RAMOS`,
+  `catalogo.conquistas`, `catalogo.arvore`; `Bonus`, `SEM_BONUS`, `EfeitosArvore`, `efeitosArvore`, `efeitosDe`,
+  `multBonus`, `pontosTotais`, `abertura`, `precoContrato`, `K_PRESTIGIO`; `Caixa`, `CAIXA_PADRAO`; `Amostra`,
+  `primeiraVenda`, `gastar`, `volta`; `idle_arv`, `idle_arvore_efeitos`, `idle_bonus_mult`, `idle_prestige_total`,
+  `idle_ganhar`, `idle_madrugada`, `idle_check_conquistas`, `idle_buy_node`, `idle_prestige`; colunas `prestige_earned`,
+  `prestige_spent`, `prestige_count`, `best_rate`, `upg_total`, `opp_total`, `hire_total`, `hired_total`, `est_usadas`,
+  `opp_recent`; campos `bonus.arvore`, `bonus.conquistas`, `pontos`, `pontos_vida`, `vendas`, `recorde`,
   `pontos_venda`, `conquistas`, `novas`, `descobertas`, placar `pontos`/`conquistas`; `IdleConquista`, `idlePrestige`,
-  `idle_prestige_low`, `dono`, `__vendavel`; `Celula`, `grade`, `ganhouEm`, `avisos`, `pontos`, `textoVenda`,
-  `TOTAL_CONQUISTAS`, `criarFilaAvisos`, `ativos.conquista`; `Aba 'conquistas'`, `Modelo.vendaAberta`,
-  `Modelo.conquistaAviso`, `Acoes.vender`.
-- **Conferido ao escrever o plano (10/10), num worktree descartado:** com as migrações reais 0027–0038 + a 0040 gerada
-  + a 0041 deste plano no PGlite, passaram os testes de banco das Tasks 3–5 (inclusive a 0041 rodando duas vezes), a
-  paridade (bônus, vencimento no meio e teto de 8h, pontos em cima dos cubos), todos os testes de antes (`idle`/`idleGente`
-  com `conquistas: false`), a simulação com K = 1e6, os testes da tela e de `conquistas.ts`, `tsc` e `build` em `games/`
-  e, na raiz, `tsc` e `npm test` (com as travas novas e a do safeupdate). Os estados intermediários da 0041 (só a parte 1;
-  partes 1+2) também foram rodados: só falham os testes das tasks seguintes.
-- **Foco da revisão:** itens 1 a 3 têm teste no banco (Tasks 4 e 5); o 4 tem teste da tela para a folha e conferência
-  real com dois aparelhos (Task 11); o 5 tem o teste das 5 abas e conferência no `?mock` a 360 px (Task 8).
+  `idleBuyNode`, `idle_prestige_low`, `idle_points_low`, `idle_node_owned`, `dono`, `__vendavel`; `legado.ts` (`grade`,
+  `situacao`, `RAMOS_ARVORE`, `falta`, `textoVenda`, `criarFilaAvisos`…), `efeitos`/`caixa` (store), `ativos.conquista`,
+  `ativos.no`; `Aba 'legado'`, `Modelo.vendaAberta`, `Modelo.conquistaAviso`, `Acoes.vender`, `Acoes.comprarNo`.
+- **Conferido ao escrever o plano (10/10), num rascunho descartado:** com as migrações reais 0027–0038 + a 0040 gerada
+  + a 0041 deste plano no PGlite, passaram os testes de banco das Tasks 3–6 (inclusive a 0041 rodando duas vezes), a
+  paridade (efeitos de cada nó e de pedaços sorteados da árvore, taxa com contratos, teto de 8 a 48h atravessando
+  vencimento, caixinha e validade, preço do contrato, pontos em cima dos cubos), todos os testes de antes, a simulação
+  com K = 1e6, os testes da tela e de `legado.ts`, `tsc` e `build` em `games/` e, na raiz, `tsc` e `npm test` (com as
+  travas novas e a do safeupdate). Os estados intermediários da 0041 (parte 1; 1+2; 1+2+3) também rodaram: só falham os
+  testes das tasks seguintes. Os trechos "troque/vira" deste plano foram reaplicados por script nos arquivos da `main` e
+  dão exatamente os arquivos testados.
+- **Foco da revisão:** itens 1 a 3 têm teste no banco (Tasks 3–6); o 4 tem teste da tela para a folha e conferência
+  real com dois aparelhos (Task 12); o 5 tem os testes das 5 abas e da árvore e conferência no `?mock` a 360 px (Task 9).
