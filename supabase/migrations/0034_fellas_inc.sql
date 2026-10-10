@@ -212,6 +212,159 @@ begin
 end;
 $$;
 
+-- preço de k unidades tendo n (igual a economia.ts preco; o divisor é 1,15 − 1 em double, como lá)
+create or replace function public.idle_price(p_custo double precision, p_n int, p_k int, p_cm double precision)
+returns double precision language sql immutable as $$
+  select p_custo * power(1.15::double precision, p_n) * (power(1.15::double precision, p_k) - 1)
+         / (1.15::double precision - 1) * p_cm
+$$;
+
+-- quantas unidades cabem em v (igual a economia.ts maxCompra)
+create or replace function public.idle_max_qty(p_custo double precision, p_n int, p_v double precision, p_cm double precision)
+returns int language plpgsql immutable set search_path = public as $$
+declare k int;
+begin
+  if p_v <= 0 then
+    return 0;
+  end if;
+  k := floor(ln(p_v * (1.15::double precision - 1) / (p_custo * power(1.15::double precision, p_n) * p_cm) + 1)
+             / ln(1.15::double precision))::int;
+  while k > 0 and public.idle_price(p_custo, p_n, k, p_cm) > p_v loop
+    k := k - 1;
+  end loop;
+  while public.idle_price(p_custo, p_n, k + 1, p_cm) <= p_v loop
+    k := k + 1;
+  end loop;
+  return greatest(k, 0);
+end;
+$$;
+
+create or replace function public.idle_upg_unlocked(u public.idle_cat_upg, gens int[])
+returns boolean language sql stable set search_path = public as $$
+  select case u.tipo
+    when 'gerador' then gens[u.gerador] >= u.requer
+    when 'geral' then public.idle_era(gens) >= u.requer_era
+    else gens[u.fonte] >= u.requer_fonte and gens[u.alvo] >= u.requer_alvo
+  end
+$$;
+
+create or replace function public.idle_buy(p_kind text, p_id int, p_qty int default 1)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  g      public.idle_cat_gen;
+  u      public.idle_cat_upg;
+  v_era  int;
+  v_cm   double precision;
+  v_n    int;
+  v_k    int;
+  v_preco double precision;
+  v_meia boolean := false;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_era := public.idle_era(s.generators);
+  if v_era >= 2 and s.strategies[v_era - 1] < 0 then
+    raise exception 'idle_strategy_pending' using errcode = 'P0001';
+  end if;
+  v_cm := public.idle_cost_mult(s);
+
+  if p_kind = 'gerador' then
+    select * into g from public.idle_cat_gen where id = p_id;
+    if not found then
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    if p_id > 1 and s.generators[p_id - 1] < 1 then
+      raise exception 'idle_locked' using errcode = 'P0001';
+    end if;
+    v_n := s.generators[p_id];
+    if p_qty = 0 then
+      v_k := public.idle_max_qty(g.custo, v_n, s.valuation, v_cm);
+      if v_k < 1 then
+        raise exception 'idle_cant_afford' using errcode = 'P0001';
+      end if;
+    elsif p_qty in (1, 10) then
+      v_k := p_qty;
+    else
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    v_preco := public.idle_price(g.custo, v_n, v_k, v_cm);
+    if s.half_price and v_k = 1 then
+      v_preco := v_preco / 2;
+      v_meia := true;
+    end if;
+    if v_preco > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := s.valuation - v_preco;
+    s.generators[p_id] := v_n + v_k;
+  elsif p_kind = 'melhoria' then
+    select * into u from public.idle_cat_upg where id = p_id;
+    if not found then
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    if p_id = any (s.upgrades) then
+      raise exception 'idle_owned' using errcode = 'P0001';
+    end if;
+    if not public.idle_upg_unlocked(u, s.generators) then
+      raise exception 'idle_locked' using errcode = 'P0001';
+    end if;
+    v_preco := u.preco * v_cm;
+    if s.half_price then
+      v_preco := v_preco / 2;
+      v_meia := true;
+    end if;
+    if v_preco > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := s.valuation - v_preco;
+    s.upgrades := array_append(s.upgrades, p_id);
+  else
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+
+  if v_meia then
+    s.half_price := false;
+  end if;
+  s.valuation := greatest(s.valuation, 0);
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+create or replace function public.idle_pick_strategy(p_era int, p_opcao int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare s public.idle_state;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if p_era < 2 or p_era > public.idle_era(s.generators) then
+    raise exception 'idle_locked' using errcode = 'P0001';
+  end if;
+  if s.strategies[p_era - 1] >= 0 then
+    raise exception 'idle_strategy_set' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.idle_cat_est e where e.era = p_era and e.opcao = p_opcao and e.ativa) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s); -- o tempo até agora rende com a regra antiga
+  s.strategies[p_era - 1] := p_opcao;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
 revoke all on function public.idle_era(int[]) from public, anon, authenticated;
 revoke all on function public.idle_rate(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_cost_mult(public.idle_state) from public, anon, authenticated;
@@ -229,3 +382,10 @@ revoke all on function public.idle_open() from public, anon;
 revoke all on function public.idle_start() from public, anon;
 grant execute on function public.idle_open() to authenticated;
 grant execute on function public.idle_start() to authenticated;
+revoke all on function public.idle_price(double precision, int, int, double precision) from public, anon, authenticated;
+revoke all on function public.idle_max_qty(double precision, int, double precision, double precision) from public, anon, authenticated;
+revoke all on function public.idle_upg_unlocked(public.idle_cat_upg, int[]) from public, anon, authenticated;
+revoke all on function public.idle_buy(text, int, int) from public, anon;
+revoke all on function public.idle_pick_strategy(int, int) from public, anon;
+grant execute on function public.idle_buy(text, int, int) to authenticated;
+grant execute on function public.idle_pick_strategy(int, int) to authenticated;

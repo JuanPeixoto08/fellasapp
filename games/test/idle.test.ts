@@ -80,3 +80,91 @@ describe('idle_open / idle_start', () => {
     await expect(t.asRole('authenticated', `update public.idle_state set valuation = 1e9 where user_id = '${A}'`)).rejects.toThrow();
   });
 });
+
+const dar = (uid: string, v: number) => q('update public.idle_state set valuation = $2 where user_id = $1', [uid, v]);
+const ter = (uid: string, g: number, n: number) => q('update public.idle_state set generators[$2] = $3 where user_id = $1', [uid, g, n]);
+const buy = (kind: 'gerador' | 'melhoria', id: number, qty = 1) => t.rpc<Estado>('idle_buy', { p_kind: kind, p_id: id, p_qty: qty });
+
+describe('idle_buy', () => {
+  beforeEach(async () => { await t.rpc('idle_start'); });
+
+  it('sem abrir CNPJ é erro', async () => {
+    await t.as(B);
+    await expect(buy('gerador', 1)).rejects.toThrow(/idle_not_started/);
+  });
+  it('compra 1 gerador e desconta 15·1,15^n', async () => {
+    await dar(A, 100);
+    const s = await buy('gerador', 1);
+    expect(s.generators[0]).toBe(2);
+    expect(s.valuation).toBeCloseTo(100 - 17.25, 1);
+  });
+  it('sem valuation: idle_cant_afford', async () => {
+    await dar(A, 1);
+    await expect(buy('gerador', 1)).rejects.toThrow(/idle_cant_afford/);
+  });
+  it('duas compras seguidas além do saldo: a segunda recusa', async () => {
+    await dar(A, 20);
+    await buy('gerador', 1);
+    await expect(buy('gerador', 1)).rejects.toThrow(/idle_cant_afford/);
+  });
+  it('gerador só libera com o anterior', async () => {
+    await dar(A, 1e9);
+    await expect(buy('gerador', 3)).rejects.toThrow(/idle_locked/);
+    await buy('gerador', 2);
+    await buy('gerador', 3);
+  });
+  it('comprar 10 e máx (com o valuation exatamente no preço)', async () => {
+    await dar(A, 1e6);
+    expect((await buy('gerador', 1, 10)).generators[0]).toBe(11);
+    const preco7 = (await q<{ p: number }>('select public.idle_price(15, 11, 7, 1) as p'))[0].p;
+    await dar(A, preco7);
+    const s = await buy('gerador', 1, 0);
+    expect(s.generators[0]).toBe(18);
+    expect(s.valuation).toBeCloseTo(0, 0); // sobra só o que rendeu nos milissegundos da chamada
+  });
+  it('qtd inválida e gerador inexistente: idle_bad_choice', async () => {
+    await dar(A, 1e6);
+    await expect(buy('gerador', 1, 3)).rejects.toThrow(/idle_bad_choice/);
+    await expect(buy('gerador', 31)).rejects.toThrow(/idle_bad_choice/);
+    await expect(t.rpc('idle_buy', { p_kind: 'xx', p_id: 1, p_qty: 1 })).rejects.toThrow(/idle_bad_choice/);
+  });
+  it('melhoria de nível 1 dobra o gerador; repetir é idle_owned; nível 2 sem 10 unidades é idle_locked', async () => {
+    await dar(A, 1e6);
+    const s = await buy('melhoria', 11);
+    expect(s.upgrades).toEqual([11]);
+    expect(s.rate).toBeCloseTo(1, 6);
+    await expect(buy('melhoria', 11)).rejects.toThrow(/idle_owned/);
+    await expect(buy('melhoria', 12)).rejects.toThrow(/idle_locked/);
+  });
+  it('meia-preço vale só na próxima compra unitária e depois some', async () => {
+    await dar(A, 100);
+    await q('update public.idle_state set half_price = true where user_id = $1', [A]);
+    const s = await buy('gerador', 1);
+    expect(s.valuation).toBeCloseTo(100 - 17.25 / 2, 1);
+    expect(s.half_price).toBe(false);
+  });
+});
+
+describe('estratégia por era', () => {
+  beforeEach(async () => { await t.rpc('idle_start'); await dar(A, 1e9); await ter(A, 7, 1); });
+  const pick = (era: number, opcao: number) => t.rpc<Estado>('idle_pick_strategy', { p_era: era, p_opcao: opcao });
+
+  it('entrou na era 2 sem escolher: nenhuma compra passa', async () => {
+    await expect(buy('gerador', 1)).rejects.toThrow(/idle_strategy_pending/);
+  });
+  it('escolhe uma vez; repetir é idle_strategy_set; opção desligada é idle_bad_choice; era futura é idle_locked', async () => {
+    await expect(pick(2, 2)).rejects.toThrow(/idle_bad_choice/);
+    expect((await pick(2, 0)).strategies).toEqual([0, -1, -1, -1]);
+    await expect(pick(2, 1)).rejects.toThrow(/idle_strategy_set/);
+    await expect(pick(3, 0)).rejects.toThrow(/idle_locked/);
+    await buy('gerador', 1);
+  });
+  it('Queimar caixa: compras custam 25% a mais', async () => {
+    await pick(2, 1);
+    await dar(A, 100);
+    // na era 2 rende ~17/s: para o relógio até a compra para a conta não depender de milissegundos
+    await q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
+    const s = await buy('gerador', 1);
+    expect(s.valuation).toBeCloseTo(100 - 17.25 * 1.25, 1);
+  });
+});
