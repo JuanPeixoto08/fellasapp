@@ -1,0 +1,30 @@
+// Sem @types/node no app: o mesmo jeito de ler arquivo que fellasGamesMigration.test.ts e safeUpdateMigrations.test.ts.
+declare const require: (id: string) => { readFileSync: (path: string, encoding: string) => string };
+declare const __dirname: string;
+
+const { readFileSync } = require('fs');
+
+// O comportamento roda de verdade em games/test (PGlite); aqui ficam as travas que não podem sumir.
+const ler = (n: string) => readFileSync(`${__dirname}/../supabase/migrations/${n}`, 'utf8');
+const logica = ler('0034_fellas_inc.sql');
+const catalogo = ler('0033_fellas_inc_catalogo.sql');
+// Sem os comentários `--`: a 0034 cita weekly_champion num comentário justamente para dizer que não mexe nele.
+const logicaSemComentarios = logica.split(/\r?\n/).map((l: string) => l.replace(/--.*$/, '')).join('\n');
+
+describe('Fellas Inc. (0033/0034)', () => {
+  it('reset agendado para segunda 00:00 de Brasília', () => {
+    expect(logica).toContain("cron.schedule('fellas-inc-reset', '0 3 * * 1'");
+  });
+  it('não toca nos créditos do cassino', () => {
+    for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(logicaSemComentarios).not.toContain(proibido);
+  });
+  it('funções internas fechadas; as do jogo só para quem está logado', () => {
+    for (const f of ['idle_rate(public.idle_state)', 'idle_settle(public.idle_state, timestamptz)', 'idle_lock(uuid)', 'idle_weekly_reset()'])
+      expect(logica).toContain(`revoke all on function public.${f} from public, anon, authenticated;`);
+    for (const f of ['idle_open()', 'idle_start()', 'idle_buy(text, int, int)', 'idle_pick_strategy(int, int)', 'idle_claim_opportunity(bigint)', 'idle_board()'])
+      expect(logica).toContain(`grant execute on function public.${f} to authenticated;`);
+  });
+  it('o catálogo é gerado (não editado à mão)', () => {
+    expect(catalogo).toContain('GERADO por games/idle/catalogo.ts');
+  });
+});
