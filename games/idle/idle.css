@@ -88,3 +88,9 @@
 .idle .seg button { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: #A8A398; font: 600 14px var(--font); cursor: pointer; }
 .idle .seg button.ativo { background: #262431; color: var(--paper); }
 .idle .seg button:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
+/* barras de rolagem finas e escuras (lista, modais), no lugar da clara do sistema */
+.idle, .idle * { scrollbar-width: thin; scrollbar-color: #3A3846 transparent; }
+.idle ::-webkit-scrollbar { width: 8px; height: 8px; }
+.idle ::-webkit-scrollbar-track { background: transparent; }
+.idle ::-webkit-scrollbar-thumb { background: #3A3846; border-radius: 999px; border: 2px solid #121212; }
+.idle ::-webkit-scrollbar-thumb:hover { background: #4E4B5C; }
