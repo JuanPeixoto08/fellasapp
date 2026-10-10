@@ -85,11 +85,15 @@ async function abrirCnpj() {
   });
 }
 
+const ERRO_PLACAR = 'Não deu pra carregar o placar. Tenta de novo.';
+
+/** Erro mantém o placar anterior (null = "Carregando…") e avisa; acertar depois limpa esse aviso. */
 async function carregarPlacar() {
   try {
     placar = await api.idleBoard();
+    if (aviso === ERRO_PLACAR) aviso = null;
   } catch {
-    placar = placar ?? [];
+    aviso = ERRO_PLACAR;
   }
   render();
 }

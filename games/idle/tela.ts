@@ -68,12 +68,21 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   const overlayTxt = el('p');
   const entrar = el('a', 'btn main', 'Entrar');
   entrar.href = '/';
-  overlay.append(overlayTxt, entrar);
+  const deNovo = button('Tentar de novo', 'btn main', () => location.reload());
+  overlay.append(overlayTxt, entrar, deNovo);
 
   const modalE = el('div', 'modal modal-estrategia');
-  modalE.setAttribute('role', 'dialog');
   const modalC = el('div', 'modal modal-caixa');
-  modalC.setAttribute('role', 'dialog');
+  for (const [modal, titulo] of [[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa']] as const) {
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', titulo);
+  }
+  const titulo = (id: string, texto: string) => {
+    const h = el('h2', undefined, texto);
+    h.id = id;
+    return h;
+  };
 
   app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC);
   root.append(app);
@@ -178,7 +187,8 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     }
 
     listaP.replaceChildren();
-    if (m.placar) {
+    if (!m.placar) listaP.append(el('li', 'vazio', 'Carregando…'));
+    else {
       if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda essa semana.'));
       m.placar.forEach((r, i) => {
         const li = el('li', r.userId === s?.user_id ? 'eu' : undefined);
@@ -206,7 +216,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     modalE.replaceChildren();
     mostrar(modalE, jogando && era !== null);
     if (era !== null) {
-      modalE.append(el('h2', undefined, `Era ${era}: ${ERAS[era - 1]}`), el('p', undefined, 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'));
+      modalE.append(titulo('idle-titulo-estrategia', `Era ${era}: ${ERAS[era - 1]}`), el('p', undefined, 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'));
       for (const e of catalogo.estrategias.filter((x) => x.era === era)) {
         const card = el('div', e.ativa ? 'cartao' : 'cartao off');
         card.append(el('strong', undefined, e.nome), el('p', undefined, e.frase));
@@ -222,7 +232,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     modalC.replaceChildren();
     mostrar(modalC, m.caixaAberta && jogando);
     if (s && m.caixaAberta) {
-      modalC.append(el('h2', undefined, 'Oportunidades guardadas'), el('p', 'sub', `Hoje ainda dá pra pegar ${s.opp_left}.`));
+      modalC.append(titulo('idle-titulo-caixa', 'Oportunidades guardadas'), el('p', 'sub', `Hoje ainda dá pra pegar ${s.opp_left}.`));
       if (!m.pendentes.length) modalC.append(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
       for (const w of m.pendentes) {
         const item = el('div', 'cartao');
@@ -239,6 +249,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     mostrar(notice, !!m.aviso);
     overlayTxt.textContent = 'Entra no fellas pra jogar';
     mostrar(entrar, true);
+    mostrar(deNovo, false);
     mostrar(overlay, m.fase === 'sem_sessao');
   }
 
@@ -256,6 +267,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   function fatal(texto: string) {
     overlayTxt.textContent = texto;
     mostrar(entrar, false);
+    mostrar(deNovo, true);
     mostrar(overlay, true);
     mostrar(painel, false);
   }

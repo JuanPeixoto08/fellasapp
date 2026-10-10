@@ -44,4 +44,6 @@
 .idle .cartao { display: grid; gap: 6px; padding: 12px; border-radius: 8px; background: #1B1A22; border: 1px solid #34323F; }
 .idle .cartao.off { opacity: 0.55; }
 .idle .caixinha { min-height: 44px; }
+/* o aviso fica por cima dos modais (z-index 10): erro ao escolher estratégia ou pegar na caixinha precisa aparecer */
+.idle .notice { position: fixed; z-index: 11; }
 @media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo { animation: none; } }

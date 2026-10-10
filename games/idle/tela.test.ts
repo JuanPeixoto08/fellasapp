@@ -62,4 +62,37 @@ describe('tela da Fellas Inc.', () => {
     expect(root.querySelector('.notice')!.textContent).toContain('Valuation não cobre essa compra');
     expect(root.querySelector('.caixinha')!.textContent).toBe('Oportunidades (2)');
   });
+  it('placar ainda não carregado: Carregando…', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'placar', placar: null }));
+    const lista = root.querySelector('.lista-placar')!;
+    expect(lista.hasAttribute('hidden')).toBe(false);
+    expect(lista.textContent).toBe('Carregando…');
+  });
+  it('fatal: botão de tentar de novo, sem o Entrar', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'carregando', estado: null }));
+    tela.fatal('Deu ruim');
+    const overlay = root.querySelector<HTMLElement>('.overlay')!;
+    expect(overlay.hasAttribute('hidden')).toBe(false);
+    expect(overlay.textContent).toContain('Deu ruim');
+    expect([...overlay.querySelectorAll('button')].find((b) => b.textContent === 'Tentar de novo')!.hasAttribute('hidden')).toBe(false);
+    expect(overlay.querySelector('a')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('sem sessão: Entrar, sem o tentar de novo do fatal', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'sem_sessao', estado: null }));
+    const overlay = root.querySelector<HTMLElement>('.overlay')!;
+    expect(overlay.querySelector('a')!.hasAttribute('hidden')).toBe(false);
+    expect(overlay.querySelector('button')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('modais com aria-modal e título', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }), caixaAberta: true }));
+    for (const sel of ['.modal-estrategia', '.modal-caixa']) {
+      const modal = root.querySelector(sel)!;
+      expect(modal.getAttribute('aria-modal')).toBe('true');
+      expect(root.querySelector(`#${modal.getAttribute('aria-labelledby')}`)!.tagName).toBe('H2');
+    }
+  });
 });
