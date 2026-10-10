@@ -3,52 +3,66 @@
 > **Para agentes:** SUB-SKILL OBRIGATÓRIA: use superpowers:subagent-driven-development (recomendado) ou
 > superpowers:executing-plans para executar este plano tarefa por tarefa. Os passos usam checkbox (`- [ ]`).
 
-**Objetivo:** pôr gente na Fellas Inc.: contratar amigos (preço em tempo de produção, bônus para os dois lados, piso de
-freela, cargo de piada, "mais disputado do mercado"), editor de personagem, cenas montadas com você, seus contratados e
-freelas nas vagas (o estagiário oficial incluso), as estratégias Networking e Cultura de startup ligadas, e a notificação
-"Fulano te contratou como [cargo]" no app.
+> **Revisão de 10/10 (Fellas Inc. sem reset):** a empresa nunca zera sozinha. A segunda 00:00 só tira a foto da semana
+> (placa + selo), contratos duram 7 dias e nada apaga contratos. Migrações renumeradas: 0036 é a sem-reset (fora deste
+> plano), 0037 o catálogo (Task 1, já feita), **0038 a lógica** e **0039 a notificação**.
 
-**Arquitetura:** o banco continua a autoridade. A 0036 cria `idle_avatar` e `idle_contracts` e troca, com `create or
-replace`, as funções da 0034 que mudam (taxa, estado devolvido, escolha de estratégia, placar, reset); a conta dos
-contratos existe igual em `economia.ts` (teste de paridade). A 0037 é o catálogo gerado de novo (cargos + estratégias
-ligadas). A página monta cada cena em memória (fundo → pessoas → frente) a partir de um kit de peças com tons-marcador
-trocados pelas cores do visual, uma vez por (cena, gente). A arte é feita por código fora do repositório seguindo o
-"Contrato de formato" abaixo; até ela chegar, o palco toca as tiras antigas e o resto do jogo funciona.
+**Objetivo:** pôr gente na Fellas Inc.: contratar amigos por 7 dias (preço em tempo de produção, bônus para os dois
+lados, piso de freela, cargo de piada, "mais disputado do mercado"), editor de personagem, cenas montadas com você,
+seus contratados e freelas nas vagas (o estagiário oficial incluso), as estratégias Networking e Cultura de startup
+ligadas, e a notificação "Fulano te contratou como [cargo]" no app.
+
+**Arquitetura:** o banco continua a autoridade. A 0038 cria `idle_avatar` e `idle_contracts` e troca, com `create or
+replace`, as funções que mudam (taxa, fechar a conta, estado devolvido, escolha de estratégia, placar, foto de segunda),
+sempre partindo da versão mais recente delas (0034, 0035 ou 0036). A conta dos contratos existe igual em `economia.ts`
+(teste de paridade, inclusive o fechamento de conta que atravessa um vencimento). A 0037 é o catálogo gerado de novo
+(cargos + estratégias ligadas). A página monta cada cena em memória (fundo → pessoas → frente) a partir de um kit de
+peças com tons-marcador trocados pelas cores do visual, uma vez por (cena, gente). A arte é feita por código fora do
+repositório seguindo o "Contrato de formato" abaixo; até ela chegar, o palco toca as tiras antigas e o resto funciona.
 
 **Tecnologias:** Postgres/Supabase (plpgsql, RLS), Vite + TypeScript + Vitest + PGlite (`games/`), Expo/React Native +
 Jest (app), Node (scripts de arte em `../fellas-inc-esbocos`).
 
-**Spec:** `docs/superpowers/specs/2026-10-10-fellas-inc-design.md` (seções 5, 7, 8, 9, 10, 11 e 12, entrega 2). Plano
-anterior (modelo de formato e base do código): `docs/superpowers/plans/2026-10-10-fellas-inc-nucleo.md`.
+**Spec:** `docs/superpowers/specs/2026-10-10-fellas-inc-design.md` (seções 5, 7, 8, 9, 10, 11 e 12, entrega 2), com as
+decisões do Juan de 10/10 (sem reset, contratos de 7 dias). Plano anterior: `docs/superpowers/plans/2026-10-10-fellas-inc-nucleo.md`.
 
 **Ajustes de implementação em relação à spec** (decisões tomadas; o comportamento pedido não muda):
-- Três migrações: `0036_fellas_inc_gente.sql` (lógica), `0037_fellas_inc_catalogo_gente.sql` (catálogo GERADO por
-  `catalogoSql()`, agora com a tabela de cargos) e `0038_notificacao_contrato.sql` (a função de notificações do app;
-  fica fora do PGlite dos jogos porque cita as tabelas de posts e stories).
-- Piso de freela = +2% (o bônus de quem é contratado por 1 empresa). Conta dos contratos:
+- Migrações: `0037_fellas_inc_catalogo_gente.sql` (catálogo GERADO, Task 1), `0038_fellas_inc_gente.sql` (lógica) e
+  `0039_notificacao_contrato.sql` (a função de notificações do app; fica fora do PGlite dos jogos porque cita as tabelas
+  de posts e stories). Pré-requisitos já na `main`: 0035 (placar por R$/s) e **0036 (sem reset)**.
+- **Contrato dura 7 dias** (`ends_at = created_at + 7 dias`). "Ativo em t" = `created_at <= t < ends_at`. Só contratos
+  ativos contam no bônus, no preço e no "não pode contratar de novo"; depois de vencer, dá para contratar a mesma pessoa
+  outra vez. Par ordenado: A→B ativo impede outro A→B, não impede B→A. Nada apaga contratos (a notificação fica).
+- **Vencimento sem retroativo:** a taxa de alguém só muda sem ação dele em três casos: ser contratado (`idle_hire` fecha
+  a conta do contratado antes), o chefe escolher Cultura de startup (`idle_pick_strategy` fecha a conta dos contratados
+  antes) e um contrato vencer. Para o terceiro, `idle_settle` divide o intervalo `[settled_at, min(agora, settled_at +
+  8h)]` nos vencimentos dos contratos da pessoa (dos dois lados) e cada trecho usa a taxa com os contratos ativos no
+  começo dele (`idle_rate_at(s, t)`). Nada de cron. O mesmo fechamento existe em `economia.ts` (`acumularTrechos`) com
+  teste de paridade na borda do vencimento. A tela recebe `muda_em` (o próximo vencimento que mexe na sua taxa) e bate
+  o ponto de novo quando o relógio do servidor passa dele.
+- Piso de freela = +2% (o bônus de quem é contratado por 1 empresa). Conta dos contratos ativos:
   `1 + efeito × (porContratado × contratei + Σ 2% × mult de cada empresa que te contratou)`; sem emprego, o Σ vale 2%.
-  `efeito` = ×2 com Networking (vale para tudo: o que você ganha por contratar, por ser contratado e o piso);
-  `porContratado` = 10% (15% com Cultura de startup); `mult` = 3 se aquela empresa escolheu Cultura de startup.
-- Quando a regra de alguém muda por ação de outro (foi contratado; o chefe escolheu Cultura de startup), o banco fecha
-  a conta dele antes, com a regra antiga: nada retroativo.
-- Preço do contrato = taxa atual × 1800 s × 1,5^(contratos feitos na semana) × 2 com Abrir capital
-  (`sociais.contratoCustoMult`, que já está no catálogo). Não usa o +25% de Queimar caixa nem a "próxima compra pela
-  metade" (contrato não é compra de gerador ou melhoria). Exige a estratégia da era escolhida, como comprar.
-- Par ordenado: A contratar B não impede B de contratar A.
-- "Mais disputado": quem foi mais contratado na semana; empate = quem chegou primeiro ao número.
+  `efeito` = ×2 com Networking (vale para tudo, inclusive o piso); `porContratado` = 10% (15% com Cultura de startup);
+  `mult` = 3 se aquela empresa escolheu Cultura de startup.
+- Preço do contrato = taxa atual × 1800 s × 1,5^(contratos ATIVOS que você fez) × 2 com Abrir capital
+  (`sociais.contratoCustoMult`). Não usa o +25% de Queimar caixa nem a "próxima compra pela metade" (confirmado pelo
+  Juan). Exige a estratégia da era escolhida, como comprar. Pode ser contratado quem já abriu a empresa.
+- "Mais disputado": quem recebeu mais contratos **criados** na semana (de segunda 00:00 de Brasília); empate = quem
+  chegou primeiro ao número. No placar ao vivo, a semana corrente; na placa de segunda (`idle_weeks.most_hired_id`), a
+  semana que acabou, como foto.
 - Kit: pose 6 (deitado) tem 16x10; toda folha tem 4 colunas de quadros (pose de 2 quadros repete 0,1,0,1).
-- `idle_json` vira `plpgsql` (mesma saída + campos novos), para a ordem das funções dentro da 0036 não importar.
-- **Pré-requisito:** a `0035_fellas_inc_placar_taxa.sql` (mudança separada, já na `main` antes deste plano rodar) faz
-  `idle_board` devolver também `rate` (R$/s sem o ×5) e ordenar por ela, e a tela do placar mostrar "+R$ X/s" no lugar
-  do valuation. Tudo aqui parte disso: o `create or replace` de `idle_board` na 0036 mantém `rate` e a ordem por ela;
-  `IdleBoardRow` já tem `rate`. Se ao começar a Task 1 a 0035 não estiver na `main`, pare e avise.
-- Notificação: "Ana te contratou como CEO de nada na Fellas Inc."; tocar abre o jogo. O reset apaga os contratos,
-  então ela some na segunda.
+- `idle_json` vira `plpgsql` (mesma saída + campos novos), para a ordem das funções dentro da 0038 não importar.
+- Notificação: "Ana te contratou como CEO de nada na Fellas Inc." (texto confirmado); tocar abre o jogo.
+- Fica para a entrega 3 (prestígio e conquistas): **no prestígio, os contratos que a pessoa FEZ acabam** (os que ela
+  recebeu seguem até vencer). Nada disso entra aqui.
 
 ## Restrições globais
 
 - Fellas Inc. **não toca nos créditos do cassino**: nada de `game_wallets`, `game_ledger`, `games_move`, Blackjack, Poker,
   fiado ou `weekly_champion` no código novo.
+- **Sem reset:** nenhuma função nova apaga estado, contrato ou personagem (`delete from public.idle_state` e
+  `delete from public.idle_contracts` não aparecem na 0038), e nada filtra o jogo por `week_start = games_week_start()`.
+  A semana só existe na foto de segunda (placa, selo, "mais disputado") e no limite diário de oportunidades.
 - Toda tabela com RLS; leitura para membros (`public.is_member()`); escrita só por funções `security definer
   set search_path = public`; funções internas com `revoke all ... from public, anon, authenticated`; RPCs do jogo com
   `revoke all ... from public, anon` + `grant execute ... to authenticated`.
@@ -56,21 +70,22 @@ anterior (modelo de formato e base do código): `docs/superpowers/plans/2026-10-
   using errcode = '42501'`. Códigos novos: `idle_hire_self`, `idle_hire_twice`, `idle_hire_not_open`, `idle_bad_avatar`.
 - Todo `update public.`/`delete from public.` com `where` (o `pg_safeupdate` do Supabase barra sem; o teste
   `__tests__/safeUpdateMigrations.test.ts` confere toda migração a partir da 0030).
-- Migrações idempotentes (`if not exists`, `create or replace`, `drop policy if exists`). **0033, 0034 e 0035 já estão
-  em produção e não se editam.** Função que já existe muda com `create or replace` na 0036. Catálogo muda só por migração
-  NOVA gerada por `catalogoSql()` (regra no cabeçalho da 0033 e em `games/idle/catalogo.test.ts`), listada em
-  `games/test/db.ts` e `games/dev/mockDb.ts`.
+- Migrações idempotentes (`if not exists`, `create or replace`, `drop policy if exists`). **0033 a 0037 não se editam.**
+  Função que já existe muda com `create or replace` na 0038, copiada da versão mais nova (0036 para `idle_weekly_reset`,
+  `idle_lock`, `idle_save`, `idle_board`; 0034 para o resto). Catálogo muda só por migração NOVA gerada por
+  `catalogoSql()`, listada em `games/test/db.ts` e `games/dev/mockDb.ts`.
 - Paridade: toda conta de produção existe igual em SQL (autoridade) e em `games/idle/economia.ts`; o teste
   `games/test/idleParidade.test.ts` exige erro relativo < 1e-9.
-- Interface em pt-BR no tom do `PRODUCT.md` (informal, "você", botão diz a ação, vazio convida, sem emoji como ícone).
-  Texto de usuário (nomes, cargos) sempre por `textContent`.
+- Interface em pt-BR no tom do `PRODUCT.md` (informal, "você", botão diz a ação, vazio convida, sem emoji como ícone),
+  sem falar em semana/temporada onde o jogo não zera. Texto de usuário (nomes, cargos) sempre por `textContent`.
 - Página do jogo: CSS em `games/idle/idle.css`, com as cores que ele já usa; alvo de toque ≥ 44px; foco visível. Telas
-  do app: tokens de `lib/theme.ts` e componentes de `components/ui` (nada de cor/tamanho solto); ícones Ionicons
-  `-outline`.
+  do app: tokens de `lib/theme.ts` e componentes de `components/ui`; ícones Ionicons `-outline`.
 - Arte feita por código fora do repositório (`C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`) e copiada para
-  `games/idle/assets/`. Nenhuma pessoa real desenhada além do estagiário oficial (o Luis, o do gerador 7; o "L" do
-  crachá é a inicial dele). Nada de lugares nesta entrega.
-- `?mock`: os bots têm personagem e podem ser contratados; o mock lê 0036 e 0037.
+  `games/idle/assets/`. Nenhuma pessoa real desenhada além do estagiário oficial (o Luis, o do gerador 7; ele topou
+  aparecer nas cenas). Nada de lugares nesta entrega.
+- Falha ao carregar arte (kit, tiras, cadeira) não some em silêncio: `console.warn` com o arquivo e nova tentativa
+  depois (não fica marcada como falha para sempre).
+- `?mock`: os bots têm personagem e podem ser contratados; o mock lê 0036, 0037 e 0038.
 - Commits sem `Co-Authored-By` nem qualquer marca de IA. Branch `fellas-inc-gente`; no fim, merge local na `main` e
   push, só depois de o Juan aplicar as migrações e as colunas serem conferidas.
 - Windows + Git Bash: `cd <dir> && ...` em cada comando. Na raiz: `npx tsc --noEmit` e `npm test`. Em `games/`:
@@ -78,47 +93,50 @@ anterior (modelo de formato e base do código): `docs/superpowers/plans/2026-10-
 
 ## Foco da revisão
 
-1. **Toque duplo em "Contratar"**: o segundo pedido recebe `idle_hire_twice` (o `for update` serializa) e o valuation é
-   cobrado uma vez só. Teste no banco (Task 3).
-2. **Dois fellas se contratando ao mesmo tempo** (A→B e B→A): as duas linhas são travadas sempre em ordem de `user_id`
-   (`idle_lock_all`), então ninguém espera ninguém em círculo; contratar de volta é permitido. Teste do contrato mútuo
-   (Task 3); a ordem das travas fica para a revisão de código.
-3. **A regra de alguém muda enquanto o jogo dele está fechado** (foi contratado; o chefe escolheu Cultura de startup):
-   o tempo até ali rende com a regra antiga. Testes no banco (Task 3).
-4. **Semana vira com contratos** (segunda 00:00, inclusive quem joga antes do cron): a placa grava o mais disputado, os
-   contratos somem, a semana nova começa no piso de freela e o personagem fica. Testes no banco (Task 4).
+1. **Contrato vence com o jogo fechado**: o tempo até o vencimento rende com o bônus, o depois sem, nos dois lados; e
+   quem está com a página aberta vê a taxa mudar na hora (`muda_em`). Testes no banco e de paridade na borda (Task 3),
+   teste de `store.ts` (Task 5).
+2. **Toque duplo em "Contratar"**: o segundo pedido recebe `idle_hire_twice` e o valuation é cobrado uma vez só (as
+   duas chamadas passam por `idle_lock_all`, que trava as linhas com o `insert ... on conflict do update` do
+   `idle_lock`, então a segunda espera a primeira). Teste no banco (Task 3).
+3. **Dois fellas se contratando ao mesmo tempo** (A→B e B→A): as linhas são travadas sempre em ordem de `user_id`, então
+   ninguém espera ninguém em círculo; contratar de volta é permitido. Teste do contrato mútuo (Task 3); a ordem das
+   travas fica para a revisão de código.
+4. **Segunda 00:00 com contratos**: a foto grava o mais disputado da semana que acabou, ninguém perde contrato, empresa
+   ou personagem, e a foto tirada por quem joga antes do cron é a mesma. Testes no banco (Task 4).
 5. **Visual inválido, editor fechado sem salvar, arte faltando**: faixa errada ou nula é `idle_bad_avatar` (e o `check`
-   da tabela segura); fechar sem salvar mostra o fundador padrão e o editor volta na próxima abertura; sem o kit, a
-   página funciona sem gente. Testes nas Tasks 2, 6 e 7.
+   da tabela segura); sem a arte do kit a página funciona sem gente (Tasks 2 e 6). "Fechar sem salvar mostra o padrão e
+   o editor volta na próxima abertura" mora no `main.ts`, sem teste automático: entra na conferência no `?mock` (Task 7).
 
 ---
 
 ## Estrutura de arquivos
 
 ```
-supabase/migrations/0036_fellas_inc_gente.sql            personagem, contratos, conta com contratos, placar, reset
-supabase/migrations/0037_fellas_inc_catalogo_gente.sql   GERADO por catalogo.ts: + cargos; Networking e Cultura ligadas
-supabase/migrations/0038_notificacao_contrato.sql        notifications_feed (a da 0021) + idle_hired
+supabase/migrations/0037_fellas_inc_catalogo_gente.sql   GERADO por catalogo.ts: + cargos; Networking e Cultura ligadas (feita)
+supabase/migrations/0038_fellas_inc_gente.sql            personagem, contratos de 7 dias, conta com contratos, placar, foto
+supabase/migrations/0039_notificacao_contrato.sql        notifications_feed (a da 0021) + idle_hired
 games/idle/
-  nomes.ts             + CARGOS, VISUAL_NOMES; Networking e Cultura sem "ativa: false"
-  catalogo.ts          + cargos no catálogo e no SQL gerado
-  economia.ts          + Social, SOLO, multContratos (piso de freela) dentro da taxa
+  nomes.ts             + CARGOS (feito), VISUAL_NOMES
+  catalogo.ts          + cargos no catálogo e no SQL gerado (feito)
+  economia.ts          + Social, SOLO, multContratos (piso de freela) na taxa; acumularTrechos (vencimentos)
   simulacao.ts         jogador solo com o piso
+  store.ts             + vencido (bater o ponto quando um contrato vence)
   imagem.ts            (novo) bytes RGBA: vazia, recortar, colar
   personagem.ts        (novo) faixas, PADRAO, paletas, marcadores, trocarCores, sortear, chave
   montagem.ts          (novo) POSES, folha do kit, boneco, ocuparVagas, montarTira, validarVagas, naCadeira
   navegador.ts         (novo) carregarImagem, pintar, carregarKit, criarDesenhista (só roda no navegador)
   ativos.ts            camadas por cena (fundo/frente/vagas), com volta para a tira antiga; kit
   palco.ts             monta e guarda a tira com gente
-  tela.ts, idle.css    aba Contratar, editor, placar com boneco e "mais disputado"
-  main.ts              editor, contratar, gente no palco
+  tela.ts, idle.css    aba Contratar, editor, placar com boneco e "mais disputado" (edições pontuais)
+  main.ts              editor, contratar, gente no palco, vencimento (edições pontuais)
   assets/pessoas/      (Task 11) pose-1..6.png, estagiario-pose-3.png, estagiario-pose-4.png, cadeira.png
   assets/cenas/        (Task 11) <cena>-fundo.png, <cena>-frente.png, <cena>-vagas.json (as tiras antigas saem)
 games/shared/types.ts, api.ts, errors.ts     formatos novos, idleHire, idleSetAvatar, erros novos
-games/dev/mockIdle.ts, mockDb.ts             bots com personagem; 0036 e 0037
-games/test/db.ts                             0036 e 0037
-games/test/idleGente.test.ts                 (novo) banco: personagem, contratos, placar, reset
-games/test/idle.test.ts, idleParidade.test.ts   ajustes (piso, estratégias ligadas); paridade com contratos
+games/dev/mockIdle.ts, mockDb.ts             bots com personagem; 0036, 0037 e 0038
+games/test/db.ts                             0036, 0037 e 0038
+games/test/idleGente.test.ts                 (novo) banco: personagem, contratos, vencimento, placar, foto
+games/test/idle.test.ts, idleParidade.test.ts   ajustes do piso; paridade com contratos e vencimentos
 lib/notifications.ts, components/notifications/NotificationRow.tsx, app/(tabs)/notifications.tsx   idle_hired
 types/database.ts                            idle_weeks.most_hired_id
 __tests__/fellasIncMigration.test.ts, notifications.test.ts, notificationsScreen.test.tsx
@@ -200,6 +218,9 @@ Para cada cena `<nome>`: `cena-0-antes` (8 quadros), `cena-0-abrindo` (12, toca 
 ---
 
 ### Task 1: Catálogo da entrega 2 (cargos; Networking e Cultura de startup ligadas)
+
+> **Feita** (commit c7f80069, revisada e aprovada). Fica como registro. Na época a lógica ainda não tinha número; ela é a
+> 0038 (Task 2) e a 0036 é a sem-reset, que vem da `main`.
 
 **Files:**
 - Modify: `games/idle/nomes.ts`, `games/idle/catalogo.ts`, `games/idle/catalogo.test.ts`
@@ -372,7 +393,7 @@ ${lista(car)}`;
 
 `games/dev/mockDb.ts`: depois do import `m35`, acrescente
 `import m37 from '../../supabase/migrations/0037_fellas_inc_catalogo_gente.sql?raw';` e troque a lista por
-`[m27, m28, m29, m30, m31, m33, m34, m35, m37]`. (A 0036 entra na Task 2, entre a 35 e a 37.)
+`[m27, m28, m29, m30, m31, m33, m34, m35, m37]`. (A 0036 sem-reset chega pela `main` e a 0038 entra na Task 2.)
 
 Gere a migração e confira que a 0033 não mudou:
 
@@ -435,8 +456,8 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/nomes.ts 
 **Files:**
 - Create: `games/idle/imagem.ts`, `games/idle/personagem.ts`, `games/idle/personagem.test.ts`
 - Modify: `games/idle/nomes.ts` (+ `VISUAL_NOMES`), `games/shared/types.ts` (+ `IdleVisual`)
-- Create: `supabase/migrations/0036_fellas_inc_gente.sql` (parte 1)
-- Modify: `games/test/db.ts`, `games/dev/mockDb.ts` (+ 0036)
+- Create: `supabase/migrations/0038_fellas_inc_gente.sql` (parte 1)
+- Modify: `games/test/db.ts`, `games/dev/mockDb.ts` (+ 0038)
 - Create: `games/test/idleGente.test.ts`
 
 **Interfaces:**
@@ -450,6 +471,17 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/nomes.ts 
   acessorio 0–5, cor_acessorio 0–9); `idle_avatar_json(uuid) → jsonb | null` (interna); RPC
   `idle_set_avatar(p_pele, p_cabelo, p_cor_cabelo, p_roupa, p_cor_roupa, p_acessorio, p_cor_acessorio)` → estado;
   `idle_json` passa a ser `plpgsql` e devolve também `avatar` (visual ou `null`).
+
+- [ ] **Step 0: Trazer a `main` (com a 0036 sem reset) para o branch**
+
+```bash
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git checkout fellas-inc-gente && git log --oneline main | grep -c "sem reset semanal" && git merge main -m "Merge da main (Fellas Inc. sem reset) no fellas-inc-gente"
+```
+
+Se o `grep` der 0, a sem-reset ainda não está na `main`: pare e avise. Conflito esperado em `games/test/db.ts` e
+`games/dev/mockDb.ts` (as duas linhas entraram depois da 0035): a ordem fica 0035, `0036_fellas_inc_sem_reset.sql`,
+`0037_fellas_inc_catalogo_gente.sql` (no mockDb, `m35, m36, m37`). Depois:
+`cd games && npx tsc --noEmit && npx vitest run` passa.
 
 - [ ] **Step 1: Teste do personagem (`games/idle/personagem.test.ts`)**
 
@@ -529,7 +561,7 @@ Expected: FAIL (`./imagem` e `./personagem` não existem).
 Em `games/shared/types.ts`, acrescente no fim:
 
 ```ts
-// Fellas Inc., entrega 2 (0036): o visual do personagem como o banco guarda (índices das opções do editor)
+// Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)
 export type IdleVisual = {
   pele: number; cabelo: number; cor_cabelo: number; roupa: number; cor_roupa: number; acessorio: number; cor_acessorio: number;
 };
@@ -597,7 +629,7 @@ export function colar(dest: Imagem, src: Imagem, x: number, y: number, espelhar 
 ```ts
 // Personagem da Fellas Inc.: as opções do editor, o visual padrão (o fundador) e a troca de cores. As peças do kit
 // (assets/pessoas) vêm pintadas com 3 tons-marcador por canal; aqui eles viram os 3 tons da cor escolhida.
-// As faixas são as mesmas dos `check` de idle_avatar (0036). Contrato de formato: plano da entrega 2.
+// As faixas são as mesmas dos `check` de idle_avatar (0038). Contrato de formato: plano da entrega 2.
 import type { IdleVisual } from '../shared/types';
 import type { Imagem } from './imagem';
 
@@ -697,7 +729,7 @@ Expected: PASS.
 O arquivo nasce com os ajudantes que as Tasks 3 e 4 também usam:
 
 ```ts
-// Banco da entrega 2 da Fellas Inc. (personagem, contratos, placar, reset), com as migrações reais no PGlite.
+// Banco da entrega 2 da Fellas Inc. (personagem, contratos de 7 dias, placar, foto de segunda), com as migrações reais no PGlite.
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
@@ -715,9 +747,9 @@ const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql,
 type Visual = Record<string, number | null>;
 type Estado = {
   user_id: string; started: boolean; valuation: number; rate: number; era: number; strategies: number[];
-  avatar: Visual | null; equipe: { user_id: string; cargo: string; avatar: Visual | null }[];
-  chefes: { user_id: string; cargo: string; mult: number }[]; social: { contratei: number; empregos: number[] };
-  hire_price: number;
+  avatar: Visual | null; equipe: { user_id: string; cargo: string; avatar: Visual | null; ate: string }[];
+  chefes: { user_id: string; cargo: string; mult: number; ate: string }[]; social: { contratei: number; empregos: number[] };
+  hire_price: number; muda_em: string | null; server_now: string;
 };
 
 beforeEach(async () => {
@@ -804,14 +836,14 @@ describe('personagem', () => {
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run test/idleGente.test.ts`
 Expected: FAIL (`function public.idle_set_avatar(...) does not exist`).
 
-- [ ] **Step 7: Migração `supabase/migrations/0036_fellas_inc_gente.sql` (parte 1) e listas**
+- [ ] **Step 7: Migração `supabase/migrations/0038_fellas_inc_gente.sql` (parte 1) e listas**
 
 ```sql
--- fellasapp: Fellas Inc., entrega 2 (gente): personagem, contratos, a conta da produção com contratos, placar com o
--- "mais disputado" e o reset que zera os contratos. As funções da 0034/0035 que mudam são trocadas aqui com
--- create or replace (aquelas já estão em produção). idle_hire lê os cargos de idle_cat_cargo (0037) só na hora da
--- chamada. As mesmas contas existem em games/idle/economia.ts (teste de paridade). Não toca nos créditos do cassino.
--- Idempotente.
+-- fellasapp: Fellas Inc., entrega 2 (gente): personagem, contratos de 7 dias, a conta da produção com contratos (e
+-- com os vencimentos no meio), placar com o "mais disputado" e a foto de segunda guardando ele. A Fellas Inc. não tem
+-- reset (0036): nada aqui apaga estado, contrato ou personagem. As funções que mudam são trocadas com create or replace
+-- a partir da versão mais nova (0034/0035/0036, já em produção). As mesmas contas existem em games/idle/economia.ts
+-- (teste de paridade). Não toca nos créditos do cassino. Idempotente.
 
 -- ===== personagem =====
 
@@ -894,11 +926,11 @@ revoke all on function public.idle_set_avatar(int, int, int, int, int, int, int)
 grant execute on function public.idle_set_avatar(int, int, int, int, int, int, int) to authenticated;
 ```
 
-`games/test/db.ts`: em `MIGRATIONS`, entre `'0035_fellas_inc_placar_taxa.sql',` e
-`'0037_fellas_inc_catalogo_gente.sql',`, acrescente `'0036_fellas_inc_gente.sql',`.
+`games/test/db.ts`: em `MIGRATIONS`, depois de `'0037_fellas_inc_catalogo_gente.sql',` acrescente
+`'0038_fellas_inc_gente.sql',` (a lista fica ... 0035, 0036 sem-reset, 0037, 0038).
 
-`games/dev/mockDb.ts`: `import m36 from '../../supabase/migrations/0036_fellas_inc_gente.sql?raw';` e a lista vira
-`[m27, m28, m29, m30, m31, m33, m34, m35, m36, m37]`.
+`games/dev/mockDb.ts`: `import m38 from '../../supabase/migrations/0038_fellas_inc_gente.sql?raw';` e a lista vira
+`[m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38]` (`m36` é a sem-reset).
 
 - [ ] **Step 8: Rodar**
 
@@ -908,34 +940,44 @@ Expected: PASS (inclusive os testes do núcleo: `idle_json` devolve o mesmo de a
 - [ ] **Step 9: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/imagem.ts games/idle/personagem.ts games/idle/personagem.test.ts games/idle/nomes.ts games/shared/types.ts supabase/migrations/0036_fellas_inc_gente.sql games/test/db.ts games/dev/mockDb.ts games/test/idleGente.test.ts && git commit -m "Fellas Inc.: personagem (visual, troca de cores e idle_avatar)"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/imagem.ts games/idle/personagem.ts games/idle/personagem.test.ts games/idle/nomes.ts games/shared/types.ts supabase/migrations/0038_fellas_inc_gente.sql games/test/db.ts games/dev/mockDb.ts games/test/idleGente.test.ts && git commit -m "Fellas Inc.: personagem (visual, troca de cores e idle_avatar)"
 ```
 
 ---
 
-### Task 3: Contratos e a conta da produção com contratos (banco + `economia.ts`)
+### Task 3: Contratos de 7 dias e a conta da produção com contratos (banco + `economia.ts`)
 
 **Files:**
-- Modify: `supabase/migrations/0036_fellas_inc_gente.sql` (troca o bloco do `idle_json`; acrescenta a parte 2)
+- Modify: `supabase/migrations/0038_fellas_inc_gente.sql` (troca o bloco do `idle_json`; acrescenta a parte 2)
 - Modify: `games/idle/economia.ts`, `games/idle/economia.test.ts`, `games/idle/simulacao.ts`, `games/idle/simulacao.test.ts`
 - Modify: `games/test/idleGente.test.ts`, `games/test/idleParidade.test.ts`, `games/test/idle.test.ts`
 
 **Interfaces:**
-- Consome: `idle_lock`, `idle_settle`, `idle_save`, `idle_era`, `idle_cat_est.sociais` (0034/0033), `idle_cat_cargo`
-  (Task 1), `idle_avatar_json` (Task 2).
-- Produz (banco): tabela `idle_contracts (week_start, employer_id, employee_id, cargo, created_at)`, PK
-  `(week_start, employer_id, employee_id)`; internas `idle_employee_mult(uuid)`, `idle_social_mult(idle_state)`,
-  `idle_hire_price(idle_state)`, `idle_lock_all(uuid[])`; `idle_rate` passa a multiplicar `idle_social_mult`; RPC
-  `idle_hire(p_user uuid)` → estado; `idle_pick_strategy` fecha a conta dos contratados ao escolher Cultura de startup;
-  `idle_json` devolve também `equipe` (`[{user_id, cargo, avatar}]`, do contrato mais recente ao mais antigo),
-  `chefes` (`[{user_id, cargo, mult}]`), `social` (`{contratei, empregos: number[]}`) e `hire_price`.
+- Consome: `idle_lock` e `idle_save` (versão da 0036), `idle_era`, `idle_cat_est.sociais` (0033/0037), `idle_cat_cargo`
+  (Task 1), `idle_avatar_json` (Task 2). O `idle_settle` e o `idle_rate` da 0034 são trocados aqui.
+- Produz (banco): tabela `idle_contracts (id, employer_id, employee_id, cargo, created_at, ends_at)` com
+  `ends_at = created_at + 7 dias`; "ativo em t" = `created_at <= t and ends_at > t`. Internas `idle_employee_mult(uuid)`,
+  `idle_social_mult(idle_state, timestamptz)`, `idle_rate_at(idle_state, timestamptz)`, `idle_rate(idle_state)`
+  (= `idle_rate_at(s, now())`), `idle_settle(idle_state, timestamptz default now())` (divide nos vencimentos),
+  `idle_hire_price(idle_state)`, `idle_next_change(idle_state)`, `idle_lock_all(uuid[])`; RPC `idle_hire(p_user uuid)` →
+  estado; `idle_pick_strategy` fecha a conta dos contratados ativos ao escolher Cultura de startup; `idle_json` devolve
+  também `equipe` (`[{user_id, cargo, avatar, ate}]`, contratos ativos que você fez, do mais recente ao mais antigo),
+  `chefes` (`[{user_id, cargo, mult, ate}]`), `social` (`{contratei, empregos: number[]}`), `hire_price` e `muda_em`
+  (próximo vencimento que mexe na sua taxa, ou `null`).
 - Produz (TS, economia.ts): `type Social = { contratei: number; empregos: number[] }`, `SOLO`, `POR_CONTRATADO = 0.1`,
   `POR_EMPREGO = 0.02`, `Estado.social?: Social` (sem = `SOLO`), `multContratos(cat, s): number` (entra no
-  multiplicador global de `fatores`, então `taxa` e `taxaPorUnidade` já contam).
+  multiplicador global de `fatores`), `acumularTrechos(v, trechos: { desdeMs: number; r: number }[], desdeMs, ateMs,
+  boostAteMs): number` (igual a `idle_settle`).
+
+**Por que o vencimento fica certo assim:** a taxa de alguém só muda sem ação dele quando (1) é contratado, (2) o chefe
+escolhe Cultura de startup ou (3) um contrato dele vence. (1) e (2) já fecham a conta da pessoa antes (`idle_hire`,
+`idle_pick_strategy`). Para (3), `idle_settle` corta o intervalo nos `ends_at` dos contratos da pessoa (dos dois lados)
+e usa, em cada trecho, a taxa com os contratos ativos no começo dele. Contrato só nasce com a conta dos dois lados
+fechada naquele instante (`created_at = settled_at`), então nenhum contrato começa no meio de um intervalo. Sem cron.
 
 - [ ] **Step 1: Testes da economia (`games/idle/economia.test.ts`)**
 
-Import: `import { acumular, custoMult, era, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxa, taxaPorUnidade, type Estado } from './economia';`
+Import: `import { acumular, acumularTrechos, custoMult, era, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxa, taxaPorUnidade, type Estado } from './economia';`
 
 Troque o `describe('taxa', ...)` inteiro por este (toda taxa agora tem o piso de freela de quem ninguém contratou):
 
@@ -988,20 +1030,36 @@ describe('contratos (multContratos)', () => {
     expect(taxa(cat, com([[1, 2]], { social: { contratei: 1, empregos: [] } }))).toBeCloseTo(1 * 1.12, 10);
   });
 });
+
+describe('acumularTrechos (contrato vencendo no meio)', () => {
+  it('com um trecho só é o mesmo que acumular', () => {
+    expect(acumularTrechos(10, [{ desdeMs: 0, r: 0.5 }], 0, 100_000, 60_000)).toBeCloseTo(acumular(10, 0.5, 0, 100_000, 60_000), 12);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 10 * 3600_000, null)).toBeCloseTo(8 * 3600, 6);
+  });
+  it('cada trecho rende com a sua taxa; o ×5 vale só até o fim do bônus', () => {
+    // r = 1 até 100 s, r = 2 depois; bônus até 150 s; fecha em 300 s
+    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 100_000, r: 2 }], 0, 300_000, 150_000);
+    expect(v).toBeCloseTo(1 * 100 + 4 * 1 * 100 + 2 * 200 + 4 * 2 * 50, 10);
+  });
+  it('vencimento depois do teto de 8h não conta', () => {
+    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 9 * 3600_000, r: 100 }], 0, 10 * 3600_000, null);
+    expect(v).toBeCloseTo(8 * 3600, 6);
+  });
+});
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run idle/economia.test.ts`
-Expected: FAIL (`multContratos` não existe; taxas sem o piso).
+Expected: FAIL (`multContratos` e `acumularTrechos` não existem; taxas sem o piso).
 
 - [ ] **Step 3: `games/idle/economia.ts`**
 
 Troque a linha do `Estado` por:
 
 ```ts
-/** O que muda a produção pelos contratos: quantos você contratou e, para cada empresa que te contratou, quanto ela
- *  paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */
+/** O que muda a produção pelos contratos ATIVOS: quantos você contratou e, para cada empresa que te contratou, quanto
+ *  ela paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */
 export type Social = { contratei: number; empregos: number[] };
 export const SOLO: Social = { contratei: 0, empregos: [] };
 export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social };
@@ -1014,7 +1072,7 @@ Acrescente depois de `estrategiasAtivas`:
 
 ```ts
 /**
- * Multiplicador dos contratos (igual a idle_social_mult na 0036):
+ * Multiplicador dos contratos ativos (igual a idle_social_mult na 0038):
  * 1 + efeito × (porContratado × contratei + Σ 2% × o que cada empresa paga). Ninguém te contratou = piso de freela
  * (2%, como 1 contrato). efeito = ×2 com Networking; porContratado = 10% (15% com Cultura de startup).
  */
@@ -1029,11 +1087,37 @@ export function multContratos(cat: Catalogo, s: Estado): number {
 }
 ```
 
-Em `fatores`, logo depois de `global *= 1 + est.reduce((a, e) => a + e.porGeradorDistinto, 0) * distintos;`, acrescente:
+Em `fatores`, logo depois de `global *= 1 + est.reduce((a, e) => a + e.porGeradorDistinto, 0) * distintos;`:
 
 ```ts
   global *= multContratos(cat, s);
 ```
+
+E no fim do arquivo:
+
+```ts
+/**
+ * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
+ * começando em `desdeMs`. Igual a idle_settle na 0038: teto de 8h contado de `desdeMs`, ×5 dentro do bônus.
+ */
+export function acumularTrechos(
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
+): number {
+  const fim = Math.min(ateMs, desdeMs + TETO_SEGUNDOS * 1000);
+  for (let i = 0; i < trechos.length; i++) {
+    const a = Math.max(trechos[i].desdeMs, desdeMs);
+    const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : fim, fim);
+    if (b <= a) continue;
+    const r = trechos[i].r;
+    v += (r * (b - a)) / 1000;
+    if (boostAteMs !== null && boostAteMs > a) v += r * 4 * Math.max(0, (Math.min(b, boostAteMs) - a) / 1000);
+  }
+  return v;
+}
+```
+
+(A tela continua animando com `acumular` e a `rate` do banco; quando o relógio do servidor passa de `muda_em`, ela bate
+o ponto de novo, Tasks 5 e 7.)
 
 - [ ] **Step 4: Simulação com o piso (`games/idle/simulacao.ts` e `simulacao.test.ts`)**
 
@@ -1041,21 +1125,24 @@ Em `fatores`, logo depois de `global *= 1 + est.reduce((a, e) => a + e.porGerado
 e o estado inicial vira:
 
 ```ts
-  // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) em toda a semana
+  // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
   const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1], social: SOLO };
 ```
 
-`simulacao.test.ts`: logo acima do `describe('ritmo da semana', ...)`, acrescente o comentário (as asserções não mudam):
+Rode `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run idle/economia.test.ts idle/simulacao.test.ts`
+e meça os marcos de verdade (por exemplo, um `console.log(simular())` temporário, apagado depois). Na conferência do
+plano (renda ×1,02, que é a mesma conta) deu: 2º notebook 15 s, era 2 em 895 s, era 3 em 0,5 d, era 4 em 1,0 d, era 5
+em 3,0 d (começo do dia 4), 489 compras na 1ª hora, gerador 30 fora. Em `simulacao.test.ts`, acima do
+`describe('ritmo da semana', ...)`, grave os números MEDIDOS agora (as asserções não mudam):
 
 ```ts
-// Com o piso de freela (+2%, entrega 2), medido em 10/10: 2º notebook 15 s, era 2 em 895 s, era 3 em 0,5 d,
-// era 4 em 1,0 d, era 5 em 3,0 d (início do dia 4), 489 compras na 1ª hora, gerador 30 fora da semana.
-// Era 4 e era 5 caem no começo de uma sessão (meia-noite), então um 2% a mais não as adianta; a era 2 tem 5 s de folga.
-// Se algum marco sair do alvo, NÃO mexa em PARAMETROS (mudaria os preços em produção no meio da semana): pare e avise.
+// Com o piso de freela (+2%, entrega 2), medido ao implementar: 2º notebook <N> s, era 2 em <N> s, era 3 em <N> d,
+// era 4 em <N> d, era 5 em <N> d, <N> compras na 1ª hora, gerador 30 fora. Era 4 e era 5 caem no começo de uma sessão
+// (meia-noite); a era 2 tem pouca folga para o teto de 900 s.
+// Se algum marco sair do alvo, NÃO mexa em PARAMETROS (mudaria os preços em produção): pare e avise.
 ```
 
-Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run idle/economia.test.ts idle/simulacao.test.ts`
-Expected: PASS.
+(troque cada `<N>` pelo número medido). Se a era 2 passar de 900 s ou outro marco sair do alvo: PARE e reporte.
 
 - [ ] **Step 5: Testes de contrato no banco (acrescentar em `games/test/idleGente.test.ts`)**
 
@@ -1063,6 +1150,12 @@ Expected: PASS.
 const contratar = (u: string | null) => t.rpc<Estado>('idle_hire', { p_user: u });
 const valuationDe = async (u: string) =>
   (await q<{ valuation: number }>('select valuation from public.idle_state where user_id = $1', [u]))[0].valuation;
+/** Joga os contratos pro passado: criados há `dias` dias + `horas` horas (vencem 7 dias depois de criados). */
+const envelhecerContratos = (dias: number, horas = 0) =>
+  q(`update public.idle_contracts
+        set created_at = created_at - make_interval(days => $1, hours => $2),
+            ends_at = ends_at - make_interval(days => $1, hours => $2)
+      where true`, [dias, horas]);
 
 describe('contratar', () => {
   beforeEach(async () => {
@@ -1075,18 +1168,23 @@ describe('contratar', () => {
     const antes = await t.rpc<Estado>('idle_open');
     expect(antes.rate).toBeCloseTo(0.5 * 1.02, 10);
     expect(antes.hire_price).toBeCloseTo(antes.rate * 1800, 6);
+    expect(antes.muda_em).toBeNull();
     const s = await contratar(B);
     expect(s.valuation).toBeCloseTo(10_000 - antes.rate * 1800, 6);
     expect(s.rate).toBeCloseTo(0.5 * (1 + 0.1 + 0.02), 10);
     expect(s.equipe).toHaveLength(1);
     expect(s.equipe[0]).toMatchObject({ user_id: B, avatar: null });
     expect(catalogo.cargos).toContain(s.equipe[0].cargo);
+    // vence em 7 dias, e é esse o próximo momento em que a taxa muda sozinha
+    expect(Date.parse(s.equipe[0].ate) - Date.parse(s.server_now)).toBeCloseTo(7 * 86400_000, -4);
+    expect(s.muda_em).toBe(s.equipe[0].ate);
     await t.as(B);
     const b = await t.rpc<Estado>('idle_open');
-    expect(b.chefes).toEqual([{ user_id: A, cargo: s.equipe[0].cargo, mult: 1 }]);
+    expect(b.chefes).toEqual([{ user_id: A, cargo: s.equipe[0].cargo, mult: 1, ate: s.equipe[0].ate }]);
+    expect(b.muda_em).toBe(s.equipe[0].ate);
     expect(b.rate).toBeCloseTo(0.5 * 1.02, 10);
   });
-  it('cada contrato na semana deixa o próximo 1,5× mais caro (sobre a produção da hora)', async () => {
+  it('cada contrato ativo deixa o próximo 1,5× mais caro (sobre a produção da hora)', async () => {
     await abrir(C);
     await dar(A, 1e6);
     await parar(A);
@@ -1102,12 +1200,43 @@ describe('contratar', () => {
     expect(s.hire_price).toBeCloseTo(s.rate * 1800 * 2, 6);
   });
   it('toque duplo: a segunda vez é idle_hire_twice e cobra uma vez só', async () => {
+    // em produção as duas chamadas passam por idle_lock_all (trava de linha do idle_lock): a segunda espera a primeira
     await dar(A, 1e6);
     await parar(A);
     const s = await contratar(B);
     await expect(contratar(B)).rejects.toThrow(/idle_hire_twice/);
     expect(await valuationDe(A)).toBeCloseTo(s.valuation, 6);
     expect(await q('select employee_id from public.idle_contracts')).toEqual([{ employee_id: B }]);
+  });
+  it('contrato vence em 7 dias: sai da conta, o preço volta e dá pra contratar de novo', async () => {
+    await dar(A, 1e6);
+    await contratar(B);
+    await envelhecerContratos(7);
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s).toMatchObject({ equipe: [], social: { contratei: 0, empregos: [] }, muda_em: null });
+    expect(s.rate).toBeCloseTo(0.5 * 1.02, 10);
+    expect(s.hire_price).toBeCloseTo(s.rate * 1800, 6);
+    expect((await contratar(B)).equipe.map((e) => e.user_id)).toEqual([B]);
+    expect(await q('select count(*)::int as n from public.idle_contracts')).toEqual([{ n: 2 }]); // o vencido fica
+  });
+  it('vencimento com o jogo fechado: até ele rende com o bônus, depois sem (quem contratou)', async () => {
+    await dar(A, 1e6);
+    await contratar(B);
+    // criado há 7 dias e 2 horas: venceu há 2 horas; A ficou 3 horas sem abrir
+    await envelhecerContratos(7, 2);
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '3 hours' where user_id = $1`, [A]);
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.valuation).toBeCloseTo(0.5 * 1.12 * 3600 + 0.5 * 1.02 * 7200, 0);
+  });
+  it('vencimento com o jogo fechado: o contratado também (chefe com Cultura de startup paga o triplo até vencer)', async () => {
+    await q(`update public.idle_state set generators[13] = 1, generators[19] = 1, strategies = '{0,0,2,-1}', valuation = 1e12 where user_id = $1`, [A]);
+    await contratar(B);
+    await envelhecerContratos(7, 2);
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '3 hours' where user_id = $1`, [B]);
+    await t.as(B);
+    const b = await t.rpc<Estado>('idle_open');
+    expect(b.valuation).toBeCloseTo(0.5 * 1.06 * 3600 + 0.5 * 1.02 * 7200, 0);
+    expect(b.chefes).toEqual([]);
   });
   it('não contrata a si mesmo, quem não abriu a empresa, quem não é membro nem ninguém', async () => {
     await dar(A, 1e6);
@@ -1141,8 +1270,7 @@ describe('contratar', () => {
   });
   it('ninguém escreve direto nos contratos', async () => {
     await expect(
-      t.asRole('authenticated', `insert into public.idle_contracts (week_start, employer_id, employee_id, cargo)
-                                 values (public.games_week_start(), '${A}', '${B}', 'x')`),
+      t.asRole('authenticated', `insert into public.idle_contracts (employer_id, employee_id, cargo) values ('${A}', '${B}', 'x')`),
     ).rejects.toThrow();
   });
   it('equipe do contrato mais recente pro mais antigo; chefes com o que pagam; social', async () => {
@@ -1182,40 +1310,46 @@ describe('contratar', () => {
 });
 ```
 
-- [ ] **Step 6: Paridade com contratos (`games/test/idleParidade.test.ts`)**
+- [ ] **Step 6: Paridade com contratos e vencimentos (`games/test/idleParidade.test.ts`)**
 
+Import: troque o import da economia por
+`import { acumular, acumularTrechos, custoMult, maxCompra, preco, taxa, type Estado } from '../idle/economia';`.
 Acrescente as constantes ao lado de `A`:
 
 ```ts
 const B = '00000000-0000-0000-0000-00000000000b';
 const C = '00000000-0000-0000-0000-00000000000c';
 const D = '00000000-0000-0000-0000-00000000000d';
+// estratégias dos outros: C escolheu Cultura de startup (paga o triplo a quem contrata)
+const OUTROS: [string, number[]][] = [[B, [0, 0, -1, -1]], [C, [0, 0, 2, -1]], [D, [2, -1, -1, -1]]];
+const contrato = (de: string, para: string, criado = 'now()', vence = `now() + interval '7 days'`) =>
+  q(`insert into public.idle_contracts (employer_id, employee_id, cargo, created_at, ends_at) values ($1, $2, 'x', ${criado}, ${vence})`, [de, para]);
+/** Recomeça com A no estado s e os outros três com empresa aberta, sem contrato nenhum. */
+async function preparar(s: Estado, extras = '', valores: unknown[] = []) {
+  await q('delete from public.idle_contracts where true');
+  await q('delete from public.idle_state where true');
+  await q(
+    `insert into public.idle_state (user_id, week_start, started, generators, upgrades, strategies${extras ? `, ${extras}` : ''})
+     values ($1, public.games_week_start(), true, $2, $3, $4${valores.map((_, i) => `, $${i + 5}`).join('')})`,
+    [A, s.generators, s.upgrades, s.strategies, ...valores],
+  );
+  for (const [u, est] of OUTROS) {
+    await q(`insert into public.idle_state (user_id, week_start, started, strategies) values ($1, public.games_week_start(), true, $2)`, [u, est]);
+  }
+}
 ```
 
 No `beforeAll`, depois de `await t.member(A);`: `for (const u of [B, C, D]) await t.member(u);`
 
-E acrescente como ÚLTIMO teste do `describe('paridade')`:
+Acrescente como os DOIS ÚLTIMOS testes do `describe('paridade')`:
 
 ```ts
   it('taxa com contratos: piso, +10%/+15% por contratado, Networking e chefe com Cultura de startup', async () => {
     const r = rng(99);
-    // estratégias dos outros: C escolheu Cultura de startup (paga o triplo a quem contrata)
-    const outros: [string, number[]][] = [[B, [0, 0, -1, -1]], [C, [0, 0, 2, -1]], [D, [2, -1, -1, -1]]];
-    const contrato = (de: string, para: string) =>
-      q(`insert into public.idle_contracts (week_start, employer_id, employee_id, cargo) values (public.games_week_start(), $1, $2, 'x')`, [de, para]);
     for (const s of estados(30)) {
-      await q('delete from public.idle_contracts where true');
-      await q('delete from public.idle_state where true');
-      await q(
-        `insert into public.idle_state (user_id, week_start, started, generators, upgrades, strategies)
-         values ($1, public.games_week_start(), true, $2, $3, $4)`,
-        [A, s.generators, s.upgrades, s.strategies],
-      );
-      for (const [u, est] of outros) {
-        await q(`insert into public.idle_state (user_id, week_start, started, strategies) values ($1, public.games_week_start(), true, $2)`, [u, est]);
-      }
-      const contratei = outros.filter(() => r() < 0.5).map(([u]) => u);
-      const chefes = outros.filter(() => r() < 0.5).map(([u]) => u);
+      await preparar(s);
+      const contratei = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      const chefes = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
       for (const u of contratei) await contrato(A, u);
       for (const u of chefes) await contrato(u, A);
       const social = { contratei: contratei.length, empregos: chefes.map((u) => (u === C ? 3 : 1)) };
@@ -1231,6 +1365,30 @@ E acrescente como ÚLTIMO teste do `describe('paridade')`:
       expect(emp).toHaveLength(esperado.length);
       emp.forEach((m, i) => expect(m).toBeCloseTo(esperado[i], 12));
     }
+  });
+  it('fechar a conta atravessando vencimentos (com bônus e teto de 8h)', async () => {
+    const T0 = Date.parse('2026-10-12T10:00:00Z');
+    const iso = (ms: number) => `'${new Date(ms).toISOString()}'::timestamptz`;
+    const s = estados(3)[2];
+    await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
+    const criado = iso(T0 - 86400_000);
+    await contrato(A, B, criado, iso(T0 + 100_000)); // A contratou B: vence 100 s depois
+    await contrato(C, A, criado, iso(T0 + 300_000)); // C (Cultura) contratou A: vence 300 s depois
+    await contrato(D, A, criado, iso(T0 + 9 * 3600_000)); // D contratou A: vence depois do teto
+    const r = (social: { contratei: number; empregos: number[] }) => taxa(catalogo, { ...s, social });
+    const trechos = [
+      { desdeMs: T0, r: r({ contratei: 1, empregos: [3, 1] }) },
+      { desdeMs: T0 + 100_000, r: r({ contratei: 0, empregos: [3, 1] }) },
+      { desdeMs: T0 + 300_000, r: r({ contratei: 0, empregos: [1] }) },
+      { desdeMs: T0 + 9 * 3600_000, r: r({ contratei: 0, empregos: [] }) },
+    ];
+    for (const ate of [T0 + 50_000, T0 + 1000_000, T0 + 10 * 3600_000]) {
+      const [db] = await q<{ v: number }>(
+        `select (public.idle_settle(s, $2::timestamptz)).valuation as v from public.idle_state s where user_id = $1`,
+        [A, new Date(ate).toISOString()],
+      );
+      expect(rel(db.v, acumularTrechos(1000, trechos, T0, ate, T0 + 200_000))).toBeLessThan(1e-9);
+    }
     await q('delete from public.idle_contracts where true');
   });
 ```
@@ -1240,15 +1398,16 @@ E acrescente como ÚLTIMO teste do `describe('paridade')`:
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run test/idleGente.test.ts test/idleParidade.test.ts`
 Expected: FAIL (`idle_hire` e `idle_contracts` não existem; a taxa do banco ainda sem o piso).
 
-- [ ] **Step 8: Migração 0036, parte 2**
+- [ ] **Step 8: Migração 0038, parte 2**
 
-Em `supabase/migrations/0036_fellas_inc_gente.sql`, troque o bloco `create or replace function public.idle_json ... $$;`
+Em `supabase/migrations/0038_fellas_inc_gente.sql`, troque o bloco `create or replace function public.idle_json ... $$;`
 (da parte 1, com o comentário de cima) por:
 
 ```sql
--- o estado que toda função do jogo devolve: o da 0034 + personagem, equipe (contratos que você fez, do mais recente
--- ao mais antigo), chefes (quem te contratou e quanto paga), social (o que entra na conta) e o preço do próximo
--- contrato. plpgsql: as funções que ela chama podem vir depois neste arquivo.
+-- o estado que toda função do jogo devolve: o da 0034 + personagem, equipe (contratos ativos que você fez, do mais
+-- recente ao mais antigo), chefes (quem te contratou e quanto paga), social (o que entra na conta), o preço do próximo
+-- contrato e muda_em (o próximo vencimento que mexe na sua taxa: a tela bate o ponto de novo nessa hora).
+-- plpgsql: as funções que ela chama podem vir depois neste arquivo.
 create or replace function public.idle_json(s public.idle_state)
 returns jsonb language plpgsql stable set search_path = public as $$
 begin
@@ -1262,22 +1421,23 @@ begin
     'server_now', now(),
     'avatar', public.idle_avatar_json(s.user_id),
     'equipe', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employee_id, 'cargo', c.cargo,
-                                                            'avatar', public.idle_avatar_json(c.employee_id))
-                                         order by c.created_at desc, c.employee_id)
+                                                            'avatar', public.idle_avatar_json(c.employee_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
                           from public.idle_contracts c
-                         where c.week_start = s.week_start and c.employer_id = s.user_id), '[]'::jsonb),
+                         where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
     'chefes', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employer_id, 'cargo', c.cargo,
-                                                            'mult', public.idle_employee_mult(c.employer_id))
-                                         order by c.created_at desc, c.employer_id)
+                                                            'mult', public.idle_employee_mult(c.employer_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
                           from public.idle_contracts c
-                         where c.week_start = s.week_start and c.employee_id = s.user_id), '[]'::jsonb),
+                         where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
     'social', jsonb_build_object(
       'contratei', (select count(*) from public.idle_contracts c
-                     where c.week_start = s.week_start and c.employer_id = s.user_id),
-      'empregos', coalesce((select jsonb_agg(public.idle_employee_mult(c.employer_id) order by c.created_at desc, c.employer_id)
+                     where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()),
+      'empregos', coalesce((select jsonb_agg(public.idle_employee_mult(c.employer_id) order by c.created_at desc, c.id desc)
                               from public.idle_contracts c
-                             where c.week_start = s.week_start and c.employee_id = s.user_id), '[]'::jsonb)),
-    'hire_price', public.idle_hire_price(s));
+                             where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb)),
+    'hire_price', public.idle_hire_price(s),
+    'muda_em', public.idle_next_change(s));
 end;
 $$;
 ```
@@ -1285,18 +1445,20 @@ $$;
 E acrescente no fim do arquivo:
 
 ```sql
--- ===== contratos =====
+-- ===== contratos (duram 7 dias; nada apaga: o vencido só deixa de contar) =====
 
 create table if not exists public.idle_contracts (
-  week_start  date not null,
+  id          bigint generated always as identity primary key,
   employer_id uuid not null references public.profiles (id) on delete cascade,
   employee_id uuid not null references public.profiles (id) on delete cascade,
   cargo       text not null,
   created_at  timestamptz not null default now(),
-  primary key (week_start, employer_id, employee_id),
-  check (employer_id <> employee_id)
+  ends_at     timestamptz not null default now() + interval '7 days',
+  check (employer_id <> employee_id),
+  check (ends_at > created_at)
 );
-create index if not exists idle_contracts_employee on public.idle_contracts (employee_id, week_start);
+create index if not exists idle_contracts_employer on public.idle_contracts (employer_id, ends_at);
+create index if not exists idle_contracts_employee on public.idle_contracts (employee_id, ends_at);
 
 alter table public.idle_contracts enable row level security;
 revoke all on public.idle_contracts from anon, authenticated;
@@ -1313,11 +1475,11 @@ returns double precision language sql stable set search_path = public as $$
                     where es.user_id = p_employer and (e.sociais ->> 'empregadoMult') is not null), 1)
 $$;
 
--- multiplicador dos contratos (igual a economia.ts multContratos):
+-- multiplicador dos contratos ativos em t (igual a economia.ts multContratos):
 -- 1 + efeito × (por_contratado × quantos você contratou + Σ 2% × o que cada empresa que te contratou paga).
 -- Ninguém te contratou = piso de freela (2%, como 1 contrato). efeito = ×2 com Networking; por_contratado = 10%
 -- (15% com Cultura de startup).
-create or replace function public.idle_social_mult(s public.idle_state)
+create or replace function public.idle_social_mult(s public.idle_state, t timestamptz)
 returns double precision language sql stable set search_path = public as $$
   with est as (
     select e.sociais from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
@@ -1327,13 +1489,13 @@ returns double precision language sql stable set search_path = public as $$
            * (coalesce((select max((x.sociais ->> 'porContratado')::double precision) from est x
                          where (x.sociais ->> 'porContratado') is not null), 0.1)
                 * (select count(*) from public.idle_contracts c
-                    where c.week_start = s.week_start and c.employer_id = s.user_id)
+                    where c.employer_id = s.user_id and c.created_at <= t and c.ends_at > t)
               + coalesce((select sum(0.02 * public.idle_employee_mult(c.employer_id)) from public.idle_contracts c
-                           where c.week_start = s.week_start and c.employee_id = s.user_id), 0.02))
+                           where c.employee_id = s.user_id and c.created_at <= t and c.ends_at > t), 0.02))
 $$;
 
--- produção por segundo (igual a economia.ts taxa): a da 0034 × o multiplicador dos contratos
-create or replace function public.idle_rate(s public.idle_state)
+-- produção por segundo em t (igual a economia.ts taxa): a da 0034 × o multiplicador dos contratos ativos em t
+create or replace function public.idle_rate_at(s public.idle_state, t timestamptz)
 returns double precision language sql stable set search_path = public as $$
   with est as (
     select e.* from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
@@ -1351,18 +1513,70 @@ returns double precision language sql stable set search_path = public as $$
        * coalesce((select exp(sum(ln(e.prod_mult))) from est e), 1)
        * (1 + coalesce((select sum(e.por_gerador_distinto) from est e), 0)
             * (select count(*) from public.idle_cat_gen c where s.generators[c.id] > 0))
-       * public.idle_social_mult(s)
+       * public.idle_social_mult(s, t)
 $$;
 
--- preço do próximo contrato: 30 min da produção atual × 1,5^(contratos que você já fez na semana) × 2 com Abrir capital
+-- produção por segundo agora (é a que o placar, a foto de segunda e a tela usam)
+create or replace function public.idle_rate(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_rate_at(s, now())
+$$;
+
+-- fecha a conta até ts (a da 0034: teto de 8h, ×5 dentro do bônus), agora em trechos: um contrato da pessoa que vence
+-- no meio muda a taxa dali pra frente (igual a economia.ts acumularTrechos). Contrato novo e Cultura de startup não
+-- precisam de trecho: quem cria fecha a conta dos dois lados antes.
+create or replace function public.idle_settle(s public.idle_state, ts timestamptz default now())
+returns public.idle_state language plpgsql stable set search_path = public as $$
+declare
+  v_fim   timestamptz;
+  v_a     timestamptz;
+  v_b     timestamptz;
+  v_rate  double precision;
+  v_boost double precision;
+begin
+  if not s.started or ts <= s.settled_at then
+    s.settled_at := greatest(s.settled_at, ts);
+    return s;
+  end if;
+  v_fim := least(ts, s.settled_at + interval '8 hours');
+  v_a := s.settled_at;
+  for v_b in
+    select x from (select c.ends_at as x from public.idle_contracts c
+                    where (c.employer_id = s.user_id or c.employee_id = s.user_id)
+                      and c.ends_at > s.settled_at and c.ends_at < v_fim
+                   union
+                   select v_fim) y
+     order by x
+  loop
+    v_rate := public.idle_rate_at(s, v_a);
+    v_boost := 0;
+    if s.boost_until is not null and s.boost_until > v_a then
+      v_boost := greatest(0, extract(epoch from least(v_b, s.boost_until) - v_a));
+    end if;
+    s.valuation := s.valuation + v_rate * extract(epoch from v_b - v_a) + v_rate * 4 * v_boost;
+    v_a := v_b;
+  end loop;
+  s.settled_at := ts;
+  return s;
+end;
+$$;
+
+-- preço do próximo contrato: 30 min da produção atual × 1,5^(contratos ATIVOS que você fez) × 2 com Abrir capital
 create or replace function public.idle_hire_price(s public.idle_state)
 returns double precision language sql stable set search_path = public as $$
   select public.idle_rate(s) * 1800
        * power(1.5::double precision, (select count(*) from public.idle_contracts c
-                                        where c.week_start = s.week_start and c.employer_id = s.user_id))
+                                        where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()))
        * coalesce((select exp(sum(ln((e.sociais ->> 'contratoCustoMult')::double precision)))
                      from public.idle_cat_est e
                     where e.opcao = s.strategies[e.era - 1] and (e.sociais ->> 'contratoCustoMult') is not null), 1)
+$$;
+
+-- o próximo vencimento que mexe na taxa da pessoa (null = nenhum contrato ativo)
+create or replace function public.idle_next_change(s public.idle_state)
+returns timestamptz language sql stable set search_path = public as $$
+  select min(c.ends_at) from public.idle_contracts c
+   where (c.employer_id = s.user_id or c.employee_id = s.user_id) and c.ends_at > now()
 $$;
 
 -- trava várias linhas sempre na ordem de user_id: dois fellas se contratando ao mesmo tempo não esperam um pelo
@@ -1377,7 +1591,7 @@ begin
 end;
 $$;
 
--- contratar um amigo que já abriu a empresa na semana: um par por semana, sem demissão, cargo sorteado
+-- contratar um amigo que já abriu a empresa: 7 dias, um contrato ativo por par (A→B), sem demissão, cargo sorteado
 create or replace function public.idle_hire(p_user uuid)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -1411,7 +1625,7 @@ begin
     raise exception 'idle_strategy_pending' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.idle_contracts c
-              where c.week_start = s.week_start and c.employer_id = v_me and c.employee_id = p_user) then
+              where c.employer_id = v_me and c.employee_id = p_user and c.ends_at > now()) then
     raise exception 'idle_hire_twice' using errcode = 'P0001';
   end if;
   s := public.idle_settle(s);
@@ -1422,15 +1636,15 @@ begin
   s.valuation := greatest(s.valuation - v_preco, 0);
   perform public.idle_save(public.idle_settle(o)); -- o contratado rende até agora com a regra antiga
   select k.nome into v_cargo from public.idle_cat_cargo k order by random() limit 1;
-  insert into public.idle_contracts (week_start, employer_id, employee_id, cargo)
-  values (s.week_start, v_me, p_user, coalesce(v_cargo, 'freela'));
+  insert into public.idle_contracts (employer_id, employee_id, cargo, created_at, ends_at)
+  values (v_me, p_user, coalesce(v_cargo, 'freela'), now(), now() + interval '7 days');
   perform public.idle_save(s);
   return public.idle_json(s);
 end;
 $$;
 
--- escolher a estratégia da era (a da 0034) + Cultura de startup: quem você contratou passa a ganhar o triplo, então
--- a conta dele fecha antes, com a regra antiga. Trava você e sua equipe na ordem de user_id.
+-- escolher a estratégia da era (a da 0034) + Cultura de startup: quem você contratou (contratos ativos) passa a
+-- ganhar o triplo, então a conta dele fecha antes, com a regra antiga. Trava você e sua equipe na ordem de user_id.
 create or replace function public.idle_pick_strategy(p_era int, p_opcao int)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -1443,8 +1657,7 @@ begin
     raise exception 'not_member' using errcode = '42501';
   end if;
   perform public.idle_lock_all(array[v_me] || coalesce((select array_agg(c.employee_id) from public.idle_contracts c
-                                                         where c.employer_id = v_me
-                                                           and c.week_start = public.games_week_start()), '{}'::uuid[]));
+                                                         where c.employer_id = v_me and c.ends_at > now()), '{}'::uuid[]));
   select * into s from public.idle_state where user_id = v_me;
   if not s.started then
     raise exception 'idle_not_started' using errcode = 'P0001';
@@ -1465,7 +1678,7 @@ begin
   if v_mult <> 1 then
     for x in select es.* from public.idle_state es
                join public.idle_contracts c on c.employee_id = es.user_id
-              where c.employer_id = v_me and c.week_start = s.week_start loop
+              where c.employer_id = v_me and c.ends_at > now() loop
       perform public.idle_save(public.idle_settle(x));
     end loop;
   end if;
@@ -1476,9 +1689,12 @@ end;
 $$;
 
 revoke all on function public.idle_employee_mult(uuid) from public, anon, authenticated;
-revoke all on function public.idle_social_mult(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_social_mult(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_rate(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_hire_price(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_next_change(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_lock_all(uuid[]) from public, anon, authenticated;
 revoke all on function public.idle_hire(uuid) from public, anon;
 grant execute on function public.idle_hire(uuid) to authenticated;
@@ -1499,40 +1715,44 @@ Ninguém contratou ninguém nesses testes, então toda taxa ganha ×1,02. Troque
 - em `'só quem abriu a empresa, do maior pro menor R$/s (não pelo valuation)'`:
   `expect(rows[1].rate).toBe(0.5); // só o gerador 1 do Abrir CNPJ` →
   `expect(rows[1].rate).toBeCloseTo(0.5 * 1.02, 12); // só o gerador 1 do Abrir CNPJ, com o piso de freela`
-- em `'o pódio conta a produção só até a meia-noite de Brasília'`: `500 + 0.5 * 3600` → `500 + 0.51 * 3600`
+- em `'o pódio conta a produção só até a meia-noite de Brasília'` (describe da foto de segunda): `500 + 0.5 * 3600` →
+  `500 + 0.51 * 3600` (o desempate pelo valuation continua: os dois têm a mesma taxa)
 
 - [ ] **Step 10: Rodar tudo de `games/`**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx tsc --noEmit && npx vitest run`
-Expected: PASS.
+Expected: PASS (inclusive a foto de segunda da 0036, que agora fecha a conta pelo `idle_settle` em trechos).
 
 - [ ] **Step 11: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0036_fellas_inc_gente.sql games/idle/economia.ts games/idle/economia.test.ts games/idle/simulacao.ts games/idle/simulacao.test.ts games/test/idleGente.test.ts games/test/idleParidade.test.ts games/test/idle.test.ts && git commit -m "Fellas Inc.: contratos (idle_hire, piso de freela, Networking e Cultura de startup na conta)"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0038_fellas_inc_gente.sql games/idle/economia.ts games/idle/economia.test.ts games/idle/simulacao.ts games/idle/simulacao.test.ts games/test/idleGente.test.ts games/test/idleParidade.test.ts games/test/idle.test.ts && git commit -m "Fellas Inc.: contratos de 7 dias (idle_hire, piso de freela, vencimento sem retroativo)"
 ```
 
 ---
 
-### Task 4: Placar com gente, "mais disputado" e reset com contratos
+### Task 4: Placar com gente, "mais disputado" e a foto de segunda com contratos
 
 **Files:**
-- Modify: `supabase/migrations/0036_fellas_inc_gente.sql` (acrescenta a parte 3)
+- Modify: `supabase/migrations/0038_fellas_inc_gente.sql` (acrescenta a parte 3)
 - Modify: `games/test/idleGente.test.ts`
 
 **Interfaces:**
-- Consome: `idle_board` da 0035 (devolve `rate` e ordena por ela, depois por valuation), `idle_weekly_reset` da 0034,
-  `idle_contracts`, `idle_avatar_json`.
-- Produz: coluna `idle_weeks.most_hired_id uuid`; interna `idle_most_hired(date) → uuid` (mais contratado da semana;
-  empate = quem chegou primeiro ao número); `idle_board()` → `[{ user_id, valuation, rate, era, strategies, avatar,
-  hired_count, by_me, most_hired }]` (mesma ordem da 0035); `idle_weekly_reset()` grava `most_hired_id` na placa e apaga
-  os contratos da semana velha (personagem fica).
+- Consome: `idle_board` e `idle_weekly_reset` da **0036** (sem filtro de semana; foto que não apaga nada; pódio e
+  placar por R$/s, desempate pelo valuation), `idle_contracts`, `idle_avatar_json`.
+- Produz: coluna `idle_weeks.most_hired_id uuid`; interna `idle_most_hired(date) → uuid` (quem recebeu mais contratos
+  criados naquela semana, de segunda 00:00 de Brasília até a seguinte; empate = quem chegou primeiro ao número);
+  `idle_board()` → `[{ user_id, valuation, rate, era, strategies, avatar, hired_count, by_me, most_hired }]` (mesma
+  ordem e mesmo universo da 0036; `hired_count` e `by_me` contam contratos ativos; `most_hired` = semana corrente);
+  `idle_weekly_reset()` = a foto da 0036 + `most_hired_id` da semana que acabou. Nada apaga contratos.
 
 - [ ] **Step 1: Testes (acrescentar em `games/test/idleGente.test.ts`)**
 
 ```ts
 type LinhaPlacar = { user_id: string; rate: number; avatar: Visual | null; hired_count: number; by_me: boolean; most_hired: boolean };
 const placar = () => t.rpc<LinhaPlacar[]>('idle_board');
+/** Segunda 00:00 de Brasília desta semana, como texto para o SQL. */
+const SEGUNDA = `(public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')`;
 
 describe('placar com gente', () => {
   beforeEach(async () => {
@@ -1540,7 +1760,7 @@ describe('placar com gente', () => {
     for (const u of [A, B, C]) await dar(u, 1e9);
   });
 
-  it('cada linha traz o visual, quantas empresas contrataram, se foi você e o mais disputado', async () => {
+  it('cada linha traz o visual, em quantas empresas trabalha, se foi você e o mais disputado', async () => {
     await t.as(B);
     await salvar(V);
     await t.as(A);
@@ -1555,7 +1775,7 @@ describe('placar com gente', () => {
     expect(de(C)).toMatchObject({ avatar: null, hired_count: 1, by_me: true, most_hired: false });
     expect(de(A)).toMatchObject({ hired_count: 0, by_me: false, most_hired: false });
   });
-  it('continua na ordem do R$/s (a da 0035)', async () => {
+  it('continua na ordem do R$/s (a da 0035/0036)', async () => {
     await contratar(B); // A ganha +10%: passa B e C
     const rows = await placar();
     expect(rows[0].user_id).toBe(A);
@@ -1564,35 +1784,50 @@ describe('placar com gente', () => {
   it('empate no mais disputado: quem chegou primeiro', async () => {
     await contratar(B);
     await contratar(C);
-    await q(`update public.idle_contracts set created_at = now() - interval '1 hour' where employee_id = $1`, [C]);
+    await q(`update public.idle_contracts set created_at = now() - interval '1 minute' where employee_id = $1`, [C]);
     expect((await placar()).find((r) => r.most_hired)!.user_id).toBe(C);
+  });
+  it('mais disputado é da semana: contrato criado na semana passada não conta (mas ainda vale e aparece no "trabalha em")', async () => {
+    await contratar(B);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
+    const rows = await placar();
+    expect(rows.some((r) => r.most_hired)).toBe(false);
+    expect(rows.find((r) => r.user_id === B)).toMatchObject({ hired_count: 1, by_me: true });
+  });
+  it('contrato vencido sai do "trabalha em" e do "foi você"', async () => {
+    await contratar(B);
+    await q(`update public.idle_contracts set created_at = created_at - interval '7 days', ends_at = ends_at - interval '7 days' where true`);
+    expect((await placar()).find((r) => r.user_id === B)).toMatchObject({ hired_count: 0, by_me: false });
   });
   it('ninguém contratado: ninguém é o mais disputado', async () => {
     expect((await placar()).some((r) => r.most_hired)).toBe(false);
   });
 });
 
-const envelhecer = async () => {
-  await q('update public.idle_state set week_start = week_start - 7 where true');
-  await q('update public.idle_contracts set week_start = week_start - 7 where true');
-};
+// a pessoa chegou na semana anterior (a foto de segunda só conta quem já jogava antes da semana nova)
+const envelhecer = () => q('update public.idle_state set week_start = public.games_week_start() - 7 where true');
+/** Os contratos foram criados no domingo da semana que acabou (e valem até o domingo que vem). */
+const contratosDaSemanaPassada = () =>
+  q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
 
-describe('reset com contratos', () => {
+describe('foto de segunda com contratos', () => {
   beforeEach(async () => {
     await abrir(A, B, C);
     for (const u of [A, B, C]) await dar(u, 1e9);
     await salvar(V);
   });
 
-  it('a placa guarda o mais disputado; contratos zeram; personagem fica', async () => {
+  it('a placa guarda o mais disputado da semana que acabou; contratos, empresas e personagem continuam', async () => {
     await contratar(B);
     await t.as(C);
     await contratar(B);
     await t.as(A);
+    await contratosDaSemanaPassada();
     await envelhecer();
     await q('select public.idle_weekly_reset()');
     expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: B }]);
-    expect(await q('select * from public.idle_contracts')).toEqual([]);
+    expect(await q('select count(*)::int as n from public.idle_contracts')).toEqual([{ n: 2 }]);
+    expect(await q('select count(*)::int as n from public.idle_state where started')).toEqual([{ n: 3 }]);
     expect(await q('select user_id from public.idle_avatar')).toEqual([{ user_id: A }]);
   });
   it('semana sem contrato: placa sem mais disputado', async () => {
@@ -1600,25 +1835,21 @@ describe('reset com contratos', () => {
     await q('select public.idle_weekly_reset()');
     expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: null }]);
   });
-  it('quem joga antes do cron começa a semana nova sem contrato nenhum (no piso de freela)', async () => {
+  it('quem joga antes do cron: a foto sai igual e o contrato continua valendo', async () => {
     await contratar(B);
+    await contratosDaSemanaPassada();
     await envelhecer();
     const s = await t.rpc<Estado>('idle_open');
-    expect(s).toMatchObject({ started: false, equipe: [], chefes: [], social: { contratei: 0, empregos: [] } });
+    expect(s.started).toBe(true);
+    expect(s.equipe.map((e) => e.user_id)).toEqual([B]);
     expect(s.avatar).toEqual(V);
-    expect(await q('select * from public.idle_contracts')).toEqual([]);
     expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: B }]);
   });
-  it('o pódio da semana velha conta os contratos dela', async () => {
+  it('o pódio da foto conta os contratos que valiam até a meia-noite', async () => {
     await contratar(B);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '2 hours', ends_at = ${SEGUNDA} + interval '6 days 22 hours' where true`);
     await envelhecer();
-    await q(
-      `update public.idle_state
-          set valuation = 0,
-              settled_at = (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo') - interval '1 hour'
-        where user_id = $1`,
-      [A],
-    );
+    await q(`update public.idle_state set valuation = 0, settled_at = ${SEGUNDA} - interval '1 hour' where user_id = $1`, [A]);
     await q('select public.idle_weekly_reset()');
     const [semana] = await q<{ podium: { user_id: string; valuation: number }[] }>('select podium from public.idle_weeks');
     expect(semana.podium.find((p) => p.user_id === A)!.valuation).toBeCloseTo(0.5 * 1.12 * 3600, 3);
@@ -1631,26 +1862,28 @@ describe('reset com contratos', () => {
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run test/idleGente.test.ts`
 Expected: FAIL (`hired_count` indefinido; `idle_weeks.most_hired_id` não existe).
 
-- [ ] **Step 3: Migração 0036, parte 3 (acrescentar no fim do arquivo)**
+- [ ] **Step 3: Migração 0038, parte 3 (acrescentar no fim do arquivo)**
 
 ```sql
--- ===== placar, "mais disputado" e reset =====
+-- ===== placar, "mais disputado" e a foto de segunda =====
 
 alter table public.idle_weeks add column if not exists most_hired_id uuid references public.profiles (id) on delete set null;
 
--- quem mais foi contratado na semana; empate = quem chegou primeiro ao número (null = ninguém contratado)
+-- quem recebeu mais contratos criados na semana que começa em p_week (segunda 00:00 de Brasília); empate = quem chegou
+-- primeiro ao número; null = ninguém contratado
 create or replace function public.idle_most_hired(p_week date)
 returns uuid language sql stable set search_path = public as $$
   select c.employee_id
     from public.idle_contracts c
-   where c.week_start = p_week
+   where c.created_at >= (p_week::timestamp at time zone 'America/Sao_Paulo')
+     and c.created_at < ((p_week + 7)::timestamp at time zone 'America/Sao_Paulo')
    group by c.employee_id
    order by count(*) desc, max(c.created_at), c.employee_id
    limit 1
 $$;
 
--- placar (o da 0035: R$/s, desempate pelo valuation) + visual, quantas empresas contrataram cada um, se foi você e o
--- mais disputado do mercado
+-- placar (o da 0036: todo mundo que abriu a empresa, por R$/s, desempate pelo valuation) + visual, em quantas empresas
+-- cada um trabalha agora, se você contratou, e o mais disputado da semana
 create or replace function public.idle_board()
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v_mais uuid;
@@ -1667,42 +1900,42 @@ begin
       from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_rate(s) as rate,
                    public.idle_era(s.generators) as era, s.strategies,
                    (select count(*) from public.idle_contracts c
-                     where c.week_start = s.week_start and c.employee_id = s.user_id)::int as n,
+                     where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now())::int as n,
                    exists (select 1 from public.idle_contracts c
-                            where c.week_start = s.week_start and c.employer_id = auth.uid()
-                              and c.employee_id = s.user_id) as by_me
+                            where c.employer_id = auth.uid() and c.employee_id = s.user_id
+                              and c.created_at <= now() and c.ends_at > now()) as by_me
               from public.idle_state s
-             where s.week_start = public.games_week_start() and s.started) x);
+             where s.started) x);
 end;
 $$;
 
--- segunda 00:00 (a da 0034) + a placa guarda o mais disputado e os contratos da semana velha somem. O pódio conta
--- os contratos (idle_settle usa a taxa com eles), por isso eles só saem no fim. Personagem e placas ficam.
+-- foto da semana que acabou (a da 0036, que não apaga nada) + o mais disputado dela na placa
 create or replace function public.idle_weekly_reset()
 returns void language plpgsql security definer set search_path = public as $$
 declare
-  v_new    date;
-  v_old    date;
+  v_new    date := public.games_week_start();
+  v_old    date := public.games_week_start() - 7;
   v_podium jsonb;
   v_champ  uuid;
   v_gravou date;
 begin
-  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- um reset por vez, e ninguém jogando no meio
-  v_new := public.games_week_start();
-  select max(week_start) into v_old from public.idle_state where week_start < v_new;
-  if v_old is null then
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- uma foto por vez
+  if exists (select 1 from public.idle_weeks where week_start = v_old) then
     return;
   end if;
-  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'era', x.era,
-                                               'strategies', to_jsonb(x.strategies)) order by x.v desc), '[]')
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era,
+                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc), '[]')
     into v_podium
     from (select s.user_id,
-                 (public.idle_settle(s, (v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
-                 public.idle_era(s.generators) as era, s.strategies
+                 (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 public.idle_rate(s) as rate, public.idle_era(s.generators) as era, s.strategies
             from public.idle_state s
-           where s.week_start < v_new and s.started
-           order by 2 desc
+           where s.started and s.week_start < v_new
+           order by 3 desc, 2 desc
            limit 3) x;
+  if jsonb_array_length(v_podium) = 0 then
+    return; -- ninguém jogava antes desta semana: sem placa
+  end if;
   v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
   insert into public.idle_weeks (week_start, unicorn_id, podium, most_hired_id)
   values (v_old, v_champ, v_podium, public.idle_most_hired(v_old))
@@ -1714,8 +1947,6 @@ begin
       update public.profiles set badges = array_append(badges, 'weekly_unicorn') where id = v_champ;
     end if;
   end if;
-  delete from public.idle_state where week_start < v_new;
-  delete from public.idle_contracts where week_start < v_new;
 end;
 $$;
 
@@ -1725,15 +1956,18 @@ revoke all on function public.idle_board() from public, anon;
 grant execute on function public.idle_board() to authenticated;
 ```
 
+Confira que o corpo de `idle_weekly_reset` é o da 0036 (`git show main:supabase/migrations/0036_fellas_inc_sem_reset.sql`)
+com só duas mudanças: a coluna `most_hired_id` no `insert` e o `public.idle_most_hired(v_old)` no `values`.
+
 - [ ] **Step 4: Rodar tudo de `games/`**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx tsc --noEmit && npx vitest run`
-Expected: PASS (inclusive os testes de reset e de placar do núcleo e da 0035).
+Expected: PASS (inclusive os testes de placar e da foto de segunda do núcleo e da 0036).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0036_fellas_inc_gente.sql games/test/idleGente.test.ts && git commit -m "Fellas Inc.: placar com gente, mais disputado na placa e contratos zerando no reset"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0038_fellas_inc_gente.sql games/test/idleGente.test.ts && git commit -m "Fellas Inc.: placar com gente e o mais disputado na foto de segunda"
 ```
 
 ---
@@ -1744,12 +1978,14 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/
 - Modify: `games/shared/types.ts`, `games/shared/api.ts`, `games/shared/errors.ts`, `games/shared/errors.test.ts`
 - Create: `games/shared/types.test.ts`
 - Modify: `games/dev/mockIdle.ts`
-- Modify (fixtures): `games/idle/tela.test.ts`, `games/idle/store.test.ts`
+- Modify: `games/idle/store.ts` (+ `vencido`), `games/idle/store.test.ts`, `games/idle/tela.test.ts` (fixtures)
 
 **Interfaces:**
 - Consome: o JSON de `idle_json` (Task 3) e de `idle_board` (Task 4); `IdleVisual` (Task 2).
-- Produz: `IdleContratado = { user_id; cargo; avatar: IdleVisual | null }`, `IdleChefe = { user_id; cargo; mult }`;
-  `IdleState` + `avatar`, `equipe`, `chefes`, `social: { contratei: number; empregos: number[] }`, `hire_price`;
+- Produz: `IdleContratado = { user_id; cargo; avatar: IdleVisual | null; ate: string }`, `IdleChefe = { user_id; cargo;
+  mult; ate: string }` (`ate` = quando o contrato vence); `IdleState` + `avatar`, `equipe`, `chefes`,
+  `social: { contratei: number; empregos: number[] }`, `hire_price`, `muda_em: string | null`; `vencido(estado,
+  agoraServidorMs): boolean` (store.ts);
   `IdleBoardRow` + `avatar`, `hiredCount`, `byMe`, `mostHired`; `LinhaPlacar` (linha crua do banco) e
   `linhaPlacar(r, name): IdleBoardRow`; `idleHire(userId): Promise<IdleState>`,
   `idleSetAvatar(v: IdleVisual): Promise<IdleState>` (api.ts e mockIdle.ts com os mesmos nomes); erros
@@ -1782,8 +2018,8 @@ Em `games/shared/errors.test.ts`, no `it.each` de `'erros da Fellas Inc.'`, acre
 
 ```ts
     ['idle_hire_self', 'Não dá pra se contratar'],
-    ['idle_hire_twice', 'Você já contratou essa pessoa essa semana'],
-    ['idle_hire_not_open', 'Essa pessoa ainda não abriu a empresa essa semana'],
+    ['idle_hire_twice', 'Essa pessoa já trabalha pra você'],
+    ['idle_hire_not_open', 'Essa pessoa ainda não abriu a empresa'],
     ['idle_bad_avatar', 'Esse visual não existe'],
 ```
 
@@ -1799,13 +2035,14 @@ export type IdleState = {
   user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
-  /** Entrega 2 (0036): seu visual (null = nunca salvou), quem você contratou (do mais recente ao mais antigo),
-   *  quem te contratou, o que entra na conta dos contratos e o preço do próximo contrato. */
+  /** Entrega 2 (0038): seu visual (null = nunca salvou), quem você contratou (contratos ativos, do mais recente ao
+   *  mais antigo), quem te contratou, o que entra na conta dos contratos, o preço do próximo contrato e o próximo
+   *  vencimento que muda a sua taxa (null = nenhum). */
   avatar: IdleVisual | null; equipe: IdleContratado[]; chefes: IdleChefe[];
-  social: { contratei: number; empregos: number[] }; hire_price: number;
+  social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
 };
-export type IdleContratado = { user_id: string; cargo: string; avatar: IdleVisual | null };
-export type IdleChefe = { user_id: string; cargo: string; mult: number };
+export type IdleContratado = { user_id: string; cargo: string; avatar: IdleVisual | null; ate: string };
+export type IdleChefe = { user_id: string; cargo: string; mult: number; ate: string };
 export type IdleBoardRow = {
   userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[];
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
@@ -1829,8 +2066,8 @@ No tipo `GameErrorCode`, depois de `| 'idle_opp_cap'`, acrescente
 
 ```ts
   idle_hire_self: 'Não dá pra se contratar',
-  idle_hire_twice: 'Você já contratou essa pessoa essa semana',
-  idle_hire_not_open: 'Essa pessoa ainda não abriu a empresa essa semana',
+  idle_hire_twice: 'Essa pessoa já trabalha pra você',
+  idle_hire_not_open: 'Essa pessoa ainda não abriu a empresa',
   idle_bad_avatar: 'Esse visual não existe',
 ```
 
@@ -1929,12 +2166,35 @@ w.__meContrata = async () => {
 - [ ] **Step 6: Fixtures dos testes da página**
 
 `games/idle/tela.test.ts`, na função `estado`, antes de `...x`, acrescente
-`avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0,`. No teste
+`avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,`. No teste
 `'placar mostra o R$/s de cada um, não o valuation'`, a linha do placar ganha
 `avatar: null, hiredCount: 0, byMe: false, mostHired: false`.
 
 `games/idle/store.test.ts`, na função `base`, antes de `...x`, acrescente o mesmo
-`avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0,`.
+`avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,`.
+
+- [ ] **Step 6b: Vencimento na tela (`games/idle/store.ts`)**
+
+Teste (em `games/idle/store.test.ts`; acrescente `vencido` ao import de `./store`):
+
+```ts
+describe('vencimento de contrato', () => {
+  it('bate o ponto quando o relógio do servidor passa de muda_em', () => {
+    expect(vencido(base(), Date.parse('2026-10-20T00:00:00Z'))).toBe(false);
+    const s = base({ muda_em: '2026-10-19T12:00:00.000Z' });
+    expect(vencido(s, Date.parse('2026-10-19T11:59:59Z'))).toBe(false);
+    expect(vencido(s, Date.parse('2026-10-19T12:00:00Z'))).toBe(true);
+  });
+});
+```
+
+E em `games/idle/store.ts`, no fim:
+
+```ts
+/** Um contrato seu venceu (o relógio do servidor passou de muda_em): a taxa mudou e a tela precisa bater o ponto. */
+export const vencido = (estado: IdleState, agoraServidorMs: number): boolean =>
+  estado.muda_em !== null && agoraServidorMs >= Date.parse(estado.muda_em);
+```
 
 - [ ] **Step 7: Rodar tudo de `games/`**
 
@@ -1944,7 +2204,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/shared/types.ts games/shared/types.test.ts games/shared/api.ts games/shared/errors.ts games/shared/errors.test.ts games/dev/mockIdle.ts games/idle/tela.test.ts games/idle/store.test.ts && git commit -m "Fellas Inc.: chamadas e formatos de contratar e do personagem; bots com visual no ?mock"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/shared/types.ts games/shared/types.test.ts games/shared/api.ts games/shared/errors.ts games/shared/errors.test.ts games/dev/mockIdle.ts games/idle/tela.test.ts games/idle/store.ts games/idle/store.test.ts && git commit -m "Fellas Inc.: chamadas e formatos de contratar e do personagem; bots com visual no ?mock"
 ```
 
 ---
@@ -2366,21 +2626,26 @@ export function pintar(canvas: HTMLCanvasElement, img: Imagem): void {
   canvas.getContext('2d')?.putImageData(new ImageData(img.d, img.w, img.h), 0, 0);
 }
 
-export async function carregarKit(): Promise<Kit | null> {
+/** O kit inteiro; falha de rede avisa no console e tenta de novo (3 vezes, esperando 5 s e 10 s). */
+export async function carregarKit(tentativas = 3): Promise<Kit | null> {
   const urls = POSES_KIT.map((p) => ativos.pose(p));
   if (urls.some((u) => !u)) return null; // a arte do kit ainda não chegou: cenas antigas, sem gente
-  try {
-    const folhas = await Promise.all(urls.map((u) => carregarImagem(u!)));
-    const poses = Object.fromEntries(POSES_KIT.map((p, i) => [p, folhas[i]])) as Record<Pose, Imagem>;
-    const estagiario: Kit['estagiario'] = {};
-    for (const p of POSES_KIT) {
-      const u = ativos.estagiario(p);
-      if (u) estagiario[p] = await carregarImagem(u);
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      const folhas = await Promise.all(urls.map((u) => carregarImagem(u!)));
+      const poses = Object.fromEntries(POSES_KIT.map((p, j) => [p, folhas[j]])) as Record<Pose, Imagem>;
+      const estagiario: Kit['estagiario'] = {};
+      for (const p of POSES_KIT) {
+        const u = ativos.estagiario(p);
+        if (u) estagiario[p] = await carregarImagem(u);
+      }
+      return { poses, estagiario };
+    } catch (e) {
+      console.warn(`Fellas Inc.: o kit de personagem não carregou (tentativa ${i} de ${tentativas})`, e);
+      if (i < tentativas) await new Promise((ok) => setTimeout(ok, 5000 * i));
     }
-    return { poses, estagiario };
-  } catch {
-    return null;
   }
+  return null;
 }
 
 export function criarDesenhista(kit: Kit | null, cadeira: Imagem | null): Desenhar {
@@ -2506,7 +2771,12 @@ export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) 
       tiras.set(k, cv);
       if (k === chaveDe(nome)) ultima.set(nome, cv);
     })()
-      .catch(() => falhas.add(k))
+      .catch((e) => {
+        // avisa e deixa tentar de novo daqui a 30 s (ou antes, se a gente mudar)
+        console.warn(`Fellas Inc.: a cena ${nome} não montou (${c.fundo})`, e);
+        falhas.add(k);
+        setTimeout(() => falhas.delete(k), 30_000);
+      })
       .finally(() => pedidas.delete(k));
   }
 
@@ -2549,6 +2819,7 @@ export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) 
       const k = chaveGente(nova);
       if (k === chaveGente(gente)) return;
       gente = nova;
+      falhas.clear();
       for (const x of [...tiras.keys()]) if (!x.endsWith(`#${k}`)) tiras.delete(x);
       if (atual) pedir(atual.nome);
     },
@@ -2592,22 +2863,24 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/montagem.
 ### Task 7: A página: aba Contratar, editor de personagem e gente no palco
 
 **Files:**
-- Modify: `games/idle/tela.ts` (arquivo inteiro abaixo), `games/idle/idle.css`, `games/idle/main.ts` (arquivo inteiro abaixo)
+- Modify: `games/idle/tela.ts`, `games/idle/idle.css`, `games/idle/main.ts` (edições pontuais: o que já está na `main`
+  fica, inclusive a aba Melhorias "À venda | Compradas", o placar "+R$ X/s", caixinha e estratégia como folha,
+  `vigiarVersao()` e os textos sem "semana")
 - Test: `games/idle/tela.test.ts`
 
 **Interfaces:**
-- Consome: `IdleState`/`IdleBoardRow` novos e `idleHire`/`idleSetAvatar` (Task 5); `multContratos` (Task 3);
+- Consome: `IdleState`/`IdleBoardRow` novos, `idleHire`/`idleSetAvatar`, `vencido` (Task 5); `multContratos` (Task 3);
   `PADRAO`, `sortear`, `PELES`, `CORES_CABELO`, `CORES`, `Campo`, `Tons`, `VISUAL_NOMES` (Task 2); `Desenhar`,
   `carregarKit`, `carregarImagem`, `criarDesenhista`, `palco.gente`, `palco.preparar`, `ativos.cadeira` (Task 6).
 - Produz: `Aba` + `'contratar'`; `Modelo.editor: IdleVisual | null` (rascunho; null = fechado); `Acoes` +
   `contratar(userId)`, `editor(acao: 'abrir' | 'fechar' | 'sortear' | 'salvar')`, `mudarVisual(campo, valor)`;
-  `criarTela(root, acoes, desenhar?: Desenhar)`; `porcento(mult)`; `empresas(n)`.
+  `criarTela(root, acoes, desenhar?: Desenhar)`; `porcento(mult)`, `empresas(n)`, `restam(ms)`.
 
 - [ ] **Step 1: Testes (`games/idle/tela.test.ts`)**
 
 Imports novos: `import type { IdleBoardRow } from '../shared/types';`, `import type { Desenhar } from './navegador';`,
 `import { PADRAO } from './personagem';`; e troque o import da tela por
-`import { criarTela, empresas, porcento, prazo, type Acoes, type Modelo } from './tela';`.
+`import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';`.
 
 Na função `modelo`, antes de `...x`, acrescente `editor: null,`. No `beforeEach`, o objeto `acoes` ganha
 `contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),`.
@@ -2622,6 +2895,7 @@ const linha = (x: Partial<IdleBoardRow> = {}): IdleBoardRow => ({
   userId: 'b', name: 'Bia', valuation: 1000, rate: 2, era: 2, strategies: [0, -1, -1, -1],
   avatar: null, hiredCount: 0, byMe: false, mostHired: false, ...x,
 });
+const ATE = '2026-10-19T00:00:00.000Z'; // 6,5 dias depois do server_now das fixtures
 
 describe('contratar', () => {
   it('cartas de quem abriu a empresa (menos você); botão libera no preço; tocar contrata', () => {
@@ -2642,16 +2916,16 @@ describe('contratar', () => {
     expect(acoes.contratar).toHaveBeenCalledWith('b');
     expect(desenhar).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), PADRAO, undefined); // sem visual = fundador
   });
-  it('quem você já contratou: sem botão, com o cargo', () => {
+  it('quem você já contratou: sem botão, com o cargo e quanto falta pro contrato vencer', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({
       aba: 'contratar',
-      estado: estado({ equipe: [{ user_id: 'b', cargo: 'CEO de nada', avatar: null }] }),
+      estado: estado({ equipe: [{ user_id: 'b', cargo: 'CEO de nada', avatar: null, ate: ATE }] }),
       placar: [linha({ byMe: true, hiredCount: 1 })],
     }));
     const carta = root.querySelector('.lista-contratar .carta')!;
     expect(carta.querySelector('button')).toBeNull();
-    expect(carta.textContent).toContain('Trabalha pra você como CEO de nada');
+    expect(carta.textContent).toContain('Trabalha pra você como CEO de nada por mais 6 dias');
     expect(carta.textContent).toContain('trabalha em 1 empresa');
   });
   it('topo: bônus dos contratos, piso de freela ou quem te contratou; Mudar visual abre o editor; vazio convida', () => {
@@ -2659,31 +2933,35 @@ describe('contratar', () => {
     tela.renderizar(modelo({ aba: 'contratar', placar: [] }));
     const topo = root.querySelector('.contratos-topo')!;
     expect(topo.textContent).toContain('Contratos: +2% de produção');
-    expect(topo.textContent).toContain('Ninguém te contratou ainda: você ganha o piso de freela.');
-    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Ninguém mais abriu a empresa essa semana. Chama a galera.');
+    expect(topo.textContent).toContain('Ninguém te contratou: você ganha o piso de freela.');
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Ninguém mais abriu a empresa ainda. Chama a galera.');
     [...topo.querySelectorAll('button')].find((x) => x.textContent === 'Mudar visual')!.click();
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
     tela.renderizar(modelo({
       aba: 'contratar', placar: [linha()],
-      estado: estado({ chefes: [{ user_id: 'b', cargo: 'sócio de fachada', mult: 1 }], social: { contratei: 0, empregos: [1] } }),
+      estado: estado({ chefes: [{ user_id: 'b', cargo: 'sócio de fachada', mult: 1, ate: ATE }], social: { contratei: 0, empregos: [1] } }),
     }));
-    expect(root.querySelector('.contratos-topo')!.textContent).toContain('Você trabalha pra Bia (sócio de fachada).');
+    expect(root.querySelector('.contratos-topo')!.textContent).toContain('Você trabalha pra Bia (sócio de fachada, por mais 6 dias).');
   });
   it('placar: boneco de cada um e o mais disputado do mercado', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: [linha({ mostHired: true, hiredCount: 3 }), linha({ userId: 'c', name: 'Teteu' })] }));
     const itens = root.querySelectorAll('.lista-placar li');
     expect(itens[0].querySelector('canvas')).not.toBeNull();
-    expect(itens[0].textContent).toContain('Mais disputado do mercado');
+    expect(itens[0].textContent).toContain('Mais disputado da semana');
     expect(itens[1].textContent).not.toContain('Mais disputado');
   });
-  it('porcento e empresas', () => {
+  it('porcento, empresas e restam', () => {
     expect(porcento(1.02)).toBe('+2%');
     expect(porcento(1.12)).toBe('+12%');
     expect(porcento(1.025)).toBe('+2,5%');
     expect(empresas(0)).toBe('ninguém contratou ainda');
     expect(empresas(1)).toBe('trabalha em 1 empresa');
     expect(empresas(3)).toBe('trabalha em 3 empresas');
+    expect(restam(6.5 * 86400_000)).toBe('por mais 6 dias');
+    expect(restam(30 * 3600_000)).toBe('por mais 1 dia');
+    expect(restam(5.5 * 3600_000)).toBe('por mais 5 h');
+    expect(restam(20 * 60_000)).toBe('por menos de 1 h');
   });
 });
 
@@ -2723,15 +3001,14 @@ describe('editor de personagem', () => {
 ```
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx vitest run idle/tela.test.ts`
-Expected: FAIL (sem aba Contratar, sem editor, sem `porcento`).
+Expected: FAIL (sem aba Contratar, sem editor, sem `porcento`/`restam`). Os testes que já existiam (Compradas, placar por
+R$/s, caixinha) continuam passando depois do Step 2: são a trava de que nada da `main` se perdeu.
 
-- [ ] **Step 2: `games/idle/tela.ts` (arquivo inteiro)**
+- [ ] **Step 2: `games/idle/tela.ts` (edições pontuais, na ordem do arquivo)**
+
+(a) Troque os imports de `../shared/types` até `./store` por:
 
 ```ts
-// Tela da Fellas Inc. em DOM puro (sem framework), no padrão do Blackjack: monta uma vez; `renderizar` a cada
-// mudança de estado; `atualizarValor` ~10x por segundo (só o número e quais botões estão liberados).
-// Texto de usuário (nomes, cargos) sempre por textContent.
-import { button, el } from '../shared/hud/hud';
 import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { catalogo, type Melhoria } from './catalogo';
@@ -2743,7 +3020,11 @@ import { ERAS, VISUAL_NOMES } from './nomes';
 import { instante, TEXTO_TIPO, tipo as tipoOportunidade, VALIDADE_S } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
+```
 
+(b) Troque os tipos `Aba`, `Modelo` e `Acoes` por:
+
+```ts
 export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar';
 export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
 export type Modelo = {
@@ -2757,72 +3038,45 @@ export type Acoes = {
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
 };
-export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
+```
 
-const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidden') : n.setAttribute('hidden', ''));
-const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
+(c) Logo depois da função `prazo`, acrescente:
 
-/** "some em 3h12" / "some em 40 min": quanto falta pra oportunidade guardada sumir. */
-export function prazo(ms: number) {
-  const min = Math.ceil(ms / 60000);
-  if (min <= 1) return 'some em menos de 1 min';
-  if (min < 60) return `some em ${min} min`;
-  return `some em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
-}
-
+```ts
 /** "+12%" / "+2,5%": o bônus dos contratos em pt-BR, com uma casa no máximo. */
 export const porcento = (mult: number) => `+${(Math.round((mult - 1) * 1000) / 10).toLocaleString('pt-BR')}%`;
 
-/** Quantas empresas contrataram alguém, para a carta de contratar. */
+/** Em quantas empresas alguém trabalha agora (carta de contratar). */
 export function empresas(n: number) {
   if (n === 0) return 'ninguém contratou ainda';
   return n === 1 ? 'trabalha em 1 empresa' : `trabalha em ${n} empresas`;
 }
 
-/** X desenhado (não glifo), traço de 2px. */
-function iconeFechar() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 20 20');
-  svg.setAttribute('width', '20');
-  svg.setAttribute('height', '20');
-  svg.setAttribute('aria-hidden', 'true');
-  const p = document.createElementNS(ns, 'path');
-  p.setAttribute('d', 'M5 5l10 10M15 5L5 15');
-  p.setAttribute('stroke', 'currentColor');
-  p.setAttribute('stroke-width', '2');
-  p.setAttribute('stroke-linecap', 'round');
-  svg.append(p);
-  return svg;
+/** Quanto falta pro contrato vencer: "por mais 6 dias", "por mais 5 h", "por menos de 1 h". */
+export function restam(ms: number) {
+  const h = Math.floor(ms / 3600_000);
+  if (h < 1) return 'por menos de 1 h';
+  if (h < 24) return `por mais ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'por mais 1 dia' : `por mais ${d} dias`;
 }
+```
 
-export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
-  const app = el('div', 'app idle');
-  const topo = el('header', 'top');
-  const voltar = el('a', undefined, '← Voltar');
-  voltar.href = '/games';
-  const caixinha = button('Oportunidades (0)', 'btn caixinha', () => a.caixa(true));
-  topo.append(voltar, el('span', undefined, 'Fellas Inc.'), caixinha);
+(d) A assinatura vira `export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {`.
 
-  const palco = el('div', 'palco');
-  const canvas = el('canvas', 'cena');
-  const vivo = button('', 'vivo', () => undefined);
-  palco.append(canvas, vivo);
+(e) O `abrir.append(...)` vira:
 
-  const placa = el('div', 'valor');
-  const numero = el('div', 'numero', 'R$ 0');
-  const taxaTxt = el('div', 'taxa', '');
-  const bonus = el('div', 'bonus', '');
-  placa.append(numero, taxaTxt, bonus);
-
-  const abrir = el('div', 'abrir');
+```ts
   abrir.append(
     el('p', undefined, '3h06. Bora fundar uma empresa?'),
     button('Abrir CNPJ', 'btn main', a.abrirCnpj),
     button('Mudar visual', 'btn', () => a.editor('abrir')),
   );
+```
 
-  const abas = el('nav', 'abas');
+(f) As abas e listas viram (o resto do bloco fica):
+
+```ts
   const botoesAba: Record<Aba, HTMLButtonElement> = {
     geradores: button('Geradores', 'aba', () => a.trocarAba('geradores')),
     melhorias: button('Melhorias', 'aba', () => a.trocarAba('melhorias')),
@@ -2836,39 +3090,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const listaP = el('ol', 'lista lista-placar');
   const painel = el('main', 'painel');
   painel.append(abrir, abas, listaG, listaM, listaC, listaP);
+```
 
-  const notice = el('div', 'notice');
-  notice.setAttribute('role', 'status');
-  const noticeTxt = el('span');
-  notice.append(noticeTxt, button('Tentar de novo', '', a.tentarDeNovo));
-  const overlay = el('div', 'overlay');
-  const overlayTxt = el('p');
-  const entrar = el('a', 'btn main', 'Entrar');
-  entrar.href = '/';
-  const deNovo = button('Tentar de novo', 'btn main', () => location.reload());
-  overlay.append(overlayTxt, entrar, deNovo);
+(g) Os modais: depois de `const modalC = el('div', 'modal modal-caixa');` acrescente
+`const modalV = el('div', 'modal modal-visual');`; o `for` dos atributos passa a percorrer
+`[[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual']] as const`; e o
+`app.append(...)` termina em `modalE, modalC, modalV);`.
 
-  const modalE = el('div', 'modal modal-estrategia');
-  const modalC = el('div', 'modal modal-caixa');
-  const modalV = el('div', 'modal modal-visual');
-  for (const [modal, titulo] of [[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual']] as const) {
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', titulo);
-  }
-  const titulo = (id: string, texto: string) => {
-    const h = el('h2', undefined, texto);
-    h.id = id;
-    return h;
-  };
+(h) Depois de `let ultimo: Modelo | null = null;`, acrescente:
 
-  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV);
-  root.append(app);
-
-  // botões que dependem do valor (atualizados em atualizarValor)
-  let precos: { botao: HTMLButtonElement; preco: number; maximo?: { custo: number; n: number; cm: number } }[] = [];
-  // "some em ..." das oportunidades guardadas (atualizado em atualizarValor)
-  let prazos: { texto: HTMLElement; fim: number }[] = [];
+```ts
 
   /** Personagem num canvas pequeno (o CSS amplia). rotulo null = decorativo (o nome já está do lado). */
   function boneco(v: IdleVisual | null, rotulo: string | null, opcoes?: { pose?: Pose; cadeira?: boolean }) {
@@ -2879,58 +3110,6 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     } else c.setAttribute('aria-hidden', 'true');
     desenhar(c, v ?? PADRAO, opcoes);
     return c;
-  }
-
-  function linhaGerador(s: IdleState, gid: number) {
-    const g = catalogo.geradores[gid - 1];
-    const n = s.generators[gid - 1];
-    const linha = el('div', 'gerador');
-    const sprite = el('div', 'sprite');
-    sprite.style.backgroundImage = `url(${ativos.gerador(gid)})`;
-    const meio = el('div', 'meio');
-    meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid))} cada`));
-    const cm = custoMult(catalogo, s);
-    const botoes = el('div', 'compra');
-    const um = button(formatarValor(preco(g.custo, n, 1, cm) * (s.half_price ? 0.5 : 1)), 'btn', () => a.comprar('gerador', gid, 1));
-    um.dataset.qtd = '1';
-    const dez = button('10', 'btn', () => a.comprar('gerador', gid, 10));
-    dez.dataset.qtd = '10';
-    const max = button('Máx', 'btn', () => a.comprar('gerador', gid, 0));
-    max.dataset.qtd = '0';
-    precos.push(
-      { botao: um, preco: preco(g.custo, n, 1, cm) * (s.half_price ? 0.5 : 1) },
-      { botao: dez, preco: preco(g.custo, n, 10, cm) },
-      { botao: max, preco: preco(g.custo, n, 1, cm), maximo: { custo: g.custo, n, cm } },
-    );
-    botoes.append(um, dez, max);
-    linha.append(sprite, meio, botoes);
-    return linha;
-  }
-
-  function linhaTrancada(gid: number) {
-    const linha = el('div', 'gerador trancado');
-    linha.append(el('div', 'sprite'), el('div', 'meio', `Compra 1 "${catalogo.geradores[gid - 2].nome}" pra liberar`));
-    return linha;
-  }
-
-  function iconeMelhoria(m: Melhoria) {
-    const box = el('div', 'icone');
-    if (m.tipo === 'gerador') {
-      box.classList.add(NIVEL[m.nivel - 1]);
-      box.style.backgroundImage = `url(${ativos.gerador(m.gerador)})`;
-    } else if (m.tipo === 'geral') {
-      const url = ativos.geral(m.id);
-      if (url) box.style.backgroundImage = `url(${url})`;
-      box.classList.add('geral');
-    } else {
-      box.classList.add('sinergia');
-      for (const id of [m.fonte, m.alvo]) {
-        const mini = el('span', 'mini');
-        mini.style.backgroundImage = `url(${ativos.gerador(id)})`;
-        box.append(mini);
-      }
-    }
-    return box;
   }
 
   /** Uma linha do editor: rótulo + botões (texto, ou amostras de cor com `tons`). */
@@ -2951,79 +3130,45 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     linha.append(el('span', 'opcoes-rotulo', rotulo), botoes);
     return linha;
   }
+```
 
-  function renderizar(m: Modelo) {
-    const s = m.estado;
-    const jogando = m.fase === 'jogando' || m.fase === 'abrindo';
-    precos = [];
-    prazos = [];
-    mostrar(abrir, m.fase === 'antes');
-    mostrar(abas, jogando);
-    mostrar(placa, jogando);
-    for (const k of Object.keys(botoesAba) as Aba[]) botoesAba[k].classList.toggle('ativa', m.aba === k);
-    mostrar(listaG, jogando && m.aba === 'geradores');
-    mostrar(listaM, jogando && m.aba === 'melhorias');
-    mostrar(listaC, jogando && m.aba === 'contratar');
-    mostrar(listaP, jogando && m.aba === 'placar');
-    caixinha.textContent = `Oportunidades (${m.pendentes.length})`;
-    mostrar(caixinha, jogando);
+e, dentro de `renderizar`, na caixinha, renomeie a variável local `boneco` (o `el('div', 'boneco')`) para
+`bonequinho` (as duas linhas que a usam), para não esconder a função nova.
 
-    listaG.replaceChildren();
-    listaM.replaceChildren();
-    if (s && jogando) {
-      taxaTxt.textContent = formatarTaxa(s.rate);
-      const agoraBoost = s.boost_until && Date.parse(s.boost_until) > Date.parse(s.server_now);
-      bonus.textContent = agoraBoost ? 'Produção ×5 por alguns segundos' : s.half_price ? 'Próxima compra pela metade' : '';
-      for (let gid = 1; gid <= 30; gid++) {
-        if (podeComprarGerador(s, gid)) listaG.append(linhaGerador(s, gid));
-        else {
-          listaG.append(linhaTrancada(gid));
-          break;
-        }
-      }
-      const cm = custoMult(catalogo, s);
-      const disponiveis = catalogo.melhorias
-        .filter((x) => !s.upgrades.includes(x.id) && liberada(catalogo, x, s))
-        .sort((x, y) => x.preco - y.preco);
-      if (!disponiveis.length) listaM.append(el('p', 'vazio', 'Nenhuma melhoria liberada agora. Compra mais geradores.'));
-      for (const x of disponiveis) {
-        const item = el('div', 'melhoria');
-        const meio = el('div', 'meio');
-        meio.append(el('strong', undefined, x.nome), el('span', 'sub', x.frase));
-        const p = x.preco * cm * (s.half_price ? 0.5 : 1);
-        const comprar = button(formatarValor(p), 'btn', () => a.comprar('melhoria', x.id, 1));
-        precos.push({ botao: comprar, preco: p });
-        item.append(iconeMelhoria(x), meio, comprar);
-        listaM.append(item);
-      }
-    }
+(i) Em `renderizar`, depois de `mostrar(listaM, jogando && m.aba === 'melhorias');`:
+`mostrar(listaC, jogando && m.aba === 'contratar');`
 
+(j) Logo antes de `listaP.replaceChildren();`, acrescente:
+
+```ts
     // contratar: você no topo (bônus, quem te contratou), depois uma carta por fella que abriu a empresa
     listaC.replaceChildren();
     if (s && jogando && m.aba === 'contratar') {
+      const agora = Date.parse(s.server_now);
       const nome = (uid: string) => m.placar?.find((r) => r.userId === uid)?.name ?? 'Alguém';
       const topoC = el('div', 'contratos-topo');
       const texto = el('div', 'meio');
       texto.append(
         el('strong', undefined, `Contratos: ${porcento(multContratos(catalogo, s))} de produção`),
         el('span', 'sub', s.chefes.length
-          ? `Você trabalha pra ${s.chefes.map((c) => `${nome(c.user_id)} (${c.cargo})`).join(', ')}.`
-          : 'Ninguém te contratou ainda: você ganha o piso de freela.'),
+          ? `Você trabalha pra ${s.chefes.map((c) => `${nome(c.user_id)} (${c.cargo}, ${restam(Date.parse(c.ate) - agora)})`).join(', ')}.`
+          : 'Ninguém te contratou: você ganha o piso de freela.'),
       );
       topoC.append(boneco(s.avatar, 'Seu personagem'), texto, button('Mudar visual', 'btn', () => a.editor('abrir')));
       listaC.append(topoC);
       if (!m.placar) listaC.append(el('p', 'vazio', 'Carregando…'));
       else {
         const outros = m.placar.filter((r) => r.userId !== s.user_id);
-        if (!outros.length) listaC.append(el('p', 'vazio', 'Ninguém mais abriu a empresa essa semana. Chama a galera.'));
+        if (!outros.length) listaC.append(el('p', 'vazio', 'Ninguém mais abriu a empresa ainda. Chama a galera.'));
         for (const r of outros) {
           const carta = el('div', 'carta');
           const meio = el('div', 'meio');
           meio.append(el('strong', undefined, r.name), el('span', 'sub', `${ERAS[r.era - 1]} · ${empresas(r.hiredCount)}`));
           carta.append(boneco(r.avatar, null), meio);
-          if (r.byMe) {
-            const cargo = s.equipe.find((e) => e.user_id === r.userId)?.cargo;
-            carta.append(el('span', 'contratado', cargo ? `Trabalha pra você como ${cargo}` : 'Trabalha pra você'));
+          // "já trabalha pra você" vem do estado (sempre fresco), não só do placar (recarrega a cada 60 s)
+          const meu = s.equipe.find((e) => e.user_id === r.userId);
+          if (meu) {
+            carta.append(el('span', 'contratado', `Trabalha pra você como ${meu.cargo} ${restam(Date.parse(meu.ate) - agora)}`));
           } else {
             const b = button(`Contratar · ${formatarValor(s.hire_price)}`, 'btn', () => a.contratar(r.userId));
             precos.push({ botao: b, preco: s.hire_price });
@@ -3034,94 +3179,21 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       }
     }
 
-    listaP.replaceChildren();
-    if (!m.placar) listaP.append(el('li', 'vazio', 'Carregando…'));
-    else {
-      if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda essa semana.'));
-      m.placar.forEach((r, i) => {
-        const li = el('li', r.userId === s?.user_id ? 'eu' : undefined);
-        const est = r.strategies
-          .map((o, k) => catalogo.estrategias.find((e) => e.era === k + 2 && e.opcao === o)?.nome)
-          .filter(Boolean)
-          .join(' · ');
+```
+
+(k) No placar, troque a linha `li.append(el('span', 'pos', ...), ..., el('span', 'v', formatarTaxa(r.rate)));` por:
+
+```ts
         li.append(
           el('span', 'pos', `${i + 1}º`), boneco(r.avatar, null), el('span', 'nome', r.name),
           el('span', 'sub', `${ERAS[r.era - 1]}${est ? ` · ${est}` : ''}`), el('span', 'v', formatarTaxa(r.rate)),
         );
-        if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado do mercado'));
-        listaP.append(li);
-      });
-    }
+        if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
+```
 
-    // oportunidade passando na cena
-    mostrar(vivo, !!s && m.aoVivo !== null && s.opp_left > 0);
-    if (s && m.aoVivo !== null) {
-      const w = m.aoVivo;
-      vivo.style.backgroundImage = `url(${ativos.oportunidade(tipoOportunidade(s.user_id, w))})`;
-      vivo.style.animationDuration = `${segundosOportunidade(s)}s`;
-      vivo.setAttribute('aria-label', `Pegar oportunidade: ${TEXTO_TIPO[tipoOportunidade(s.user_id, w)]}`);
-      vivo.onclick = () => a.pegar(w);
-    }
+(l) Logo antes de `noticeTxt.textContent = m.aviso ?? '';`, acrescente:
 
-    // estratégia
-    const era = s ? estrategiaPendente(s) : null;
-    modalE.replaceChildren();
-    mostrar(modalE, jogando && era !== null);
-    if (era !== null) {
-      const folha = el('div', 'folha');
-      const topoE = el('div', 'folha-topo');
-      topoE.append(titulo('idle-titulo-estrategia', `Era ${era}: ${ERAS[era - 1]}`));
-      const lista = el('ul', 'escolhas');
-      for (const e of catalogo.estrategias.filter((x) => x.era === era)) {
-        const li = el('li', e.ativa ? 'escolha' : 'escolha off');
-        const texto = el('div', 'escolha-texto');
-        texto.append(el('strong', undefined, e.nome), el('span', 'sub', e.frase));
-        li.append(texto);
-        if (e.ativa) {
-          const b = button('Escolher', 'btn main compacto', () => a.escolher(era, e.opcao));
-          b.disabled = m.ocupado;
-          li.append(b);
-        } else {
-          li.append(el('span', 'em-breve', e.requer === 'contratos' ? 'Chega com Contratar' : 'Chega com o Mapa do rolê'));
-        }
-        lista.append(li);
-      }
-      folha.append(topoE, el('p', 'sub', 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'), lista);
-      modalE.append(folha);
-    }
-
-    // caixinha
-    modalC.replaceChildren();
-    mostrar(modalC, m.caixaAberta && jogando);
-    if (s && m.caixaAberta) {
-      const folha = el('div', 'folha');
-      const topoC = el('div', 'folha-topo');
-      const fechar = button('', 'fechar', () => a.caixa(false));
-      fechar.setAttribute('aria-label', 'Fechar');
-      fechar.append(iconeFechar());
-      topoC.append(titulo('idle-titulo-caixa', 'Oportunidades guardadas'), fechar);
-      folha.append(topoC, el('p', 'sub', s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}.` : 'Já pegou todas de hoje. Amanhã tem mais.'));
-      if (!m.pendentes.length) folha.append(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
-      const lista = el('ul', 'escolhas');
-      for (const w of m.pendentes) {
-        const k = tipoOportunidade(s.user_id, w);
-        const li = el('li', 'escolha');
-        const bonequinho = el('div', 'boneco');
-        bonequinho.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
-        const texto = el('div', 'escolha-texto');
-        const quando = el('span', 'sub prazo', '');
-        texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
-        prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
-        const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
-        b.disabled = m.ocupado || s.opp_left <= 0;
-        li.append(bonequinho, texto, b);
-        lista.append(li);
-      }
-      if (m.pendentes.length) folha.append(lista);
-      modalC.append(folha);
-      atualizarPrazos();
-    }
-
+```ts
     // editor de personagem
     modalV.replaceChildren();
     mostrar(modalV, m.editor !== null && (m.fase === 'antes' || jogando));
@@ -3155,45 +3227,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       modalV.append(folha);
     }
 
-    noticeTxt.textContent = m.aviso ?? '';
-    mostrar(notice, !!m.aviso);
-    overlayTxt.textContent = 'Entra no fellas pra jogar';
-    mostrar(entrar, true);
-    mostrar(deNovo, false);
-    mostrar(overlay, m.fase === 'sem_sessao');
-  }
-
-  function atualizarPrazos() {
-    const agora = Date.now();
-    for (const p of prazos) p.texto.textContent = prazo(p.fim - agora);
-  }
-
-  function atualizarValor(valor: number) {
-    numero.textContent = formatarValor(valor);
-    atualizarPrazos();
-    for (const p of precos) {
-      p.botao.disabled = p.preco > valor;
-      if (p.maximo) {
-        const k = maxCompra(p.maximo.custo, p.maximo.n, valor, p.maximo.cm);
-        p.botao.textContent = k > 1 ? `Máx (${k})` : 'Máx';
-      }
-    }
-  }
-
-  function fatal(texto: string) {
-    overlayTxt.textContent = texto;
-    mostrar(entrar, false);
-    mostrar(deNovo, true);
-    mostrar(overlay, true);
-    mostrar(painel, false);
-  }
-
-  return { canvas, renderizar, atualizarValor, fatal };
-}
 ```
-
-Nota: o boneco da caixinha virou `bonequinho` (o nome `boneco` agora é a função do personagem); a classe CSS `.boneco`
-continua a mesma.
 
 - [ ] **Step 3: `games/idle/idle.css`**
 
@@ -3214,7 +3248,7 @@ Troque as quatro regras `.idle .lista-placar li`, `.idle .lista-placar li.eu`, `
 .idle .lista-placar .v { grid-row: 1; grid-column: 4; font-weight: 700; }
 ```
 
-E acrescente antes da linha `@media (prefers-reduced-motion: reduce) ...`:
+E acrescente no fim do arquivo (depois das regras `.seg`):
 
 ```css
 .idle .mini-boneco { flex: none; width: 36px; height: 52px; image-rendering: pixelated; }
@@ -3237,126 +3271,109 @@ E acrescente antes da linha `@media (prefers-reduced-motion: reduce) ...`:
 .idle .editor-fim { display: flex; gap: 12px; justify-content: flex-end; padding-top: 12px; }
 ```
 
-- [ ] **Step 4: `games/idle/main.ts` (arquivo inteiro)**
+
+- [ ] **Step 4: `games/idle/main.ts` (edições pontuais; `vigiarVersao()` e o resto ficam como estão)**
+
+(a) Imports: o de `../shared/types` vira `import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';`;
+acrescente
 
 ```ts
-// Fellas Inc.: liga banco, tela e palco. O banco decide tudo; aqui só se pede, se mostra e se anima o número.
-import '../shared/hud/hud.css';
-import './idle.css';
-
-import * as realApi from '../shared/api';
-import { GameError, toGameError } from '../shared/errors';
-import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
-import { ativos } from './ativos';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
-import { aoVivo, instante, pendentes } from './oportunidades';
-import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
-import {
-  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, type Ancora, type Fase,
-} from './store';
-import { criarTela, type Aba } from './tela';
+```
 
-type Api = Pick<
-  typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'hasSession'
->;
-// só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
-const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
+(se a Task 6 já pôs `import { carregarKit } from './navegador';`, troque essa linha pela de cima) e acrescente `vencido`
+ao import de `./store`.
 
+(b) `type Api` passa a escolher também `'idleHire' | 'idleSetAvatar'`.
+
+(c) Troque `const RECARREGA = [...]` por:
+
+```ts
 const RECARREGA = [
   'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
   'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open',
 ];
+// contratar recusado: o placar (quem já trabalha pra quem) também ficou velho
+const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];
+```
 
-let fase: Fase = 'carregando';
-let ancora: Ancora | null = null;
-let aba: Aba = 'geradores';
-let placar: IdleBoardRow[] | null = null;
-let aviso: string | null = null;
-let ocupado = false;
-let caixaAberta = false;
-let vivoAtual: number | null = null;
+(d) Depois de `let vivoAtual: number | null = null;`, acrescente:
+
+```ts
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
 // volta sozinho na próxima abertura da página, até o primeiro "Bora".
 let rascunho: IdleVisual | null = null;
 let editorFechado = false;
 // bonecos soltos (cartas, placar, editor) só desenham depois que o kit carrega
 let desenhar: Desenhar = () => undefined;
+// o vencimento de contrato que já pediu um "bater o ponto" (pede uma vez por vencimento)
+let vencimentoPedido: string | null = null;
+```
 
-const tela = criarTela(
-  document.getElementById('app')!,
-  {
-    abrirCnpj: () => void guard(abrirCnpj),
-    comprar: (tipo, id, qtd) => void guard(async () => aplicar(await api.idleBuy(tipo, id, qtd))),
-    escolher: (era, opcao) => void guard(async () => aplicar(await api.idlePickStrategy(era, opcao))),
-    pegar: (w) => void guard(async () => aplicar(await api.idleClaim(w))),
-    trocarAba: (nova) => {
-      aba = nova;
-      if (nova === 'placar' || nova === 'contratar') void carregarPlacar();
-      render();
-    },
-    caixa: (aberta) => { caixaAberta = aberta; render(); },
-    tentarDeNovo: () => void guard(recarregar),
-    contratar: (uid) => void guard(async () => {
-      aplicar(await api.idleHire(uid));
-      await carregarPlacar();
-    }),
-    editor: (acao) => {
-      if (acao === 'salvar') {
-        const v = rascunho;
-        if (v) void guard(() => salvarVisual(v));
-        return;
-      }
-      if (acao === 'abrir') rascunho = { ...(ancora?.estado.avatar ?? PADRAO) };
-      else if (acao === 'fechar') {
-        rascunho = null;
-        editorFechado = true;
-      } else rascunho = sortear();
-      render();
-    },
-    mudarVisual: (campo, valor) => {
-      if (!rascunho) return;
-      rascunho = { ...rascunho, [campo]: valor };
-      render();
-    },
+(e) Na chamada `criarTela(document.getElementById('app')!, { ... })`: troque `trocarAba` por
+
+```ts
+  trocarAba: (nova) => {
+    aba = nova;
+    if (nova === 'placar' || nova === 'contratar') void carregarPlacar();
+    render();
   },
-  (canvas, v, opcoes) => desenhar(canvas, v, opcoes),
-);
+```
+
+acrescente às ações
+
+```ts
+  contratar: (uid) => void guard(async () => {
+    aplicar(await api.idleHire(uid));
+    await carregarPlacar();
+  }),
+  editor: (acao) => {
+    if (acao === 'salvar') {
+      const v = rascunho;
+      if (v) void guard(() => salvarVisual(v));
+      return;
+    }
+    if (acao === 'abrir') rascunho = { ...(ancora?.estado.avatar ?? PADRAO) };
+    else if (acao === 'fechar') {
+      rascunho = null;
+      editorFechado = true;
+    } else rascunho = sortear();
+    render();
+  },
+  mudarVisual: (campo, valor) => {
+    if (!rascunho) return;
+    rascunho = { ...rascunho, [campo]: valor };
+    render();
+  },
+```
+
+e passe o terceiro argumento depois do objeto: `}, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));`.
+
+(f) Troque a linha do palco (a da Task 6) por:
+
+```ts
 const kit = carregarKit();
 const palco = criarPalco(tela.canvas, ativos.camadas, kit);
 void (async () => {
   const k = await kit;
   const url = ativos.cadeira();
-  const cadeira = url ? await carregarImagem(url).catch(() => null) : null;
+  const cadeira = url
+    ? await carregarImagem(url).catch((e) => {
+        console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
+        return null;
+      })
+    : null;
   desenhar = criarDesenhista(k, cadeira);
   render();
 })();
+```
 
-function agoraSrv() {
-  return ancora ? agoraServidor(ancora, Date.now()) : Date.now();
-}
+(g) Em `render`, o objeto passado a `tela.renderizar` ganha `editor: rascunho,`.
 
-/** A oportunidade passando agora, só se o banco ainda aceita: não pega e não é de antes do início da semana. */
-function vivoAgora(s: IdleState, agora: number): number | null {
-  if (fase !== 'jogando' || s.opp_left <= 0) return null;
-  const w = aoVivo(s.user_id, agora, segundosOportunidade(s));
-  if (w === null || s.opp_claimed.map(Number).includes(w) || instante(s.user_id, w) < inicioSemana(s)) return null;
-  return w;
-}
+(h) `aplicar` vira:
 
-function render() {
-  const s = ancora?.estado ?? null;
-  const agora = agoraSrv();
-  const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s)) : [];
-  vivoAtual = s ? vivoAgora(s, agora) : null;
-  tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho,
-    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual,
-  });
-  if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
-}
-
+```ts
 function aplicar(estado: IdleState) {
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
@@ -3369,109 +3386,53 @@ function aplicar(estado: IdleState) {
   if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
   render();
 }
+```
 
-async function recarregar() {
-  aplicar(await api.idleOpen());
-}
+e, logo depois de `recarregar`, acrescente:
 
+```ts
 async function salvarVisual(v: IdleVisual) {
   aplicar(await api.idleSetAvatar(v));
   rascunho = null;
   if (aba === 'placar' || aba === 'contratar') await carregarPlacar();
 }
-
-async function abrirCnpj() {
-  const estado = await api.idleStart();
-  fase = 'abrindo';
-  aplicar(estado);
-  palco.tocar('cena-0-abrindo', {
-    umaVez: true,
-    aoTerminar: () => {
-      fase = 'jogando';
-      palco.tocar(cenaDoEstado(ancora!.estado, fase));
-      render();
-    },
-  });
-}
-
-const ERRO_PLACAR = 'Não deu pra carregar o placar. Tenta de novo.';
-
-/** Erro mantém o placar anterior (null = "Carregando…") e avisa; acertar depois limpa esse aviso. */
-async function carregarPlacar() {
-  try {
-    placar = await api.idleBoard();
-    if (aviso === ERRO_PLACAR) aviso = null;
-  } catch {
-    aviso = ERRO_PLACAR;
-  }
-  render();
-}
-
-/** Uma ação por vez; erro vira aviso; se o banco disse que o estado mudou, recarrega. */
-async function guard(trabalho: () => Promise<void>) {
-  if (ocupado) return;
-  ocupado = true;
-  aviso = null;
-  render();
-  try {
-    await trabalho();
-  } catch (e) {
-    const err = toGameError(e);
-    if (err.code === 'no_session') fase = 'sem_sessao';
-    else {
-      aviso = err.message;
-      if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
-    }
-  } finally {
-    ocupado = false;
-    render();
-  }
-}
-
-// número subindo e a oportunidade ao vivo (só com a aba visível)
-setInterval(() => {
-  if (document.hidden || !ancora) return;
-  tela.atualizarValor(valuationAgora(ancora, Date.now()));
-  if (vivoAgora(ancora.estado, agoraSrv()) !== vivoAtual) render();
-}, 100);
-setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'contratar')) void carregarPlacar(); }, 60_000);
-
-// voltou pra aba: bate o ponto de novo (pode ter virado a semana)
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
-});
-
-void (async () => {
-  if (import.meta.env.DEV && api.idleOpen === realApi.idleOpen) {
-    const { devLogin } = await import('../shared/devLogin');
-    await devLogin();
-  }
-  await document.fonts.ready;
-  if (!(await api.hasSession())) {
-    fase = 'sem_sessao';
-    render();
-    return;
-  }
-  await guard(recarregar);
-  if (fase === 'carregando') tela.fatal(new GameError('unknown').message);
-})();
 ```
 
-Antes de colar, compare com o `main.ts` atual (`git diff` depois): o que já existia (guard, placar, oportunidades,
-`abrirCnpj`) tem que ficar igual; as mudanças são só o editor, `contratar`, `palco.gente/preparar`, o desenhista e as
-listas `RECARREGA`/`Api`.
+(i) Em `guard`, troque `if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);` por:
+
+```ts
+      if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
+      if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
+```
+
+(j) No `setInterval` de 100 ms, depois de `if (vivoAgora(...) !== vivoAtual) render();`, acrescente:
+
+```ts
+  // um contrato venceu: a taxa mudou no banco, bate o ponto (uma vez por vencimento)
+  const s = ancora.estado;
+  if (vencido(s, agoraSrv()) && vencimentoPedido !== s.muda_em && !ocupado) {
+    vencimentoPedido = s.muda_em;
+    void guard(recarregar);
+  }
+```
+
+O `setInterval` do placar (60 s) passa a valer para as duas abas: `if (!document.hidden && (aba === 'placar' || aba === 'contratar')) void carregarPlacar();`.
+O comentário do `visibilitychange` vira `// voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)`.
 
 - [ ] **Step 5: Rodar os testes, o build e conferir no `?mock`**
 
-Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx tsc --noEmit && npx vitest run && npm run build`
-Expected: PASS.
+Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npx tsc --noEmit && npx vitest run && npm run build && git diff --stat main -- idle/tela.ts idle/main.ts`
+Expected: PASS; o diff de `tela.ts`/`main.ts` contra a `main` só tem as mudanças acima (nada de "À venda | Compradas",
+`vigiarVersao` ou textos novos sumindo).
 
-Conferência rápida (a arte do kit ainda não existe: bonecos vazios e cenas antigas, de propósito):
+Conferência no `?mock` (a arte do kit pode ainda não existir: bonecos vazios e cenas antigas, de propósito):
 `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp/games && npm run dev` e abrir `http://localhost:5173/games/idle/?mock`.
-Ver: o editor abre sozinho antes do Abrir CNPJ; "Bora" fecha e salva; X fecha e não volta até recarregar a página;
-Abrir CNPJ; no console `__rico(1e9)`; aba Contratar lista Oliveira, Bia e Teteu com "Contratar · R$ ..."; contratar a
-Bia mostra "Trabalha pra você como ..."; `__meContrata()` e reabrir a aba mostra "Você trabalha pra Oliveira (...)";
-o placar marca "Mais disputado do mercado".
+Ver: o editor abre sozinho antes do Abrir CNPJ; "Bora" fecha e salva; recarregar a página, abrir o editor e fechar no X:
+a cena fica com o fundador e o editor não volta até recarregar a página de novo (isto não tem teste automático);
+Abrir CNPJ; no console `__rico(1e9)`; aba Contratar lista Oliveira, Bia e Teteu com "Contratar · R$ ..."; contratar a Bia
+mostra "Trabalha pra você como ... por mais 6 dias"; tocar de novo rápido não cobra duas vezes; `__meContrata()` e
+reabrir a aba mostra "Você trabalha pra Oliveira (..., por mais 6 dias)"; o placar marca "Mais disputado da semana";
+desligar a rede e recarregar: o console avisa o arquivo que não carregou e a página continua.
 
 - [ ] **Step 6: Commit**
 
@@ -3484,7 +3445,7 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add games/idle/tela.ts g
 ### Task 8: No app: notificação "te contratou" e travas das migrações
 
 **Files:**
-- Create: `supabase/migrations/0038_notificacao_contrato.sql` (gerada pelo script do Step 3)
+- Create: `supabase/migrations/0039_notificacao_contrato.sql` (gerada pelo script do Step 3)
 - Modify: `lib/notifications.ts`, `components/notifications/NotificationRow.tsx`, `app/(tabs)/notifications.tsx`,
   `types/database.ts`
 - Test: `__tests__/notifications.test.ts`, `__tests__/notificationsScreen.test.tsx`, `__tests__/fellasIncMigration.test.ts`
@@ -3530,9 +3491,9 @@ e, depois do teste `'reação no meu story: toque abre o story'`:
 `__tests__/fellasIncMigration.test.ts`: acrescente no fim do arquivo:
 
 ```ts
-const gente = ler('0036_fellas_inc_gente.sql');
+const gente = ler('0038_fellas_inc_gente.sql');
 const genteSemComentarios = gente.split(/\r?\n/).map((l: string) => l.replace(/--.*$/, '')).join('\n');
-const notificacao = ler('0038_notificacao_contrato.sql');
+const notificacao = ler('0039_notificacao_contrato.sql');
 /** O `create or replace function public.notifications_feed ... $$;` de uma migração. */
 const feed = (sql: string) => {
   const s = sql.replace(/\r\n/g, '\n');
@@ -3541,15 +3502,19 @@ const feed = (sql: string) => {
 };
 const BLOCO_IDLE = /\n\n {4}union all\n {4}-- Fellas Inc\.: alguém me contratou[\s\S]*?c\.created_at >= me\.since\n/;
 
-describe('Fellas Inc., entrega 2 (0036–0038)', () => {
+describe('Fellas Inc., entrega 2 (0038–0039)', () => {
   it('não toca nos créditos do cassino', () => {
     for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(genteSemComentarios).not.toContain(proibido);
   });
+  it('sem reset: nada apaga estado nem contrato', () => {
+    for (const proibido of ['delete from public.idle_state', 'delete from public.idle_contracts']) expect(genteSemComentarios).not.toContain(proibido);
+  });
   it('funções internas fechadas; as do jogo só para quem está logado', () => {
     for (const f of [
-      'idle_avatar_json(uuid)', 'idle_json(public.idle_state)', 'idle_employee_mult(uuid)', 'idle_social_mult(public.idle_state)',
-      'idle_rate(public.idle_state)', 'idle_hire_price(public.idle_state)', 'idle_lock_all(uuid[])', 'idle_most_hired(date)',
-      'idle_weekly_reset()',
+      'idle_avatar_json(uuid)', 'idle_json(public.idle_state)', 'idle_employee_mult(uuid)',
+      'idle_social_mult(public.idle_state, timestamptz)', 'idle_rate_at(public.idle_state, timestamptz)', 'idle_rate(public.idle_state)',
+      'idle_settle(public.idle_state, timestamptz)', 'idle_hire_price(public.idle_state)', 'idle_next_change(public.idle_state)',
+      'idle_lock_all(uuid[])', 'idle_most_hired(date)', 'idle_weekly_reset()',
     ])
       expect(gente).toContain(`revoke all on function public.${f} from public, anon, authenticated;`);
     for (const f of ['idle_set_avatar(int, int, int, int, int, int, int)', 'idle_hire(uuid)', 'idle_pick_strategy(int, int)', 'idle_board()'])
@@ -3564,7 +3529,7 @@ describe('Fellas Inc., entrega 2 (0036–0038)', () => {
   it('o catálogo novo é o gerado', () => {
     expect(ler('0037_fellas_inc_catalogo_gente.sql')).toContain('GERADO por games/idle/catalogo.ts');
   });
-  it('0038: a função de notificações é a da 0021 mais o idle_hired', () => {
+  it('0039: a função de notificações é a da 0021 mais o idle_hired', () => {
     const nova = feed(notificacao);
     expect(nova).toMatch(BLOCO_IDLE);
     expect(nova.replace(BLOCO_IDLE, '\n')).toBe(feed(ler('0021_stories.sql')));
@@ -3574,7 +3539,7 @@ describe('Fellas Inc., entrega 2 (0036–0038)', () => {
 ```
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && npx jest __tests__/notifications.test.ts __tests__/notificationsScreen.test.tsx __tests__/fellasIncMigration.test.ts`
-Expected: FAIL (tipo `idle_hired` desconhecido; 0038 não existe).
+Expected: FAIL (tipo `idle_hired` desconhecido; 0039 não existe).
 
 - [ ] **Step 2: App**
 
@@ -3604,7 +3569,7 @@ Expected: FAIL (tipo `idle_hired` desconhecido; 0038 não existe).
 
 `types/database.ts`, em `idle_weeks.Row`, depois de `podium: Json;`: `most_hired_id: string | null;`
 
-- [ ] **Step 3: Migração 0038 (gerada a partir da 0021, sem redigitar a função)**
+- [ ] **Step 3: Migração 0039 (gerada a partir da 0021, sem redigitar a função)**
 
 ```bash
 cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && node - <<'JS'
@@ -3618,7 +3583,7 @@ if (fn.split(ancora).length !== 2) throw new Error('âncora do "fella novo" não
 const bloco = [
   '',
   '    union all',
-  '    -- Fellas Inc.: alguém me contratou (o cargo vai no body; o contrato some no reset de segunda)',
+  '    -- Fellas Inc.: alguém me contratou (o cargo vai no body; contrato não é apagado, então a notificação fica)',
   "    select 'idle_hired',",
   '           null::uuid,',
   '           null::uuid,',
@@ -3635,14 +3600,14 @@ const bloco = [
 ].join('\n');
 const sql = `-- fellasapp: notificação da Fellas Inc. "Fulano te contratou como [cargo]" (idle_hired). Idempotente.
 -- A função é a da 0021 inteira (mesmo retorno, então create or replace basta) com um bloco a mais no fim do feed.
--- Depende da 0036 (idle_contracts). Fica fora do PGlite dos jogos: a função cita as tabelas de posts e stories.
+-- Depende da 0038 (idle_contracts). Fica fora do PGlite dos jogos: a função cita as tabelas de posts e stories.
 
 ${fn.replace(ancora, ancora + bloco)}
 
 revoke all on function public.notifications_feed(integer) from public;
 grant execute on function public.notifications_feed(integer) to authenticated;
 `;
-fs.writeFileSync(`${dir}/0038_notificacao_contrato.sql`, sql);
+fs.writeFileSync(`${dir}/0039_notificacao_contrato.sql`, sql);
 JS
 ```
 
@@ -3652,12 +3617,12 @@ fecha o `feed`.
 - [ ] **Step 4: Rodar tudo na raiz**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && npx tsc --noEmit && npm test`
-Expected: PASS (inclusive `safeUpdateMigrations.test.ts` para 0036, 0037 e 0038).
+Expected: PASS (inclusive `safeUpdateMigrations.test.ts` para 0037, 0038 e 0039).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0038_notificacao_contrato.sql lib/notifications.ts components/notifications/NotificationRow.tsx "app/(tabs)/notifications.tsx" types/database.ts __tests__/notifications.test.ts __tests__/notificationsScreen.test.tsx __tests__/fellasIncMigration.test.ts && git commit -m "Notificações: \"te contratou como...\" da Fellas Inc.; travas das migrações da entrega 2"
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git add supabase/migrations/0039_notificacao_contrato.sql lib/notifications.ts components/notifications/NotificationRow.tsx "app/(tabs)/notifications.tsx" types/database.ts __tests__/notifications.test.ts __tests__/notificationsScreen.test.tsx __tests__/fellasIncMigration.test.ts && git commit -m "Notificações: \"te contratou como...\" da Fellas Inc.; travas das migrações da entrega 2"
 ```
 
 ---
@@ -3951,13 +3916,13 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && npx tsc --noEmit && npm test
 Expected: tudo passa.
 
 - [ ] **Step 2: Banco de produção (o Juan roda)** — pedir ao Juan, no terminal dele:
-`! npx supabase migration list` (só 0036, 0037 e 0038 pendentes; se aparecer outra, parar e conversar) e depois
-`! npx supabase db push`.
+`! npx supabase migration list` (pendentes só 0037, 0038 e 0039; a 0036 sem-reset já foi antes; se aparecer outra,
+parar e conversar) e depois `! npx supabase db push`.
 
 - [ ] **Step 3: Conferir pela REST que entrou (antes de qualquer push na `main`)**
 
 ```bash
-cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && set -a && . ./.env && set +a && for q in "idle_weeks?select=most_hired_id" "idle_avatar?select=cor_acessorio" "idle_contracts?select=cargo" "idle_cat_cargo?select=nome"; do curl -s -o /dev/null -w "$q %{http_code}\n" "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/$q&limit=1" -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY"; done
+cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && set -a && . ./.env && set +a && for q in "idle_weeks?select=most_hired_id" "idle_avatar?select=cor_acessorio" "idle_contracts?select=ends_at" "idle_cat_cargo?select=nome"; do curl -s -o /dev/null -w "$q %{http_code}\n" "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/$q&limit=1" -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY"; done
 ```
 
 Expected: 200 ou 401 (existe; anônimo não tem permissão) em todos; 400 ("column ... does not exist") ou 404 = a
@@ -3970,34 +3935,44 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git checkout main && git pul
 ```
 
 - [ ] **Step 5: Conferência real (com o Juan e mais um fella)** — `https://fellasapp.pages.dev/games` no celular:
-o editor abre antes do Abrir CNPJ; "Bora"; a cena mostra o personagem; na aba Contratar, contratar alguém que já abriu
-a empresa (o preço some do valuation; a produção sobe 10%); o contratado vê "Fulano te contratou como …" nas
-notificações do app e, tocando, cai no jogo com "Você trabalha pra …"; o placar marca o mais disputado. Na terça,
-conferir `idle_weeks.most_hired_id` e que `idle_contracts` zerou.
+o editor abre antes do Abrir CNPJ (para quem nunca salvou o visual); "Bora"; a cena mostra o personagem; na aba
+Contratar, contratar alguém que já abriu a empresa (o preço some do valuation; a produção sobe 10%; a carta diz
+"por mais 6 dias"); o contratado vê "Fulano te contratou como … na Fellas Inc." nas notificações do app e, tocando, cai
+no jogo com "Você trabalha pra …"; o placar marca o mais disputado da semana. Na segunda seguinte, conferir
+`idle_weeks.most_hired_id` e que os contratos e empresas continuam; uma semana depois do contrato, conferir que ele
+venceu (sai da equipe, a produção volta) e que dá para contratar de novo.
 
 ---
 
 ## Autorrevisão
 
-- **Cobertura da spec (entrega 2):** 5 contratar (quem pode, preço, +10%/+2%, piso, par único, sem demissão, cargo,
-  reset, mais disputado) → Tasks 1, 3, 4, 7; notificação (5, 8.3) → Task 8; 4 estratégias Networking, Cultura de
-  startup e "contratar custa ×2" de Abrir capital → Tasks 1, 3; 7.1 kit (poses, peças, cores, marcadores, padrões,
-  freelas, estagiário oficial) → contrato de formato, Tasks 2, 6, 9, 11; 7.2 editor → Tasks 2 (banco), 7 (tela);
-  7.3 vagas (camadas, ordem de ocupação, montagem em memória, linha única, quadros 2/4 no loop de 8/12) → contrato de
-  formato, Tasks 6, 10, 11; 8.1 reset (placa com mais disputado, contratos zeram, personagem fica) → Task 4; 8.2 aba
-  Contratar e personagem no placar → Task 7; 9.1 `idle_contracts`, `idle_avatar`, `idle_weeks.most_hired_id` →
-  Tasks 2, 3, 4; 9.2 `idle_hire`, `idle_set_avatar`, paridade → Tasks 2, 3; 10 arte → Tasks 9–11; 11 testes (par
-  único, preço crescente, faixas inválidas, ninguém escreve no personagem dos outros, troca de cores, montagem das
-  camadas, ordem das vagas, paridade, simulação com o piso) → Tasks 2, 3, 6. Propriedades ficam para a entrega 3.
+- **Cobertura da spec (entrega 2, com as decisões de 10/10):** 5 contratar (quem pode, preço com contratos ativos,
+  +10%/+2%, piso, um contrato ativo por par, sem demissão, cargo, 7 dias, mais disputado) → Tasks 1, 3, 4, 7;
+  notificação (5, 8.3) → Task 8; estratégias Networking, Cultura de startup e "contratar custa ×2" de Abrir capital →
+  Tasks 1, 3; 7.1 kit (poses, peças, cores, marcadores, padrões, freelas, estagiário oficial) → contrato de formato,
+  Tasks 2, 6, 9, 11; 7.2 editor → Tasks 2 (banco), 7 (tela); 7.3 vagas (camadas, ordem de ocupação, montagem em
+  memória, linha única, quadros 2/4 no loop de 8/12) → contrato de formato, Tasks 6, 10, 11; 8.1 segunda 00:00 sem
+  reset (foto com o mais disputado; nada apaga contrato, empresa ou personagem) → Task 4; 8.2 aba Contratar e
+  personagem no placar → Task 7; 9.1 `idle_contracts`, `idle_avatar`, `idle_weeks.most_hired_id` → Tasks 2, 3, 4; 9.2
+  `idle_hire`, `idle_set_avatar`, paridade (inclusive o vencimento no meio) → Tasks 2, 3; 10 arte → Tasks 9–11; 11
+  testes (par único, preço crescente, vencimento, faixas inválidas, ninguém escreve no personagem dos outros, troca de
+  cores, montagem das camadas, ordem das vagas, paridade, simulação com o piso) → Tasks 2, 3, 5, 6. Propriedades,
+  prestígio e conquistas ficam para a entrega 3 (no prestígio, os contratos que a pessoa fez acabam).
 - **Nomes conferidos entre tasks:** `idle_avatar_json`, `idle_json`, `idle_set_avatar`, `idle_employee_mult`,
-  `idle_social_mult`, `idle_hire_price`, `idle_lock_all`, `idle_hire`, `idle_most_hired`; `Social`, `SOLO`,
-  `multContratos`; `Imagem`, `vazia`, `recortar`, `colar`; `Visual`, `Campo`, `Tons`, `FAIXAS`, `CAMPOS`, `PADRAO`,
-  `MARCADORES`, `PELES`, `CORES_CABELO`, `CORES`, `valido`, `sortear`, `chave`, `trocarCores`; `Pose`, `POSES`,
-  `QUADROS_POSE`, `LINHAS_KIT`, `CADEIRA`, `Kit`, `Vaga`, `Vagas`, `VAGAS_CONTRATADO`, `boneco`, `naCadeira`,
-  `ocuparVagas`, `posicaoNoQuadro`, `montarTira`, `validarVagas`; `Camadas`, `ativos.camadas/pose/estagiario/cadeira`;
-  `Desenhar`, `carregarImagem`, `pintar`, `carregarKit`, `criarDesenhista`; `Gente`, `chaveGente`,
-  `palco.gente/preparar`; `IdleVisual`, `IdleContratado`, `IdleChefe`, `LinhaPlacar`, `linhaPlacar`, `idleHire`,
-  `idleSetAvatar`; `Modelo.editor`, `Acoes.contratar/editor/mudarVisual`, `porcento`, `empresas`.
-- **Numeração:** 0035 é a do placar por R$/s (pré-requisito, fora deste plano); 0036 lógica, 0037 catálogo gerado,
-  0038 notificação. `games/test/db.ts` e `games/dev/mockDb.ts` listam 0035, 0036 e 0037 (a 0038 não roda no PGlite).
-- **Foco da revisão:** os 5 itens têm teste nas Tasks 2, 3, 4, 6 e 7.
+  `idle_social_mult(s, t)`, `idle_rate_at(s, t)`, `idle_rate(s)`, `idle_settle`, `idle_hire_price`, `idle_next_change`,
+  `idle_lock_all`, `idle_hire`, `idle_most_hired`; `Social`, `SOLO`, `multContratos`, `acumularTrechos`; `vencido`;
+  `Imagem`, `vazia`, `recortar`, `colar`; `Visual`, `Campo`, `Tons`, `FAIXAS`, `CAMPOS`, `PADRAO`, `MARCADORES`,
+  `PELES`, `CORES_CABELO`, `CORES`, `valido`, `sortear`, `chave`, `trocarCores`; `Pose`, `POSES`, `QUADROS_POSE`,
+  `LINHAS_KIT`, `CADEIRA`, `Kit`, `Vaga`, `Vagas`, `VAGAS_CONTRATADO`, `boneco`, `naCadeira`, `ocuparVagas`,
+  `posicaoNoQuadro`, `montarTira`, `validarVagas`; `Camadas`, `ativos.camadas/pose/estagiario/cadeira`; `Desenhar`,
+  `carregarImagem`, `pintar`, `carregarKit`, `criarDesenhista`; `Gente`, `chaveGente`, `palco.gente/preparar`;
+  `IdleVisual`, `IdleContratado.ate`, `IdleChefe.ate`, `IdleState.muda_em`, `LinhaPlacar`, `linhaPlacar`, `idleHire`,
+  `idleSetAvatar`; `Modelo.editor`, `Acoes.contratar/editor/mudarVisual`, `porcento`, `empresas`, `restam`.
+- **Numeração:** 0035 placar por R$/s e 0036 sem reset (pré-requisitos, fora deste plano); 0037 catálogo gerado (Task 1,
+  feita); 0038 lógica; 0039 notificação. `games/test/db.ts` e `games/dev/mockDb.ts` listam 0035 a 0038 (a 0039 não roda
+  no PGlite).
+- **Conferido no PGlite ao revisar o plano (10/10):** o SQL das Tasks 2–4 montado como a 0038, com as migrações reais
+  0027–0037, passou nos testes de banco das Tasks 2–4, na paridade (inclusive o vencimento no meio) e nos testes do
+  núcleo com os ajustes do piso; a `tela.ts` com as edições da Task 7 passou nos testes da tela (os de antes e os novos).
+- **Foco da revisão:** itens 1 a 4 têm teste nas Tasks 3, 4 e 5; o 5 tem teste nas Tasks 2 e 6 e conferência à mão no
+  `?mock` (Task 7) para a parte que mora no `main.ts`.
