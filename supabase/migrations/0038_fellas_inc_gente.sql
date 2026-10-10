@@ -364,3 +364,95 @@ revoke all on function public.idle_hire(uuid) from public, anon;
 grant execute on function public.idle_hire(uuid) to authenticated;
 revoke all on function public.idle_pick_strategy(int, int) from public, anon;
 grant execute on function public.idle_pick_strategy(int, int) to authenticated;
+
+-- ===== placar, "mais disputado" e a foto de segunda =====
+
+alter table public.idle_weeks add column if not exists most_hired_id uuid references public.profiles (id) on delete set null;
+
+-- quem recebeu mais contratos criados na semana que começa em p_week (segunda 00:00 de Brasília); empate = quem chegou
+-- primeiro ao número; null = ninguém contratado
+create or replace function public.idle_most_hired(p_week date)
+returns uuid language sql stable set search_path = public as $$
+  select c.employee_id
+    from public.idle_contracts c
+   where c.created_at >= (p_week::timestamp at time zone 'America/Sao_Paulo')
+     and c.created_at < ((p_week + 7)::timestamp at time zone 'America/Sao_Paulo')
+   group by c.employee_id
+   order by count(*) desc, max(c.created_at), c.employee_id
+   limit 1
+$$;
+
+-- placar (o da 0036: todo mundo que abriu a empresa, por R$/s, desempate pelo valuation) + visual, em quantas empresas
+-- cada um trabalha agora, se você contratou, e o mais disputado da semana
+create or replace function public.idle_board()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_mais uuid;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  v_mais := public.idle_most_hired(public.games_week_start());
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era, 'strategies', to_jsonb(x.strategies),
+             'avatar', public.idle_avatar_json(x.user_id), 'hired_count', x.n, 'by_me', x.by_me,
+             'most_hired', coalesce(x.user_id = v_mais, false)) order by x.rate desc, x.v desc), '[]'::jsonb)
+      from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_rate(s) as rate,
+                   public.idle_era(s.generators) as era, s.strategies,
+                   (select count(*) from public.idle_contracts c
+                     where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now())::int as n,
+                   exists (select 1 from public.idle_contracts c
+                            where c.employer_id = auth.uid() and c.employee_id = s.user_id
+                              and c.created_at <= now() and c.ends_at > now()) as by_me
+              from public.idle_state s
+             where s.started) x);
+end;
+$$;
+
+-- foto da semana que acabou (a da 0036, que não apaga nada) + o mais disputado dela na placa; o R$/s do pódio é o da
+-- meia-noite (contrato que venceu depois disso não muda o pódio)
+create or replace function public.idle_weekly_reset()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_new    date := public.games_week_start();
+  v_old    date := public.games_week_start() - 7;
+  v_podium jsonb;
+  v_champ  uuid;
+  v_gravou date;
+begin
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- uma foto por vez
+  if exists (select 1 from public.idle_weeks where week_start = v_old) then
+    return;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era,
+                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc), '[]')
+    into v_podium
+    from (select s.user_id,
+                 (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 public.idle_rate_at(s, v_new::timestamp at time zone 'America/Sao_Paulo') as rate,
+                 public.idle_era(s.generators) as era, s.strategies
+            from public.idle_state s
+           where s.started and s.week_start < v_new
+           order by 3 desc, 2 desc
+           limit 3) x;
+  if jsonb_array_length(v_podium) = 0 then
+    return; -- ninguém jogava antes desta semana: sem placa
+  end if;
+  v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
+  insert into public.idle_weeks (week_start, unicorn_id, podium, most_hired_id)
+  values (v_old, v_champ, v_podium, public.idle_most_hired(v_old))
+  on conflict (week_start) do nothing
+  returning week_start into v_gravou;
+  if v_gravou is not null then
+    update public.profiles set badges = array_remove(badges, 'weekly_unicorn') where 'weekly_unicorn' = any (badges);
+    if v_champ is not null then
+      update public.profiles set badges = array_append(badges, 'weekly_unicorn') where id = v_champ;
+    end if;
+  end if;
+end;
+$$;
+
+revoke all on function public.idle_most_hired(date) from public, anon, authenticated;
+revoke all on function public.idle_weekly_reset() from public, anon, authenticated;
+revoke all on function public.idle_board() from public, anon;
+grant execute on function public.idle_board() to authenticated;

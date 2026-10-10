@@ -268,3 +268,124 @@ describe('contratar', () => {
     expect(await valuationDe(B)).toBeCloseTo(0.5 * 1.02 * 7200 + 0.5 * 1.02 * 3600, 0);
   });
 });
+
+type LinhaPlacar = { user_id: string; rate: number; avatar: Visual | null; hired_count: number; by_me: boolean; most_hired: boolean };
+const placar = () => t.rpc<LinhaPlacar[]>('idle_board');
+/** Segunda 00:00 de Brasília desta semana, como texto para o SQL. */
+const SEGUNDA = `(public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')`;
+
+describe('placar com gente', () => {
+  beforeEach(async () => {
+    await abrir(A, B, C);
+    for (const u of [A, B, C]) await dar(u, 1e9);
+  });
+
+  it('cada linha traz o visual, em quantas empresas trabalha, se foi você e o mais disputado', async () => {
+    await t.as(B);
+    await salvar(V);
+    await t.as(A);
+    await contratar(B);
+    await contratar(C);
+    await t.as(C);
+    await contratar(B);
+    await t.as(A);
+    const rows = await placar();
+    const de = (u: string) => rows.find((r) => r.user_id === u)!;
+    expect(de(B)).toMatchObject({ avatar: V, hired_count: 2, by_me: true, most_hired: true });
+    expect(de(C)).toMatchObject({ avatar: null, hired_count: 1, by_me: true, most_hired: false });
+    expect(de(A)).toMatchObject({ hired_count: 0, by_me: false, most_hired: false });
+  });
+  it('continua na ordem do R$/s (a da 0035/0036)', async () => {
+    await contratar(B); // A ganha +10%: passa B e C
+    const rows = await placar();
+    expect(rows[0].user_id).toBe(A);
+    for (let i = 1; i < rows.length; i++) expect(rows[i - 1].rate).toBeGreaterThanOrEqual(rows[i].rate);
+  });
+  it('empate no mais disputado: quem chegou primeiro', async () => {
+    await contratar(B);
+    await contratar(C);
+    await q(`update public.idle_contracts set created_at = now() - interval '1 minute' where employee_id = $1`, [C]);
+    expect((await placar()).find((r) => r.most_hired)!.user_id).toBe(C);
+  });
+  it('mais disputado é da semana: contrato criado na semana passada não conta (mas ainda vale e aparece no "trabalha em")', async () => {
+    await contratar(B);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
+    const rows = await placar();
+    expect(rows.some((r) => r.most_hired)).toBe(false);
+    expect(rows.find((r) => r.user_id === B)).toMatchObject({ hired_count: 1, by_me: true });
+  });
+  it('contrato vencido sai do "trabalha em" e do "foi você"', async () => {
+    await contratar(B);
+    await q(`update public.idle_contracts set created_at = created_at - interval '7 days', ends_at = ends_at - interval '7 days' where true`);
+    expect((await placar()).find((r) => r.user_id === B)).toMatchObject({ hired_count: 0, by_me: false });
+  });
+  it('ninguém contratado: ninguém é o mais disputado', async () => {
+    expect((await placar()).some((r) => r.most_hired)).toBe(false);
+  });
+});
+
+// a pessoa chegou na semana anterior (a foto de segunda só conta quem já jogava antes da semana nova)
+const envelhecer = () => q('update public.idle_state set week_start = public.games_week_start() - 7 where true');
+/** Os contratos foram criados no domingo da semana que acabou (e valem até o domingo que vem). */
+const contratosDaSemanaPassada = () =>
+  q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
+
+describe('foto de segunda com contratos', () => {
+  beforeEach(async () => {
+    await abrir(A, B, C);
+    for (const u of [A, B, C]) await dar(u, 1e9);
+    await salvar(V);
+  });
+
+  it('a placa guarda o mais disputado da semana que acabou; contratos, empresas e personagem continuam', async () => {
+    await contratar(B);
+    await t.as(C);
+    await contratar(B);
+    await t.as(A);
+    await contratosDaSemanaPassada();
+    await envelhecer();
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: B }]);
+    expect(await q('select count(*)::int as n from public.idle_contracts')).toEqual([{ n: 2 }]);
+    expect(await q('select count(*)::int as n from public.idle_state where started')).toEqual([{ n: 3 }]);
+    expect(await q('select user_id from public.idle_avatar')).toEqual([{ user_id: A }]);
+  });
+  it('semana sem contrato: placa sem mais disputado', async () => {
+    await envelhecer();
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: null }]);
+  });
+  it('quem joga antes do cron: a foto sai igual e o contrato continua valendo', async () => {
+    await contratar(B);
+    await contratosDaSemanaPassada();
+    await envelhecer();
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.started).toBe(true);
+    expect(s.equipe.map((e) => e.user_id)).toEqual([B]);
+    expect(s.avatar).toEqual(V);
+    expect(await q('select most_hired_id from public.idle_weeks')).toEqual([{ most_hired_id: B }]);
+  });
+  it('o pódio da foto conta os contratos que valiam até a meia-noite', async () => {
+    await contratar(B);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '2 hours', ends_at = ${SEGUNDA} + interval '6 days 22 hours' where true`);
+    await envelhecer();
+    await q(`update public.idle_state set valuation = 0, settled_at = ${SEGUNDA} - interval '1 hour' where user_id = $1`, [A]);
+    await q('select public.idle_weekly_reset()');
+    const [semana] = await q<{ podium: { user_id: string; valuation: number }[] }>('select podium from public.idle_weeks');
+    expect(semana.podium.find((p) => p.user_id === A)!.valuation).toBeCloseTo(0.5 * 1.12 * 3600, 3);
+  });
+  it('o R$/s do pódio é o da meia-noite, mesmo se o contrato venceu depois dela', async () => {
+    await contratar(B);
+    // venceu um segundo depois da meia-noite: agora já não vale, mas valia às 00:00
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '2 hours', ends_at = ${SEGUNDA} + interval '1 second' where true`);
+    await envelhecer();
+    const [{ meia, agora }] = await q<{ meia: number; agora: number }>(
+      `select public.idle_rate_at(s, ${SEGUNDA}) as meia, public.idle_rate(s) as agora from public.idle_state s where user_id = $1`,
+      [A],
+    );
+    expect(meia).toBeGreaterThan(agora);
+    await q('select public.idle_weekly_reset()');
+    const [semana] = await q<{ podium: { user_id: string; rate: number }[] }>('select podium from public.idle_weeks');
+    expect(semana.podium.find((p) => p.user_id === A)!.rate).toBeCloseTo(meia, 6);
+  });
+});
