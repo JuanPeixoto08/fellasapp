@@ -429,7 +429,7 @@ begin
     into v_podium
     from (select s.user_id,
                  (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
-                 -- a taxa da meia-noite usa os geradores e estratÈgias de agora (sÛ os contratos s„o os de 00:00)
+                 -- a taxa da meia-noite usa os geradores e estrat√©gias de agora (s√≥ os contratos s√£o os de 00:00)
                  public.idle_rate_at(s, v_new::timestamp at time zone 'America/Sao_Paulo') as rate,
                  public.idle_era(s.generators) as era, s.strategies
             from public.idle_state s
