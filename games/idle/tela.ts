@@ -250,11 +250,8 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
       if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda.'));
       m.placar.forEach((r, i) => {
         const li = el('li', r.userId === s?.user_id ? 'eu' : undefined);
-        const est = r.strategies
-          .map((o, k) => catalogo.estrategias.find((e) => e.era === k + 2 && e.opcao === o)?.nome)
-          .filter(Boolean)
-          .join(' · ');
-        li.append(el('span', 'pos', `${i + 1}º`), el('span', 'nome', r.name), el('span', 'sub', `${ERAS[r.era - 1]}${est ? ` · ${est}` : ''}`), el('span', 'v', formatarTaxa(r.rate)));
+        // a era é a cena em que a pessoa está (cena 1 = era 1, cena 2 = era 2...)
+        li.append(el('span', 'pos', `${i + 1}º`), el('span', 'nome', r.name), el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)));
         listaP.append(li);
       });
     }
