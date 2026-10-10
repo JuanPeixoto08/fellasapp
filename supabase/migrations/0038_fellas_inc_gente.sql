@@ -303,7 +303,10 @@ end;
 $$;
 
 -- escolher a estratégia da era (a da 0034) + Cultura de startup: quem você contratou (contratos ativos) passa a
--- ganhar o triplo, então a conta dele fecha antes, com a regra antiga. Trava você e sua equipe na ordem de user_id.
+-- ganhar o triplo, então a conta dele fecha antes, com a regra antiga. Vale também para contrato já vencido cujo
+-- trecho ainda não foi fechado (ends_at depois do settled_at do contratado): a estratégia atual do chefe vale pra
+-- qualquer instante, então sem fechar antes o triplo viraria retroativo. Trava você e essa equipe na ordem de user_id
+-- (e fecha exatamente o conjunto travado).
 create or replace function public.idle_pick_strategy(p_era int, p_opcao int)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -311,12 +314,16 @@ declare
   x      public.idle_state;
   v_me   uuid := auth.uid();
   v_mult double precision;
+  v_team uuid[];
 begin
   if not public.is_member() then
     raise exception 'not_member' using errcode = '42501';
   end if;
-  perform public.idle_lock_all(array[v_me] || coalesce((select array_agg(c.employee_id) from public.idle_contracts c
-                                                         where c.employer_id = v_me and c.ends_at > now()), '{}'::uuid[]));
+  select coalesce(array_agg(distinct c.employee_id), '{}'::uuid[]) into v_team
+    from public.idle_contracts c
+    join public.idle_state es on es.user_id = c.employee_id
+   where c.employer_id = v_me and c.ends_at > es.settled_at;
+  perform public.idle_lock_all(array[v_me] || v_team);
   select * into s from public.idle_state where user_id = v_me;
   if not s.started then
     raise exception 'idle_not_started' using errcode = 'P0001';
@@ -335,9 +342,7 @@ begin
   end if;
   s := public.idle_settle(s); -- o tempo até agora rende com a regra antiga
   if v_mult <> 1 then
-    for x in select es.* from public.idle_state es
-               join public.idle_contracts c on c.employee_id = es.user_id
-              where c.employer_id = v_me and c.ends_at > now() loop
+    for x in select es.* from public.idle_state es where es.user_id = any (v_team) loop
       perform public.idle_save(public.idle_settle(x));
     end loop;
   end if;

@@ -257,4 +257,14 @@ describe('contratar', () => {
     await t.as(B);
     expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.06, 10);
   });
+  it('Cultura de startup escolhida depois: contrato já vencido também fecha a conta antes (sem triplo retroativo)', async () => {
+    await q(`update public.idle_state set generators[13] = 1, strategies = '{0,0,-1,-1}', valuation = 1e12 where user_id = $1`, [A]);
+    await contratar(B);
+    await q('update public.idle_state set generators[19] = 1 where user_id = $1', [A]);
+    // venceu há 1 hora; B não fecha a conta desde 3 horas atrás
+    await envelhecerContratos(7, 1);
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '3 hours' where user_id = $1`, [B]);
+    await t.rpc('idle_pick_strategy', { p_era: 4, p_opcao: 2 });
+    expect(await valuationDe(B)).toBeCloseTo(0.5 * 1.02 * 7200 + 0.5 * 1.02 * 3600, 0);
+  });
 });

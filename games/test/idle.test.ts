@@ -360,7 +360,7 @@ describe('foto de segunda (sem reset)', () => {
     const [semana] = await q<{ podium: { user_id: string; valuation: number }[] }>('select podium from public.idle_weeks');
     const a = semana.podium.find((p) => p.user_id === A)!;
     expect(a.valuation).toBeCloseTo(500 + 0.51 * 3600, 3);
-    expect(semana.podium.map((p) => p.user_id)).toEqual([A, B]); // R$/s igual (0,5): desempata pelo valuation
+    expect(semana.podium.map((p) => p.user_id)).toEqual([A, B]); // R$/s igual (0,51): desempata pelo valuation
   });
   it('opp_claimed guarda só as janelas recentes', async () => {
     await t.as(A);
