@@ -139,3 +139,14 @@ export const CARGOS: readonly string[] = [
   'analista de café', 'gerente do grupo do zap', 'consultor de LinkedIn', 'growth hacker', 'especialista em PowerPoint',
   'VP de happy hour', 'embaixador da marca', 'trainee eterno', 'estrategista de rolê', 'assessor de assuntos aleatórios',
 ];
+
+/** Opções do editor de personagem, na ordem dos números guardados em idle_avatar (e das linhas do kit). */
+export const VISUAL_NOMES = {
+  pele: ['Pele 1', 'Pele 2', 'Pele 3', 'Pele 4', 'Pele 5', 'Pele 6'],
+  cabelo: ['Curto', 'Raspado', 'Cacheado', 'Black power', 'Comprido', 'De lado'],
+  cor_cabelo: ['Preto', 'Castanho', 'Loiro', 'Ruivo', 'Grisalho', 'Roxo', 'Azul', 'Rosa'],
+  roupa: ['Moletom', 'Camiseta', 'Camisa social', 'Jaqueta'],
+  cor_roupa: ['Preto', 'Branco', 'Cinza', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Rosa'],
+  acessorio: ['Nada', 'Boné', 'Fone', 'Óculos', 'Gorro', 'Bandana'],
+  cor_acessorio: ['Preto', 'Branco', 'Cinza', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Rosa'],
+} as const;

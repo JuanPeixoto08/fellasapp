@@ -121,3 +121,8 @@ export type IdleState = {
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
 };
 export type IdleBoardRow = { userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[] };
+
+// Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)
+export type IdleVisual = {
+  pele: number; cabelo: number; cor_cabelo: number; roupa: number; cor_roupa: number; acessorio: number; cor_acessorio: number;
+};
