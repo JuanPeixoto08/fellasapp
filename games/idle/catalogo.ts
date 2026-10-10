@@ -1,6 +1,6 @@
 // Catálogo da Fellas Inc. montado a partir dos textos (nomes.ts) e dos parâmetros de balanceamento.
 // É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
-import { ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS } from './nomes';
+import { CARGOS, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS } from './nomes';
 
 /** Balanceamento (ajustado pela simulação, Task 2). custo_g = custoInicial·crescimentoCusto^(g-1);
  *  renda_g = custo_g / (retornoInicial·crescimentoRetorno^(g-1)) (segundos pra se pagar).
@@ -32,7 +32,7 @@ export type Estrategia = {
   oppBonusMult: number; oppExtra: number; oppSegundos: number; porGeradorDistinto: number;
   sociais: Record<string, number>;
 };
-export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[] };
+export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[] };
 
 export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
   const geradores: Gerador[] = GERADORES.map((nome, i) => {
@@ -71,7 +71,7 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
     custoMult: e.custoMult ?? 1, oppBonusMult: e.oppBonusMult ?? 1, oppExtra: e.oppExtra ?? 0,
     oppSegundos: e.oppSegundos ?? 10, porGeradorDistinto: e.porGeradorDistinto ?? 0, sociais: e.sociais ?? {},
   }));
-  return { geradores, melhorias, estrategias };
+  return { geradores, melhorias, estrategias, cargos: [...CARGOS] };
 }
 
 export const catalogo = montarCatalogo();
@@ -79,7 +79,7 @@ export const catalogo = montarCatalogo();
 const txt = (s: string) => `'${s.replace(/'/g, "''")}'`;
 const num = (n: number | null) => (n === null ? 'null' : String(n));
 
-/** A migração 0033 inteira. Catálogo mudou: migração NOVA (ver o cabeçalho gerado). */
+/** A migração de catálogo inteira (a 0033 e as seguintes). Catálogo mudou: migração NOVA (ver o cabeçalho gerado). */
 export function catalogoSql(cat: Catalogo = catalogo): string {
   const gen = cat.geradores.map((g) => `  (${g.id}, ${g.era}, ${txt(g.nome)}, ${num(g.custo)}, ${num(g.renda)})`);
   const upg = cat.melhorias.map((m) => {
@@ -90,8 +90,9 @@ export function catalogoSql(cat: Catalogo = catalogo): string {
     (e) =>
       `  (${e.era}, ${e.opcao}, ${txt(e.nome)}, ${txt(e.frase)}, ${e.ativa}, ${e.requer ? txt(e.requer) : 'null'}, ${num(e.genDe)}, ${num(e.genAte)}, ${num(e.genMult)}, ${num(e.prodMult)}, ${num(e.custoMult)}, ${num(e.oppBonusMult)}, ${num(e.oppExtra)}, ${num(e.oppSegundos)}, ${num(e.porGeradorDistinto)}, ${txt(JSON.stringify(e.sociais))}::jsonb)`,
   );
+  const car = cat.cargos.map((nome, i) => `  (${i + 1}, ${txt(nome)})`);
   const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
-  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias e estratégias. Idempotente.
+  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias e cargos. Idempotente.
 -- GERADO por games/idle/catalogo.ts: não edite à mão. Mudou o catálogo? Crie uma migração NOVA NNNN_fellas_inc_catalogo_<nome>.sql com ATUALIZAR_CATALOGO=NNNN_fellas_inc_catalogo_<nome>.sql npx vitest run idle/catalogo.test.ts (em games/) e acrescente o arquivo em games/test/db.ts e games/dev/mockDb.ts.
 
 create table if not exists public.idle_cat_gen (
@@ -109,27 +110,34 @@ create table if not exists public.idle_cat_est (
   opp_segundos int not null, por_gerador_distinto double precision not null, sociais jsonb not null,
   primary key (era, opcao)
 );
+create table if not exists public.idle_cat_cargo (id int primary key, nome text not null);
 
 alter table public.idle_cat_gen enable row level security;
 alter table public.idle_cat_upg enable row level security;
 alter table public.idle_cat_est enable row level security;
-revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est from anon, authenticated;
-grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est to authenticated;
+alter table public.idle_cat_cargo enable row level security;
+revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo from anon, authenticated;
+grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo to authenticated;
 drop policy if exists "idle_cat_gen_select_members" on public.idle_cat_gen;
 create policy "idle_cat_gen_select_members" on public.idle_cat_gen for select to authenticated using (public.is_member());
 drop policy if exists "idle_cat_upg_select_members" on public.idle_cat_upg;
 create policy "idle_cat_upg_select_members" on public.idle_cat_upg for select to authenticated using (public.is_member());
 drop policy if exists "idle_cat_est_select_members" on public.idle_cat_est;
 create policy "idle_cat_est_select_members" on public.idle_cat_est for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_cargo_select_members" on public.idle_cat_cargo;
+create policy "idle_cat_cargo_select_members" on public.idle_cat_cargo for select to authenticated using (public.is_member());
 
 delete from public.idle_cat_gen where true;
 delete from public.idle_cat_upg where true;
 delete from public.idle_cat_est where true;
+delete from public.idle_cat_cargo where true;
 
 insert into public.idle_cat_gen (id, era, nome, custo, renda) values
 ${lista(gen)}
 insert into public.idle_cat_upg (id, tipo, nome, frase, preco, gerador, nivel, requer, mult, requer_era, fonte, alvo, por_unidade, requer_fonte, requer_alvo) values
 ${lista(upg)}
 insert into public.idle_cat_est (era, opcao, nome, frase, ativa, requer, gen_de, gen_ate, gen_mult, prod_mult, custo_mult, opp_bonus_mult, opp_extra, opp_segundos, por_gerador_distinto, sociais) values
-${lista(est)}`;
+${lista(est)}
+insert into public.idle_cat_cargo (id, nome) values
+${lista(car)}`;
 }

@@ -119,5 +119,30 @@ export type IdleState = {
   user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
+  /** Entrega 2 (0038): seu visual (null = nunca salvou), quem você contratou (contratos ativos, do mais recente ao
+   *  mais antigo), quem te contratou, o que entra na conta dos contratos, o preço do próximo contrato e o próximo
+   *  vencimento que muda a sua taxa (null = nenhum). */
+  avatar: IdleVisual | null; equipe: IdleContratado[]; chefes: IdleChefe[];
+  social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
 };
-export type IdleBoardRow = { userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[] };
+export type IdleContratado = { user_id: string; cargo: string; avatar: IdleVisual | null; ate: string };
+/** mult vem de exp(sum(ln)) no banco e pode trazer ruído (3.0000000000000004): arredonde para mostrar, não compare por igualdade. */
+export type IdleChefe = { user_id: string; cargo: string; mult: number; ate: string };
+export type IdleBoardRow = {
+  userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[];
+  avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
+};
+/** Linha de idle_board como o banco devolve. */
+export type LinhaPlacar = {
+  user_id: string; valuation: number; rate: number; era: number; strategies: number[];
+  avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean;
+};
+export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
+  userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
+  avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired,
+});
+
+// Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)
+export type IdleVisual = {
+  pele: number; cabelo: number; cor_cabelo: number; roupa: number; cor_roupa: number; acessorio: number; cor_acessorio: number;
+};

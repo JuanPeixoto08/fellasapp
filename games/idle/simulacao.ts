@@ -3,7 +3,7 @@
 // oportunidades guardadas (15 min de produção), escolhe a primeira estratégia ativa e compra, de 5 em 5 segundos,
 // sempre o que tem o melhor ganho de taxa por real.
 import { catalogo as padrao, type Catalogo } from './catalogo';
-import { acumular, custoMult, era, liberada, podeComprarGerador, preco, taxa, taxaPorUnidade, type Estado } from './economia';
+import { acumular, custoMult, era, liberada, podeComprarGerador, preco, SOLO, taxa, taxaPorUnidade, type Estado } from './economia';
 
 export type Marcos = { segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null };
 
@@ -18,7 +18,8 @@ function sessoes(dias: number): [number, number][] {
 }
 
 export function simular(cat: Catalogo = padrao, dias = 7): Marcos {
-  const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1] };
+  // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
+  const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1], social: SOLO };
   s.generators[0] = 1;
   let v = 10;
   let relogio = 0;

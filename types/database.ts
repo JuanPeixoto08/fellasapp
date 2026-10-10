@@ -81,6 +81,7 @@ export type Database = {
           week_start: string;
           unicorn_id: string | null;
           podium: Json;
+          most_hired_id: string | null;
           closed_at: string;
         };
         Insert: { [_ in never]: never };

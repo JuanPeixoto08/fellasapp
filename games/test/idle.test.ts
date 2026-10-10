@@ -23,7 +23,7 @@ describe('catálogo no banco', () => {
     const gens = await q<{ id: number; custo: number; renda: number }>('select id, custo, renda from public.idle_cat_gen order by id');
     expect(gens.map((g) => [g.id, g.custo, g.renda])).toEqual(catalogo.geradores.map((g) => [g.id, g.custo, g.renda]));
     expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(200);
-    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(8);
+    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(10);
   });
   it('membro lê; anônimo não', async () => {
     const lidos = await t.asRole<{ n: number }>('authenticated', 'select count(*)::int as n from public.idle_cat_gen');
@@ -56,7 +56,8 @@ describe('idle_open / idle_start', () => {
   });
   it('Abrir CNPJ: 1 notebook e R$ 10; abrir de novo é erro', async () => {
     const s = await t.rpc<Estado>('idle_start');
-    expect(s).toMatchObject({ started: true, valuation: 10, rate: 0.5 });
+    expect(s).toMatchObject({ started: true, valuation: 10 });
+    expect(s.rate).toBeCloseTo(0.5 * 1.02, 12);
     expect(s.generators[0]).toBe(1);
     await expect(t.rpc('idle_start')).rejects.toThrow(/idle_started/);
   });
@@ -64,12 +65,12 @@ describe('idle_open / idle_start', () => {
     await t.rpc('idle_start');
     await recuar(A, 100);
     const s = await t.rpc<Estado>('idle_open');
-    expect(s.valuation).toBeCloseTo(60, 0);
+    expect(s.valuation).toBeCloseTo(10 + 0.51 * 100, 0);
   });
   it('teto de 8 horas', async () => {
     await t.rpc('idle_start');
     await recuar(A, 10 * 3600);
-    expect((await t.rpc<Estado>('idle_open')).valuation).toBeCloseTo(10 + 0.5 * 8 * 3600, 0);
+    expect((await t.rpc<Estado>('idle_open')).valuation).toBeCloseTo(10 + 0.51 * 8 * 3600, 0);
   });
   it('quem não abriu a empresa não acumula', async () => {
     await t.rpc('idle_open');
@@ -133,7 +134,7 @@ describe('idle_buy', () => {
     await dar(A, 1e6);
     const s = await buy('melhoria', 11);
     expect(s.upgrades).toEqual([11]);
-    expect(s.rate).toBeCloseTo(1, 6);
+    expect(s.rate).toBeCloseTo(1.02, 6);
     await expect(buy('melhoria', 11)).rejects.toThrow(/idle_owned/);
     await expect(buy('melhoria', 12)).rejects.toThrow(/idle_locked/);
   });
@@ -153,8 +154,8 @@ describe('estratégia por era', () => {
   it('entrou na era 2 sem escolher: nenhuma compra passa', async () => {
     await expect(buy('gerador', 1)).rejects.toThrow(/idle_strategy_pending/);
   });
-  it('escolhe uma vez; repetir é idle_strategy_set; opção desligada é idle_bad_choice; era futura é idle_locked', async () => {
-    await expect(pick(2, 2)).rejects.toThrow(/idle_bad_choice/);
+  it('escolhe uma vez; repetir é idle_strategy_set; opção que não existe é idle_bad_choice; era futura é idle_locked', async () => {
+    await expect(pick(2, 5)).rejects.toThrow(/idle_bad_choice/);
     expect((await pick(2, 0)).strategies).toEqual([0, -1, -1, -1]);
     await expect(pick(2, 1)).rejects.toThrow(/idle_strategy_set/);
     await expect(pick(3, 0)).rejects.toThrow(/idle_locked/);
@@ -272,7 +273,7 @@ describe('placar', () => {
     const rows = await t.rpc<{ user_id: string; valuation: number; rate: number; era: number }[]>('idle_board');
     expect(rows.map((r) => r.user_id)).toEqual([A, B]);
     expect(rows[0].rate).toBeGreaterThan(rows[1].rate);
-    expect(rows[1].rate).toBe(0.5); // só o gerador 1 do Abrir CNPJ
+    expect(rows[1].rate).toBeCloseTo(0.5 * 1.02, 12); // só o gerador 1 do Abrir CNPJ, com o piso de freela
     expect(rows[1].valuation).toBeGreaterThanOrEqual(900);
   });
   it('R$/s empatado: desempata pelo valuation', async () => {
@@ -358,8 +359,8 @@ describe('foto de segunda (sem reset)', () => {
     await q('select public.idle_weekly_reset()');
     const [semana] = await q<{ podium: { user_id: string; valuation: number }[] }>('select podium from public.idle_weeks');
     const a = semana.podium.find((p) => p.user_id === A)!;
-    expect(a.valuation).toBeCloseTo(500 + 0.5 * 3600, 3);
-    expect(semana.podium.map((p) => p.user_id)).toEqual([A, B]); // R$/s igual (0,5): desempata pelo valuation
+    expect(a.valuation).toBeCloseTo(500 + 0.51 * 3600, 3);
+    expect(semana.podium.map((p) => p.user_id)).toEqual([A, B]); // R$/s igual (0,51): desempata pelo valuation
   });
   it('opp_claimed guarda só as janelas recentes', async () => {
     await t.as(A);

@@ -1,12 +1,15 @@
 // Chamadas ao banco da mesa. Toda falha sai como GameError (código + frase).
 import { toGameError } from './errors';
 import { supabase } from './supabase';
+import { linhaPlacar } from './types';
 import type {
   Action,
   BoardRow,
   Fella,
   IdleBoardRow,
   IdleState,
+  IdleVisual,
+  LinhaPlacar,
   PokerAction,
   PokerCards,
   PokerHistoryRow,
@@ -52,6 +55,12 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
   rpc<IdleState>('idle_buy', { p_kind: kind, p_id: id, p_qty: qty });
 export const idlePickStrategy = (era: number, opcao: number) => rpc<IdleState>('idle_pick_strategy', { p_era: era, p_opcao: opcao });
 export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportunity', { p_window: window });
+export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
+export const idleSetAvatar = (v: IdleVisual) =>
+  rpc<IdleState>('idle_set_avatar', {
+    p_pele: v.pele, p_cabelo: v.cabelo, p_cor_cabelo: v.cor_cabelo, p_roupa: v.roupa, p_cor_roupa: v.cor_roupa,
+    p_acessorio: v.acessorio, p_cor_acessorio: v.cor_acessorio,
+  });
 
 const isUrl = (p: string) => /^https?:\/\//.test(p);
 
@@ -87,12 +96,9 @@ export async function weekBoard(): Promise<BoardRow[]> {
 }
 
 export async function idleBoard(): Promise<IdleBoardRow[]> {
-  const rows = await rpc<{ user_id: string; valuation: number; rate: number; era: number; strategies: number[] }[]>('idle_board');
+  const rows = await rpc<LinhaPlacar[]>('idle_board');
   const quem = await fellas(rows.map((r) => r.user_id));
-  return rows.map((r) => ({
-    userId: r.user_id, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
-    name: quem.find((f) => f.id === r.user_id)?.name ?? 'Alguém',
-  }));
+  return rows.map((r) => linhaPlacar(r, quem.find((f) => f.id === r.user_id)?.name ?? 'Alguém'));
 }
 
 export async function hasSession(): Promise<boolean> {

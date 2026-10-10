@@ -34,6 +34,18 @@ export function estrategiaPendente(estado: IdleState): number | null {
   return estado.started && estado.era >= 2 && estado.strategies[estado.era - 2] < 0 ? estado.era : null;
 }
 
+/** O editor de personagem abre sozinho até o primeiro "Bora": sem avatar salvo, sem fechar no X nesta sessão, sem rascunho
+ *  aberto, fora da cena de abrir e sem a folha de estratégia por cima. */
+export function deveAbrirEditor(estado: IdleState, fase: Fase, editorFechado: boolean, rascunhoAberto: boolean): boolean {
+  if (estado.avatar || editorFechado || rascunhoAberto) return false;
+  if (fase === 'antes') return true;
+  return fase === 'jogando' && estrategiaPendente(estado) === null;
+}
+
 export function segundosOportunidade(estado: IdleState): number {
   return Math.max(10, ...estrategiasAtivas(catalogo, estado).map((e) => e.oppSegundos));
 }
+
+/** Um contrato seu venceu (o relógio do servidor passou de muda_em): a taxa mudou e a tela precisa bater o ponto. */
+export const vencido = (estado: IdleState, agoraServidorMs: number): boolean =>
+  estado.muda_em !== null && agoraServidorMs >= Date.parse(estado.muda_em);

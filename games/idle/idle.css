@@ -24,7 +24,7 @@
 .idle .bonus { color: var(--gold); min-height: 1.2em; }
 .idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 24px; color: var(--paper); }
 .idle .abas { display: flex; gap: 8px; padding: 8px 16px; position: sticky; top: 0; z-index: 1; background: #121212; }
-.idle .aba { flex: 1; min-height: 44px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); font: 700 15px var(--font); }
+.idle .aba { flex: 1; min-height: 44px; padding: 0 4px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); font: 700 14px var(--font); }
 .idle .aba.ativa { background: #5B3FD9; border-color: #B8A2FF; }
 .idle .painel { overflow: auto; padding-bottom: 24px; }
 .idle .lista { display: grid; gap: 8px; padding: 12px 16px; margin: 0; list-style: none; }
@@ -51,10 +51,11 @@
 .idle .icone.roxo { border-color: #B8A2FF; } .idle .icone.diamante { border-color: #5EC8FF; }
 .idle .icone.sinergia { display: flex; }
 .idle .icone .mini { flex: 1; background: no-repeat 0 0 / 84px 21px; image-rendering: pixelated; }
-.idle .lista-placar li { display: grid; grid-template-columns: 32px 1fr auto; gap: 2px 8px; padding: 8px; border-radius: 8px; background: #1B1A22; color: var(--paper); }
+.idle .lista-placar li { display: grid; grid-template-columns: 32px 36px 1fr auto; align-items: center; gap: 2px 8px; padding: 8px; border-radius: 8px; background: #1B1A22; color: var(--paper); }
 .idle .lista-placar li.eu { outline: 2px solid #B8A2FF; }
-.idle .lista-placar .sub { grid-column: 2; }
-.idle .lista-placar .v { grid-row: 1; grid-column: 3; font-weight: 700; }
+.idle .lista-placar .mini-boneco { grid-row: 1 / span 3; grid-column: 2; width: 27px; height: 39px; }
+.idle .lista-placar .nome, .idle .lista-placar .sub, .idle .lista-placar .disputado { grid-column: 3; }
+.idle .lista-placar .v { grid-row: 1; grid-column: 4; font-weight: 700; }
 .idle .vazio { color: #A8A398; text-align: center; }
 /* modais: folha que sobe de baixo no celular (a cena continua à vista em cima); janela no meio do PC */
 .idle .modal { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(11, 10, 14, 0.72); color: var(--paper); z-index: 10; }
@@ -94,3 +95,21 @@
 .idle ::-webkit-scrollbar-track { background: transparent; }
 .idle ::-webkit-scrollbar-thumb { background: #3A3846; border-radius: 999px; border: 2px solid #121212; }
 .idle ::-webkit-scrollbar-thumb:hover { background: #4E4B5C; }
+.idle .mini-boneco { flex: none; width: 36px; height: 52px; image-rendering: pixelated; }
+.idle .contratos-topo, .idle .carta { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; background: #1B1A22; color: var(--paper); }
+.idle .contratos-topo { border: 1px solid #34323F; }
+.idle .carta .btn, .idle .contratos-topo .btn { flex: none; min-height: 44px; height: auto; padding: 0 12px; white-space: nowrap; }
+.idle .contratado { flex: none; max-width: 45%; text-align: right; font-size: 13px; color: var(--mint); }
+.idle .disputado { justify-self: start; padding: 2px 8px; border-radius: 999px; background: #3A2A66; color: #DDD2FF; font-size: 12px; font-weight: 700; }
+.idle .previa { display: flex; justify-content: center; align-items: flex-end; gap: 24px; padding: 8px 0 12px; }
+.idle .previa .mini-boneco:first-child { width: 54px; height: 78px; }
+.idle .previa .mini-boneco:last-child { width: 72px; height: 90px; }
+.idle .opcoes { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid #2A2833; }
+.idle .opcoes-rotulo { font-size: 13px; font-weight: 700; color: #A8A398; }
+.idle .opcoes-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.idle .chip { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #34323F; background: #121212; color: var(--paper); font: 600 14px var(--font); cursor: pointer; }
+.idle .cor { width: 44px; height: 44px; border-radius: 8px; border: 2px solid #34323F; cursor: pointer; }
+.idle .chip[aria-pressed='true'] { background: #3A2A66; border-color: #B8A2FF; }
+.idle .cor[aria-pressed='true'] { border-color: #B8A2FF; box-shadow: 0 0 0 2px #B8A2FF; }
+.idle .chip:focus-visible, .idle .cor:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
+.idle .editor-fim { display: flex; gap: 12px; justify-content: flex-end; padding-top: 12px; }

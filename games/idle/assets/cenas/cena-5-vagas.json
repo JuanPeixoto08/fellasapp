@@ -1,0 +1,81 @@
+{
+  "quadros": 12,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 5,
+      "x": 53,
+      "y": 17,
+      "espelhada": false
+    },
+    {
+      "id": "danca-1",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 62,
+      "y": 17,
+      "espelhada": false,
+      "freela": {
+        "pele": 4,
+        "cabelo": 4,
+        "cor_cabelo": 7,
+        "roupa": 1,
+        "cor_roupa": 3,
+        "acessorio": 0,
+        "cor_acessorio": 0
+      }
+    },
+    {
+      "id": "danca-2",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 70,
+      "y": 17,
+      "espelhada": false,
+      "freela": {
+        "pele": 1,
+        "cabelo": 2,
+        "cor_cabelo": 2,
+        "roupa": 1,
+        "cor_roupa": 6,
+        "acessorio": 0,
+        "cor_acessorio": 0
+      }
+    },
+    {
+      "id": "dj",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 83,
+      "y": 17,
+      "espelhada": false,
+      "freela": {
+        "pele": 2,
+        "cabelo": 0,
+        "cor_cabelo": 0,
+        "roupa": 3,
+        "cor_roupa": 1,
+        "acessorio": 2,
+        "cor_acessorio": 3
+      }
+    },
+    {
+      "id": "tapete",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 71,
+      "y": 72,
+      "espelhada": true,
+      "freela": {
+        "pele": 5,
+        "cabelo": 5,
+        "cor_cabelo": 4,
+        "roupa": 2,
+        "cor_roupa": 1,
+        "acessorio": 3,
+        "cor_acessorio": 0
+      }
+    }
+  ]
+}

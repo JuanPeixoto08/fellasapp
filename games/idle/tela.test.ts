@@ -1,17 +1,21 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import type { IdleState } from '../shared/types';
+import type { IdleBoardRow, IdleState } from '../shared/types';
+import type { Desenhar } from './navegador';
 import { instante, VALIDADE_S } from './oportunidades';
-import { criarTela, prazo, type Acoes, type Modelo } from './tela';
+import { PADRAO } from './personagem';
+import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
-  server_now: '2026-10-12T12:00:00.000Z', ...x,
+  server_now: '2026-10-12T12:00:00.000Z',
+  avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
+  ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
-  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, ...x,
+  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -22,6 +26,7 @@ beforeEach(() => {
   acoes = {
     abrirCnpj: vi.fn<Acoes['abrirCnpj']>(), comprar: vi.fn<Acoes['comprar']>(), escolher: vi.fn<Acoes['escolher']>(), pegar: vi.fn<Acoes['pegar']>(),
     trocarAba: vi.fn<Acoes['trocarAba']>(), caixa: vi.fn<Acoes['caixa']>(), tentarDeNovo: vi.fn<Acoes['tentarDeNovo']>(),
+    contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -50,12 +55,13 @@ describe('tela da Fellas Inc.', () => {
   });
   it('era nova sem estratégia: cartões, os desligados avisam o porquê', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }) }));
+    const g = [...Array(13).fill(1), ...Array(17).fill(0)];
+    tela.renderizar(modelo({ estado: estado({ era: 3, generators: g, strategies: [0, -1, -1, -1] }) }));
     const modal = root.querySelector('.modal-estrategia')!;
     expect(modal.hasAttribute('hidden')).toBe(false);
-    expect(modal.textContent).toContain('Chega com Contratar');
+    expect(modal.textContent).toContain('Chega com o Mapa do rolê');
     [...modal.querySelectorAll('button')].find((b) => b.textContent === 'Escolher' && !b.disabled)!.click();
-    expect(acoes.escolher).toHaveBeenCalledWith(2, 0);
+    expect(acoes.escolher).toHaveBeenCalledWith(3, 0);
   });
   it('aviso aparece; caixinha mostra quantas tem', () => {
     const tela = criarTela(root, acoes);
@@ -100,7 +106,7 @@ describe('tela da Fellas Inc.', () => {
   });
   it('placar mostra o R$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1] }] }));
+    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false }] }));
     const v = root.querySelector('.lista-placar .v')!.textContent!;
     expect(v).toContain('/s');
     expect(v).not.toContain('bi');
@@ -132,11 +138,131 @@ describe('tela da Fellas Inc.', () => {
   });
   it('modais com aria-modal e título', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }), caixaAberta: true }));
-    for (const sel of ['.modal-estrategia', '.modal-caixa']) {
+    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }), caixaAberta: true, editor: { ...PADRAO } }));
+    for (const sel of ['.modal-estrategia', '.modal-caixa', '.modal-visual']) {
       const modal = root.querySelector(sel)!;
       expect(modal.getAttribute('aria-modal')).toBe('true');
       expect(root.querySelector(`#${modal.getAttribute('aria-labelledby')}`)!.tagName).toBe('H2');
     }
+  });
+});
+
+const linha = (x: Partial<IdleBoardRow> = {}): IdleBoardRow => ({
+  userId: 'b', name: 'Bia', valuation: 1000, rate: 2, era: 2, strategies: [0, -1, -1, -1],
+  avatar: null, hiredCount: 0, byMe: false, mostHired: false, ...x,
+});
+const ATE = '2026-10-19T00:00:00.000Z'; // 6,5 dias depois do server_now das fixtures
+
+describe('contratar', () => {
+  it('cartas de quem abriu a empresa (menos você); botão libera no preço; tocar contrata', () => {
+    const desenhar = vi.fn<Desenhar>();
+    const tela = criarTela(root, acoes, desenhar);
+    tela.renderizar(modelo({ aba: 'contratar', estado: estado({ hire_price: 918 }), placar: [linha({ userId: 'u', name: 'Você' }), linha()] }));
+    const cartas = root.querySelectorAll('.lista-contratar .carta');
+    expect(cartas).toHaveLength(1);
+    expect(cartas[0].textContent).toContain('Bia');
+    expect(cartas[0].textContent).toContain('Garagem · ninguém contratou ainda');
+    const b = cartas[0].querySelector('button')!;
+    expect(b.textContent).toBe('Contratar · R$ 918');
+    tela.atualizarValor(917);
+    expect(b.disabled).toBe(true);
+    tela.atualizarValor(918);
+    expect(b.disabled).toBe(false);
+    b.click();
+    expect(acoes.contratar).toHaveBeenCalledWith('b');
+    expect(desenhar).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), PADRAO, undefined); // sem visual = fundador
+  });
+  it('quem você já contratou: sem botão, com o cargo e quanto falta pro contrato vencer', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({
+      aba: 'contratar',
+      estado: estado({ equipe: [{ user_id: 'b', cargo: 'CEO de nada', avatar: null, ate: ATE }] }),
+      placar: [linha({ byMe: true, hiredCount: 1 })],
+    }));
+    const carta = root.querySelector('.lista-contratar .carta')!;
+    expect(carta.querySelector('button')).toBeNull();
+    expect(carta.textContent).toContain('Trabalha pra você como CEO de nada por mais 6 dias');
+    expect(carta.textContent).toContain('trabalha em 1 empresa');
+  });
+  it('topo: bônus dos contratos, piso de freela ou quem te contratou; Mudar visual abre o editor; vazio convida', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'contratar', placar: [] }));
+    const topo = root.querySelector('.contratos-topo')!;
+    expect(topo.textContent).toContain('Contratos: +2% de produção');
+    expect(topo.textContent).toContain('Ninguém te contratou: você ganha o piso de freela.');
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Ninguém mais abriu a empresa ainda. Chama a galera.');
+    [...topo.querySelectorAll('button')].find((x) => x.textContent === 'Mudar visual')!.click();
+    expect(acoes.editor).toHaveBeenCalledWith('abrir');
+    tela.renderizar(modelo({
+      aba: 'contratar', placar: [linha()],
+      estado: estado({ chefes: [{ user_id: 'b', cargo: 'sócio de fachada', mult: 1, ate: ATE }], social: { contratei: 0, empregos: [1] } }),
+    }));
+    expect(root.querySelector('.contratos-topo')!.textContent).toContain('Você trabalha pra Bia (sócio de fachada, por mais 6 dias).');
+  });
+  it('placar: boneco de cada um e o mais disputado do mercado', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'placar', placar: [linha({ mostHired: true, hiredCount: 3 }), linha({ userId: 'c', name: 'Teteu' })] }));
+    const itens = root.querySelectorAll('.lista-placar li');
+    expect(itens[0].querySelector('canvas')).not.toBeNull();
+    expect(itens[0].textContent).toContain('Mais disputado da semana');
+    expect(itens[1].textContent).not.toContain('Mais disputado');
+  });
+  it('porcento, empresas e restam', () => {
+    expect(porcento(1.02)).toBe('+2%');
+    expect(porcento(1.12)).toBe('+12%');
+    expect(porcento(1.025)).toBe('+2,5%');
+    expect(empresas(0)).toBe('ninguém contratou ainda');
+    expect(empresas(1)).toBe('trabalha em 1 empresa');
+    expect(empresas(3)).toBe('trabalha em 3 empresas');
+    expect(restam(6.5 * 86400_000)).toBe('por mais 6 dias');
+    expect(restam(30 * 3600_000)).toBe('por mais 1 dia');
+    expect(restam(5.5 * 3600_000)).toBe('por mais 5 h');
+    expect(restam(20 * 60_000)).toBe('por menos de 1 h');
+  });
+});
+
+describe('placar que falhou', () => {
+  it('Contratar e Placar mostram o erro em vez de Carregando… pra sempre', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'contratar', placar: null }));
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Carregando…');
+    tela.renderizar(modelo({ aba: 'contratar', placar: null, placarFalhou: true }));
+    expect(root.querySelector('.lista-contratar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
+    tela.renderizar(modelo({ aba: 'placar', placar: null, placarFalhou: true }));
+    expect(root.querySelector('.lista-placar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
+  });
+});
+
+describe('editor de personagem', () => {
+  const grupo = (nome: string) => root.querySelector<HTMLElement>(`.modal-visual [role="group"][aria-label="${nome}"]`);
+  it('mostra o rascunho marcado; tocar muda; a cor da cabeça some com "Nada"', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }), editor: { ...PADRAO } }));
+    expect(root.querySelector('.modal-visual')!.hasAttribute('hidden')).toBe(false);
+    expect(grupo('Cor do cabelo')!.querySelector('[aria-label="Preto"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(grupo('Na cabeça')!.querySelector('[aria-pressed="true"]')!.textContent).toBe('Fone');
+    [...grupo('Cabelo')!.querySelectorAll('button')].find((x) => x.textContent === 'Cacheado')!.click();
+    expect(acoes.mudarVisual).toHaveBeenCalledWith('cabelo', 2);
+    expect(grupo('Cor do que vai na cabeça')).not.toBeNull();
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }), editor: { ...PADRAO, acessorio: 0 } }));
+    expect(grupo('Cor do que vai na cabeça')).toBeNull();
+  });
+  it('Sortear, Bora e fechar chamam o editor; Bora apagado enquanto salva', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ editor: { ...PADRAO } }));
+    const modal = root.querySelector('.modal-visual')!;
+    [...modal.querySelectorAll('button')].find((x) => x.textContent === 'Sortear')!.click();
+    [...modal.querySelectorAll('button')].find((x) => x.textContent === 'Bora')!.click();
+    modal.querySelector<HTMLButtonElement>('.fechar')!.click();
+    expect(acoes.editor.mock.calls.map((c) => c[0])).toEqual(['sortear', 'salvar', 'fechar']);
+    tela.renderizar(modelo({ editor: { ...PADRAO }, ocupado: true }));
+    expect([...root.querySelectorAll<HTMLButtonElement>('.modal-visual button')].find((x) => x.textContent === 'Bora')!.disabled).toBe(true);
+  });
+  it('fechado: modal escondido; "Mudar visual" na tela de abrir a empresa abre', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    expect(root.querySelector('.modal-visual')!.hasAttribute('hidden')).toBe(true);
+    [...root.querySelectorAll<HTMLButtonElement>('.abrir button')].find((x) => x.textContent === 'Mudar visual')!.click();
+    expect(acoes.editor).toHaveBeenCalledWith('abrir');
   });
 });

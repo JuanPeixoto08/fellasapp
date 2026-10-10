@@ -33,6 +33,9 @@ const mockOpenStories = jest.fn();
 jest.mock('../lib/api/stories', () => ({ listActiveStories: () => mockListStories() }));
 jest.mock('../lib/storyViewerStore', () => ({ openStories: (...a: unknown[]) => mockOpenStories(...a) }));
 
+const mockOpenGame = jest.fn();
+jest.mock('../lib/games', () => ({ openGame: (slug: string) => mockOpenGame(slug) }));
+
 import NotificationsScreen from '../app/(tabs)/notifications';
 import { emitLive, LIVE_DEBOUNCE_MS } from '../lib/realtime';
 
@@ -172,6 +175,14 @@ describe('Tela de notificações', () => {
     await open();
     await fireEvent.press(await screen.findByLabelText(/Ana reagiu 😂 ao seu story/));
     await waitFor(() => expect(mockOpenStories).toHaveBeenCalledWith(groups, 'me', 's1'));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('contrato na Fellas Inc.: toque abre o jogo', async () => {
+    mockFetch.mockResolvedValue([item({ kind: 'idle_hired', postId: null, body: 'CEO de nada' })]);
+    await open();
+    await fireEvent.press(await screen.findByLabelText(/Ana te contratou como CEO de nada na Fellas Inc\./));
+    expect(mockOpenGame).toHaveBeenCalledWith('idle');
     expect(mockPush).not.toHaveBeenCalled();
   });
 

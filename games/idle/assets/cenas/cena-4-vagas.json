@@ -1,0 +1,98 @@
+{
+  "quadros": 8,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 2,
+      "x": 100,
+      "y": 69,
+      "espelhada": false
+    },
+    {
+      "id": "trader",
+      "papel": "contratado",
+      "pose": 1,
+      "x": 118,
+      "y": 47,
+      "espelhada": false,
+      "freela": {
+        "pele": 1,
+        "cabelo": 0,
+        "cor_cabelo": 1,
+        "roupa": 2,
+        "cor_roupa": 7,
+        "acessorio": 2,
+        "cor_acessorio": 2
+      }
+    },
+    {
+      "id": "mesa-1",
+      "papel": "contratado",
+      "pose": 1,
+      "x": 40,
+      "y": 40,
+      "espelhada": false,
+      "freela": {
+        "pele": 4,
+        "cabelo": 4,
+        "cor_cabelo": 3,
+        "roupa": 1,
+        "cor_roupa": 8,
+        "acessorio": 0,
+        "cor_acessorio": 0
+      }
+    },
+    {
+      "id": "mesa-2",
+      "papel": "contratado",
+      "pose": 1,
+      "x": 75,
+      "y": 40,
+      "espelhada": false,
+      "freela": {
+        "pele": 2,
+        "cabelo": 1,
+        "cor_cabelo": 0,
+        "roupa": 3,
+        "cor_roupa": 3,
+        "acessorio": 4,
+        "cor_acessorio": 5
+      }
+    },
+    {
+      "id": "pingue-1",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 44,
+      "y": 56,
+      "espelhada": false,
+      "freela": {
+        "pele": 0,
+        "cabelo": 3,
+        "cor_cabelo": 5,
+        "roupa": 3,
+        "cor_roupa": 6,
+        "acessorio": 0,
+        "cor_acessorio": 0
+      }
+    },
+    {
+      "id": "pingue-2",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 89,
+      "y": 56,
+      "espelhada": true,
+      "freela": {
+        "pele": 5,
+        "cabelo": 5,
+        "cor_cabelo": 2,
+        "roupa": 1,
+        "cor_roupa": 5,
+        "acessorio": 1,
+        "cor_acessorio": 7
+      }
+    }
+  ]
+}

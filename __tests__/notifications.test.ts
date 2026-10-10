@@ -35,6 +35,12 @@ describe('describeNotification', () => {
     );
   });
 
+  it('contrato na Fellas Inc. traz o cargo', () => {
+    expect(notificationText(n({ kind: 'idle_hired', postId: null, body: 'CEO de nada' }))).toBe(
+      'Ana te contratou como CEO de nada na Fellas Inc.',
+    );
+  });
+
   it('nomes em negrito, o resto normal', () => {
     expect(describeNotification(n({ actors: [p('Ana'), p('Pedro')], actorCount: 2 }))).toEqual([
       { text: 'Ana', bold: true },

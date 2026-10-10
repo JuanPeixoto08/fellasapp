@@ -7,6 +7,10 @@ const DIA = 24 * H;
 
 // Jogador que abre 3x por dia (meio-dia, 17h, meia-noite) e sempre compra o que se paga mais rápido.
 // A primeira sessão dura 1h. Os alvos são os da spec (seção 1.3).
+// Com o piso de freela (+2%, entrega 2), medido ao implementar: 2º notebook 15 s, era 2 em 895 s, era 3 em 0,5 d (43210 s),
+// era 4 em 1,0 d (86405 s), era 5 em 3,0 d (259200 s), 489 compras na 1ª hora, gerador 30 fora. Era 4 e era 5 caem no começo de uma sessão
+// (meia-noite); a era 2 tem pouca folga para o teto de 900 s.
+// Se algum marco sair do alvo, NÃO mexa em PARAMETROS (mudaria os preços em produção): pare e avise.
 describe('ritmo da semana', () => {
   const m = simular();
   it('2º notebook em até 15 s', () => {

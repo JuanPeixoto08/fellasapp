@@ -1,0 +1,62 @@
+{
+  "quadros": 12,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 6,
+      "x": 136,
+      "y": 49,
+      "espelhada": true,
+      "trilha": [
+        {},
+        {},
+        {},
+        null,
+        null,
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        },
+        {
+          "pose": 1,
+          "x": 76,
+          "y": 36,
+          "espelhada": false
+        }
+      ]
+    }
+  ]
+}

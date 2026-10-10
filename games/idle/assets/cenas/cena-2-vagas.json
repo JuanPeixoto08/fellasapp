@@ -1,0 +1,22 @@
+{
+  "quadros": 8,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 1,
+      "x": 83,
+      "y": 35,
+      "espelhada": false
+    },
+    {
+      "id": "estagiario",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 117,
+      "y": 53,
+      "espelhada": true,
+      "freela": "estagiario"
+    }
+  ]
+}
