@@ -9,6 +9,10 @@ import { createTable, type Table } from '../shared/table3d/scene';
 import { canAct, createEpoch, initial, reduce, type MachineEvent, type MachineState } from './machine';
 import { actionDelta, canDouble, canSplit, MIN_BET } from './rules';
 import { createView } from './view';
+import { vigiarVersao } from '../shared/atualizar';
+
+// aba aberta há tempo recarrega sozinha quando sai versão nova (no dev o Vite já recarrega)
+if (!import.meta.env.DEV) vigiarVersao();
 
 // só no dev: ?shot faz a página se achar visível (o Chrome da automação marca a aba como escondida e freia timers)
 const SHOT = import.meta.env.DEV && new URLSearchParams(location.search).has('shot');

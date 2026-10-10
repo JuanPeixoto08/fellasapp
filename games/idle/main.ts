@@ -12,6 +12,10 @@ import {
   agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba } from './tela';
+import { vigiarVersao } from '../shared/atualizar';
+
+// aba aberta há tempo recarrega sozinha quando sai versão nova (no dev o Vite já recarrega)
+if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'hasSession'>;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
