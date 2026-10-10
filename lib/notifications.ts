@@ -7,7 +7,8 @@ export type NotificationKind =
   | 'birthday'
   | 'new_member'
   | 'mention'
-  | 'story_reaction';
+  | 'story_reaction'
+  | 'idle_hired';
 
 const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'like',
@@ -19,6 +20,7 @@ const KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'new_member',
   'mention',
   'story_reaction',
+  'idle_hired',
 ]);
 
 /** Tipo que este app sabe mostrar (uma migração mais nova pode trazer outros). */
@@ -93,6 +95,8 @@ export function describeNotification(n: AppNotification): TextPart[] {
       return [...who, { text: ' entrou no fellas' }];
     case 'story_reaction':
       return [...who, { text: `${plural ? ' reagiram' : ' reagiu'} ${emojis} ao seu story` }];
+    case 'idle_hired':
+      return [...who, { text: ` te contratou como ${n.body ?? 'freela'} na Fellas Inc.` }];
     case 'mention':
       return [...who, { text: ` te marcou num ${n.commentId ? 'comentário' : 'post'}: “${snippet(n.body)}”` }];
   }

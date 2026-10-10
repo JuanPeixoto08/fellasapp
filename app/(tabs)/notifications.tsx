@@ -7,6 +7,7 @@ import { NotificationRow } from '../../components/notifications/NotificationRow'
 import { Divider, EmptyState, Screen } from '../../components/ui';
 import { fetchNotifications, markNotificationsSeen } from '../../lib/api/notifications';
 import { listActiveStories } from '../../lib/api/stories';
+import { openGame } from '../../lib/games';
 import type { AppNotification } from '../../lib/notifications';
 import { setUnreadNotifications } from '../../lib/notificationsStore';
 import { openStories } from '../../lib/storyViewerStore';
@@ -69,6 +70,10 @@ export default function NotificationsScreen() {
   );
 
   const open = (n: AppNotification) => {
+    if (n.kind === 'idle_hired') {
+      openGame('idle'); // o contrato aparece no jogo (aba Contratar)
+      return;
+    }
     if (n.kind === 'story_reaction' && n.storyId) {
       // abre o meu story que recebeu a reação (se já sumiu, não faz nada)
       const storyId = n.storyId;

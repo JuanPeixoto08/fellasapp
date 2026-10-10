@@ -20,6 +20,8 @@ function kindIcon(t: Theme, kind: NotificationKind): { name: IconName; color?: s
       return { name: 'gift-outline' };
     case 'new_member':
       return { name: 'person-add-outline' };
+    case 'idle_hired':
+      return { name: 'briefcase-outline' };
     case 'mention':
       return { name: 'at-outline' };
   }
