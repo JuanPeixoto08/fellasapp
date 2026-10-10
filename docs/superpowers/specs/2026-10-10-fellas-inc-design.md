@@ -4,7 +4,7 @@ Data: 10/10/2026. Status: design aprovado em conversa; esta spec aguarda revisã
 
 ## Resumo
 
-Fellas Inc. é o terceiro jogo do Fellas Games: um idle em que cada fella toca a própria startup de mentira. O número que
+Fellas Inc. é o terceiro jogo do Fellas Games: um idle em que cada fella toca a própria startup fellada. O número que
 sobe é o **valuation**. Cada um compra geradores e melhorias, escolhe estratégias, contrata amigos e disputa propriedades
 (lugares reais que o grupo frequenta). A temporada dura uma semana: segunda 00:00 tudo zera, o maior valuation leva o selo
 **"unicórnio da semana"** e fica registrado numa placa.
