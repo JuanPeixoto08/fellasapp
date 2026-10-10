@@ -2,7 +2,14 @@
 // (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
 import type { Catalogo, Estrategia, Melhoria } from './catalogo';
 
-export type Estado = { generators: number[]; upgrades: number[]; strategies: number[] };
+/** O que muda a produção pelos contratos ATIVOS: quantos você contratou e, para cada empresa que te contratou, quanto
+ *  ela paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */
+export type Social = { contratei: number; empregos: number[] };
+export const SOLO: Social = { contratei: 0, empregos: [] };
+export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social };
+
+export const POR_CONTRATADO = 0.1;
+export const POR_EMPREGO = 0.02;
 
 export const CRESCIMENTO = 1.15;
 export const TETO_SEGUNDOS = 8 * 3600;
@@ -15,6 +22,21 @@ export function era(cat: Catalogo, gens: number[]): number {
 
 export function estrategiasAtivas(cat: Catalogo, s: Estado): Estrategia[] {
   return cat.estrategias.filter((e) => s.strategies[e.era - 2] === e.opcao);
+}
+
+/**
+ * Multiplicador dos contratos ativos (igual a idle_social_mult na 0038):
+ * 1 + efeito × (porContratado × contratei + Σ 2% × o que cada empresa paga). Ninguém te contratou = piso de freela
+ * (2%, como 1 contrato). efeito = ×2 com Networking; porContratado = 10% (15% com Cultura de startup).
+ */
+export function multContratos(cat: Catalogo, s: Estado): number {
+  const est = estrategiasAtivas(cat, s);
+  const soc = s.social ?? SOLO;
+  const pors = est.map((e) => e.sociais.porContratado).filter((x) => x !== undefined);
+  const por = pors.length ? Math.max(...pors) : POR_CONTRATADO;
+  const efeito = est.reduce((a, e) => a * (e.sociais.contratoEfeitoMult ?? 1), 1);
+  const empregos = soc.empregos.length ? soc.empregos.reduce((a, m) => a + POR_EMPREGO * m, 0) : POR_EMPREGO;
+  return 1 + efeito * (por * soc.contratei + empregos);
 }
 
 const porId = new WeakMap<Catalogo, Map<number, Melhoria>>();
@@ -40,6 +62,7 @@ export function fatores(cat: Catalogo, s: Estado): { porGerador: number[]; globa
   for (const e of est) global *= e.prodMult;
   const distintos = s.generators.filter((n) => n > 0).length;
   global *= 1 + est.reduce((a, e) => a + e.porGeradorDistinto, 0) * distintos;
+  global *= multContratos(cat, s);
   const porGerador = cat.geradores.map((g) => {
     let mult = 1;
     for (const e of est) if (e.genDe !== null && e.genAte !== null && g.id >= e.genDe && g.id <= e.genAte) mult *= e.genMult;
@@ -94,4 +117,23 @@ export function acumular(v: number, r: number, desdeMs: number, ateMs: number, b
   let boost = 0;
   if (boostAteMs !== null && boostAteMs > desdeMs) boost = Math.max(0, Math.min((Math.min(ateMs, boostAteMs) - desdeMs) / 1000, dt));
   return v + r * dt + r * 4 * boost;
+}
+
+/**
+ * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
+ * começando em `desdeMs`. Igual a idle_settle na 0038: teto de 8h contado de `desdeMs`, ×5 dentro do bônus.
+ */
+export function acumularTrechos(
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
+): number {
+  const fim = Math.min(ateMs, desdeMs + TETO_SEGUNDOS * 1000);
+  for (let i = 0; i < trechos.length; i++) {
+    const a = Math.max(trechos[i].desdeMs, desdeMs);
+    const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : fim, fim);
+    if (b <= a) continue;
+    const r = trechos[i].r;
+    v += (r * (b - a)) / 1000;
+    if (boostAteMs !== null && boostAteMs > a) v += r * 4 * Math.max(0, (Math.min(b, boostAteMs) - a) / 1000);
+  }
+  return v;
 }
