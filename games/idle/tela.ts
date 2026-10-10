@@ -2,23 +2,30 @@
 // mudança de estado; `atualizarValor` ~10x por segundo (só o número e quais botões estão liberados).
 // Texto de usuário sempre por textContent.
 import { button, el } from '../shared/hud/hud';
-import type { IdleBoardRow, IdleState } from '../shared/types';
+import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { catalogo, type Melhoria } from './catalogo';
-import { custoMult, liberada, maxCompra, podeComprarGerador, preco, taxaPorUnidade } from './economia';
+import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
-import { ERAS } from './nomes';
+import type { Pose } from './montagem';
+import type { Desenhar } from './navegador';
+import { ERAS, VISUAL_NOMES } from './nomes';
 import { instante, TEXTO_TIPO, tipo as tipoOportunidade, VALIDADE_S } from './oportunidades';
+import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
 
-export type Aba = 'geradores' | 'melhorias' | 'placar';
+export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar';
+export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
 export type Modelo = {
   fase: Fase; estado: IdleState | null; aba: Aba; placar: IdleBoardRow[] | null; aviso: string | null;
   ocupado: boolean; pendentes: number[]; aoVivo: number | null; caixaAberta: boolean;
+  /** Rascunho do editor de personagem (null = fechado). */
+  editor: IdleVisual | null;
 };
 export type Acoes = {
   abrirCnpj(): void; comprar(tipo: 'gerador' | 'melhoria', id: number, qtd: 0 | 1 | 10): void; escolher(era: number, opcao: number): void;
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
+  contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
 };
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
 
@@ -31,6 +38,24 @@ export function prazo(ms: number) {
   if (min <= 1) return 'some em menos de 1 min';
   if (min < 60) return `some em ${min} min`;
   return `some em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
+}
+
+/** "+12%" / "+2,5%": o bônus dos contratos em pt-BR, com uma casa no máximo. */
+export const porcento = (mult: number) => `+${(Math.round((mult - 1) * 1000) / 10).toLocaleString('pt-BR')}%`;
+
+/** Em quantas empresas alguém trabalha agora (carta de contratar). */
+export function empresas(n: number) {
+  if (n === 0) return 'ninguém contratou ainda';
+  return n === 1 ? 'trabalha em 1 empresa' : `trabalha em ${n} empresas`;
+}
+
+/** Quanto falta pro contrato vencer: "por mais 6 dias", "por mais 5 h", "por menos de 1 h". */
+export function restam(ms: number) {
+  const h = Math.floor(ms / 3600_000);
+  if (h < 1) return 'por menos de 1 h';
+  if (h < 24) return `por mais ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'por mais 1 dia' : `por mais ${d} dias`;
 }
 
 /** X desenhado (não glifo), traço de 2px. */
@@ -50,7 +75,7 @@ function iconeFechar() {
   return svg;
 }
 
-export function criarTela(root: HTMLElement, a: Acoes): Tela {
+export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
   const app = el('div', 'app idle');
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
@@ -70,20 +95,26 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   placa.append(numero, taxaTxt, bonus);
 
   const abrir = el('div', 'abrir');
-  abrir.append(el('p', undefined, '3h06. Bora fundar uma empresa?'), button('Abrir CNPJ', 'btn main', a.abrirCnpj));
+  abrir.append(
+    el('p', undefined, '3h06. Bora fundar uma empresa?'),
+    button('Abrir CNPJ', 'btn main', a.abrirCnpj),
+    button('Mudar visual', 'btn', () => a.editor('abrir')),
+  );
 
   const abas = el('nav', 'abas');
   const botoesAba: Record<Aba, HTMLButtonElement> = {
     geradores: button('Geradores', 'aba', () => a.trocarAba('geradores')),
     melhorias: button('Melhorias', 'aba', () => a.trocarAba('melhorias')),
+    contratar: button('Contratar', 'aba', () => a.trocarAba('contratar')),
     placar: button('Placar', 'aba', () => a.trocarAba('placar')),
   };
-  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.placar);
+  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar);
   const listaG = el('div', 'lista lista-geradores');
   const listaM = el('div', 'lista lista-melhorias');
+  const listaC = el('div', 'lista lista-contratar');
   const listaP = el('ol', 'lista lista-placar');
   const painel = el('main', 'painel');
-  painel.append(abrir, abas, listaG, listaM, listaP);
+  painel.append(abrir, abas, listaG, listaM, listaC, listaP);
 
   const notice = el('div', 'notice');
   notice.setAttribute('role', 'status');
@@ -98,7 +129,8 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
 
   const modalE = el('div', 'modal modal-estrategia');
   const modalC = el('div', 'modal modal-caixa');
-  for (const [modal, titulo] of [[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa']] as const) {
+  const modalV = el('div', 'modal modal-visual');
+  for (const [modal, titulo] of [[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual']] as const) {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', titulo);
@@ -109,7 +141,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     return h;
   };
 
-  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC);
+  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -119,6 +151,36 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   // aba Melhorias: à venda ou as já compradas (só apresentação; refaz com o último modelo)
   let verCompradas = false;
   let ultimo: Modelo | null = null;
+
+  /** Personagem num canvas pequeno (o CSS amplia). rotulo null = decorativo (o nome já está do lado). */
+  function boneco(v: IdleVisual | null, rotulo: string | null, opcoes?: { pose?: Pose; cadeira?: boolean }) {
+    const c = el('canvas', 'mini-boneco');
+    if (rotulo) {
+      c.setAttribute('role', 'img');
+      c.setAttribute('aria-label', rotulo);
+    } else c.setAttribute('aria-hidden', 'true');
+    desenhar(c, v ?? PADRAO, opcoes);
+    return c;
+  }
+
+  /** Uma linha do editor: rótulo + botões (texto, ou amostras de cor com `tons`). */
+  function opcoes(rotulo: string, grupoNome: string, campo: Campo, v: IdleVisual, tons?: readonly Tons[]) {
+    const linha = el('div', 'opcoes');
+    linha.setAttribute('role', 'group');
+    linha.setAttribute('aria-label', grupoNome);
+    const botoes = el('div', 'opcoes-botoes');
+    VISUAL_NOMES[campo].forEach((nome, i) => {
+      const b = button(tons ? '' : nome, tons ? 'cor' : 'chip', () => a.mudarVisual(campo, i));
+      if (tons) {
+        b.style.backgroundColor = tons[i][1];
+        b.setAttribute('aria-label', nome);
+      }
+      b.setAttribute('aria-pressed', String(v[campo] === i));
+      botoes.append(b);
+    });
+    linha.append(el('span', 'opcoes-rotulo', rotulo), botoes);
+    return linha;
+  }
 
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
@@ -184,6 +246,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     for (const k of Object.keys(botoesAba) as Aba[]) botoesAba[k].classList.toggle('ativa', m.aba === k);
     mostrar(listaG, jogando && m.aba === 'geradores');
     mostrar(listaM, jogando && m.aba === 'melhorias');
+    mostrar(listaC, jogando && m.aba === 'contratar');
     mostrar(listaP, jogando && m.aba === 'placar');
     caixinha.textContent = `Oportunidades (${m.pendentes.length})`;
     mostrar(caixinha, jogando);
@@ -244,6 +307,44 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
       }
     }
 
+    // contratar: você no topo (bônus, quem te contratou), depois uma carta por fella que abriu a empresa
+    listaC.replaceChildren();
+    if (s && jogando && m.aba === 'contratar') {
+      const agora = Date.parse(s.server_now);
+      const nome = (uid: string) => m.placar?.find((r) => r.userId === uid)?.name ?? 'Alguém';
+      const topoC = el('div', 'contratos-topo');
+      const texto = el('div', 'meio');
+      texto.append(
+        el('strong', undefined, `Contratos: ${porcento(multContratos(catalogo, s))} de produção`),
+        el('span', 'sub', s.chefes.length
+          ? `Você trabalha pra ${s.chefes.map((c) => `${nome(c.user_id)} (${c.cargo}, ${restam(Date.parse(c.ate) - agora)})`).join(', ')}.`
+          : 'Ninguém te contratou: você ganha o piso de freela.'),
+      );
+      topoC.append(boneco(s.avatar, 'Seu personagem'), texto, button('Mudar visual', 'btn', () => a.editor('abrir')));
+      listaC.append(topoC);
+      if (!m.placar) listaC.append(el('p', 'vazio', 'Carregando…'));
+      else {
+        const outros = m.placar.filter((r) => r.userId !== s.user_id);
+        if (!outros.length) listaC.append(el('p', 'vazio', 'Ninguém mais abriu a empresa ainda. Chama a galera.'));
+        for (const r of outros) {
+          const carta = el('div', 'carta');
+          const meio = el('div', 'meio');
+          meio.append(el('strong', undefined, r.name), el('span', 'sub', `${ERAS[r.era - 1]} · ${empresas(r.hiredCount)}`));
+          carta.append(boneco(r.avatar, null), meio);
+          // "já trabalha pra você" vem do estado (sempre fresco), não só do placar (recarrega a cada 60 s)
+          const meu = s.equipe.find((e) => e.user_id === r.userId);
+          if (meu) {
+            carta.append(el('span', 'contratado', `Trabalha pra você como ${meu.cargo} ${restam(Date.parse(meu.ate) - agora)}`));
+          } else {
+            const b = button(`Contratar · ${formatarValor(s.hire_price)}`, 'btn', () => a.contratar(r.userId));
+            precos.push({ botao: b, preco: s.hire_price });
+            carta.append(b);
+          }
+          listaC.append(carta);
+        }
+      }
+    }
+
     listaP.replaceChildren();
     if (!m.placar) listaP.append(el('li', 'vazio', 'Carregando…'));
     else {
@@ -251,7 +352,11 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
       m.placar.forEach((r, i) => {
         const li = el('li', r.userId === s?.user_id ? 'eu' : undefined);
         // a era é a cena em que a pessoa está (cena 1 = era 1, cena 2 = era 2...)
-        li.append(el('span', 'pos', `${i + 1}º`), el('span', 'nome', r.name), el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)));
+        li.append(
+          el('span', 'pos', `${i + 1}º`), boneco(r.avatar, null), el('span', 'nome', r.name),
+          el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)),
+        );
+        if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
         listaP.append(li);
       });
     }
@@ -309,20 +414,53 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
       for (const w of m.pendentes) {
         const k = tipoOportunidade(s.user_id, w);
         const li = el('li', 'escolha');
-        const boneco = el('div', 'boneco');
-        boneco.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
+        const bonequinho = el('div', 'boneco');
+        bonequinho.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
         const texto = el('div', 'escolha-texto');
         const quando = el('span', 'sub prazo', '');
         texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
         prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
         const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
         b.disabled = m.ocupado || s.opp_left <= 0;
-        li.append(boneco, texto, b);
+        li.append(bonequinho, texto, b);
         lista.append(li);
       }
       if (m.pendentes.length) folha.append(lista);
       modalC.append(folha);
       atualizarPrazos();
+    }
+
+    // editor de personagem
+    modalV.replaceChildren();
+    mostrar(modalV, m.editor !== null && (m.fase === 'antes' || jogando));
+    if (m.editor) {
+      const v = m.editor;
+      const folha = el('div', 'folha');
+      const topoV = el('div', 'folha-topo');
+      const fechar = button('', 'fechar', () => a.editor('fechar'));
+      fechar.setAttribute('aria-label', 'Fechar');
+      fechar.append(iconeFechar());
+      topoV.append(titulo('idle-titulo-visual', 'Seu visual'), fechar);
+      const previa = el('div', 'previa');
+      previa.append(boneco(v, 'Você de frente', { pose: 5 }), boneco(v, 'Você na cadeira', { pose: 1, cadeira: true }));
+      folha.append(
+        topoV,
+        el('p', 'sub', 'É assim que você aparece nas suas cenas, no placar e na empresa de quem te contratar.'),
+        previa,
+        opcoes('Pele', 'Pele', 'pele', v, PELES),
+        opcoes('Cabelo', 'Cabelo', 'cabelo', v),
+        opcoes('Cor', 'Cor do cabelo', 'cor_cabelo', v, CORES_CABELO),
+        opcoes('Roupa', 'Roupa', 'roupa', v),
+        opcoes('Cor', 'Cor da roupa', 'cor_roupa', v, CORES),
+        opcoes('Na cabeça', 'Na cabeça', 'acessorio', v),
+      );
+      if (v.acessorio > 0) folha.append(opcoes('Cor', 'Cor do que vai na cabeça', 'cor_acessorio', v, CORES));
+      const fim = el('div', 'editor-fim');
+      const bora = button('Bora', 'btn main', () => a.editor('salvar'));
+      bora.disabled = m.ocupado;
+      fim.append(button('Sortear', 'btn', () => a.editor('sortear')), bora);
+      folha.append(fim);
+      modalV.append(folha);
     }
 
     noticeTxt.textContent = m.aviso ?? '';

@@ -4,13 +4,14 @@ import './idle.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
-import type { IdleBoardRow, IdleState } from '../shared/types';
+import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { aoVivo, instante, pendentes } from './oportunidades';
-import { carregarKit } from './navegador';
+import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
+import { PADRAO, sortear } from './personagem';
 import {
-  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, type Ancora, type Fase,
+  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -18,11 +19,16 @@ import { vigiarVersao } from '../shared/atualizar';
 // aba aberta há tempo recarrega sozinha quando sai versão nova (no dev o Vite já recarrega)
 if (!import.meta.env.DEV) vigiarVersao();
 
-type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'hasSession'>;
+type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'hasSession'>;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
 
-const RECARREGA = ['idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap', 'idle_not_started', 'idle_started'];
+const RECARREGA = [
+  'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
+  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open',
+];
+// contratar recusado: o placar (quem já trabalha pra quem) também ficou velho
+const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];
 
 let fase: Fase = 'carregando';
 let ancora: Ancora | null = null;
@@ -32,17 +38,64 @@ let aviso: string | null = null;
 let ocupado = false;
 let caixaAberta = false;
 let vivoAtual: number | null = null;
+// editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
+// volta sozinho na próxima abertura da página, até o primeiro "Bora".
+let rascunho: IdleVisual | null = null;
+let editorFechado = false;
+// bonecos soltos (cartas, placar, editor) só desenham depois que o kit carrega
+let desenhar: Desenhar = () => undefined;
+// o vencimento de contrato que já pediu um "bater o ponto" (pede uma vez por vencimento)
+let vencimentoPedido: string | null = null;
 
 const tela = criarTela(document.getElementById('app')!, {
   abrirCnpj: () => void guard(abrirCnpj),
   comprar: (tipo, id, qtd) => void guard(async () => aplicar(await api.idleBuy(tipo, id, qtd))),
   escolher: (era, opcao) => void guard(async () => aplicar(await api.idlePickStrategy(era, opcao))),
   pegar: (w) => void guard(async () => aplicar(await api.idleClaim(w))),
-  trocarAba: (nova) => { aba = nova; if (nova === 'placar') void carregarPlacar(); render(); },
+  trocarAba: (nova) => {
+    aba = nova;
+    if (nova === 'placar' || nova === 'contratar') void carregarPlacar();
+    render();
+  },
   caixa: (aberta) => { caixaAberta = aberta; render(); },
   tentarDeNovo: () => void guard(recarregar),
-});
+  contratar: (uid) => void guard(async () => {
+    aplicar(await api.idleHire(uid));
+    await carregarPlacar();
+  }),
+  editor: (acao) => {
+    if (acao === 'salvar') {
+      const v = rascunho;
+      if (v) void guard(() => salvarVisual(v));
+      return;
+    }
+    if (acao === 'abrir') rascunho = { ...(ancora?.estado.avatar ?? PADRAO) };
+    else if (acao === 'fechar') {
+      rascunho = null;
+      editorFechado = true;
+    } else rascunho = sortear();
+    render();
+  },
+  mudarVisual: (campo, valor) => {
+    if (!rascunho) return;
+    rascunho = { ...rascunho, [campo]: valor };
+    render();
+  },
+}, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
+// o palco recebe o kit como função (tenta de novo quando falha); o editor e as cartas esperam o mesmo kit
 const palco = criarPalco(tela.canvas, ativos.camadas, carregarKit);
+void (async () => {
+  const k = await carregarKit().catch(() => null); // já avisou no console; sem kit os bonecos ficam vazios
+  const url = ativos.cadeira();
+  const cadeira = url
+    ? await carregarImagem(url).catch((e) => {
+        console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
+        return null;
+      })
+    : null;
+  desenhar = criarDesenhista(k, cadeira);
+  render();
+})();
 
 function agoraSrv() {
   return ancora ? agoraServidor(ancora, Date.now()) : Date.now();
@@ -61,19 +114,31 @@ function render() {
   const agora = agoraSrv();
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
-  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
+  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
 
 function aplicar(estado: IdleState) {
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
+  palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO) });
+  if (fase === 'antes') {
+    palco.preparar(['cena-0-abrindo', 'cena-1']);
+    // primeira vez (nunca salvou o visual): o editor aparece antes do Abrir CNPJ
+    if (!estado.avatar && !editorFechado && rascunho === null) rascunho = { ...PADRAO };
+  }
   if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
   render();
 }
 
 async function recarregar() {
   aplicar(await api.idleOpen());
+}
+
+async function salvarVisual(v: IdleVisual) {
+  aplicar(await api.idleSetAvatar(v));
+  rascunho = null;
+  if (aba === 'placar' || aba === 'contratar') await carregarPlacar();
 }
 
 async function abrirCnpj() {
@@ -117,6 +182,7 @@ async function guard(trabalho: () => Promise<void>) {
     else {
       aviso = err.message;
       if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
+      if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
     }
   } finally {
     ocupado = false;
@@ -129,10 +195,16 @@ setInterval(() => {
   if (document.hidden || !ancora) return;
   tela.atualizarValor(valuationAgora(ancora, Date.now()));
   if (vivoAgora(ancora.estado, agoraSrv()) !== vivoAtual) render();
+  // um contrato venceu: a taxa mudou no banco, bate o ponto (uma vez por vencimento)
+  const s = ancora.estado;
+  if (vencido(s, agoraSrv()) && vencimentoPedido !== s.muda_em && !ocupado) {
+    vencimentoPedido = s.muda_em;
+    void guard(recarregar);
+  }
 }, 100);
-setInterval(() => { if (!document.hidden && aba === 'placar') void carregarPlacar(); }, 60_000);
+setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'contratar')) void carregarPlacar(); }, 60_000);
 
-// voltou pra aba: bate o ponto de novo (pode ter virado a semana)
+// voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
 });
