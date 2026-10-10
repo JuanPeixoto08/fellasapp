@@ -56,10 +56,30 @@
 .idle .lista-placar .sub { grid-column: 2; }
 .idle .lista-placar .v { grid-row: 1; grid-column: 3; font-weight: 700; }
 .idle .vazio { color: #A8A398; text-align: center; }
-.idle .modal { position: fixed; inset: 0; display: grid; align-content: center; justify-content: center; grid-template-columns: minmax(0, 560px); gap: 12px; padding: 24px; background: rgba(11, 10, 14, 0.92); color: var(--paper); overflow: auto; z-index: 10; }
-.idle .cartao { display: grid; gap: 6px; padding: 12px; border-radius: 8px; background: #1B1A22; border: 1px solid #34323F; }
-.idle .cartao.off { opacity: 0.55; }
+/* modais: folha que sobe de baixo no celular (a cena continua à vista em cima); janela no meio do PC */
+.idle .modal { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(11, 10, 14, 0.72); color: var(--paper); z-index: 10; }
+.idle .folha { width: 100%; max-height: 85dvh; overflow: auto; display: grid; gap: 4px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: #1B1A22; border-top: 1px solid #34323F; border-radius: 12px 12px 0 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4); }
+@media (min-width: 600px) {
+  .idle .modal { align-items: center; padding: 24px; }
+  .idle .folha { width: min(460px, 100%); border: 1px solid #34323F; border-radius: 12px; padding: 20px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); }
+}
+.idle .folha-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.idle .folha h2 { margin: 0; font: 700 19px/1.2 var(--font); letter-spacing: -0.01em; }
+.idle .folha > .sub { margin: 0 0 8px; }
+.idle .fechar { flex: none; width: 44px; height: 44px; margin-right: -10px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--paper); cursor: pointer; }
+.idle .fechar:hover { background: #262431; }
+.idle .escolhas { list-style: none; margin: 0; padding: 0; }
+.idle .escolha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #2A2833; }
+.idle .escolha.off { opacity: 0.5; }
+.idle .escolha-texto { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.idle .escolha-texto strong { font-size: 15px; line-height: 1.3; }
+.idle .prazo { font-variant-numeric: tabular-nums; }
+.idle .em-breve { flex: none; max-width: 40%; text-align: right; font-size: 12px; color: #A8A398; }
+.idle .boneco { flex: none; width: 48px; height: 48px; background: no-repeat 0 0 / 192px 48px; image-rendering: pixelated; animation: quadros4 0.6s steps(4) infinite; }
+.idle .btn.compacto { flex: none; height: 44px; padding: 0 18px; font-size: 14px; background: var(--gold); box-shadow: none; }
+.idle .btn.compacto:hover:not(:disabled) { background: #F7DE95; }
+.idle .fechar:focus-visible, .idle .btn:focus-visible, .idle .aba:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
 .idle .caixinha { flex: none; height: auto; min-height: 44px; padding: 0 14px; font-size: 14px; }
 /* o aviso fica por cima dos modais (z-index 10): erro ao escolher estratégia ou pegar na caixinha precisa aparecer */
 .idle .notice { position: fixed; z-index: 11; }
-@media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo, .idle .boneco { animation: none; } }

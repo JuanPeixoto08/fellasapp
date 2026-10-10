@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { criarTela, type Acoes, type Modelo } from './tela';
+import { instante, VALIDADE_S } from './oportunidades';
+import { criarTela, prazo, type Acoes, type Modelo } from './tela';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
@@ -61,6 +62,30 @@ describe('tela da Fellas Inc.', () => {
     tela.renderizar(modelo({ aviso: 'Valuation não cobre essa compra', pendentes: [3, 2] }));
     expect(root.querySelector('.notice')!.textContent).toContain('Valuation não cobre essa compra');
     expect(root.querySelector('.caixinha')!.textContent).toBe('Oportunidades (2)');
+  });
+  it('caixinha: uma linha por oportunidade com o boneco, o prazo e Pegar; X fecha; sem pega no dia, botões apagados', () => {
+    vi.useFakeTimers();
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    vi.setSystemTime(instante(uid, 50) + 60 * 60 * 1000); // 1h depois de a janela 50 aparecer
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid }) }));
+    const linha = root.querySelector('.modal-caixa .escolha')!;
+    expect((linha.querySelector('.boneco') as HTMLElement).style.backgroundImage).toContain('url(');
+    expect(linha.querySelector('.prazo')!.textContent).toBe('some em 3h00');
+    linha.querySelector('button')!.click();
+    expect(acoes.pegar).toHaveBeenCalledWith(50);
+    root.querySelector<HTMLButtonElement>('.modal-caixa .fechar')!.click();
+    expect(acoes.caixa).toHaveBeenCalledWith(false);
+    tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid, opp_left: 0 }) }));
+    expect(root.querySelector('.modal-caixa')!.textContent).toContain('Já pegou todas de hoje. Amanhã tem mais.');
+    expect(root.querySelector<HTMLButtonElement>('.modal-caixa .escolha button')!.disabled).toBe(true);
+    vi.useRealTimers();
+  });
+  it('prazo: horas com minutos, minutos, menos de 1 min', () => {
+    expect(prazo(VALIDADE_S * 1000)).toBe('some em 4h00');
+    expect(prazo((3 * 60 + 12) * 60000)).toBe('some em 3h12');
+    expect(prazo(40 * 60000)).toBe('some em 40 min');
+    expect(prazo(30000)).toBe('some em menos de 1 min');
   });
   it('placar ainda não carregado: Carregando…', () => {
     const tela = criarTela(root, acoes);

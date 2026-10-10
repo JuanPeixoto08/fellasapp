@@ -8,7 +8,7 @@ import { catalogo, type Melhoria } from './catalogo';
 import { custoMult, liberada, maxCompra, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { ERAS } from './nomes';
-import { TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
+import { instante, TEXTO_TIPO, tipo as tipoOportunidade, VALIDADE_S } from './oportunidades';
 import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
 
 export type Aba = 'geradores' | 'melhorias' | 'placar';
@@ -24,6 +24,31 @@ export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atu
 
 const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidden') : n.setAttribute('hidden', ''));
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
+
+/** "some em 3h12" / "some em 40 min": quanto falta pra oportunidade guardada sumir. */
+export function prazo(ms: number) {
+  const min = Math.ceil(ms / 60000);
+  if (min <= 1) return 'some em menos de 1 min';
+  if (min < 60) return `some em ${min} min`;
+  return `some em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
+}
+
+/** X desenhado (não glifo), traço de 2px. */
+function iconeFechar() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(ns, 'path');
+  p.setAttribute('d', 'M5 5l10 10M15 5L5 15');
+  p.setAttribute('stroke', 'currentColor');
+  p.setAttribute('stroke-width', '2');
+  p.setAttribute('stroke-linecap', 'round');
+  svg.append(p);
+  return svg;
+}
 
 export function criarTela(root: HTMLElement, a: Acoes): Tela {
   const app = el('div', 'app idle');
@@ -89,6 +114,8 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
 
   // botões que dependem do valor (atualizados em atualizarValor)
   let precos: { botao: HTMLButtonElement; preco: number; maximo?: { custo: number; n: number; cm: number } }[] = [];
+  // "some em ..." das oportunidades guardadas (atualizado em atualizarValor)
+  let prazos: { texto: HTMLElement; fim: number }[] = [];
 
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
@@ -146,6 +173,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     const s = m.estado;
     const jogando = m.fase === 'jogando' || m.fase === 'abrindo';
     precos = [];
+    prazos = [];
     mostrar(abrir, m.fase === 'antes');
     mostrar(abas, jogando);
     mostrar(placa, jogando);
@@ -216,33 +244,58 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     modalE.replaceChildren();
     mostrar(modalE, jogando && era !== null);
     if (era !== null) {
-      modalE.append(titulo('idle-titulo-estrategia', `Era ${era}: ${ERAS[era - 1]}`), el('p', undefined, 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'));
+      const folha = el('div', 'folha');
+      const topo = el('div', 'folha-topo');
+      topo.append(titulo('idle-titulo-estrategia', `Era ${era}: ${ERAS[era - 1]}`));
+      const lista = el('ul', 'escolhas');
       for (const e of catalogo.estrategias.filter((x) => x.era === era)) {
-        const card = el('div', e.ativa ? 'cartao' : 'cartao off');
-        card.append(el('strong', undefined, e.nome), el('p', undefined, e.frase));
-        if (!e.ativa) card.append(el('p', 'sub', e.requer === 'contratos' ? 'Chega com Contratar' : 'Chega com o Mapa do rolê'));
-        const b = button('Escolher', 'btn main', () => a.escolher(era, e.opcao));
-        b.disabled = !e.ativa || m.ocupado;
-        card.append(b);
-        modalE.append(card);
+        const li = el('li', e.ativa ? 'escolha' : 'escolha off');
+        const texto = el('div', 'escolha-texto');
+        texto.append(el('strong', undefined, e.nome), el('span', 'sub', e.frase));
+        li.append(texto);
+        if (e.ativa) {
+          const b = button('Escolher', 'btn main compacto', () => a.escolher(era, e.opcao));
+          b.disabled = m.ocupado;
+          li.append(b);
+        } else {
+          li.append(el('span', 'em-breve', e.requer === 'contratos' ? 'Chega com Contratar' : 'Chega com o Mapa do rolê'));
+        }
+        lista.append(li);
       }
+      folha.append(topo, el('p', 'sub', 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'), lista);
+      modalE.append(folha);
     }
 
     // caixinha
     modalC.replaceChildren();
     mostrar(modalC, m.caixaAberta && jogando);
     if (s && m.caixaAberta) {
-      modalC.append(titulo('idle-titulo-caixa', 'Oportunidades guardadas'), el('p', 'sub', `Hoje ainda dá pra pegar ${s.opp_left}.`));
-      if (!m.pendentes.length) modalC.append(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
+      const folha = el('div', 'folha');
+      const topo = el('div', 'folha-topo');
+      const fechar = button('', 'fechar', () => a.caixa(false));
+      fechar.setAttribute('aria-label', 'Fechar');
+      fechar.append(iconeFechar());
+      topo.append(titulo('idle-titulo-caixa', 'Oportunidades guardadas'), fechar);
+      folha.append(topo, el('p', 'sub', s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}.` : 'Já pegou todas de hoje. Amanhã tem mais.'));
+      if (!m.pendentes.length) folha.append(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
+      const lista = el('ul', 'escolhas');
       for (const w of m.pendentes) {
-        const item = el('div', 'cartao');
-        item.append(el('strong', undefined, TEXTO_TIPO[tipoOportunidade(s.user_id, w)]));
-        const b = button('Pegar', 'btn main', () => a.pegar(w));
+        const k = tipoOportunidade(s.user_id, w);
+        const li = el('li', 'escolha');
+        const boneco = el('div', 'boneco');
+        boneco.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
+        const texto = el('div', 'escolha-texto');
+        const quando = el('span', 'sub prazo', '');
+        texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+        prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
+        const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
         b.disabled = m.ocupado || s.opp_left <= 0;
-        item.append(b);
-        modalC.append(item);
+        li.append(boneco, texto, b);
+        lista.append(li);
       }
-      modalC.append(button('Fechar', 'btn', () => a.caixa(false)));
+      if (m.pendentes.length) folha.append(lista);
+      modalC.append(folha);
+      atualizarPrazos();
     }
 
     noticeTxt.textContent = m.aviso ?? '';
@@ -253,8 +306,14 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     mostrar(overlay, m.fase === 'sem_sessao');
   }
 
+  function atualizarPrazos() {
+    const agora = Date.now();
+    for (const p of prazos) p.texto.textContent = prazo(p.fim - agora);
+  }
+
   function atualizarValor(valor: number) {
     numero.textContent = formatarValor(valor);
+    atualizarPrazos();
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {
