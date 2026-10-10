@@ -6,8 +6,9 @@ Data: 10/10/2026. Status: design aprovado em conversa; esta spec aguarda revisã
 
 Fellas Inc. é o terceiro jogo do Fellas Games: um idle em que cada fella toca a própria startup fellada. O número que
 sobe é o **valuation**. Cada um compra geradores e melhorias, escolhe estratégias, contrata amigos e disputa propriedades
-(lugares reais que o grupo frequenta). A temporada dura uma semana: segunda 00:00 tudo zera, o maior valuation leva o selo
-**"unicórnio da semana"** e fica registrado numa placa.
+(lugares reais que o grupo frequenta). A empresa nunca zera sozinha (o reset é só dos jogos que valem crédito).
+Toda segunda 00:00 o 1º do placar em R$/s leva o selo **"unicórnio da semana"** e fica numa placa, sem ninguém perder
+nada. Recomeçar será o prestígio, por escolha do jogador (entrega futura).
 
 O jogo é grande de propósito (30 geradores, ~200 melhorias), mas as decisões pesam mais que o tempo de tela: quem abre o
 jogo umas 3 vezes por dia fica competitivo.
@@ -200,15 +201,15 @@ pessoas) e `vagas` (JSON: posição, pose, espelhada, papel `dono` ou `contratad
 
 ## 8. Temporada, telas e app
 
-### 8.1 Reset (segunda 00:00 de Brasília)
+### 8.1 Foto da semana (segunda 00:00 de Brasília), sem reset
 
-`idle_weekly_reset()` roda 2 minutos depois do `games_weekly_reset` (entrada própria no `pg_cron`, `2 3 * * 1`) para os dois não disputarem as linhas de `profiles`; quem jogar antes é fechado pelo `idle_lock`:
+`idle_weekly_reset()` roda 2 minutos depois do `games_weekly_reset` (entrada própria no `pg_cron`, `2 3 * * 1`) para os dois não disputarem as linhas de `profiles`. Não apaga nada: é só uma foto do placar. Se o cron não rodou, o primeiro `idle_lock` da semana nova tira a foto:
 
-1. Grava a placa da semana em `idle_weeks`: unicórnio (maior valuation), top 3, mais disputado, estratégias do pódio e a
-   era mais alta de cada um.
-2. Passa o selo `weekly_unicorn` para o campeão (independente do `weekly_champion` do cassino).
-3. Zera estado, contratos, donos de propriedade e oportunidades da semana. **Não** zera personagem nem placas.
-4. Todo mundo volta para a cena "antes" com "Abrir CNPJ".
+1. Grava a placa da semana que acabou em `idle_weeks`: unicórnio (1º em R$/s, desempate pelo valuation até a meia-noite
+   de Brasília), top 3 e estratégias e era de cada um. Só entra quem já jogava antes da semana nova; sem ninguém, sem placa.
+2. Passa o selo `weekly_unicorn` para o 1º (independente do `weekly_champion` do cassino) e o tira de quem tinha. Rodar de
+   novo na mesma semana não grava outra placa nem troca o selo.
+3. Estado, geradores, melhorias e valuation ficam como estão. Nada é zerado.
 
 ### 8.2 Telas (`games/idle/`)
 

@@ -105,6 +105,7 @@ describe('tela da Fellas Inc.', () => {
     const v = root.querySelector('.lista-placar .v')!.textContent!;
     expect(v).toContain('/s');
     expect(v).not.toContain('bi');
+    expect(root.querySelector('.lista-placar .sub')!.textContent).toBe('Era 3 · Escritório');
   });
   it('placar ainda não carregado: Carregando…', () => {
     const tela = criarTela(root, acoes);
