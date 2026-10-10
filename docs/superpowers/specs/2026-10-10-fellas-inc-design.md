@@ -130,8 +130,14 @@ O placar mostra as estratégias de cada um.
 
 ## 6. Propriedades (lugares reais do grupo)
 
-- 8 a 12 lugares públicos que o grupo frequenta. **Nomes ficam só no banco** (tabela preenchida pelo dono, nada no código
-  público); nada de casa ou endereço de ninguém.
+- 8 a 12 lugares públicos que o grupo frequenta; nada de casa ou endereço de ninguém.
+- **Privacidade:** o repositório e o site são públicos (arquivos de `games/idle/assets/` podem ser baixados sem login),
+  então nada que identifique os lugares vai para o código ou para o site:
+  - nomes, frases, posições no mapa, **ícones (PNG 32x32) e o mapa (PNG 160x96)** ficam só no banco, em `idle_places` e
+    `idle_map`, legíveis apenas por membros logados (RLS com `is_member()`);
+  - o mapa é estilizado ("mapa do rolê" inventado), sem nome de rua nem geografia real;
+  - a arte é gerada fora do repositório e as fotos de referência não são guardadas;
+  - o modo `?mock` (desenvolvimento, prints, vídeo) usa lugares de mentira.
 - Abre a partir da era 2. Aba "Mapa do rolê": mapa 160x96 com os pontos; cada ponto mostra o mini-personagem do dono.
 - Tudo medido em tempo e %: preço em **horas da produção de quem compra**, benefício em **+% de produção**.
 
@@ -235,7 +241,9 @@ funções `security definer`; todo `UPDATE`/`DELETE` com `WHERE`, por causa do `
   smallint[]`, `era`, `opp_claimed int[]` (janelas pegas), `opp_day`, `opp_count`, `boost_until`, `next_half_price`,
   `settled_at timestamptz`, `opened_at`).
 - `idle_contracts` (`week_start`, `employer_id`, `employee_id`, `cargo`, `created_at`; único por semana + par).
-- `idle_places` (`id`, `nome`, `faixa`, `frase`, `mapa_x`, `mapa_y`): preenchida pelo dono, fora do repositório.
+- `idle_places` (`id`, `nome`, `faixa`, `frase`, `mapa_x`, `mapa_y`, `icone bytea` com o PNG 32x32) e `idle_map`
+  (uma linha, `imagem bytea` com o PNG 160x96): preenchidas pelo dono com um script local, fora do repositório; só
+  membros leem.
 - `idle_place_owner` (`place_id`, `week_start`, `owner_id`, `paid_hours`, `protected_until`).
 - `idle_avatar` (`user_id`, `pele`, `cabelo`, `cor_cabelo`, `roupa`, `cor_roupa`, `acessorio`, `cor_acessorio`,
   `updated_at`) com `check` de faixa em cada coluna.
@@ -272,7 +280,8 @@ Feita por código em `../fellas-inc-esbocos` (fora do repositório), com `cena-u
 - Ícones dos lugares (32x32), desenhados a partir de fotos dos lugares que o dono vai mandar, e o mapa do rolê
   (160x96). As fotos são só referência: não ficam salvas no projeto.
 
-Os arquivos finais são copiados para `games/idle/assets/`.
+Os arquivos finais são copiados para `games/idle/assets/`, **menos os dos lugares e o mapa**, que vão direto para o banco
+(seção 6).
 
 ## 11. Testes
 
