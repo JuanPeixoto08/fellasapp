@@ -7,6 +7,7 @@ import { GameError, toGameError } from '../shared/errors';
 import type { IdleBoardRow, IdleState } from '../shared/types';
 import { ativos } from './ativos';
 import { aoVivo, instante, pendentes } from './oportunidades';
+import { carregarKit } from './navegador';
 import { criarPalco } from './palco';
 import {
   agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, type Ancora, type Fase,
@@ -41,7 +42,7 @@ const tela = criarTela(document.getElementById('app')!, {
   caixa: (aberta) => { caixaAberta = aberta; render(); },
   tentarDeNovo: () => void guard(recarregar),
 });
-const palco = criarPalco(tela.canvas, ativos.cenas);
+const palco = criarPalco(tela.canvas, ativos.camadas, carregarKit);
 
 function agoraSrv() {
   return ancora ? agoraServidor(ancora, Date.now()) : Date.now();
