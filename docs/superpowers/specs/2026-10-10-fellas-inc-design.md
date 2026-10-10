@@ -38,7 +38,7 @@ jogo umas 3 vezes por dia fica competitivo.
 
 ### 1.1 Valuation e produção
 
-- Valuation em "R$" de mentira, `numeric` no banco (passa de trilhões).
+- Valuation em "R$" de mentira, `double precision` no banco (passa de trilhões).
 - Cada gerador `g` tem custo base `c_g`, rendimento base `r_g` (R$/s) e quantidade `n_g`. O preço da próxima unidade é
   `c_g · 1,15^n_g`. "Comprar 10" e "comprar máx" somam a série geométrica numa compra só.
 - Produção por segundo: `R = Σ (n_g · r_g · M_g) · M_global`, em que `M_g` junta as melhorias e estratégias que atingem o
@@ -202,7 +202,7 @@ pessoas) e `vagas` (JSON: posição, pose, espelhada, papel `dono` ou `contratad
 
 ### 8.1 Reset (segunda 00:00 de Brasília)
 
-`idle_weekly_reset()` roda no mesmo horário do `games_weekly_reset` (entrada própria no `pg_cron`, `0 3 * * 1`):
+`idle_weekly_reset()` roda 2 minutos depois do `games_weekly_reset` (entrada própria no `pg_cron`, `2 3 * * 1`) para os dois não disputarem as linhas de `profiles`; quem jogar antes é fechado pelo `idle_lock`:
 
 1. Grava a placa da semana em `idle_weeks`: unicórnio (maior valuation), top 3, mais disputado, estratégias do pódio e a
    era mais alta de cada um.
@@ -239,7 +239,7 @@ funções `security definer`; todo `UPDATE`/`DELETE` com `WHERE`, por causa do `
 ### 9.1 Tabelas
 
 - `idle_catalog_generators`, `idle_catalog_upgrades`, `idle_catalog_strategies`: o catálogo, preenchido pela migração.
-- `idle_state` (`user_id`, `week_start`, `valuation numeric`, `generators int[30]`, `upgrades int[]`, `strategies
+- `idle_state` (`user_id`, `week_start`, `valuation double precision`, `generators int[30]`, `upgrades int[]`, `strategies
   smallint[]`, `era`, `opp_claimed int[]` (janelas pegas), `opp_day`, `opp_count`, `boost_until`, `next_half_price`,
   `settled_at timestamptz`, `opened_at`).
 - `idle_contracts` (`week_start`, `employer_id`, `employee_id`, `cargo`, `created_at`; único por semana + par).

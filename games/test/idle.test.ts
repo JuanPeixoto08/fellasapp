@@ -302,7 +302,7 @@ describe('reset de segunda', () => {
     await q('select public.idle_weekly_reset()');
     expect(await q('select * from public.idle_weeks')).toEqual([]);
     expect(await q(`select schedule, command from cron.jobs where name = 'fellas-inc-reset'`)).toEqual([
-      { schedule: '0 3 * * 1', command: 'select public.idle_weekly_reset()' },
+      { schedule: '2 3 * * 1', command: 'select public.idle_weekly_reset()' },
     ]);
   });
   it('reset de novo pra mesma semana velha (linha atrasada) não troca o selo do campeão', async () => {

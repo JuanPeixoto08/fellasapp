@@ -13,7 +13,7 @@ const logicaSemComentarios = logica.split(/\r?\n/).map((l: string) => l.replace(
 
 describe('Fellas Inc. (0033/0034)', () => {
   it('reset agendado para segunda 00:00 de Brasília', () => {
-    expect(logica).toContain("cron.schedule('fellas-inc-reset', '0 3 * * 1'");
+    expect(logica).toContain("cron.schedule('fellas-inc-reset', '2 3 * * 1'");
   });
   it('não toca nos créditos do cassino', () => {
     for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(logicaSemComentarios).not.toContain(proibido);

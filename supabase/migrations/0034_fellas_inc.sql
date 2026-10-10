@@ -485,4 +485,4 @@ grant execute on function public.idle_claim_opportunity(bigint) to authenticated
 revoke all on function public.idle_board() from public, anon;
 grant execute on function public.idle_board() to authenticated;
 
-select cron.schedule('fellas-inc-reset', '0 3 * * 1', $$select public.idle_weekly_reset()$$);
+select cron.schedule('fellas-inc-reset', '2 3 * * 1', $$select public.idle_weekly_reset()$$);
