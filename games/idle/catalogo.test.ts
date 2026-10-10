@@ -1,6 +1,9 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { catalogo, montarCatalogo, PARAMETROS } from './catalogo';
+import { catalogo, catalogoSql, montarCatalogo, PARAMETROS } from './catalogo';
 
 describe('catálogo', () => {
   it('30 geradores em 5 eras de 6, custo e renda crescentes', () => {
@@ -34,5 +37,23 @@ describe('catálogo', () => {
   it('montarCatalogo usa os parâmetros', () => {
     const c = montarCatalogo({ ...PARAMETROS, custoInicial: 20 });
     expect(c.geradores[0].custo).toBe(20);
+  });
+});
+
+const ARQUIVO = resolve(__dirname, '../../supabase/migrations/0033_fellas_inc_catalogo.sql');
+
+describe('0033 (catálogo no banco)', () => {
+  it('é exatamente o que catalogo.ts gera', () => {
+    const sql = catalogoSql();
+    if (process.env.ATUALIZAR_CATALOGO) writeFileSync(ARQUIVO, sql);
+    expect(readFileSync(ARQUIVO, 'utf8').replace(/\r\n/g, '\n')).toBe(sql);
+  });
+  it('escapa aspas simples nos textos', () => {
+    expect(catalogoSql()).toContain("'Selo de \"open to work\"'");
+    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [] }))
+      .toContain("'Pão d''água'");
+  });
+  it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', () => {
+    expect(catalogo.melhorias.find((x) => x.id === 2006)?.frase).toContain('+0,5%');
   });
 });

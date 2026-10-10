@@ -75,3 +75,61 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
 }
 
 export const catalogo = montarCatalogo();
+
+const txt = (s: string) => `'${s.replace(/'/g, "''")}'`;
+const num = (n: number | null) => (n === null ? 'null' : String(n));
+
+/** A migração 0033 inteira. Regerar: ATUALIZAR_CATALOGO=1 npx vitest run idle/catalogo.test.ts (em games/). */
+export function catalogoSql(cat: Catalogo = catalogo): string {
+  const gen = cat.geradores.map((g) => `  (${g.id}, ${g.era}, ${txt(g.nome)}, ${num(g.custo)}, ${num(g.renda)})`);
+  const upg = cat.melhorias.map((m) => {
+    const c = (k: string) => num(((m as Record<string, unknown>)[k] as number | undefined) ?? null);
+    return `  (${m.id}, ${txt(m.tipo)}, ${txt(m.nome)}, ${txt(m.frase)}, ${num(m.preco)}, ${c('gerador')}, ${c('nivel')}, ${c('requer')}, ${c('mult')}, ${c('requerEra')}, ${c('fonte')}, ${c('alvo')}, ${c('porUnidade')}, ${c('requerFonte')}, ${c('requerAlvo')})`;
+  });
+  const est = cat.estrategias.map(
+    (e) =>
+      `  (${e.era}, ${e.opcao}, ${txt(e.nome)}, ${txt(e.frase)}, ${e.ativa}, ${e.requer ? txt(e.requer) : 'null'}, ${num(e.genDe)}, ${num(e.genAte)}, ${num(e.genMult)}, ${num(e.prodMult)}, ${num(e.custoMult)}, ${num(e.oppBonusMult)}, ${num(e.oppExtra)}, ${num(e.oppSegundos)}, ${num(e.porGeradorDistinto)}, ${txt(JSON.stringify(e.sociais))}::jsonb)`,
+  );
+  const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
+  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias e estratégias. Idempotente.
+-- GERADO por games/idle/catalogo.ts: não edite à mão. Regerar: ATUALIZAR_CATALOGO=1 npx vitest run idle/catalogo.test.ts (em games/).
+
+create table if not exists public.idle_cat_gen (
+  id int primary key, era int not null, nome text not null, custo double precision not null, renda double precision not null
+);
+create table if not exists public.idle_cat_upg (
+  id int primary key, tipo text not null check (tipo in ('gerador', 'geral', 'sinergia')), nome text not null, frase text not null,
+  preco double precision not null, gerador int, nivel int, requer int, mult double precision, requer_era int,
+  fonte int, alvo int, por_unidade double precision, requer_fonte int, requer_alvo int
+);
+create table if not exists public.idle_cat_est (
+  era int not null, opcao int not null, nome text not null, frase text not null, ativa boolean not null, requer text,
+  gen_de int, gen_ate int, gen_mult double precision not null, prod_mult double precision not null,
+  custo_mult double precision not null, opp_bonus_mult double precision not null, opp_extra int not null,
+  opp_segundos int not null, por_gerador_distinto double precision not null, sociais jsonb not null,
+  primary key (era, opcao)
+);
+
+alter table public.idle_cat_gen enable row level security;
+alter table public.idle_cat_upg enable row level security;
+alter table public.idle_cat_est enable row level security;
+revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est from anon, authenticated;
+grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est to authenticated;
+drop policy if exists "idle_cat_gen_select_members" on public.idle_cat_gen;
+create policy "idle_cat_gen_select_members" on public.idle_cat_gen for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_upg_select_members" on public.idle_cat_upg;
+create policy "idle_cat_upg_select_members" on public.idle_cat_upg for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_est_select_members" on public.idle_cat_est;
+create policy "idle_cat_est_select_members" on public.idle_cat_est for select to authenticated using (public.is_member());
+
+delete from public.idle_cat_gen where true;
+delete from public.idle_cat_upg where true;
+delete from public.idle_cat_est where true;
+
+insert into public.idle_cat_gen (id, era, nome, custo, renda) values
+${lista(gen)}
+insert into public.idle_cat_upg (id, tipo, nome, frase, preco, gerador, nivel, requer, mult, requer_era, fonte, alvo, por_unidade, requer_fonte, requer_alvo) values
+${lista(upg)}
+insert into public.idle_cat_est (era, opcao, nome, frase, ativa, requer, gen_de, gen_ate, gen_mult, prod_mult, custo_mult, opp_bonus_mult, opp_extra, opp_segundos, por_gerador_distinto, sociais) values
+${lista(est)}`;
+}
