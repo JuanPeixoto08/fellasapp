@@ -92,7 +92,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   palco.append(canvas, vivo);
 
   const placa = el('div', 'valor');
-  const numero = el('div', 'numero', 'R$ 0');
+  const numero = el('div', 'numero', 'F$ 0');
   const taxaTxt = el('div', 'taxa', '');
   const bonus = el('div', 'bonus', '');
   placa.append(numero, taxaTxt, bonus);
