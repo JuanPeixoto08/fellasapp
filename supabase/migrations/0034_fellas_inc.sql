@@ -141,7 +141,11 @@ $$;
 
 -- reset da semana (corpo completo na Task 7; aqui só existe para idle_lock compilar)
 create or replace function public.idle_weekly_reset()
-returns void language plpgsql security definer set search_path = public as $$ begin end $$;
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- um reset por vez, e ninguém jogando no meio
+end;
+$$;
 
 -- linha da pessoa na semana atual, travada; semana virou antes do cron: fecha a velha primeiro
 create or replace function public.idle_lock(p_user uuid)
@@ -150,13 +154,15 @@ declare
   s      public.idle_state;
   v_week date := public.games_week_start();
 begin
-  insert into public.idle_state (user_id, week_start) values (p_user, v_week) on conflict (user_id) do nothing;
-  select * into s from public.idle_state where user_id = p_user for update;
-  if s.week_start < v_week then
+  -- semana virou e o cron ainda não fechou a velha: fecha antes de travar qualquer linha
+  if exists (select 1 from public.idle_state where week_start < v_week) then
     perform public.idle_weekly_reset();
-    insert into public.idle_state (user_id, week_start) values (p_user, v_week) on conflict (user_id) do nothing;
-    select * into s from public.idle_state where user_id = p_user for update;
   end if;
+  -- quem joga segura a "semana" em modo compartilhado; o reset pega exclusivo e espera (e vice-versa)
+  perform pg_advisory_xact_lock_shared(hashtext('fellas-inc-semana'));
+  insert into public.idle_state (user_id, week_start) values (p_user, v_week)
+  on conflict (user_id) do update set user_id = excluded.user_id
+  returning * into s;
   return s;
 end;
 $$;

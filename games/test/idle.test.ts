@@ -45,6 +45,10 @@ describe('idle_open / idle_start', () => {
     expect(s).toMatchObject({ user_id: A, started: false, valuation: 0, rate: 0, era: 1, strategies: [-1, -1, -1, -1], upgrades: [], half_price: false });
     expect(s.generators).toEqual(Array(30).fill(0));
   });
+  it('idle_open duas vezes seguidas devolve a mesma linha (user_id preenchido)', async () => {
+    expect((await t.rpc<Estado>('idle_open')).user_id).toBe(A);
+    expect((await t.rpc<Estado>('idle_open')).user_id).toBe(A);
+  });
   it('não membro é barrado', async () => {
     await t.as(OUT);
     await expect(t.rpc('idle_open')).rejects.toThrow(/not_member/);
