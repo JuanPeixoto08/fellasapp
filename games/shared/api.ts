@@ -5,6 +5,8 @@ import type {
   Action,
   BoardRow,
   Fella,
+  IdleBoardRow,
+  IdleState,
   PokerAction,
   PokerCards,
   PokerHistoryRow,
@@ -44,6 +46,13 @@ export const pokerMyCards = () => rpc<PokerCards>('poker_my_cards');
 export const pokerTick = () => rpc<PokerState | null>('poker_tick');
 export const pokerHistory = () => rpc<PokerHistoryRow[]>('poker_history');
 
+export const idleOpen = () => rpc<IdleState>('idle_open');
+export const idleStart = () => rpc<IdleState>('idle_start');
+export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 10 = 1) =>
+  rpc<IdleState>('idle_buy', { p_kind: kind, p_id: id, p_qty: qty });
+export const idlePickStrategy = (era: number, opcao: number) => rpc<IdleState>('idle_pick_strategy', { p_era: era, p_opcao: opcao });
+export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportunity', { p_window: window });
+
 const isUrl = (p: string) => /^https?:\/\//.test(p);
 
 /** Nome e foto dos fellas. Avatar no bucket privado: link assinado por 1 h (como o app faz). */
@@ -74,6 +83,15 @@ export async function weekBoard(): Promise<BoardRow[]> {
     userId: r.user_id,
     balance: r.balance,
     name: names.find((n) => n.id === r.user_id)?.name ?? 'Alguém',
+  }));
+}
+
+export async function idleBoard(): Promise<IdleBoardRow[]> {
+  const rows = await rpc<{ user_id: string; valuation: number; era: number; strategies: number[] }[]>('idle_board');
+  const quem = await fellas(rows.map((r) => r.user_id));
+  return rows.map((r) => ({
+    userId: r.user_id, valuation: r.valuation, era: r.era, strategies: r.strategies,
+    name: quem.find((f) => f.id === r.user_id)?.name ?? 'Alguém',
   }));
 }
 

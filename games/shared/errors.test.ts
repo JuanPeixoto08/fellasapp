@@ -32,3 +32,22 @@ describe('erros do poker', () => {
     expect(toGameError({ message: 'fiado_seated' }).code).toBe('fiado_seated');
   });
 });
+
+describe('erros da Fellas Inc.', () => {
+  it.each([
+    ['idle_not_started', 'Abre o CNPJ primeiro'],
+    ['idle_started', 'Sua empresa já tá aberta'],
+    ['idle_strategy_pending', 'Escolhe a estratégia da era antes'],
+    ['idle_cant_afford', 'Valuation não cobre essa compra'],
+    ['idle_locked', 'Isso ainda não liberou'],
+    ['idle_owned', 'Você já tem essa melhoria'],
+    ['idle_strategy_set', 'Essa estratégia já foi escolhida'],
+    ['idle_bad_choice', 'Essa opção não existe'],
+    ['idle_opp_gone', 'Essa oportunidade já passou'],
+    ['idle_opp_cap', 'Chega de oportunidade por hoje'],
+  ])('%s', (code, text) => {
+    const e = toGameError({ message: code, code: 'P0001' });
+    expect(e.code).toBe(code);
+    expect(e.message).toBe(text);
+  });
+});

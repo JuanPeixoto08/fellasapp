@@ -24,6 +24,16 @@ export type GameErrorCode =
   | 'rebuy_in_hand'
   | 'rebuy_out_of_range'
   | 'nothing_to_show'
+  | 'idle_not_started'
+  | 'idle_started'
+  | 'idle_strategy_pending'
+  | 'idle_cant_afford'
+  | 'idle_locked'
+  | 'idle_owned'
+  | 'idle_strategy_set'
+  | 'idle_bad_choice'
+  | 'idle_opp_gone'
+  | 'idle_opp_cap'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -51,6 +61,16 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   rebuy_in_hand: 'Completa quando a mão acabar',
   rebuy_out_of_range: 'Completa de 10 em 10, até 500 na mesa',
   nothing_to_show: 'Não tem carta pra mostrar agora',
+  idle_not_started: 'Abre o CNPJ primeiro',
+  idle_started: 'Sua empresa já tá aberta',
+  idle_strategy_pending: 'Escolhe a estratégia da era antes',
+  idle_cant_afford: 'Valuation não cobre essa compra',
+  idle_locked: 'Isso ainda não liberou',
+  idle_owned: 'Você já tem essa melhoria',
+  idle_strategy_set: 'Essa estratégia já foi escolhida',
+  idle_bad_choice: 'Essa opção não existe',
+  idle_opp_gone: 'Essa oportunidade já passou',
+  idle_opp_cap: 'Chega de oportunidade por hoje',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -85,6 +105,16 @@ const FROM_DB: GameErrorCode[] = [
   'rebuy_in_hand',
   'rebuy_out_of_range',
   'nothing_to_show',
+  'idle_not_started',
+  'idle_started',
+  'idle_strategy_pending',
+  'idle_cant_afford',
+  'idle_locked',
+  'idle_owned',
+  'idle_strategy_set',
+  'idle_bad_choice',
+  'idle_opp_gone',
+  'idle_opp_cap',
 ];
 
 export function toGameError(e: unknown): GameError {

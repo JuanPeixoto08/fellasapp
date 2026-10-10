@@ -113,3 +113,11 @@ export type PokerHistoryRow = {
   ended_at: string;
 };
 export type Fella = { id: string; name: string; avatarUrl: string | null };
+
+// Fellas Inc. (0034): o estado que toda função do idle devolve
+export type IdleState = {
+  user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
+  generators: number[]; upgrades: number[]; strategies: number[]; era: number;
+  boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
+};
+export type IdleBoardRow = { userId: string; name: string; valuation: number; era: number; strategies: number[] };
