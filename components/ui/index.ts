@@ -21,6 +21,8 @@ export { TextField, type TextFieldProps } from './TextField';
 export { Heading, Text, type HeadingProps, type TextProps } from './Text';
 export { useAutoGrow } from './useAutoGrow';
 export { NameWithBadge } from './NameWithBadge';
+export { PixelArt } from './PixelArt';
 export { TrophyBadge } from './TrophyBadge';
+export { UnicornBadge } from './UnicornBadge';
 export { UserBadge } from './UserBadge';
 export { VerifiedBadge } from './VerifiedBadge';

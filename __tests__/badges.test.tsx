@@ -126,3 +126,12 @@ describe('selo ao lado do nome', () => {
     expect(screen.queryByLabelText('Verificado')).toBeNull();
   });
 });
+
+describe('selo de unicórnio da semana', () => {
+  it('existe, tem nome e é desenhado', async () => {
+    expect(badgeLabel('weekly_unicorn')).toBe('Unicórnio da semana');
+    expect(ownBadges(['weekly_unicorn', 'xx'])).toEqual(['weekly_unicorn']);
+    await render(<UserBadge badge="weekly_unicorn" />);
+    expect(screen.getByLabelText('Unicórnio da semana')).toBeTruthy();
+  });
+});

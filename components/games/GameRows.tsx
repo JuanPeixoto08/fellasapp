@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { GAMES_ERRORS, MIN_BET, type Champion, type PokerTable, type Wallet } from '../../lib/api/games';
+import { FELLAS_INC } from '../../lib/pixelArt';
 import { useTheme } from '../../lib/theme';
-import { Avatar, Button, Divider, Text, TrophyBadge } from '../ui';
+import { Avatar, Button, Divider, PixelArt, Text, TrophyBadge } from '../ui';
 import { TableArt } from './TableArt';
 
 const fmt = (n: number) => n.toLocaleString('pt-BR');
@@ -75,20 +77,22 @@ export function GameRow({
   subtitle,
   meta,
   art,
+  icon,
   playLabel,
   onPlay,
 }: {
   title: string;
   subtitle: string;
   meta?: string;
-  art: Parameters<typeof TableArt>[0]['cards'];
+  art?: Parameters<typeof TableArt>[0]['cards'];
+  icon?: ReactNode;
   playLabel?: string;
   onPlay?: () => void;
 }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md, paddingVertical: t.spacing.md }}>
-      <TableArt cards={art} muted={!onPlay} />
+      {icon ?? (art ? <TableArt cards={art} muted={!onPlay} /> : null)}
       <View style={{ flex: 1, gap: t.spacing.xs }}>
         <Text variant="lead" bold>
           {title}
@@ -118,11 +122,15 @@ export function GameList({
   onBlackjack,
   poker,
   onPoker,
+  onIdle,
+  unicorn,
 }: {
   openRound: boolean;
   onBlackjack: () => void;
   poker: PokerTable | null;
   onPoker: () => void;
+  onIdle: () => void;
+  unicorn: string | null;
 }) {
   return (
     <View>
@@ -148,6 +156,25 @@ export function GameList({
         playLabel={poker?.seated ? 'Voltar pra mesa' : 'Jogar'}
         onPlay={onPoker}
       />
+      <Divider />
+      <GameRow
+        title="Fellas Inc."
+        subtitle="Sua startup de mentira · temporada de uma semana"
+        meta={unicorn ? `Unicórnio da semana passada: ${unicorn}` : undefined}
+        icon={<IdleArt />}
+        onPlay={onIdle}
+      />
+    </View>
+  );
+}
+
+/** Capa da Fellas Inc.: a torre com a coroa roxa (pixel art), no tamanho da mesa dos outros jogos. */
+function IdleArt() {
+  const t = useTheme();
+  const { width, height } = t.layout.gameArt;
+  return (
+    <View style={{ width, height, alignItems: 'center', justifyContent: 'center', borderRadius: t.radii.md, backgroundColor: t.colors.surface }}>
+      <PixelArt pixels={FELLAS_INC} tamanho={Math.floor(height / 24) * 24} />
     </View>
   );
 }

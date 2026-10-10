@@ -76,6 +76,17 @@ export type Database = {
         Update: { [_ in never]: never };
         Relationships: [];
       };
+      idle_weeks: {
+        Row: {
+          week_start: string;
+          unicorn_id: string | null;
+          podium: Json;
+          closed_at: string;
+        };
+        Insert: { [_ in never]: never };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
       poker_tables: {
         Row: {
           id: number;

@@ -1,6 +1,7 @@
 import type { Badge } from '../../lib/badges';
 import type { IconSize } from '../../lib/theme';
 import { TrophyBadge } from './TrophyBadge';
+import { UnicornBadge } from './UnicornBadge';
 import { VerifiedBadge } from './VerifiedBadge';
 
 /** Desenho de um selo do perfil ao lado do nome. Selo novo ganha o desenho aqui. */
@@ -10,5 +11,7 @@ export function UserBadge({ badge, size = 'sm' }: { badge: Badge; size?: IconSiz
       return <VerifiedBadge size={size} />;
     case 'weekly_champion':
       return <TrophyBadge size={size} />;
+    case 'weekly_unicorn':
+      return <UnicornBadge size={size} />;
   }
 }

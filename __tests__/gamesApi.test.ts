@@ -23,7 +23,7 @@ jest.mock('../lib/supabase', () => ({
   },
 }));
 
-import { gamesErrorMessage, getLastChampion, getLeaderboard, getPokerTable, getWallet, takeFiado } from '../lib/api/games';
+import { gamesErrorMessage, getLastChampion, getLastUnicorn, getLeaderboard, getPokerTable, getWallet, takeFiado } from '../lib/api/games';
 import { setMemberDirectory } from '../lib/memberDirectory';
 
 const ROW = { balance: 1000, fiado_count: 0, can_fiado: false, open_round_id: null, week_start: '2026-10-05' };
@@ -129,5 +129,17 @@ describe('getLastChampion', () => {
       weekStart: '2026-09-28',
     });
     expect(mockCalls.find((c) => c.op === 'order')?.args).toEqual(['week_start', { ascending: false }]);
+  });
+});
+
+describe('getLastUnicorn', () => {
+  it('sem semana fechada: null', async () => {
+    mockResult = { data: null, error: null };
+    await expect(getLastUnicorn()).resolves.toBeNull();
+  });
+  it('unicórnio com nome do diretório e o valuation com que fechou', async () => {
+    mockResult = { data: { week_start: '2026-10-05', unicorn_id: 'u2', podium: [{ user_id: 'u2', valuation: 7.1e12, era: 5 }] }, error: null };
+    await expect(getLastUnicorn()).resolves.toEqual({ userId: 'u2', name: 'Teteu', username: 'teteu', avatarUrl: null, valuation: 7.1e12, weekStart: '2026-10-05' });
+    expect(mockCalls.find((c) => c.op === 'select')).toMatchObject({ table: 'idle_weeks', args: ['week_start, unicorn_id, podium'] });
   });
 });

@@ -131,6 +131,24 @@ export async function getLastChampion(): Promise<Champion | null> {
   return { userId: week.champion_id, weekStart: week.week_start, balance: podium[0]?.balance ?? 0, ...who(week.champion_id) };
 }
 
+export type Unicorn = { userId: string; name: string; username: string; avatarUrl: string | null; valuation: number; weekStart: string };
+type IdleWeekRow = Database['public']['Tables']['idle_weeks']['Row'];
+
+/** O unicórnio da semana passada na Fellas Inc. (maior valuation), ou null. */
+export async function getLastUnicorn(): Promise<Unicorn | null> {
+  const { data, error } = await supabase
+    .from('idle_weeks')
+    .select('week_start, unicorn_id, podium')
+    .order('week_start', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const week = data as Pick<IdleWeekRow, 'week_start' | 'unicorn_id' | 'podium'> | null;
+  if (!week?.unicorn_id) return null;
+  const podium = week.podium as { valuation: number }[];
+  return { userId: week.unicorn_id, weekStart: week.week_start, valuation: podium[0]?.valuation ?? 0, ...who(week.unicorn_id) };
+}
+
 export function gamesErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? '';
   if (msg.includes('fiado_today')) return GAMES_ERRORS.fiadoToday;

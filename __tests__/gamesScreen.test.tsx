@@ -2,13 +2,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import type { ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import type { Champion, LeaderRow, PokerTable, Wallet } from '../lib/api/games';
+import type { Champion, LeaderRow, PokerTable, Unicorn, Wallet } from '../lib/api/games';
 
 const mockApi = {
   getWallet: jest.fn<Promise<Wallet>, []>(),
   takeFiado: jest.fn<Promise<Wallet>, []>(),
   getLeaderboard: jest.fn<Promise<LeaderRow[]>, []>(),
   getLastChampion: jest.fn<Promise<Champion | null>, []>(),
+  getLastUnicorn: jest.fn<Promise<Unicorn | null>, []>(),
   getPokerTable: jest.fn<Promise<PokerTable>, [string | null]>(),
 };
 jest.mock('../lib/api/games', () => ({
@@ -17,6 +18,7 @@ jest.mock('../lib/api/games', () => ({
   takeFiado: () => mockApi.takeFiado(),
   getLeaderboard: () => mockApi.getLeaderboard(),
   getLastChampion: () => mockApi.getLastChampion(),
+  getLastUnicorn: () => mockApi.getLastUnicorn(),
   getPokerTable: (me: string | null) => mockApi.getPokerTable(me),
 }));
 const mockOpen = jest.fn();
@@ -59,6 +61,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockApi.getWallet.mockResolvedValue(wallet());
   mockApi.getPokerTable.mockResolvedValue({ count: 0, seated: false });
+  mockApi.getLastUnicorn.mockResolvedValue({ userId: 'u2', name: 'Rafa', username: 'rafa', avatarUrl: null, valuation: 7.1e12, weekStart: '2026-10-05' });
   mockApi.getLeaderboard.mockResolvedValue([row('u1', 'Oliveira', 3420), row('me', 'Juan', 1090), row('u2', 'Rafa', 640, 1)]);
   mockApi.getLastChampion.mockResolvedValue({
     userId: 'u1',
@@ -188,5 +191,18 @@ describe('Fellas Games', () => {
     await waitFor(() => expect(screen.getByText('+ 300 na mesa de poker')).toBeTruthy());
     expect(screen.getByText('Levanta da mesa de poker pra pegar fiado')).toBeTruthy();
     expect(screen.queryByText('Fiado de hoje já foi. Volta amanhã.')).toBeNull();
+  });
+
+  it('Fellas Inc.: mostra o unicórnio da semana passada e abre o jogo', async () => {
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByLabelText('Jogar Fellas Inc.')).toBeTruthy());
+    expect(screen.getByText('Unicórnio da semana passada: Rafa')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Jogar Fellas Inc.'));
+    expect(mockOpen).toHaveBeenCalledWith('idle');
+  });
+  it('Fellas Inc.: falha ao ler o unicórnio não derruba a aba', async () => {
+    mockApi.getLastUnicorn.mockRejectedValue(new Error('x'));
+    await render(<GamesScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByLabelText('Jogar Fellas Inc.')).toBeTruthy());
   });
 });

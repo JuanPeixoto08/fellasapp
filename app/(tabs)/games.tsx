@@ -10,6 +10,7 @@ import {
   GAMES_ERRORS,
   gamesErrorMessage,
   getLastChampion,
+  getLastUnicorn,
   getLeaderboard,
   getPokerTable,
   getWallet,
@@ -18,6 +19,7 @@ import {
   type Champion,
   type LeaderRow,
   type PokerTable,
+  type Unicorn,
   type Wallet,
 } from '../../lib/api/games';
 import { useSession } from '../../lib/auth/SessionProvider';
@@ -54,18 +56,21 @@ export default function GamesScreen() {
   const [fiadoBusy, setFiadoBusy] = useState(false);
   const [fiadoMessage, setFiadoMessage] = useState<string | null>(null);
   const [poker, setPoker] = useState<PokerTable | null>(null);
+  const [unicorn, setUnicorn] = useState<Unicorn | null>(null);
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const [wallet, board, champion, table] = await Promise.all([
+      const [wallet, board, champion, table, lastUnicorn] = await Promise.all([
         getWallet(),
         getLeaderboard(),
         getLastChampion(),
         getPokerTable(me).catch(() => null), // o card do poker não derruba a aba se falhar
+        getLastUnicorn().catch(() => null), // o card da Fellas Inc. não derruba a aba
       ]);
       setData({ wallet, board, champion });
       setPoker(table);
+      setUnicorn(lastUnicorn);
     } catch {
       setFailed(true);
     }
@@ -140,6 +145,8 @@ export default function GamesScreen() {
           onBlackjack={() => openGame('blackjack')}
           poker={poker}
           onPoker={() => openGame('poker')}
+          onIdle={() => openGame('idle')}
+          unicorn={unicorn ? withMember(unicorn, members).name : null}
         />,
       )
     : null;
