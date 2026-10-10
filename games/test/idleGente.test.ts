@@ -304,12 +304,13 @@ describe('placar com gente', () => {
   it('empate no mais disputado: quem chegou primeiro', async () => {
     await contratar(B);
     await contratar(C);
-    await q(`update public.idle_contracts set created_at = now() - interval '1 minute' where employee_id = $1`, [C]);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} + interval '1 hour' where employee_id = $1`, [B]);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} + interval '30 minutes' where employee_id = $1`, [C]);
     expect((await placar()).find((r) => r.most_hired)!.user_id).toBe(C);
   });
   it('mais disputado é da semana: contrato criado na semana passada não conta (mas ainda vale e aparece no "trabalha em")', async () => {
     await contratar(B);
-    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
+    await q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '13 days' where true`);
     const rows = await placar();
     expect(rows.some((r) => r.most_hired)).toBe(false);
     expect(rows.find((r) => r.user_id === B)).toMatchObject({ hired_count: 1, by_me: true });
@@ -326,9 +327,9 @@ describe('placar com gente', () => {
 
 // a pessoa chegou na semana anterior (a foto de segunda só conta quem já jogava antes da semana nova)
 const envelhecer = () => q('update public.idle_state set week_start = public.games_week_start() - 7 where true');
-/** Os contratos foram criados no domingo da semana que acabou (e valem até o domingo que vem). */
+/** Os contratos foram criados no domingo da semana que acabou (e valem a semana toda: até o domingo da semana que vem). */
 const contratosDaSemanaPassada = () =>
-  q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '6 days' where true`);
+  q(`update public.idle_contracts set created_at = ${SEGUNDA} - interval '1 day', ends_at = ${SEGUNDA} + interval '13 days' where true`);
 
 describe('foto de segunda com contratos', () => {
   beforeEach(async () => {

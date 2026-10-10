@@ -396,7 +396,7 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object(
              'user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era, 'strategies', to_jsonb(x.strategies),
              'avatar', public.idle_avatar_json(x.user_id), 'hired_count', x.n, 'by_me', x.by_me,
-             'most_hired', coalesce(x.user_id = v_mais, false)) order by x.rate desc, x.v desc), '[]'::jsonb)
+             'most_hired', coalesce(x.user_id = v_mais, false)) order by x.rate desc, x.v desc, x.user_id), '[]'::jsonb)
       from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_rate(s) as rate,
                    public.idle_era(s.generators) as era, s.strategies,
                    (select count(*) from public.idle_contracts c
@@ -425,15 +425,16 @@ begin
     return;
   end if;
   select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era,
-                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc), '[]')
+                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc, x.user_id), '[]')
     into v_podium
     from (select s.user_id,
                  (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 -- a taxa da meia-noite usa os geradores e estratégias de agora (só os contratos são os de 00:00)
                  public.idle_rate_at(s, v_new::timestamp at time zone 'America/Sao_Paulo') as rate,
                  public.idle_era(s.generators) as era, s.strategies
             from public.idle_state s
            where s.started and s.week_start < v_new
-           order by 3 desc, 2 desc
+           order by 3 desc, 2 desc, 1
            limit 3) x;
   if jsonb_array_length(v_podium) = 0 then
     return; -- ninguÃ©m jogava antes desta semana: sem placa
