@@ -3,6 +3,14 @@
 .idle .palco { position: relative; display: flex; justify-content: center; padding: 8px; }
 .idle .cena { width: 320px; height: 192px; image-rendering: pixelated; border-radius: 8px; }
 @media (min-width: 900px) { .idle .cena { width: 640px; height: 384px; } }
+/* PC: cena e valor à esquerda, lista à direita (em pilha a cena grande deixava uma linha só da lista) */
+@media (min-width: 1100px) {
+  .idle { grid-template-columns: minmax(0, 1fr) minmax(420px, 560px); grid-template-rows: auto auto 1fr; }
+  .idle .top { grid-column: 1 / -1; }
+  .idle .palco { grid-column: 1; grid-row: 2; padding-top: 24px; }
+  .idle .valor { grid-column: 1; grid-row: 3; align-self: start; }
+  .idle .painel { grid-column: 2; grid-row: 2 / 4; min-height: 0; }
+}
 .idle .vivo {
   position: absolute; top: 40%; left: 0; width: 48px; height: 48px; border: 0; padding: 0; cursor: pointer;
   background: transparent no-repeat 0 0 / 192px 48px; image-rendering: pixelated;
@@ -15,7 +23,7 @@
 .idle .taxa { color: var(--mint); font-weight: 600; }
 .idle .bonus { color: var(--gold); min-height: 1.2em; }
 .idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 24px; color: var(--paper); }
-.idle .abas { display: flex; gap: 8px; padding: 0 16px; }
+.idle .abas { display: flex; gap: 8px; padding: 8px 16px; position: sticky; top: 0; z-index: 1; background: #121212; }
 .idle .aba { flex: 1; min-height: 44px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); font: 700 15px var(--font); }
 .idle .aba.ativa { background: #5B3FD9; border-color: #B8A2FF; }
 .idle .painel { overflow: auto; padding-bottom: 24px; }
@@ -26,8 +34,16 @@
 @keyframes quadros64 { from { background-position-x: 0; } to { background-position-x: -256px; } }
 .idle .meio { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .idle .sub { color: #A8A398; font-size: 13px; }
-.idle .compra { display: flex; gap: 6px; }
-.idle .compra .btn, .idle .melhoria .btn { min-height: 44px; min-width: 44px; }
+/* no celular os botões de compra descem para uma linha própria; do tablet pra cima ficam ao lado do nome */
+.idle .gerador { flex-wrap: wrap; }
+.idle .compra { display: flex; gap: 6px; flex: 1 1 100%; }
+.idle .compra .btn, .idle .melhoria .btn { min-height: 44px; min-width: 44px; height: auto; padding: 0 10px; white-space: nowrap; }
+.idle .melhoria .btn { flex: none; }
+@media (min-width: 600px) {
+  .idle .gerador { flex-wrap: nowrap; }
+  .idle .compra { flex: none; }
+  .idle .compra .btn { flex: none; min-width: 72px; }
+}
 .idle .btn:disabled { opacity: 0.4; }
 .idle .icone { flex: none; width: 48px; height: 48px; border-radius: 6px; border: 3px solid #6B6874; background: #121212 no-repeat 0 0 / 192px 48px; image-rendering: pixelated; }
 .idle .icone.geral { background-size: 42px 42px; }
@@ -40,10 +56,10 @@
 .idle .lista-placar .sub { grid-column: 2; }
 .idle .lista-placar .v { grid-row: 1; grid-column: 3; font-weight: 700; }
 .idle .vazio { color: #A8A398; text-align: center; }
-.idle .modal { position: fixed; inset: 0; display: grid; align-content: center; gap: 12px; padding: 24px; background: rgba(11, 10, 14, 0.92); color: var(--paper); overflow: auto; z-index: 10; }
+.idle .modal { position: fixed; inset: 0; display: grid; align-content: center; justify-content: center; grid-template-columns: minmax(0, 560px); gap: 12px; padding: 24px; background: rgba(11, 10, 14, 0.92); color: var(--paper); overflow: auto; z-index: 10; }
 .idle .cartao { display: grid; gap: 6px; padding: 12px; border-radius: 8px; background: #1B1A22; border: 1px solid #34323F; }
 .idle .cartao.off { opacity: 0.55; }
-.idle .caixinha { min-height: 44px; }
+.idle .caixinha { flex: none; height: auto; min-height: 44px; padding: 0 14px; font-size: 14px; }
 /* o aviso fica por cima dos modais (z-index 10): erro ao escolher estratégia ou pegar na caixinha precisa aparecer */
 .idle .notice { position: fixed; z-index: 11; }
 @media (prefers-reduced-motion: reduce) { .idle .sprite, .idle .vivo { animation: none; } }

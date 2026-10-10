@@ -30,7 +30,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
-  const caixinha = button('Oportunidades (0)', 'caixinha', () => a.caixa(true));
+  const caixinha = button('Oportunidades (0)', 'btn caixinha', () => a.caixa(true));
   topo.append(voltar, el('span', undefined, 'Fellas Inc.'), caixinha);
 
   const palco = el('div', 'palco');
