@@ -94,7 +94,7 @@ Ideias do Juan e da pesquisa (outubro de 2026). A lista final é o Juan que apro
 | **limaumdoc** | contratar o limaumdoc (pelo nome de usuário) | a combinar com o grupo |
 | **Vitor** | a combinar: o Juan explica a piada do "boneco do jogo BBB" | a combinar |
 | **Tá saindo da jaula** | comprar "Máx" de um gerador e levar 100+ unidades de uma vez | "Birl! O monstro tá saindo da jaula." |
-| **Guiana Brasileira** | ter a "Filial em Dubai" | "Agora a Guiana Brasileira tem sede própria." |
+| **Guiana Brasileira** | comprar a melhoria "Filial em Portugal" (a de 25 unidades da "Filial em Dubai", que hoje se chama "Visto de negócios" e muda de nome nesta entrega, por migração nova de catálogo) | "Fala galera! A Guiana Brasileira agora tem sede." |
 | **Fez o L** | ter 50 estagiários (o do Luis) | "L de Luis, que fique claro." |
 | **3h06** | abrir a Fellas Inc. entre 3h e 4h da manhã (Brasília) | "Bora fundar uma empresa?" |
 | **Modo sigma** | vender a startup sem nunca ter contratado ninguém | "Lobo solitário do empreendedorismo." |
