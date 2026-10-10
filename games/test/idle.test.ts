@@ -231,6 +231,16 @@ describe('oportunidades no banco', () => {
     await expect(claim(agoraW + 2)).rejects.toThrow(/idle_opp_gone/);
     await expect(claim(agoraW - 30)).rejects.toThrow(/idle_opp_gone/);
   });
+  it('janela nula: idle_opp_gone e o estado não muda', async () => {
+    await t.rpc<Estado>('idle_open');
+    const ler = () => q<{ half_price: boolean; opp_count: number }>(`select half_price, opp_count from public.idle_state where user_id = $1`, [A]);
+    const antes = (await ler())[0];
+    await expect(claim(null as unknown as number)).rejects.toThrow(/idle_opp_gone/);
+    const depois = (await ler())[0];
+    expect(depois.half_price).toBe(antes.half_price);
+    expect(depois.half_price).toBe(false);
+    expect(depois.opp_count).toBe(antes.opp_count);
+  });
   it('limite de 10 por dia; dia novo zera', async () => {
     await q(`update public.idle_state set opp_day = public.games_today(), opp_count = 10 where user_id = $1`, [A]);
     const s = await t.rpc<Estado>('idle_open');

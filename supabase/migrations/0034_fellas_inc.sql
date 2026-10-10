@@ -121,7 +121,7 @@ returns bigint[] language sql stable set search_path = public as $$
      order by w desc
      limit 3
   ) x
-  where not (w = any (s.opp_claimed))
+  where not coalesce(w = any (s.opp_claimed), false)
 $$;
 
 create or replace function public.idle_opp_cap(s public.idle_state)
@@ -416,7 +416,7 @@ begin
   if not s.started then
     raise exception 'idle_not_started' using errcode = 'P0001';
   end if;
-  if not (p_window = any (public.idle_opp_list(s))) then
+  if p_window is null or not (p_window = any (public.idle_opp_list(s))) then
     raise exception 'idle_opp_gone' using errcode = 'P0001';
   end if;
   if s.opp_day is distinct from public.games_today() then
