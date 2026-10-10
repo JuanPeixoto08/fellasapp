@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, cenaDoEstado, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -27,8 +27,21 @@ describe('âncora no relógio do banco', () => {
   });
 });
 
+describe('editor abre sozinho', () => {
+  const sem = { avatar: null };
+  it('antes e jogando sem avatar; nunca abrindo, com avatar, fechado ou com rascunho; não empilha com a estratégia', () => {
+    expect(deveAbrirEditor(base({ ...sem, started: false }), 'antes', false, false)).toBe(true);
+    expect(deveAbrirEditor(base(sem), 'jogando', false, false)).toBe(true);
+    expect(deveAbrirEditor(base(sem), 'abrindo', false, false)).toBe(false);
+    expect(deveAbrirEditor(base({ avatar: { pele: 3, cabelo: 0, cor_cabelo: 0, roupa: 0, cor_roupa: 0, acessorio: 2, cor_acessorio: 8 } }), 'jogando', false, false)).toBe(false);
+    expect(deveAbrirEditor(base(sem), 'jogando', true, false)).toBe(false);
+    expect(deveAbrirEditor(base(sem), 'jogando', false, true)).toBe(false);
+    expect(deveAbrirEditor(base({ ...sem, era: 2 }), 'jogando', false, false)).toBe(false);
+  });
+});
+
 describe('fase e cena', () => {
-  it('sem empresa aberta: antes; semana virou com a página aberta: volta pro antes', () => {
+  it('sem empresa aberta: antes; empresa aberta: jogando; abrindo continua abrindo', () => {
     expect(faseDoEstado(base({ started: false }), 'jogando')).toBe('antes');
     expect(faseDoEstado(base(), 'antes')).toBe('jogando');
     expect(faseDoEstado(base(), 'abrindo')).toBe('abrindo');

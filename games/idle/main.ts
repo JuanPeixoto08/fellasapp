@@ -11,7 +11,7 @@ import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './n
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
 import {
-  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -100,16 +100,20 @@ async function prepararDesenhista() {
   desenhistaCarregando = true;
   try {
     const k = await carregarKit(); // null = a arte ainda não existe (não é falha)
+    let cadeiraFalhou = false;
     if (cadeiraImg === undefined) {
       const url = ativos.cadeira();
-      cadeiraImg = url
-        ? await carregarImagem(url).catch((e) => {
-            console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
-            return null;
-          })
-        : null;
+      if (!url) cadeiraImg = null;
+      else {
+        cadeiraImg = await carregarImagem(url).catch((e) => {
+          console.warn(`Fellas Inc.: a cadeira do editor não carregou (${url})`, e);
+          cadeiraFalhou = true;
+          return undefined; // não guarda: a próxima chamada tenta de novo
+        });
+      }
     }
-    desenhar = criarDesenhista(k, cadeiraImg);
+    desenhar = criarDesenhista(k, cadeiraImg ?? null);
+    if (cadeiraFalhou) throw new Error('cadeira'); // desenha sem cadeira por enquanto e tenta de novo
     desenhistaPronto = true;
     render();
   } catch {
@@ -146,11 +150,9 @@ function aplicar(estado: IdleState) {
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
   palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO) });
-  if (fase === 'antes') {
-    palco.preparar(['cena-0-abrindo', 'cena-1']);
-    // primeira vez (nunca salvou o visual): o editor aparece antes do Abrir CNPJ
-    if (!estado.avatar && !editorFechado && rascunho === null) rascunho = { ...PADRAO };
-  }
+  if (fase === 'antes') palco.preparar(['cena-0-abrindo', 'cena-1']);
+  // nunca salvou o visual: o editor aparece sozinho (antes do Abrir CNPJ ou já jogando), até o primeiro "Bora"
+  if (deveAbrirEditor(estado, fase, editorFechado, rascunho !== null)) rascunho = { ...PADRAO };
   if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
   render();
 }
