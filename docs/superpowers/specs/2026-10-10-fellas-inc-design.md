@@ -135,10 +135,12 @@ O placar mostra as estratégias de cada um.
   então nada que identifique os lugares vai para o código ou para o site:
   - nomes, frases, posições no mapa, **ícones (PNG 32x32) e o mapa (PNG 160x96)** ficam só no banco, em `idle_places` e
     `idle_map`, legíveis apenas por membros logados (RLS com `is_member()`);
-  - o mapa é estilizado ("mapa do rolê" inventado), sem nome de rua nem geografia real;
+  - o mapa segue o traçado real do bairro, simplificado e girado (praia embaixo), sem nome de rua, bairro ou texto; só
+    é aceitável porque fica no banco, visível apenas para membros;
   - a arte é gerada fora do repositório e as fotos de referência não são guardadas;
   - o modo `?mock` (desenvolvimento, prints, vídeo) usa lugares de mentira.
-- Abre a partir da era 2. Aba "Mapa do rolê": mapa 160x96 com os pontos; cada ponto mostra o mini-personagem do dono.
+- Abre a partir da era 2. Aba "Mapa do rolê": mapa 160x96 com os pontos (posições aproximadas); cada ponto mostra o
+  mini-personagem do dono.
 - Tudo medido em tempo e %: preço em **horas da produção de quem compra**, benefício em **+% de produção**.
 
 | Faixa | Preço base | Benefício |
