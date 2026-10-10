@@ -45,6 +45,10 @@ describe('erros da Fellas Inc.', () => {
     ['idle_bad_choice', 'Essa opção não existe'],
     ['idle_opp_gone', 'Essa oportunidade já passou'],
     ['idle_opp_cap', 'Chega de oportunidade por hoje'],
+    ['idle_hire_self', 'Não dá pra se contratar'],
+    ['idle_hire_twice', 'Essa pessoa já trabalha pra você'],
+    ['idle_hire_not_open', 'Essa pessoa ainda não abriu a empresa'],
+    ['idle_bad_avatar', 'Esse visual não existe'],
   ])('%s', (code, text) => {
     const e = toGameError({ message: code, code: 'P0001' });
     expect(e.code).toBe(code);

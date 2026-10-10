@@ -34,6 +34,7 @@ export type GameErrorCode =
   | 'idle_bad_choice'
   | 'idle_opp_gone'
   | 'idle_opp_cap'
+  | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -71,6 +72,10 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_bad_choice: 'Essa opção não existe',
   idle_opp_gone: 'Essa oportunidade já passou',
   idle_opp_cap: 'Chega de oportunidade por hoje',
+  idle_hire_self: 'Não dá pra se contratar',
+  idle_hire_twice: 'Essa pessoa já trabalha pra você',
+  idle_hire_not_open: 'Essa pessoa ainda não abriu a empresa',
+  idle_bad_avatar: 'Esse visual não existe',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -115,6 +120,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_bad_choice',
   'idle_opp_gone',
   'idle_opp_cap',
+  'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
 ];
 
 export function toGameError(e: unknown): GameError {

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, cenaDoEstado, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora } from './store';
+import { agoraServidor, ancorar, cenaDoEstado, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
-  server_now: '2026-10-12T12:00:00.000Z', ...x,
+  server_now: '2026-10-12T12:00:00.000Z',
+  avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
+  ...x,
 });
 
 describe('âncora no relógio do banco', () => {
@@ -45,5 +47,14 @@ describe('fase e cena', () => {
   it('Rolê eterno: oportunidade fica 30 s', () => {
     expect(segundosOportunidade(base())).toBe(10);
     expect(segundosOportunidade(base({ strategies: [0, 0, 0, 2] }))).toBe(30);
+  });
+});
+
+describe('vencimento de contrato', () => {
+  it('bate o ponto quando o relógio do servidor passa de muda_em', () => {
+    expect(vencido(base(), Date.parse('2026-10-20T00:00:00Z'))).toBe(false);
+    const s = base({ muda_em: '2026-10-19T12:00:00.000Z' });
+    expect(vencido(s, Date.parse('2026-10-19T11:59:59Z'))).toBe(false);
+    expect(vencido(s, Date.parse('2026-10-19T12:00:00Z'))).toBe(true);
   });
 });

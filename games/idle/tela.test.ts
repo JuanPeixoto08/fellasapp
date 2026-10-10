@@ -8,7 +8,9 @@ import { criarTela, prazo, type Acoes, type Modelo } from './tela';
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
-  server_now: '2026-10-12T12:00:00.000Z', ...x,
+  server_now: '2026-10-12T12:00:00.000Z',
+  avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
+  ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, ...x,
@@ -101,7 +103,7 @@ describe('tela da Fellas Inc.', () => {
   });
   it('placar mostra o R$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1] }] }));
+    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false }] }));
     const v = root.querySelector('.lista-placar .v')!.textContent!;
     expect(v).toContain('/s');
     expect(v).not.toContain('bi');
