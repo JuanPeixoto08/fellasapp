@@ -3,8 +3,10 @@
 import { ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS } from './nomes';
 
 /** Balanceamento (ajustado pela simulação, Task 2). custo_g = custoInicial·crescimentoCusto^(g-1);
- *  renda_g = custo_g / (retornoInicial·crescimentoRetorno^(g-1)) (segundos pra se pagar). */
-export const PARAMETROS = { custoInicial: 15, crescimentoCusto: 3.2, retornoInicial: 30, crescimentoRetorno: 1.18 };
+ *  renda_g = custo_g / (retornoInicial·crescimentoRetorno^(g-1)) (segundos pra se pagar).
+ *  Valores finais da simulação (simulacao.test.ts): 15 / 2,6 / 30 / 1,58 passaram (era 2 em 875 s, era 3 em 0,5 d,
+ *  era 4 em 1 d, era 5 em 3,5 d, gerador 30 fora da semana, 484 compras na 1ª hora). */
+export const PARAMETROS = { custoInicial: 15, crescimentoCusto: 2.6, retornoInicial: 30, crescimentoRetorno: 1.58 };
 export type Parametros = typeof PARAMETROS;
 
 /** Quantas unidades liberam cada nível de melhoria de gerador, e o preço (× custo base do gerador). */
@@ -58,7 +60,7 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
     const especial = x.fonte === 1 && x.alvo === 30;
     melhorias.push({
       id: 2001 + i, tipo: 'sinergia', nome: x.nome,
-      frase: `Cada "${geradores[x.fonte - 1].nome}" dá +${x.porUnidade * 100}% em "${geradores[x.alvo - 1].nome}".`,
+      frase: `Cada "${geradores[x.fonte - 1].nome}" dá +${(x.porUnidade * 100).toLocaleString('pt-BR')}% em "${geradores[x.alvo - 1].nome}".`,
       preco: geradores[x.alvo - 1].custo * PRECO_SINERGIA, fonte: x.fonte, alvo: x.alvo, porUnidade: x.porUnidade,
       requerFonte: especial ? 100 : REQUER_SINERGIA, requerAlvo: especial ? 1 : REQUER_SINERGIA,
     });
