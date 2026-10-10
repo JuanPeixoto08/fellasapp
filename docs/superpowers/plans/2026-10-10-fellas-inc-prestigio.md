@@ -58,10 +58,10 @@ sobre a base `docs/superpowers/specs/2026-10-10-fellas-inc-design.md`. Plano ant
   dá para saber do passado (melhorias de agora, contratos, estratégias de agora, quem já foi unicórnio); oportunidades
   começam do zero. `idle_save` guarda as janelas de oportunidade pegas das últimas 10h (eram 5h; a validade vai a 6h).
 - **Venda:** `started = false` (a tela volta para a cena "antes" e o "Abrir CNPJ"); quem vendeu sai do placar até
-  abrir de novo (o placar é de quem tem empresa aberta, regra da 0036). O recorde de R$/s é guardado em todo `idle_save`.
+  abrir de novo (o placar é de quem tem empresa aberta, regra da 0036). O recorde de F$/s é guardado em todo `idle_save`.
   Vencer os contratos feitos = `ends_at = now()` só nos ativos com `created_at < now()` (o check da tabela exige
   `ends_at > created_at`).
-- **"Farmou aura":** 1º estrito em R$/s entre quem tem empresa aberta, com mais alguém com empresa aberta. "Indeciso
+- **"Farmou aura":** 1º estrito em F$/s entre quem tem empresa aberta, com mais alguém com empresa aberta. "Indeciso
   profissional": as 3 opções de uma era (eras com opção desligada só contam quando a entrega 4 ligar). "Conhece todos os
   caminhos": todas as opções ligadas.
 - **Contagem "N/total"** conta todas as conquistas, escondidas inclusive (73). Na grade, a bloqueada aparece apagada com
@@ -102,7 +102,7 @@ sobre a base `docs/superpowers/specs/2026-10-10-fellas-inc-design.md`. Plano ant
 - Página do jogo: pt-BR no tom do `PRODUCT.md` (informal, "você", botão diz a ação, sem emoji como ícone; "★" é
   caractere de texto); CSS em `games/idle/idle.css` com as cores que ele já usa; alvo de toque ≥ 44px; foco visível;
   texto vindo do banco por `textContent`. Edições pontuais em `tela.ts` e `main.ts`: o que já existe fica (aba Melhorias
-  "À venda | Compradas", placar "+R$ X/s" com "Era N · nome", folhas, `vigiarVersao`, editor de personagem, aba Contratar).
+  "À venda | Compradas", placar "+F$ X/s" com "Era N · nome", folhas, `vigiarVersao`, editor de personagem, aba Contratar).
   Frontend usa a skill `impeccable` (modo Operate), lendo `PRODUCT.md` e `DESIGN.md` antes.
 - Arte feita por código fora do repositório (`C:/Users/juan/Documents/PROJETOSLLM/fellas-inc-esbocos`, padrão do
   `BRIEF-SPRITES.md` e do `gerais.js`) e copiada para `games/idle/assets/`. Sem o ícone, a célula mostra só a moldura.
@@ -336,14 +336,14 @@ export type ConquistaTexto = {
  *  consegue). Conquista nova = id novo e migração nova do catálogo; id nunca muda nem é reaproveitado (o banco guarda
  *  quem ganhou pelo id). */
 export const CONQUISTAS: readonly ConquistaTexto[] = [
-  { id: 31, tipo: 'taxa', valor: 1, nome: 'Primeiro real', frase: 'R$ 1 por segundo. Já dá um chiclete.', condicao: 'Produzir R$ 1 por segundo' },
-  { id: 32, tipo: 'taxa', valor: 100, nome: 'Pix caindo', frase: 'Já paga o iFood.', condicao: 'Produzir R$ 100 por segundo' },
-  { id: 33, tipo: 'taxa', valor: 1e4, nome: 'O leão acordou', frase: 'O contador começou a te ligar.', condicao: 'Produzir R$ 10 mil por segundo' },
-  { id: 34, tipo: 'taxa', valor: 1e6, nome: 'Acumulou!', frase: 'Uma Mega da Virada a cada segundo.', condicao: 'Produzir R$ 1 mi por segundo' },
-  { id: 35, tipo: 'taxa', valor: 1e9, nome: 'Bilionário de LinkedIn', frase: 'A Forbes mandou e-mail.', condicao: 'Produzir R$ 1 bi por segundo' },
-  { id: 36, tipo: 'taxa', valor: 1e12, nome: 'Trilhão por segundo', frase: 'Maior que o PIB, menor que o ego.', condicao: 'Produzir R$ 1 tri por segundo' },
-  { id: 37, tipo: 'taxa', valor: 1e15, nome: 'Quatrilhão por segundo', frase: 'Ninguém sabe escrever esse número.', condicao: 'Produzir R$ 1 quatri por segundo' },
-  { id: 38, tipo: 'taxa', valor: 1e18, nome: 'Casa da Moeda', frase: 'O dinheiro do mundo acabou. Você imprimiu mais.', condicao: 'Produzir R$ 1 quinti por segundo' },
+  { id: 31, tipo: 'taxa', valor: 1, nome: 'Primeiro real', frase: 'F$ 1 por segundo. Já dá um chiclete.', condicao: 'Produzir F$ 1 por segundo' },
+  { id: 32, tipo: 'taxa', valor: 100, nome: 'Pix caindo', frase: 'Já paga o iFood.', condicao: 'Produzir F$ 100 por segundo' },
+  { id: 33, tipo: 'taxa', valor: 1e4, nome: 'O leão acordou', frase: 'O contador começou a te ligar.', condicao: 'Produzir F$ 10 mil por segundo' },
+  { id: 34, tipo: 'taxa', valor: 1e6, nome: 'Acumulou!', frase: 'Uma Mega da Virada a cada segundo.', condicao: 'Produzir F$ 1 mi por segundo' },
+  { id: 35, tipo: 'taxa', valor: 1e9, nome: 'Bilionário de LinkedIn', frase: 'A Forbes mandou e-mail.', condicao: 'Produzir F$ 1 bi por segundo' },
+  { id: 36, tipo: 'taxa', valor: 1e12, nome: 'Trilhão por segundo', frase: 'Maior que o PIB, menor que o ego.', condicao: 'Produzir F$ 1 tri por segundo' },
+  { id: 37, tipo: 'taxa', valor: 1e15, nome: 'Quatrilhão por segundo', frase: 'Ninguém sabe escrever esse número.', condicao: 'Produzir F$ 1 quatri por segundo' },
+  { id: 38, tipo: 'taxa', valor: 1e18, nome: 'Casa da Moeda', frase: 'O dinheiro do mundo acabou. Você imprimiu mais.', condicao: 'Produzir F$ 1 quinti por segundo' },
   { id: 39, tipo: 'era', valor: 2, nome: 'Saiu da casa dos pais', frase: 'A garagem é o novo quarto.', condicao: 'Chegar na era 2 (Garagem)' },
   { id: 40, tipo: 'era', valor: 3, nome: 'Tem até catraca', frase: 'E crachá com foto ruim.', condicao: 'Chegar na era 3 (Escritório)' },
   { id: 41, tipo: 'era', valor: 4, nome: 'Andar inteiro', frase: 'O elevador para só pra você.', condicao: 'Chegar na era 4 (Andar inteiro)' },
@@ -403,10 +403,10 @@ export const ARVORE: readonly NoTexto[] = [
   { ramo: 1, posicao: 3, tipo: 'producao', valor: 1.5, nome: 'Alta performance', efeito: 'Produção +50%.' },
   { ramo: 1, posicao: 4, tipo: 'producao', valor: 2, nome: 'Escala', efeito: 'Produção +100%.' },
   { ramo: 1, posicao: 5, tipo: 'producao', valor: 2, nome: 'Modo turbo', efeito: 'Produção ×2 em tudo.' },
-  { ramo: 2, posicao: 1, tipo: 'inicio_valuation', valor: 1000, nome: 'Pé-de-meia', efeito: 'O Abrir CNPJ começa com R$ 1 mil.' },
+  { ramo: 2, posicao: 1, tipo: 'inicio_valuation', valor: 1000, nome: 'Pé-de-meia', efeito: 'O Abrir CNPJ começa com F$ 1 mil.' },
   { ramo: 2, posicao: 2, tipo: 'inicio_notebooks', valor: 10, nome: 'Notebooks usados', efeito: 'O Abrir CNPJ começa com 10 notebooks.' },
   { ramo: 2, posicao: 3, tipo: 'manter_gerais', valor: 1, nome: 'Leva a cultura junto', efeito: 'Vender a startup mantém as melhorias gerais.' },
-  { ramo: 2, posicao: 4, tipo: 'inicio_valuation', valor: 1e6, nome: 'Herança', efeito: 'O Abrir CNPJ começa com R$ 1 mi.' },
+  { ramo: 2, posicao: 4, tipo: 'inicio_valuation', valor: 1e6, nome: 'Herança', efeito: 'O Abrir CNPJ começa com F$ 1 mi.' },
   { ramo: 2, posicao: 5, tipo: 'inicio_era1', valor: 1, nome: 'Kit startup', efeito: 'O Abrir CNPJ começa com 1 de cada gerador da era 1.' },
   { ramo: 3, posicao: 1, tipo: 'caixinha', valor: 4, nome: 'Caixinha maior', efeito: 'A caixinha guarda 4 oportunidades.' },
   { ramo: 3, posicao: 2, tipo: 'validade', valor: 6, nome: 'Lembrete no celular', efeito: 'Oportunidade guardada dura 6h.' },
@@ -742,7 +742,7 @@ describe('árvore de habilidades e conquistas', () => {
     expect(acumular(0, 1, 0, 30 * 3600_000, null, 12 * 3600)).toBeCloseTo(12 * 3600, 6);
     expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null, 24 * 3600)).toBeCloseTo(24 * 3600, 6);
   });
-  it('pontos totais: floor(cbrt(R$/s ÷ 1 milhão)), sem errar nos cubos', () => {
+  it('pontos totais: floor(cbrt(F$/s ÷ 1 milhão)), sem errar nos cubos', () => {
     for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {
       expect(pontosTotais(r), String(r)).toBe(n);
     }
@@ -863,7 +863,7 @@ export const POR_EMPREGO = 0.02;
 export const POR_EMPREGO = 0.02;
 
 export const POR_CONQUISTA = 0.01;
-/** K do prestígio (medido em simulacao.test.ts): pontos totais = floor(cbrt(R$/s ÷ K)). Igual a idle_prestige_total. */
+/** K do prestígio (medido em simulacao.test.ts): pontos totais = floor(cbrt(F$/s ÷ K)). Igual a idle_prestige_total. */
 export const K_PRESTIGIO = 1e6;
 ```
 
@@ -920,7 +920,7 @@ export function multBonus(cat: Catalogo, s: Estado): number {
   return efeitosDe(cat, s).producao * (1 + POR_CONQUISTA * (s.bonus?.conquistas ?? 0));
 }
 
-/** Quantos pontos de prestígio um R$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
+/** Quantos pontos de prestígio um F$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
 export function pontosTotais(r: number): number {
   const x = Number.isFinite(r) && r > 0 ? r / K_PRESTIGIO : 0;
   let n = Math.floor(Math.cbrt(x));
@@ -1206,7 +1206,7 @@ export type Marcos = { segundaNotebook: number | null; era: Record<number, numbe
 
 ```ts
 
-/** No fim de cada sessão (t em segundos de jogo): R$/s, era e as melhorias gerais que a empresa tem. */
+/** No fim de cada sessão (t em segundos de jogo): F$/s, era e as melhorias gerais que a empresa tem. */
 export type Amostra = { t: number; taxa: number; era: number; gerais: number[] };
 export type Marcos = {
   segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null;
@@ -1673,7 +1673,7 @@ returns double precision language sql stable set search_path = public as $$
        * public.idle_bonus_mult(s)
 $$;
 
--- pontos de prestígio que um R$/s vale: floor(cbrt(r / K)), K = 1e6 (games/idle/simulacao.test.ts). Inteiro exato
+-- pontos de prestígio que um F$/s vale: floor(cbrt(r / K)), K = 1e6 (games/idle/simulacao.test.ts). Inteiro exato
 -- nos cubos (sem erro de arredondamento do cbrt), igual a economia.ts pontosTotais.
 create or replace function public.idle_prestige_total(r double precision)
 returns int language plpgsql immutable as $$
@@ -1878,7 +1878,7 @@ const pegar = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window:
 const inicioSemana = (s: Estado) => Date.parse(s.week_start + 'T00:00:00-03:00');
 
 describe('conquistas de estado', () => {
-  it('100 de um gerador e R$ 1/s: grava na hora, volta em novas uma vez só e o +1% vale dali pra frente', async () => {
+  it('100 de um gerador e F$ 1/s: grava na hora, volta em novas uma vez só e o +1% vale dali pra frente', async () => {
     await abrir(A);
     await mudar(A, 'generators[1] = 100, settled_at = settled_at - interval \'1000 seconds\'');
     const base = 0.5 * 100 * 1.02;
@@ -1919,7 +1919,7 @@ describe('conquistas de estado', () => {
     expect(ids(await abrirJogo())).not.toContain(62);
     expect((await t.rpc<Estado>('idle_pick_strategy', { p_era: 5, p_opcao: 2 })).novas).toContain(62);
   });
-  it('Farmou aura: 1º no placar em R$/s; sozinho ou empatado não conta', async () => {
+  it('Farmou aura: 1º no placar em F$/s; sozinho ou empatado não conta', async () => {
     await abrir(A);
     expect(ids(await abrirJogo())).not.toContain(102); // sozinho
     await abrir(B);
@@ -2106,7 +2106,7 @@ begin
                select 1 from public.idle_cat_est e where e.ativa and not (e.era * 10 + e.opcao = any (s.est_usadas)))
              -- 3 oportunidades em menos de c.valor segundos
              when c.tipo = 'brainrot' then n >= 3 and s.opp_recent[n] - s.opp_recent[n - 2] < make_interval(secs => c.valor)
-             -- 1º no placar (R$/s), com mais alguém com empresa aberta e ninguém com mais
+             -- 1º no placar (F$/s), com mais alguém com empresa aberta e ninguém com mais
              when c.tipo = 'aura' then s.started and v_rate > 0
                and exists (select 1 from public.idle_state o where o.started and o.user_id <> p_user)
                and not exists (select 1 from public.idle_state o
@@ -2122,7 +2122,7 @@ end;
 $$;
 
 -- gravar o estado (o da 0036 + o que é permanente e as estratégias já usadas), conferir as conquistas e guardar o
--- recorde de R$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta. As janelas de oportunidade já
+-- recorde de F$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta. As janelas de oportunidade já
 -- pegas valem até 6h com a árvore: guarda as das últimas 10h.
 create or replace function public.idle_save(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$
@@ -2140,13 +2140,13 @@ begin
          opp_recent = s.opp_recent
    where user_id = s.user_id;
   perform public.idle_check_conquistas(s.user_id);
-  -- o recorde depois das conquistas novas (o R$/s que a tela mostra já conta com elas)
+  -- o recorde depois das conquistas novas (o F$/s que a tela mostra já conta com elas)
   update public.idle_state set best_rate = greatest(best_rate, s.best_rate, public.idle_rate(s)) where user_id = s.user_id;
 end;
 $$;
 
 -- o estado que toda função do jogo devolve: o da 0038 + bônus (os nós comprados e quantas conquistas), pontos livres
--- e ganhos na vida, vendas, recorde de R$/s, quantos pontos a venda daria agora, suas conquistas, as ganhas nesta
+-- e ganhos na vida, vendas, recorde de F$/s, quantos pontos a venda daria agora, suas conquistas, as ganhas nesta
 -- chamada (a tela avisa) e as escondidas que alguém do grupo já tem (a tela mostra "???").
 create or replace function public.idle_json(s public.idle_state)
 returns jsonb language plpgsql stable set search_path = public as $$
@@ -2433,7 +2433,7 @@ revoke all on function public.idle_hire(uuid) from public, anon;
 grant execute on function public.idle_hire(uuid) to authenticated;
 ```
 
-Nota para a revisão: a "Farmou aura" calcula o R$/s de quem tem empresa aberta a cada `idle_save` de quem ainda não a
+Nota para a revisão: a "Farmou aura" calcula o F$/s de quem tem empresa aberta a cada `idle_save` de quem ainda não a
 tem (o `case` confere "já tem" antes). Com o grupo (~20 pessoas) é o mesmo custo de uma leitura do placar.
 
 - [ ] **Step 4: Rodar e ver passar; os testes antigos continuam verdes**
@@ -2562,7 +2562,7 @@ describe('o que cada ramo faz', () => {
     await ter(A, [1, 11, 12, 13, 14, 15]);
     expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.02 * 1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 10);
   });
-  it('Recomeço: o Abrir CNPJ começa com R$ 1 mil, 10 notebooks, 1 de cada gerador da era 1 e depois R$ 1 mi', async () => {
+  it('Recomeço: o Abrir CNPJ começa com F$ 1 mil, 10 notebooks, 1 de cada gerador da era 1 e depois F$ 1 mi', async () => {
     await ter(A, [1, 21, 22]);
     let s = await t.rpc<Estado>('idle_start');
     expect(s.valuation).toBe(1000);
@@ -2634,7 +2634,7 @@ describe('o que cada ramo faz', () => {
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp-prestigio/games && npx vitest run test/idleArvore.test.ts`
-Expected: FAIL (`idle_buy_node` não existe; o "Abrir CNPJ" ainda dá R$ 10 e 1 notebook).
+Expected: FAIL (`idle_buy_node` não existe; o "Abrir CNPJ" ainda dá F$ 10 e 1 notebook).
 
 - [ ] **Step 3: Acrescentar no fim de `supabase/migrations/0041_fellas_inc_prestigio.sql`** (uma linha em branco antes):
 
@@ -2676,7 +2676,7 @@ begin
 end;
 $$;
 
--- "Abrir CNPJ" (o da 0034) com o ramo Recomeço: R$ 10 (R$ 1 mil, R$ 1 mi), 1 notebook (10), 1 de cada gerador da
+-- "Abrir CNPJ" (o da 0034) com o ramo Recomeço: F$ 10 (F$ 1 mil, F$ 1 mi), 1 notebook (10), 1 de cada gerador da
 -- era 1 (Kit startup). As melhorias gerais mantidas pela venda já estão no estado. Igual a economia.ts abertura.
 create or replace function public.idle_start()
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
@@ -2791,7 +2791,7 @@ const enriquecer = (u: string) =>
 const V = { pele: 1, cabelo: 2, cor_cabelo: 3, roupa: 1, cor_roupa: 4, acessorio: 3, cor_acessorio: 5 };
 
 describe('pontos de prestígio', () => {
-  it('pontos totais = floor(cbrt(R$/s ÷ 1 milhão)), exatos nos cubos', async () => {
+  it('pontos totais = floor(cbrt(F$/s ÷ 1 milhão)), exatos nos cubos', async () => {
     const casos: [number, number][] = [
       [0, 0], [-5, 0], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [124_999_999, 4], [125e6, 5], [1e9, 10], [1e12, 100],
     ];
@@ -2874,7 +2874,7 @@ describe('vender a startup', () => {
     expect(s.opp_left).toBe(6); // 10 por dia sem estratégia, 4 já pegas hoje: a cota não reabre
     expect(s.conquistas.map((c) => c.id)).toEqual(expect.arrayContaining(antes.conquistas.map((c) => c.id)));
     expect(s.novas).toEqual(expect.arrayContaining([51, 109])); // Exit; Modo sigma (nunca contratou)
-    // Abrir CNPJ de novo: R$ 10, 1 notebook e o bônus valendo
+    // Abrir CNPJ de novo: F$ 10, 1 notebook e o bônus valendo
     const r = await t.rpc<Estado>('idle_start');
     expect(r).toMatchObject({ started: true, valuation: 10, vendas: 1 });
     expect(r.generators[0]).toBe(1);
@@ -3062,12 +3062,12 @@ Expected: FAIL (`idle_prestige` não existe; o placar não tem `pontos`; a foto 
 ```sql
 -- ===== vender a startup =====
 
--- troca a empresa por pontos: ganha a diferença entre os pontos que o R$/s de agora vale e os que você já ganhou na
+-- troca a empresa por pontos: ganha a diferença entre os pontos que o F$/s de agora vale e os que você já ganhou na
 -- vida (gastos ou não; pelo menos 1, senão idle_prestige_low). Fecha a conta; quem você contratou fecha a conta antes
 -- (o que você paga a eles muda: suas estratégias zeram) e os contratos que você fez vencem agora (quem te contratou
 -- continua). Zera valuation, geradores, melhorias (as gerais ficam com o nó Leva a cultura junto), estratégias, boost
 -- e meia-preço e volta pro "Abrir CNPJ". Ficam pontos, nós, vendas, conquistas, personagem, contadores, o limite de
--- oportunidades do dia e o recorde de R$/s.
+-- oportunidades do dia e o recorde de F$/s.
 -- Trava você e os contratados na ordem de user_id (como idle_pick_strategy).
 create or replace function public.idle_prestige()
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
@@ -3308,7 +3308,7 @@ Em `games/idle/store.test.ts` (fixture `base`) e em `games/idle/tela.test.ts` (f
 ```
 
 Em `games/idle/tela.test.ts`, as duas linhas de placar montadas à mão ganham os campos novos: no teste
-`'placar mostra o R$/s de cada um, não o valuation'`, troque
+`'placar mostra o F$/s de cada um, não o valuation'`, troque
 `avatar: null, hiredCount: 0, byMe: false, mostHired: false }] }));` por
 `avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0 }] }));`; e na fábrica `linha`, troque
 `  avatar: null, hiredCount: 0, byMe: false, mostHired: false, ...x,` por
@@ -3333,7 +3333,7 @@ ainda não tem).
 ```ts
   social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
   /** Entrega 3 (0041): os nós da árvore que você comprou e quantas conquistas você tem (o que entra na conta), pontos de
-   *  prestígio livres e ganhos na vida, quantas vezes vendeu, o recorde de R$/s, quantos pontos vender agora daria, suas
+   *  prestígio livres e ganhos na vida, quantas vezes vendeu, o recorde de F$/s, quantos pontos vender agora daria, suas
    *  conquistas, as ganhas nesta chamada (a tela avisa) e as escondidas que alguém do grupo já tem. */
   bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
   pontos_venda: number;
@@ -3943,7 +3943,7 @@ testado.
 
 **Files:**
 - Modify: `games/idle/tela.ts`, `games/idle/idle.css`, `games/idle/main.ts` (edições pontuais: o que já está na `main`
-  fica, inclusive Compradas, o placar "+R$ X/s" com "Era N · nome", folhas, `vigiarVersao`, editor e aba Contratar)
+  fica, inclusive Compradas, o placar "+F$ X/s" com "Era N · nome", folhas, `vigiarVersao`, editor e aba Contratar)
 - Test: `games/idle/tela.test.ts`
 
 **Interfaces:**
@@ -3993,7 +3993,7 @@ describe('legado: prestígio, árvore e conquistas', () => {
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, pontos_vida: 12, vendas: 2, recorde: 1234.5 }) }));
     const card = root.querySelector('.prestigio')!;
     expect(card.textContent).toContain('★ 3 pontos pra gastar');
-    expect(card.textContent).toContain('12 ganhos na vida · recorde +R$ 1,23 mil/s · vendeu 2 vezes');
+    expect(card.textContent).toContain('12 ganhos na vida · recorde +F$ 1,23 mil/s · vendeu 2 vezes');
     const b = card.querySelector('button')!;
     expect(b.textContent).toBe('Ainda não compensa');
     expect(b.disabled).toBe(true);
@@ -4077,7 +4077,7 @@ describe('legado: prestígio, árvore e conquistas', () => {
     tela.renderizar(modelo());
     expect(root.querySelector('.palco .conquista-aviso')!.hasAttribute('hidden')).toBe(true);
   });
-  it('placar: ★ N (ganhos na vida) ao lado do R$/s de quem tem', () => {
+  it('placar: ★ N (ganhos na vida) ao lado do F$/s de quem tem', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: [linha({ pontos: 12 }), linha({ userId: 'c', name: 'Teteu' })] }));
     const itens = root.querySelectorAll('.lista-placar li');
@@ -4721,11 +4721,11 @@ Expected: PASS e build sem erro.
     ganha mostra frase e data, numa bloqueada a condição;
   - abrir o jogo já dá conquistas ("Conquista: Primeiro real" por 3 s em cima da cena, um aviso de cada vez, sem tapar a
     oportunidade que passa);
-  - placar: "★ 12" ao lado do R$/s do Oliveira, "★ 3" da Bia, nada no Teteu;
+  - placar: "★ 12" ao lado do F$/s do Oliveira, "★ 3" da Bia, nada no Teteu;
   - console: `__vendavel()`; a página bate o ponto e o botão vira "Vender a startup · +N pontos"; tocar abre a folha
     "Vender a startup?" com "Você ganha N pontos pra gastar na árvore e recomeça do zero."; "Deixa quieto" fecha;
     "Vender" volta pra cena "antes" com "Abrir CNPJ" e o Legado embaixo; comprar Fundador, Pé-de-meia e Soneca longa ali
-    mesmo; "Abrir CNPJ": começa com R$ 1 mil e a produção com os +5%; o placar some com você até reabrir.
+    mesmo; "Abrir CNPJ": começa com F$ 1 mil e a produção com os +5%; o placar some com você até reabrir.
 
 - [ ] **Step 8: Commit**
 
@@ -4762,7 +4762,7 @@ crie só `legado-icones.js` e o que ele gera. Pasta: `C:/Users/juan/Documents/PR
 - 2 a 4 cores mais o contorno. No jogo aparece a 48x48 (3x) num quadradinho escuro; bloqueado (conquista não ganha,
   nó trancado), o jogo pinta de cinza e apaga (35%): a silhueta tem que ler sem cor. Nada de texto além de números
   grandes (só onde dito).
-- Grupos com marca comum: os 30 de gerador levam uma estrela dourada 4x4 no canto de cima à direita; os de R$/s sobem
+- Grupos com marca comum: os 30 de gerador levam uma estrela dourada 4x4 no canto de cima à direita; os de F$/s sobem
   em "riqueza" do 31 ao 38; os de melhorias, gente e vendas vão de bronze (1º) a prata (2º) e ouro (3º e 4º); os nós de
   cada ramo da árvore dividem uma cor de fundo (Produção verde, Recomeço dourado, Oportunidades roxo, Tempo azul, Gente
   laranja) e o Fundador é roxo da marca.
@@ -4778,7 +4778,7 @@ vidro com pufe colorido na porta · 019 gráfico de velas verdes subindo · 020 
 servidor com LEDs · 022 cheque gigante com "A" · 023 lâmpada com post-it · 024 dois prédios unidos por uma ponte ·
 025 globo de festa · 026 bola de futebol na frente de um escudo · 027 ilha com coqueiro · 028 arranha-céu de Dubai ·
 029 sino da bolsa · 030 foguete.
-R$/s: 031 uma moeda · 032 celular com o símbolo do Pix (Pix caindo) · 033 juba de leão (O leão acordou) · 034 bilhete
+F$/s: 031 uma moeda · 032 celular com o símbolo do Pix (Pix caindo) · 033 juba de leão (O leão acordou) · 034 bilhete
 de loteria (Acumulou!) · 035 cartão de visita com gravata (Bilionário de LinkedIn) · 036 barras de ouro · 037 diamante
 · 038 prensa de moedas (Casa da Moeda).
 Eras: 039 porta de garagem com uma mochila (Saiu da casa dos pais) · 040 catraca com crachá · 041 elevador com seta pra
@@ -4930,9 +4930,9 @@ cd C:/Users/juan/Documents/PROJETOSLLM/fellasapp && git push origin main
 ```
 
 - [ ] **Step 5: Conferência real (com o Juan e mais um fella)** — `https://fellasapp.pages.dev/games` no celular:
-  abrir a Fellas Inc. (aparece "Conquista: …" por 3 s para as que a pessoa já cumpria; o R$/s sobe 1% por conquista);
+  abrir a Fellas Inc. (aparece "Conquista: …" por 3 s para as que a pessoa já cumpria; o F$/s sobe 1% por conquista);
   aba Legado com o card, a árvore (ramos empilhados no celular) e a grade "N/73" com as escondidas que alguém do grupo
-  já tem como "???"; placar com "★ N" de quem já vendeu; quem tiver R$/s ≥ 1 mi vê "Vender a startup · +N pontos":
+  já tem como "???"; placar com "★ N" de quem já vendeu; quem tiver F$/s ≥ 1 mi vê "Vender a startup · +N pontos":
   vender (folha, "Vender"), ver a cena voltar para o "Abrir CNPJ" com o Legado embaixo, comprar o Fundador e um nó de
   Recomeço, reabrir e conferir o dinheiro inicial e a produção com os +5%; quem tinha contratado alguém: o contratado
   continua com o que já rendeu e perde o bônus dali pra frente; quem te contratou continua; com o jogo aberto em dois
