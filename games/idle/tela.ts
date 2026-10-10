@@ -247,7 +247,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
     listaP.replaceChildren();
     if (!m.placar) listaP.append(el('li', 'vazio', 'Carregando…'));
     else {
-      if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda essa semana.'));
+      if (!m.placar.length) listaP.append(el('li', 'vazio', 'Ninguém abriu a empresa ainda.'));
       m.placar.forEach((r, i) => {
         const li = el('li', r.userId === s?.user_id ? 'eu' : undefined);
         const est = r.strategies
@@ -292,7 +292,7 @@ export function criarTela(root: HTMLElement, a: Acoes): Tela {
         }
         lista.append(li);
       }
-      folha.append(topo, el('p', 'sub', 'Escolhe a estratégia da empresa até o fim da semana. Não tem volta.'), lista);
+      folha.append(topo, el('p', 'sub', 'Escolhe a estratégia da empresa. Não tem volta.'), lista);
       modalE.append(folha);
     }
 

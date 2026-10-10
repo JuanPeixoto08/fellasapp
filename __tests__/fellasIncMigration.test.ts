@@ -28,3 +28,12 @@ describe('Fellas Inc. (0033/0034)', () => {
     expect(catalogo).toContain('GERADO por games/idle/catalogo.ts');
   });
 });
+
+describe('Fellas Inc. sem reset (0036)', () => {
+  const sem = ler('0036_fellas_inc_sem_reset.sql').split(/\r?\n/).map((l: string) => l.replace(/--.*$/, '')).join('\n');
+  it('só tira a foto: nada é apagado', () => {
+    expect(sem).toContain('create or replace function public.idle_weekly_reset');
+    expect(sem).not.toContain('delete from public.idle_state');
+    for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(sem).not.toContain(proibido);
+  });
+});

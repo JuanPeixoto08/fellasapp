@@ -159,7 +159,7 @@ export function GameList({
       <Divider />
       <GameRow
         title="Fellas Inc."
-        subtitle="Sua startup fellada · temporada de uma semana"
+        subtitle="Sua startup fellada · selo de unicórnio toda segunda"
         meta={unicorn ? `Unicórnio da semana passada: ${unicorn}` : undefined}
         icon={<IdleArt />}
         onPlay={onIdle}
