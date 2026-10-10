@@ -1,0 +1,13 @@
+{
+  "quadros": 8,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 1,
+      "x": 76,
+      "y": 36,
+      "espelhada": false
+    }
+  ]
+}

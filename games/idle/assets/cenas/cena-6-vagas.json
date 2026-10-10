@@ -1,0 +1,168 @@
+{
+  "quadros": 8,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 5,
+      "x": 33,
+      "y": 40,
+      "espelhada": false,
+      "trilha": [
+        {
+          "y": 40
+        },
+        {
+          "y": 40
+        },
+        {
+          "y": 41
+        },
+        {
+          "y": 41
+        },
+        {
+          "y": 42
+        },
+        {
+          "y": 42
+        },
+        {
+          "y": 41
+        },
+        {
+          "y": 41
+        }
+      ]
+    },
+    {
+      "id": "orbita",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 99,
+      "y": 27,
+      "espelhada": false,
+      "freela": {
+        "pele": 3,
+        "cabelo": 2,
+        "cor_cabelo": 6,
+        "roupa": 3,
+        "cor_roupa": 1,
+        "acessorio": 4,
+        "cor_acessorio": 3
+      },
+      "trilha": [
+        {
+          "y": 29
+        },
+        {
+          "y": 29
+        },
+        {
+          "y": 28
+        },
+        {
+          "y": 28
+        },
+        {
+          "y": 27
+        },
+        {
+          "y": 27
+        },
+        {
+          "y": 28
+        },
+        {
+          "y": 28
+        }
+      ]
+    },
+    {
+      "id": "lua",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 33,
+      "y": 9,
+      "espelhada": false,
+      "freela": {
+        "pele": 0,
+        "cabelo": 4,
+        "cor_cabelo": 5,
+        "roupa": 1,
+        "cor_roupa": 9,
+        "acessorio": 0,
+        "cor_acessorio": 0
+      },
+      "trilha": [
+        {
+          "y": 10
+        },
+        {
+          "y": 10
+        },
+        {
+          "y": 11
+        },
+        {
+          "y": 11
+        },
+        {
+          "y": 10
+        },
+        {
+          "y": 10
+        },
+        {
+          "y": 9
+        },
+        {
+          "y": 9
+        }
+      ]
+    },
+    {
+      "id": "estacao",
+      "papel": "contratado",
+      "pose": 5,
+      "x": 138,
+      "y": 55,
+      "espelhada": false,
+      "freela": {
+        "pele": 5,
+        "cabelo": 0,
+        "cor_cabelo": 3,
+        "roupa": 0,
+        "cor_roupa": 4,
+        "acessorio": 3,
+        "cor_acessorio": 2
+      },
+      "trilha": [
+        {
+          "y": 56
+        },
+        {
+          "y": 56
+        },
+        {
+          "y": 55
+        },
+        {
+          "y": 55
+        },
+        {
+          "y": 56
+        },
+        {
+          "y": 56
+        },
+        {
+          "y": 57
+        },
+        {
+          "y": 57
+        }
+      ]
+    }
+  ]
+}
