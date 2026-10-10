@@ -23,7 +23,7 @@ describe('catálogo no banco', () => {
     const gens = await q<{ id: number; custo: number; renda: number }>('select id, custo, renda from public.idle_cat_gen order by id');
     expect(gens.map((g) => [g.id, g.custo, g.renda])).toEqual(catalogo.geradores.map((g) => [g.id, g.custo, g.renda]));
     expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(200);
-    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(8);
+    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(10);
   });
   it('membro lê; anônimo não', async () => {
     const lidos = await t.asRole<{ n: number }>('authenticated', 'select count(*)::int as n from public.idle_cat_gen');
@@ -153,8 +153,8 @@ describe('estratégia por era', () => {
   it('entrou na era 2 sem escolher: nenhuma compra passa', async () => {
     await expect(buy('gerador', 1)).rejects.toThrow(/idle_strategy_pending/);
   });
-  it('escolhe uma vez; repetir é idle_strategy_set; opção desligada é idle_bad_choice; era futura é idle_locked', async () => {
-    await expect(pick(2, 2)).rejects.toThrow(/idle_bad_choice/);
+  it('escolhe uma vez; repetir é idle_strategy_set; opção que não existe é idle_bad_choice; era futura é idle_locked', async () => {
+    await expect(pick(2, 5)).rejects.toThrow(/idle_bad_choice/);
     expect((await pick(2, 0)).strategies).toEqual([0, -1, -1, -1]);
     await expect(pick(2, 1)).rejects.toThrow(/idle_strategy_set/);
     await expect(pick(3, 0)).rejects.toThrow(/idle_locked/);

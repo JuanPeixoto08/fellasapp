@@ -50,12 +50,13 @@ describe('tela da Fellas Inc.', () => {
   });
   it('era nova sem estratégia: cartões, os desligados avisam o porquê', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }) }));
+    const g = [...Array(13).fill(1), ...Array(17).fill(0)];
+    tela.renderizar(modelo({ estado: estado({ era: 3, generators: g, strategies: [0, -1, -1, -1] }) }));
     const modal = root.querySelector('.modal-estrategia')!;
     expect(modal.hasAttribute('hidden')).toBe(false);
-    expect(modal.textContent).toContain('Chega com Contratar');
+    expect(modal.textContent).toContain('Chega com o Mapa do rolê');
     [...modal.querySelectorAll('button')].find((b) => b.textContent === 'Escolher' && !b.disabled)!.click();
-    expect(acoes.escolher).toHaveBeenCalledWith(2, 0);
+    expect(acoes.escolher).toHaveBeenCalledWith(3, 0);
   });
   it('aviso aparece; caixinha mostra quantas tem', () => {
     const tela = criarTela(root, acoes);

@@ -27,11 +27,21 @@ describe('catálogo', () => {
     expect(m.find((x) => x.id === 305)).toMatchObject({ gerador: 30, nivel: 5, requer: 100 });
   });
 
-  it('12 estratégias; as que dependem de contratos/propriedades vêm desligadas', () => {
+  it('12 estratégias; só as que dependem de propriedades vêm desligadas', () => {
     const e = catalogo.estrategias;
     expect(e).toHaveLength(12);
-    expect(e.filter((x) => !x.ativa).map((x) => x.nome)).toEqual(['Networking', 'Marca forte', 'Monopólio', 'Cultura de startup']);
+    expect(e.filter((x) => !x.ativa).map((x) => x.nome)).toEqual(['Marca forte', 'Monopólio']);
     expect(e.find((x) => x.nome === 'Queimar caixa')).toMatchObject({ custoMult: 1.25, prodMult: 1.6, genMult: 1 });
+    expect(e.find((x) => x.nome === 'Networking')).toMatchObject({ ativa: true, sociais: { contratoEfeitoMult: 2, propriedadeEfeitoMult: 2 } });
+    expect(e.find((x) => x.nome === 'Cultura de startup')).toMatchObject({ ativa: true, sociais: { porContratado: 0.15, empregadoMult: 3 } });
+    expect(e.find((x) => x.nome === 'Abrir capital')).toMatchObject({ prodMult: 1.3, sociais: { contratoCustoMult: 2 } });
+  });
+
+  it('cargos: lista de piada, sem repetir, curtos', () => {
+    expect(catalogo.cargos.length).toBeGreaterThanOrEqual(12);
+    expect(new Set(catalogo.cargos).size).toBe(catalogo.cargos.length);
+    for (const c of catalogo.cargos) expect(c.length).toBeLessThanOrEqual(40);
+    expect(catalogo.cargos).toContain('CEO de nada');
   });
 
   it('montarCatalogo usa os parâmetros', () => {
@@ -61,8 +71,12 @@ describe('catálogo no banco (migração mais recente)', () => {
   });
   it('escapa aspas simples nos textos', () => {
     expect(catalogoSql()).toContain("'Selo de \"open to work\"'");
-    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [] }))
+    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [], cargos: [] }))
       .toContain("'Pão d''água'");
+  });
+  it('cargos entram no SQL gerado', () => {
+    expect(catalogoSql()).toContain('insert into public.idle_cat_cargo (id, nome) values');
+    expect(catalogoSql()).toContain("(1, 'estagiário')");
   });
   it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', () => {
     expect(catalogo.melhorias.find((x) => x.id === 2006)?.frase).toContain('+0,5%');
