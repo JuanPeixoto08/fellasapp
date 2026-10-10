@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24 # o mesmo do dev: a potência do V8 muda na última casa entre versões e a 0033 foi gerada no 24
           cache: npm
           cache-dependency-path: |
             package-lock.json
