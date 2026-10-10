@@ -134,7 +134,7 @@ export async function getLastChampion(): Promise<Champion | null> {
 export type Unicorn = { userId: string; name: string; username: string; avatarUrl: string | null; valuation: number; weekStart: string };
 type IdleWeekRow = Database['public']['Tables']['idle_weeks']['Row'];
 
-/** O unicórnio da semana passada na Fellas Inc. (o 1º em R$/s da semana), ou null. */
+/** O unicórnio da semana passada na Fellas Inc. (o 1º em F$/s da semana), ou null. */
 export async function getLastUnicorn(): Promise<Unicorn | null> {
   const { data, error } = await supabase
     .from('idle_weeks')

@@ -104,7 +104,7 @@ describe('tela da Fellas Inc.', () => {
     porTexto(root.querySelector('.seg button')!.textContent!).click();
     expect(root.querySelector('.lista-melhorias')!.textContent).not.toContain('Wi-Fi do vizinho');
   });
-  it('placar mostra o R$/s de cada um, não o valuation', () => {
+  it('placar mostra o F$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false }] }));
     const v = root.querySelector('.lista-placar .v')!.textContent!;
@@ -163,7 +163,7 @@ describe('contratar', () => {
     expect(cartas[0].textContent).toContain('Bia');
     expect(cartas[0].textContent).toContain('Garagem · ninguém contratou ainda');
     const b = cartas[0].querySelector('button')!;
-    expect(b.textContent).toBe('Contratar · R$ 918');
+    expect(b.textContent).toBe('Contratar · F$ 918');
     tela.atualizarValor(917);
     expect(b.disabled).toBe(true);
     tela.atualizarValor(918);

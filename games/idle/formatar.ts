@@ -18,10 +18,10 @@ function resumir(n: number): string {
 // Valor não finito ou negativo vira zero.
 const valido = (n: number) => (Number.isFinite(n) && n > 0 ? n : 0);
 
-export const formatarValor = (n: number) => `R$ ${resumir(valido(n))}`;
+export const formatarValor = (n: number) => `F$ ${resumir(valido(n))}`;
 
 export function formatarTaxa(bruto: number): string {
   const n = valido(bruto);
-  if (n < 10) return `+R$ ${(Math.floor(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/s`;
-  return `+R$ ${resumir(n)}/s`;
+  if (n < 10) return `+F$ ${(Math.floor(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/s`;
+  return `+F$ ${resumir(n)}/s`;
 }

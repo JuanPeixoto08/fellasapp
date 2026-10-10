@@ -7,13 +7,13 @@ personagem). Esta spec só acrescenta; o que não está aqui segue a base.
 ## Resumo
 
 A Fellas Inc. não zera sozinha. Recomeçar passa a ser escolha: **"Vender a startup"** troca a empresa inteira por
-**pontos de prestígio**, calculados pelo seu R$/s na lógica do Cookie Clicker. Os pontos são moeda: você gasta numa
+**pontos de prestígio**, calculados pelo seu F$/s na lógica do Cookie Clicker. Os pontos são moeda: você gasta numa
 **árvore de habilidades** (5 ramos, ~25 nós) e são os nós comprados que dão os efeitos, para sempre. **Conquistas** (umas 75, algumas escondidas, de zoeira) dão +1% cada, também para sempre. As duas coisas são o
 jogo de longo prazo de quem já chegou longe, sem tirar a graça de quem começa agora.
 
 ## Decisões já tomadas (Juan, 10/10)
 
-- Prestígio é escolha do jogador, a qualquer hora; os pontos dependem do R$/s, na lógica do Cookie Clicker.
+- Prestígio é escolha do jogador, a qualquer hora; os pontos dependem do F$/s, na lógica do Cookie Clicker.
 - No prestígio fica **só** o que é permanente: pontos de prestígio, nós da árvore, conquistas e personagem.
 - Pontos de prestígio NÃO aumentam a produção sozinhos: servem para comprar nós de uma árvore de habilidades (Juan,
   10/10, depois de ler o plano). Ponto guardado não faz nada.
@@ -27,21 +27,21 @@ jogo de longo prazo de quem já chegou longe, sem tirar a graça de quem começa
 
 ### 1.1 Pontos
 
-- `pontos_totais(r) = floor(cbrt(r / K))`, em que `r` é o R$/s no momento da venda (sem o ×5 das oportunidades) e `K`
+- `pontos_totais(r) = floor(cbrt(r / K))`, em que `r` é o F$/s no momento da venda (sem o ×5 das oportunidades) e `K`
   sai da simulação (1.4).
 - Ao vender, você ganha `max(0, pontos_totais(r) − pontos_já_ganhos_na_vida)` (gastos na árvore ou não). Vender de novo no mesmo ritmo não rende
   nada: para ganhar mais, precisa bater o próprio recorde. É a regra do Cookie Clicker (lá pelo total produzido; aqui,
-  pedido do dono, pelo R$/s).
+  pedido do dono, pelo F$/s).
 - Só dá para vender se isso render pelo menos 1 ponto (senão o botão fica apagado com "Ainda não compensa").
 
 ### 1.2 O que acontece na venda
 
 - Zera: valuation, geradores, melhorias, estratégias das eras, boost e "próxima compra pela metade".
-- A empresa volta para "Abrir CNPJ" (cena "antes"); o "Abrir CNPJ" dá o R$ 10 e o notebook de sempre.
+- A empresa volta para "Abrir CNPJ" (cena "antes"); o "Abrir CNPJ" dá o F$ 10 e o notebook de sempre.
 - Os contratos que você fez vencem na hora (`ends_at = agora`), com a conta dos contratados fechada antes (nada
   retroativo, como na entrega 2). Quem te contratou continua.
 - Ficam: pontos (ganhos e não gastos), nós da árvore, número de vendas, conquistas, personagem, o limite diário de
-  oportunidades (não reabre a cota do dia) e o recorde de R$/s.
+  oportunidades (não reabre a cota do dia) e o recorde de F$/s.
 - Os nós do ramo Recomeço valem na hora do novo "Abrir CNPJ" (dinheiro inicial, notebooks, melhorias gerais mantidas…).
 - Confirmação antes: folha com "Vender a startup? Você ganha N pontos pra gastar na árvore e recomeça do zero." e os
   botões "Vender" / "Deixa quieto".
@@ -56,7 +56,7 @@ ponto de partida:
 |---|---|
 | Raiz | **Fundador** (1): abre a árvore; +5% de produção |
 | Produção | +10% · +25% · +50% · +100% · ×2 em tudo (multiplicam entre si) |
-| Recomeço | começa com R$ 1 mil · começa com 10 notebooks · a venda mantém as 20 melhorias gerais · começa com R$ 1 mi · começa com 1 de cada gerador da era 1 |
+| Recomeço | começa com F$ 1 mil · começa com 10 notebooks · a venda mantém as 20 melhorias gerais · começa com F$ 1 mi · começa com 1 de cada gerador da era 1 |
 | Oportunidades | caixinha guarda 4 · validade 6h · +3 por dia · bônus ×2 · caixinha guarda 5 |
 | Tempo | teto do offline 12h · 16h · 24h · 36h · 48h |
 | Gente | contratar 25% mais barato · seus contratados rendem 15% (no lugar de 10%) · contrato dura 10 dias · quem te contrata rende o dobro pra você · contratar 50% mais barato |
@@ -75,7 +75,7 @@ A simulação ganha um jogador que vende e gasta na árvore (sempre o nó mais b
 ## 2. Bônus juntos
 
 `taxa = base × melhorias × estratégias × contratos × nós de produção da árvore × (1 + 0,01 × conquistas)`. A taxa do
-placar (R$/s) já inclui tudo. A foto de segunda continua usando a taxa da meia-noite.
+placar (F$/s) já inclui tudo. A foto de segunda continua usando a taxa da meia-noite.
 
 ## 3. Conquistas
 
@@ -92,7 +92,7 @@ placar (R$/s) já inclui tudo. A foto de segunda continua usando a taxa da meia-
 | Grupo | Conquistas |
 |---|---|
 | Geradores (30) | ter 100 de cada gerador, cada uma com nome próprio (ex.: 100 estagiários = "Estágio não remunerado em escala") |
-| R$/s (8) | 1 · 100 · 10 mil · 1 mi · 1 bi · 1 tri · 1 quatri · 1 quinti |
+| F$/s (8) | 1 · 100 · 10 mil · 1 mi · 1 bi · 1 tri · 1 quatri · 1 quinti |
 | Eras (5) | chegar nas eras 2, 3, 4, 5 e ter o gerador 30 |
 | Melhorias (3) | 10, 50 e 150 compradas |
 | Oportunidades (4) | 1, 25, 100, 500 pegas |
@@ -117,7 +117,7 @@ Ideias do Juan e da pesquisa (outubro de 2026), aprovadas. A do "Vitor" (boneco 
 | Nome | Condição | Frase |
 |---|---|---|
 | **6-7** | ter exatamente 67 unidades de algum gerador | "Seis sete. Ninguém sabe por quê." |
-| **Farmou aura** | ficar em 1º no placar (R$/s) | "+1000 de aura." |
+| **Farmou aura** | ficar em 1º no placar (F$/s) | "+1000 de aura." |
 | **Aura negativa** | vender a startup e ganhar só 1 ponto | "Vendeu por um real e um abraço." |
 | **limaumdoc** | contratar o limaumdoc (pelo nome de usuário) | a combinar com o grupo |
 | **Tá saindo da jaula** | comprar "Máx" de um gerador e levar 100+ unidades de uma vez | "Birl! O monstro tá saindo da jaula." |
@@ -133,19 +133,19 @@ Nomes de membros (limaumdoc) e do Luis aparecem no código público: aprovado pe
 ## 4. Telas (`games/idle/`)
 
 - Aba nova **Legado**, com três partes:
-  1. Card de prestígio: pontos para gastar, pontos ganhos na vida, recorde de R$/s, "Vender a startup · +N pontos".
+  1. Card de prestígio: pontos para gastar, pontos ganhos na vida, recorde de F$/s, "Vender a startup · +N pontos".
   2. Árvore: a raiz e os 5 ramos (ícone, nome, efeito, custo); nó comprado aceso, nó disponível com "Comprar · N ★",
      nó trancado apagado com o que falta. No celular os ramos empilham; no PC ficam lado a lado.
   3. Conquistas: grade (ícone, nome; tocar mostra a frase e a data). Bloqueadas aparecem apagadas com a condição;
      escondidas não aparecem até alguém conseguir (aí mostram "??? · alguém do grupo conseguiu"). Contagem "42/75".
 - Com 5 abas, a fileira de abas rola na horizontal no celular.
 - Ganhou conquista: aviso rápido por cima da cena ("Conquista: 6-7") por 3 s.
-- Placar: os pontos ganhos na vida ao lado do R$/s (ex.: "★ 12").
+- Placar: os pontos ganhos na vida ao lado do F$/s (ex.: "★ 12").
 
 ## 5. Dados e funções
 
 - `idle_state`: + `prestige_earned int` (ganhos na vida), `prestige_spent int`, `prestige_count int`,
-  `best_rate double precision` (recorde de R$/s).
+  `best_rate double precision` (recorde de F$/s).
 - Árvore: catálogo `idle_cat_no` (gerado por `catalogoSql()`, com ramo, posição, custo e efeito) e `idle_arvore`
   (`user_id`, `no_id`, `comprado_em`); RPC `idle_buy_node(p_no)` (confere pontos livres e o nó anterior; fecha a conta
   antes, porque o nó pode mudar a taxa).

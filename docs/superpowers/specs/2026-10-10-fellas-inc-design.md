@@ -39,7 +39,7 @@ jogo umas 3 vezes por dia fica competitivo.
 
 ### 1.1 Valuation e produção
 
-- Valuation em "R$" de mentira, `double precision` no banco (passa de trilhões).
+- Valuation em "F$" (a moeda dos fellas; era "R$" até 10/10), `double precision` no banco (passa de trilhões).
 - Cada gerador `g` tem custo base `c_g`, rendimento base `r_g` (R$/s) e quantidade `n_g`. O preço da próxima unidade é
   `c_g · 1,15^n_g`. "Comprar 10" e "comprar máx" somam a série geométrica numa compra só.
 - Produção por segundo: `R = Σ (n_g · r_g · M_g) · M_global`, em que `M_g` junta as melhorias e estratégias que atingem o
