@@ -79,7 +79,7 @@ export const catalogo = montarCatalogo();
 const txt = (s: string) => `'${s.replace(/'/g, "''")}'`;
 const num = (n: number | null) => (n === null ? 'null' : String(n));
 
-/** A migração 0033 inteira. Regerar: ATUALIZAR_CATALOGO=1 npx vitest run idle/catalogo.test.ts (em games/). */
+/** A migração 0033 inteira. Catálogo mudou: migração NOVA (ver o cabeçalho gerado). */
 export function catalogoSql(cat: Catalogo = catalogo): string {
   const gen = cat.geradores.map((g) => `  (${g.id}, ${g.era}, ${txt(g.nome)}, ${num(g.custo)}, ${num(g.renda)})`);
   const upg = cat.melhorias.map((m) => {
@@ -92,7 +92,7 @@ export function catalogoSql(cat: Catalogo = catalogo): string {
   );
   const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
   return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias e estratégias. Idempotente.
--- GERADO por games/idle/catalogo.ts: não edite à mão. Regerar: ATUALIZAR_CATALOGO=1 npx vitest run idle/catalogo.test.ts (em games/).
+-- GERADO por games/idle/catalogo.ts: não edite à mão. Mudou o catálogo? Crie uma migração NOVA NNNN_fellas_inc_catalogo_<nome>.sql com ATUALIZAR_CATALOGO=NNNN_fellas_inc_catalogo_<nome>.sql npx vitest run idle/catalogo.test.ts (em games/) e acrescente o arquivo em games/test/db.ts e games/dev/mockDb.ts.
 
 create table if not exists public.idle_cat_gen (
   id int primary key, era int not null, nome text not null, custo double precision not null, renda double precision not null

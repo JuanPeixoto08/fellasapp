@@ -1,5 +1,5 @@
 // Textos da Fellas Inc.: dá pra trocar nomes e frases à vontade (a lógica usa só os ids e os números).
-// Depois de mudar, regenere o catálogo do banco: ATUALIZAR_CATALOGO=1 npx vitest run idle/catalogo.test.ts (em games/).
+// Depois de mudar, crie uma migração nova do catálogo (ver o cabeçalho gerado em catalogo.ts).
 
 /** Os 30 geradores, na ordem. A cada 6 começa uma era (e uma cena). */
 export const GERADORES: readonly string[] = [

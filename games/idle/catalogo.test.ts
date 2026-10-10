@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -40,13 +40,24 @@ describe('catálogo', () => {
   });
 });
 
-const ARQUIVO = resolve(__dirname, '../../supabase/migrations/0033_fellas_inc_catalogo.sql');
+const MIGRACOES = resolve(__dirname, '../../supabase/migrations');
+const maisRecente = readdirSync(MIGRACOES)
+  .filter((n) => /^\d{4}_fellas_inc_catalogo.*\.sql$/.test(n))
+  .sort()
+  .pop()!;
+// ATUALIZAR_CATALOGO=<nome>.sql escreve uma migração NOVA; outro valor não reescreve migração antiga
+const novoNome = process.env.ATUALIZAR_CATALOGO?.endsWith('.sql') ? process.env.ATUALIZAR_CATALOGO : null;
+if (novoNome) writeFileSync(resolve(MIGRACOES, novoNome), catalogoSql());
+const ARQUIVO = resolve(MIGRACOES, novoNome ?? maisRecente);
 
-describe('0033 (catálogo no banco)', () => {
+describe('catálogo no banco (migração mais recente)', () => {
   it('é exatamente o que catalogo.ts gera', () => {
-    const sql = catalogoSql();
-    if (process.env.ATUALIZAR_CATALOGO) writeFileSync(ARQUIVO, sql);
-    expect(readFileSync(ARQUIVO, 'utf8').replace(/\r\n/g, '\n')).toBe(sql);
+    expect(readFileSync(ARQUIVO, 'utf8').replace(/\r\n/g, '\n')).toBe(catalogoSql());
+  });
+  it('db.ts e mockDb.ts listam esse arquivo', () => {
+    const nome = novoNome ?? maisRecente;
+    expect(readFileSync(resolve(__dirname, '../test/db.ts'), 'utf8')).toContain(nome);
+    expect(readFileSync(resolve(__dirname, '../dev/mockDb.ts'), 'utf8')).toContain(nome);
   });
   it('escapa aspas simples nos textos', () => {
     expect(catalogoSql()).toContain("'Selo de \"open to work\"'");
