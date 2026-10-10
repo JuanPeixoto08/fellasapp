@@ -32,7 +32,7 @@ jogo umas 3 vezes por dia fica competitivo.
 
 - Avatar do personagem fora da Fellas Inc. (Poker, perfil).
 - Itens de personagem ganhos jogando (coroa do unicórnio etc.): podem vir depois em cima do kit.
-- Conquistas, prestígio, push notification de "cofre cheio".
+- Push notification de "cofre cheio". (Prestígio e conquistas viraram a entrega 3: `2026-10-10-fellas-inc-prestigio-conquistas-design.md`.)
 - Qualquer ligação com créditos do cassino.
 
 ## 1. Economia
@@ -299,7 +299,8 @@ Os arquivos finais são copiados para `games/idle/assets/`, **menos os dos lugar
 
 1. **Núcleo:** geradores, melhorias, oportunidades, estratégias, temporada, placar, selo, cenas com o fundador padrão.
 2. **Gente:** contratar amigos, editor de personagem, cenas com vagas, estagiário oficial, notificação de contrato.
-3. **Propriedades:** mapa do rolê, tomar/compensar, notificação; depende da lista de lugares.
+3. **Prestígio e conquistas:** ver `2026-10-10-fellas-inc-prestigio-conquistas-design.md`.
+4. **Propriedades:** mapa do rolê, tomar/compensar, notificação; depende da lista de lugares.
 
 Cada entrega tem plano próprio; o jogo é jogável a partir da entrega 1.
 
