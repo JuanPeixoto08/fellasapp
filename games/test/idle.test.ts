@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
+import { pendentes, tipo } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 export const A = '00000000-0000-0000-0000-00000000000a';
@@ -166,5 +167,46 @@ describe('estratégia por era', () => {
     await q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
     const s = await buy('gerador', 1);
     expect(s.valuation).toBeCloseTo(100 - 17.25 * 1.25, 1);
+  });
+});
+
+const claim = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window: w });
+
+describe('oportunidades no banco', () => {
+  beforeEach(async () => { await t.rpc('idle_start'); });
+
+  it('o banco e a tela concordam nas pendentes', async () => {
+    const s = await t.rpc<Estado>('idle_open');
+    expect(pendentes(A, Date.parse(s.server_now), [])).toEqual(
+      (await q<{ l: string[] }>(`select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1`, [A, s.server_now]))[0].l.map(Number),
+    );
+  });
+  it('pega uma (cada tipo com o seu bônus) e não pega de novo', async () => {
+    const s0 = await t.rpc<Estado>('idle_open');
+    const lista = pendentes(A, Date.parse(s0.server_now), []);
+    const w = lista[0];
+    const antes = s0.valuation;
+    const s = await claim(w);
+    if (tipo(A, w) === 0) expect(s.valuation).toBeCloseTo(antes + 0.5 * 900, 0);
+    if (tipo(A, w) === 1) expect(Date.parse(s.boost_until!) - Date.parse(s.server_now)).toBeGreaterThan(55_000);
+    if (tipo(A, w) === 2) expect(s.half_price).toBe(true);
+    expect(s.opp_claimed.map(Number)).toContain(w);
+    expect(s.opp_left).toBe(9);
+    await expect(claim(w)).rejects.toThrow(/idle_opp_gone/);
+  });
+  it('janela do futuro ou velha demais: idle_opp_gone', async () => {
+    const s = await t.rpc<Estado>('idle_open');
+    const agoraW = Math.floor(Date.parse(s.server_now) / 600_000);
+    await expect(claim(agoraW + 2)).rejects.toThrow(/idle_opp_gone/);
+    await expect(claim(agoraW - 30)).rejects.toThrow(/idle_opp_gone/);
+  });
+  it('limite de 10 por dia; dia novo zera', async () => {
+    await q(`update public.idle_state set opp_day = public.games_today(), opp_count = 10 where user_id = $1`, [A]);
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.opp_left).toBe(0);
+    const w = pendentes(A, Date.parse(s.server_now), [])[0];
+    await expect(claim(w)).rejects.toThrow(/idle_opp_cap/);
+    await q(`update public.idle_state set opp_day = public.games_today() - 1 where user_id = $1`, [A]);
+    await claim(w);
   });
 });

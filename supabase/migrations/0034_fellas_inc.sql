@@ -365,6 +365,45 @@ begin
 end;
 $$;
 
+create or replace function public.idle_claim_opportunity(p_window bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_mult double precision;
+  v_rate double precision;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if not (p_window = any (public.idle_opp_list(s))) then
+    raise exception 'idle_opp_gone' using errcode = 'P0001';
+  end if;
+  if s.opp_day is distinct from public.games_today() then
+    s.opp_day := public.games_today();
+    s.opp_count := 0;
+  end if;
+  if s.opp_count >= public.idle_opp_cap(s) then
+    raise exception 'idle_opp_cap' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1);
+  v_rate := public.idle_rate(s);
+  case public.idle_opp_kind(s.user_id, p_window)
+    when 0 then s.valuation := s.valuation + v_rate * 900 * v_mult;
+    when 1 then s.boost_until := greatest(now(), coalesce(s.boost_until, now())) + make_interval(secs => 60 * v_mult);
+    else s.half_price := true;
+  end case;
+  s.opp_claimed := array_append(s.opp_claimed, p_window);
+  s.opp_count := s.opp_count + 1;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
 revoke all on function public.idle_era(int[]) from public, anon, authenticated;
 revoke all on function public.idle_rate(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_cost_mult(public.idle_state) from public, anon, authenticated;
@@ -389,3 +428,5 @@ revoke all on function public.idle_buy(text, int, int) from public, anon;
 revoke all on function public.idle_pick_strategy(int, int) from public, anon;
 grant execute on function public.idle_buy(text, int, int) to authenticated;
 grant execute on function public.idle_pick_strategy(int, int) to authenticated;
+revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
+grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
