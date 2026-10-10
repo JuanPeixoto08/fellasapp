@@ -107,7 +107,8 @@ returns int language sql immutable set search_path = public as $$
   select mod(public.idle_opp_seed(u) + w * 13, 3)::int
 $$;
 
--- as até 3 mais recentes que já apareceram, não foram pegas e têm menos de 4h
+-- caixinha: as 3 mais recentes que já apareceram, têm menos de 4h e são desta semana; só depois tira as pegas
+-- (pegar uma não puxa outra mais velha, e as pegas de antes do reset não voltam na segunda)
 create or replace function public.idle_opp_list(s public.idle_state, ts timestamptz default now())
 returns bigint[] language sql stable set search_path = public as $$
   select coalesce(array_agg(w order by w desc), '{}') from (
@@ -116,10 +117,11 @@ returns bigint[] language sql stable set search_path = public as $$
                            floor(extract(epoch from ts) / 600)::bigint) w
      where public.idle_opp_at(s.user_id, w) <= ts
        and public.idle_opp_at(s.user_id, w) >= ts - interval '4 hours'
-       and not (w = any (s.opp_claimed))
+       and public.idle_opp_at(s.user_id, w) >= (s.week_start::timestamp at time zone 'America/Sao_Paulo')
      order by w desc
      limit 3
   ) x
+  where not (w = any (s.opp_claimed))
 $$;
 
 create or replace function public.idle_opp_cap(s public.idle_state)

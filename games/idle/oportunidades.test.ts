@@ -28,11 +28,32 @@ describe('oportunidades', () => {
     }
     expect(pendentes(V, agora, [p[0]])).not.toContain(p[0]);
   });
+  it('pegar uma das 3 não puxa uma 4ª mais velha', () => {
+    const agora = 2_980_100 * 600_000 + 300_000;
+    const p = pendentes(V, agora, []);
+    expect(pendentes(V, agora, [p[1]])).toEqual([p[0], p[2]]);
+    expect(pendentes(V, agora, p)).toEqual([]);
+  });
+  it('nada de antes do início da semana', () => {
+    const agora = 2_980_100 * 600_000 + 300_000;
+    const p = pendentes(V, agora, []);
+    expect(pendentes(V, agora, [], instante(V, p[1]))).toEqual([p[0], p[1]]);
+    expect(pendentes(V, agora, [], agora + 1)).toEqual([]);
+  });
   it('ao vivo só durante os segundos em que ela está na tela', () => {
     const w = 2_980_100;
     const t = instante(V, w);
     expect(aoVivo(V, t + 5000, 10)).toBe(w);
     expect(aoVivo(V, t + 11_000, 10)).toBeNull();
     expect(aoVivo(V, t + 25_000, 30)).toBe(w);
+  });
+  it('ao vivo atravessa a virada da janela (30 s na tela)', () => {
+    // uma janela cuja oportunidade sai perto do fim, e a da janela seguinte só sai depois dos 30 s
+    let w = 2_980_000;
+    while (!(instante(V, w) - w * 600_000 > 580_000 && instante(V, w + 1) > instante(V, w) + 30_000)) w++;
+    const t = instante(V, w);
+    expect(Math.floor((t + 25_000) / 600_000)).toBe(w + 1);
+    expect(aoVivo(V, t + 25_000, 30)).toBe(w);
+    expect(aoVivo(V, t + 25_000, 10)).toBeNull();
   });
 });

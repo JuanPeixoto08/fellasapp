@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
-import { pendentes, tipo } from '../idle/oportunidades';
+import { instante, pendentes, tipo } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 export const A = '00000000-0000-0000-0000-00000000000a';
@@ -174,25 +174,56 @@ const claim = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window:
 
 describe('oportunidades no banco', () => {
   beforeEach(async () => { await t.rpc('idle_start'); });
+  const semana = (s: Estado) => Date.parse(s.week_start + 'T00:00:00-03:00');
+  // para o relógio até as pegas: a conta do bônus não depende de milissegundos
+  const parar = () => q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
 
   it('o banco e a tela concordam nas pendentes', async () => {
     const s = await t.rpc<Estado>('idle_open');
-    expect(pendentes(A, Date.parse(s.server_now), [])).toEqual(
+    expect(pendentes(A, Date.parse(s.server_now), [], semana(s))).toEqual(
       (await q<{ l: string[] }>(`select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1`, [A, s.server_now]))[0].l.map(Number),
     );
   });
-  it('pega uma (cada tipo com o seu bônus) e não pega de novo', async () => {
+  it('pega as 3 (cada tipo com o seu bônus) e não pega de novo', async () => {
+    let s = await t.rpc<Estado>('idle_open');
+    await parar();
+    const lista = pendentes(A, Date.parse(s.server_now), [], semana(s));
+    expect(lista).toHaveLength(3);
+    expect(new Set(lista.map((w) => tipo(A, w)))).toEqual(new Set([0, 1, 2]));
+    for (const w of lista) {
+      const antes = s;
+      s = await claim(w);
+      if (tipo(A, w) === 0) expect(s.valuation).toBeCloseTo(antes.valuation + antes.rate * 900, 3);
+      if (tipo(A, w) === 1) {
+        const dur = Date.parse(s.boost_until!) - Date.parse(s.server_now);
+        expect(dur).toBeGreaterThan(55_000);
+        expect(dur).toBeLessThan(65_000);
+      }
+      if (tipo(A, w) === 2) expect(s.half_price).toBe(true);
+      expect(s.opp_claimed.map(Number)).toContain(w);
+      await expect(claim(w)).rejects.toThrow(/idle_opp_gone/);
+    }
+    expect(s.opp_left).toBe(7);
+  });
+  it('pegas as 3, a 4ª mais recente não entra na caixinha', async () => {
+    const s = await t.rpc<Estado>('idle_open');
+    const agora = Date.parse(s.server_now);
+    for (const w of pendentes(A, agora, [], semana(s))) await claim(w);
+    const apareceram: number[] = [];
+    for (let w = Math.floor(agora / 600_000); apareceram.length < 4; w--) if (instante(A, w) <= agora) apareceram.push(w);
+    expect(instante(A, apareceram[3])).toBeGreaterThan(agora - 4 * 3600_000);
+    await expect(claim(apareceram[3])).rejects.toThrow(/idle_opp_gone/);
+  });
+  it('Viralizar: tipo 0 rende o dobro e o limite do dia vai a 13', async () => {
+    await q(`update public.idle_state set generators[13] = 1, strategies = '{0,0,-1,-1}' where user_id = $1`, [A]);
     const s0 = await t.rpc<Estado>('idle_open');
-    const lista = pendentes(A, Date.parse(s0.server_now), []);
-    const w = lista[0];
-    const antes = s0.valuation;
+    await parar();
+    expect(s0.era).toBe(3);
+    expect(s0.opp_left).toBe(13);
+    const w = pendentes(A, Date.parse(s0.server_now), [], semana(s0)).find((x) => tipo(A, x) === 0)!;
     const s = await claim(w);
-    if (tipo(A, w) === 0) expect(s.valuation).toBeCloseTo(antes + 0.5 * 900, 0);
-    if (tipo(A, w) === 1) expect(Date.parse(s.boost_until!) - Date.parse(s.server_now)).toBeGreaterThan(55_000);
-    if (tipo(A, w) === 2) expect(s.half_price).toBe(true);
-    expect(s.opp_claimed.map(Number)).toContain(w);
-    expect(s.opp_left).toBe(9);
-    await expect(claim(w)).rejects.toThrow(/idle_opp_gone/);
+    expect((s.valuation - s0.valuation) / (s0.rate * 1800)).toBeCloseTo(1, 6);
+    expect(s.opp_left).toBe(12);
   });
   it('janela do futuro ou velha demais: idle_opp_gone', async () => {
     const s = await t.rpc<Estado>('idle_open');

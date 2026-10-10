@@ -16,21 +16,30 @@ export const TEXTO_TIPO: Record<0 | 1 | 2, string> = {
   2: 'Próxima compra pela metade',
 };
 
-/** As até 3 mais recentes que já apareceram, têm menos de 4h e não foram pegas (igual a idle_opp_list). */
-export function pendentes(uid: string, agoraMs: number, pegas: number[]): number[] {
+/**
+ * Caixinha (igual a idle_opp_list): as 3 mais recentes que já apareceram, têm menos de 4h e não são de antes do
+ * início da semana; só depois tira as pegas. Pegar uma não puxa outra mais velha.
+ */
+export function pendentes(uid: string, agoraMs: number, pegas: number[], inicioSemanaMs = 0): number[] {
   const ate = Math.floor(agoraMs / 1000 / JANELA_S);
   const de = Math.floor((agoraMs / 1000 - VALIDADE_S) / JANELA_S);
-  const out: number[] = [];
-  for (let w = ate; w >= de && out.length < 3; w--) {
+  const recentes: number[] = [];
+  for (let w = ate; w >= de && recentes.length < 3; w--) {
     const t = instante(uid, w);
-    if (t <= agoraMs && t >= agoraMs - VALIDADE_S * 1000 && !pegas.includes(w)) out.push(w);
+    if (t <= agoraMs && t >= agoraMs - VALIDADE_S * 1000 && t >= inicioSemanaMs) recentes.push(w);
   }
-  return out;
+  return recentes.filter((w) => !pegas.includes(w));
 }
 
-/** A janela cuja oportunidade está passando na tela agora (fica `duracaoS` segundos), ou null. */
+/**
+ * A janela cuja oportunidade está passando na tela agora (fica `duracaoS` segundos), ou null. Olha também a janela
+ * anterior: com 30 s na tela, a de perto do fim da janela continua aparecendo depois da virada.
+ */
 export function aoVivo(uid: string, agoraMs: number, duracaoS: number): number | null {
-  const w = Math.floor(agoraMs / 1000 / JANELA_S);
-  const t = instante(uid, w);
-  return agoraMs >= t && agoraMs <= t + duracaoS * 1000 ? w : null;
+  const atual = Math.floor(agoraMs / 1000 / JANELA_S);
+  for (const w of [atual, atual - 1]) {
+    const t = instante(uid, w);
+    if (agoraMs >= t && agoraMs <= t + duracaoS * 1000) return w;
+  }
+  return null;
 }
