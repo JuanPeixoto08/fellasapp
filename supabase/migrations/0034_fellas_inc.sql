@@ -141,11 +141,46 @@ returns jsonb language sql stable set search_path = public as $$
     'server_now', now())
 $$;
 
--- reset da semana (corpo completo na Task 7; aqui só existe para idle_lock compilar)
+-- segunda 00:00 (Brasília): grava a placa, passa o selo de unicórnio e zera a semana. Também é chamada por
+-- idle_lock se alguém jogar antes do cron. Não mexe no troféu do cassino (weekly_champion).
+-- O pódio fecha a conta até a meia-noite de Brasília (não até agora). Selo só muda se a placa foi gravada agora:
+-- um 2º reset por linha atrasada não tira o selo do campeão certo.
 create or replace function public.idle_weekly_reset()
 returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_new    date;
+  v_old    date;
+  v_podium jsonb;
+  v_champ  uuid;
+  v_gravou date;
 begin
   perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- um reset por vez, e ninguém jogando no meio
+  v_new := public.games_week_start();
+  select max(week_start) into v_old from public.idle_state where week_start < v_new;
+  if v_old is null then
+    return;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'era', x.era,
+                                               'strategies', to_jsonb(x.strategies)) order by x.v desc), '[]')
+    into v_podium
+    from (select s.user_id,
+                 (public.idle_settle(s, (v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 public.idle_era(s.generators) as era, s.strategies
+            from public.idle_state s
+           where s.week_start < v_new and s.started
+           order by 2 desc
+           limit 3) x;
+  v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
+  insert into public.idle_weeks (week_start, unicorn_id, podium) values (v_old, v_champ, v_podium)
+  on conflict (week_start) do nothing
+  returning week_start into v_gravou;
+  if v_gravou is not null then
+    update public.profiles set badges = array_remove(badges, 'weekly_unicorn') where 'weekly_unicorn' = any (badges);
+    if v_champ is not null then
+      update public.profiles set badges = array_append(badges, 'weekly_unicorn') where id = v_champ;
+    end if;
+  end if;
+  delete from public.idle_state where week_start < v_new;
 end;
 $$;
 
@@ -406,6 +441,21 @@ begin
 end;
 $$;
 
+create or replace function public.idle_board()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'era', x.era,
+                                                 'strategies', to_jsonb(x.strategies)) order by x.v desc), '[]')
+      from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_era(s.generators) as era, s.strategies
+              from public.idle_state s
+             where s.week_start = public.games_week_start() and s.started) x);
+end;
+$$;
+
 revoke all on function public.idle_era(int[]) from public, anon, authenticated;
 revoke all on function public.idle_rate(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_cost_mult(public.idle_state) from public, anon, authenticated;
@@ -432,3 +482,7 @@ grant execute on function public.idle_buy(text, int, int) to authenticated;
 grant execute on function public.idle_pick_strategy(int, int) to authenticated;
 revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
 grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
+revoke all on function public.idle_board() from public, anon;
+grant execute on function public.idle_board() to authenticated;
+
+select cron.schedule('fellas-inc-reset', '0 3 * * 1', $$select public.idle_weekly_reset()$$);

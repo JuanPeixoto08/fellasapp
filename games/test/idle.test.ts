@@ -241,3 +241,85 @@ describe('oportunidades no banco', () => {
     await claim(w);
   });
 });
+
+const envelhecer = () => q('update public.idle_state set week_start = week_start - 7 where true');
+
+describe('placar', () => {
+  it('só quem abriu a empresa, do maior pro menor valuation', async () => {
+    await t.rpc('idle_start');
+    await dar(A, 500);
+    await t.as(B);
+    await t.rpc('idle_start');
+    await dar(B, 900);
+    const rows = await t.rpc<{ user_id: string; valuation: number; era: number }[]>('idle_board');
+    expect(rows.map((r) => r.user_id)).toEqual([B, A]);
+    expect(rows[0].valuation).toBeGreaterThanOrEqual(900);
+  });
+});
+
+describe('reset de segunda', () => {
+  beforeEach(async () => {
+    await t.rpc('idle_start');
+    await dar(A, 500);
+    await t.as(B);
+    await t.rpc('idle_start');
+    await dar(B, 900);
+  });
+
+  it('grava a placa, passa o selo pro unicórnio e zera a semana', async () => {
+    await q(`update public.profiles set badges = '{weekly_unicorn}' where id = $1`, [A]);
+    await envelhecer();
+    await q('select public.idle_weekly_reset()');
+    const [semana] = await q<{ unicorn_id: string; podium: { user_id: string; valuation: number }[] }>('select unicorn_id, podium from public.idle_weeks');
+    expect(semana.unicorn_id).toBe(B);
+    expect(semana.podium.map((p) => p.user_id)).toEqual([B, A]);
+    expect(await q('select id from public.profiles where \'weekly_unicorn\' = any (badges)')).toEqual([{ id: B }]);
+    expect(await q('select * from public.idle_state')).toEqual([]);
+  });
+  it('não mexe no troféu do cassino', async () => {
+    await q(`update public.profiles set badges = '{weekly_champion}' where id = $1`, [A]);
+    await envelhecer();
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select badges from public.profiles where id = $1', [A])).toEqual([{ badges: ['weekly_champion'] }]);
+  });
+  it('quem joga antes do cron: a placa da semana velha não se perde', async () => {
+    await envelhecer();
+    const s = await t.rpc<Estado>('idle_open');
+    expect(s.started).toBe(false);
+    expect((await q<{ unicorn_id: string }>('select unicorn_id from public.idle_weeks'))[0].unicorn_id).toBe(B);
+  });
+  it('sem semana velha não faz nada; cron registrado', async () => {
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select * from public.idle_weeks')).toEqual([]);
+    expect(await q(`select schedule, command from cron.jobs where name = 'fellas-inc-reset'`)).toEqual([
+      { schedule: '0 3 * * 1', command: 'select public.idle_weekly_reset()' },
+    ]);
+  });
+  it('reset de novo pra mesma semana velha (linha atrasada) não troca o selo do campeão', async () => {
+    await envelhecer();
+    await q('select public.idle_weekly_reset()');
+    await q(
+      `insert into public.idle_state (user_id, week_start, started, valuation) values ($1, public.games_week_start() - 7, true, 5000)`,
+      [A],
+    );
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select id from public.profiles where \'weekly_unicorn\' = any (badges)')).toEqual([{ id: B }]);
+    const semanas = await q<{ unicorn_id: string }>('select unicorn_id from public.idle_weeks');
+    expect(semanas).toEqual([{ unicorn_id: B }]);
+    expect(await q('select * from public.idle_state')).toEqual([]);
+  });
+  it('o pódio conta a produção só até a meia-noite de Brasília', async () => {
+    await envelhecer();
+    await q(
+      `update public.idle_state
+          set settled_at = (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo') - interval '1 hour'
+        where user_id = $1`,
+      [A],
+    );
+    await q('select public.idle_weekly_reset()');
+    const [semana] = await q<{ podium: { user_id: string; valuation: number }[] }>('select podium from public.idle_weeks');
+    const a = semana.podium.find((p) => p.user_id === A)!;
+    expect(a.valuation).toBeCloseTo(500 + 0.5 * 3600, 3);
+    expect(semana.podium.map((p) => p.user_id)).toEqual([A, B]);
+  });
+});
