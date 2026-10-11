@@ -19,7 +19,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
   ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
-  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
+  fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
   vendaAberta: false, conquistaAviso: null, ...x,
 });
 
@@ -122,13 +122,14 @@ describe('tela da Fellas Inc.', () => {
   });
   it('melhorias: Compradas mostra as que você já tem, da mais recente pra mais antiga, sem botão de compra', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'melhorias', estado: estado({ upgrades: [1001, 1002] }) }));
+    tela.renderizar(modelo({ estado: estado({ upgrades: [1001, 1002] }) }));
+    porTexto(root.querySelector('.seg-loja button:last-child')!.textContent!).click();
     porTexto('Compradas (2)').click();
     const itens = [...root.querySelectorAll('.lista-melhorias .melhoria')];
     expect(itens.map((x) => x.querySelector('strong')!.textContent)).toEqual(['Wi-Fi do vizinho', 'Café coado na hora']);
     expect(itens.every((x) => !x.querySelector('.btn'))).toBe(true);
     expect(porTexto('Compradas (2)').getAttribute('aria-pressed')).toBe('true');
-    porTexto(root.querySelector('.seg button')!.textContent!).click();
+    porTexto(root.querySelector('.lista-melhorias .seg button')!.textContent!).click();
     expect(root.querySelector('.lista-melhorias')!.textContent).not.toContain('Wi-Fi do vizinho');
   });
   it('placar mostra o F$/s de cada um, não o valuation', () => {
@@ -187,7 +188,7 @@ describe('contratar', () => {
   it('cartas de quem abriu a empresa (menos você); botão libera no preço; tocar contrata', () => {
     const desenhar = vi.fn<Desenhar>();
     const tela = criarTela(root, acoes, desenhar);
-    tela.renderizar(modelo({ aba: 'contratar', estado: estado({ hire_price: 918 }), placar: [linha({ userId: 'u', name: 'Você' }), linha()] }));
+    tela.renderizar(modelo({ aba: 'gente', estado: estado({ hire_price: 918 }), placar: [linha({ userId: 'u', name: 'Você' }), linha()] }));
     const cartas = root.querySelectorAll('.lista-contratar .carta');
     expect(cartas).toHaveLength(1);
     expect(cartas[0].textContent).toContain('Bia');
@@ -205,7 +206,7 @@ describe('contratar', () => {
   it('quem você já contratou: sem botão, com o cargo e quanto falta pro contrato vencer', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({
-      aba: 'contratar',
+      aba: 'gente',
       estado: estado({ equipe: [{ user_id: 'b', cargo: 'CEO de nada', avatar: null, ate: ATE }] }),
       placar: [linha({ byMe: true, hiredCount: 1 })],
     }));
@@ -216,7 +217,7 @@ describe('contratar', () => {
   });
   it('topo: bônus dos contratos, piso de freela ou quem te contratou; Mudar visual abre o editor; vazio convida', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'contratar', placar: [] }));
+    tela.renderizar(modelo({ aba: 'gente', placar: [] }));
     const topo = root.querySelector('.contratos-topo')!;
     expect(topo.textContent).toContain('Contratos: +2% de produção');
     expect(topo.textContent).toContain('Ninguém te contratou: você ganha o piso de freela.');
@@ -224,7 +225,7 @@ describe('contratar', () => {
     [...topo.querySelectorAll('button')].find((x) => x.textContent === 'Mudar visual')!.click();
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
     tela.renderizar(modelo({
-      aba: 'contratar', placar: [linha()],
+      aba: 'gente', placar: [linha()],
       estado: estado({ chefes: [{ user_id: 'b', cargo: 'sócio de fachada', mult: 1, ate: ATE }], social: { contratei: 0, empregos: [1] } }),
     }));
     expect(root.querySelector('.contratos-topo')!.textContent).toContain('Você trabalha pra Bia (sócio de fachada, por mais 6 dias).');
@@ -254,9 +255,9 @@ describe('contratar', () => {
 describe('placar que falhou', () => {
   it('Contratar e Placar mostram o erro em vez de Carregando… pra sempre', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'contratar', placar: null }));
+    tela.renderizar(modelo({ aba: 'gente', placar: null }));
     expect(root.querySelector('.lista-contratar')!.textContent).toContain('Carregando…');
-    tela.renderizar(modelo({ aba: 'contratar', placar: null, placarFalhou: true }));
+    tela.renderizar(modelo({ aba: 'gente', placar: null, placarFalhou: true }));
     expect(root.querySelector('.lista-contratar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
     tela.renderizar(modelo({ aba: 'placar', placar: null, placarFalhou: true }));
     expect(root.querySelector('.lista-placar')!.textContent).toContain('Não deu pra carregar a galera. Tenta de novo.');
@@ -423,12 +424,31 @@ describe('legado: prestígio, árvore e conquistas', () => {
     fundador.querySelector('button')!.click();
     expect(acoes.comprarNo).toHaveBeenCalledWith(1);
   });
-  it('cinco abas, Legado por último', () => {
+  it('quatro abas: Loja, Gente, Placar, Legado', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());
-    expect([...root.querySelectorAll('.abas .aba')].map((b) => b.textContent)).toEqual(['Geradores', 'Melhorias', 'Contratar', 'Placar', 'Legado']);
+    expect([...root.querySelectorAll('.abas .aba')].map((b) => b.textContent)).toEqual(['Loja', 'Gente', 'Placar', 'Legado']);
+    porTexto('Gente').click();
+    expect(acoes.trocarAba).toHaveBeenCalledWith('gente');
     porTexto('Legado').click();
     expect(acoes.trocarAba).toHaveBeenCalledWith('legado');
+  });
+  it('Loja: Geradores | Melhorias troca a lista; Melhorias diz quantas estão à venda', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const [verG, verM] = [...root.querySelectorAll<HTMLButtonElement>('.seg-loja button')];
+    expect(verG.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('.lista-geradores')!.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.lista-melhorias')!.hasAttribute('hidden')).toBe(true);
+    expect(verM.textContent).toMatch(/^Melhorias \(\d+\)$/);
+    verM.click();
+    expect(root.querySelector('.lista-geradores')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.lista-melhorias')!.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.seg-loja button:last-child')!.getAttribute('aria-pressed')).toBe('true');
+    // fora da Loja, o seletor some
+    tela.renderizar(modelo({ aba: 'placar', placar: [] }));
+    expect(root.querySelector('.seg-loja')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.lista-melhorias')!.hasAttribute('hidden')).toBe(true);
   });
   it('caixinha: o "some em" usa o tamanho da árvore (4 com Print de tudo: sai com a 4ª mais nova)', () => {
     vi.useFakeTimers();

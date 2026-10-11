@@ -37,7 +37,7 @@ const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];
 
 let fase: Fase = 'carregando';
 let ancora: Ancora | null = null;
-let aba: Aba = 'geradores';
+let aba: Aba = 'loja';
 let placar: IdleBoardRow[] | null = null;
 let placarFalhou = false;
 let aviso: string | null = null;
@@ -69,8 +69,8 @@ const tela = criarTela(document.getElementById('app')!, {
   pegar: (w) => void guard(async () => aplicar(await api.idleClaim(w))),
   trocarAba: (nova) => {
     aba = nova;
-    if (nova === 'placar' || nova === 'contratar') void carregarPlacar();
-    if (nova === 'contratar') void prepararDesenhista();
+    if (nova === 'placar' || nova === 'gente') void carregarPlacar();
+    if (nova === 'gente') void prepararDesenhista();
     render();
   },
   caixa: (aberta) => { caixaAberta = aberta; render(); },
@@ -107,7 +107,7 @@ const tela = criarTela(document.getElementById('app')!, {
       vendaAberta = false; // fecha já: deu certo, a cena volta pro "antes"; deu errado, o aviso diz por quê
       void guard(async () => {
         aplicar(await api.idlePrestige());
-        aba = 'geradores'; // quando reabrir a empresa, começa comprando
+        aba = 'loja'; // quando reabrir a empresa, começa comprando
         await carregarPlacar();
       });
       return;
@@ -199,7 +199,7 @@ async function recarregar() {
 async function salvarVisual(v: IdleVisual) {
   aplicar(await api.idleSetAvatar(v));
   rascunho = null;
-  if (aba === 'placar' || aba === 'contratar') await carregarPlacar();
+  if (aba === 'placar' || aba === 'gente') await carregarPlacar();
 }
 
 async function abrirCnpj() {
@@ -268,7 +268,7 @@ setInterval(() => {
     void guard(recarregar);
   }
 }, 100);
-setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'contratar')) void carregarPlacar(); }, 60_000);
+setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'gente')) void carregarPlacar(); }, 60_000);
 
 // voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)
 document.addEventListener('visibilitychange', () => {

@@ -15,7 +15,7 @@ import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { caixa, estrategiaPendente, segundosOportunidade, type Fase } from './store';
 
-export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'legado';
+export type Aba = 'loja' | 'gente' | 'placar' | 'legado';
 export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
 export type Modelo = {
   fase: Fase; estado: IdleState | null; aba: Aba; placar: IdleBoardRow[] | null; aviso: string | null;
@@ -117,20 +117,32 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   const abas = el('nav', 'abas');
   const botoesAba: Record<Aba, HTMLButtonElement> = {
-    geradores: button('Geradores', 'aba', () => a.trocarAba('geradores')),
-    melhorias: button('Melhorias', 'aba', () => a.trocarAba('melhorias')),
-    contratar: button('Contratar', 'aba', () => a.trocarAba('contratar')),
+    loja: button('Loja', 'aba', () => a.trocarAba('loja')),
+    gente: button('Gente', 'aba', () => a.trocarAba('gente')),
     placar: button('Placar', 'aba', () => a.trocarAba('placar')),
     legado: button('Legado', 'aba', () => a.trocarAba('legado')),
   };
-  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar, botoesAba.legado);
+  abas.append(botoesAba.loja, botoesAba.gente, botoesAba.placar, botoesAba.legado);
+  // Loja: Geradores | Melhorias (só apresentação, como o À venda | Compradas)
+  const segLoja = el('div', 'seg seg-loja');
+  segLoja.setAttribute('role', 'group');
+  segLoja.setAttribute('aria-label', 'Loja');
+  const verGeradores = button('Geradores', '', () => {
+    lojaVer = 'geradores';
+    if (ultimo) renderizar(ultimo);
+  });
+  const verMelhorias = button('Melhorias', '', () => {
+    lojaVer = 'melhorias';
+    if (ultimo) renderizar(ultimo);
+  });
+  segLoja.append(verGeradores, verMelhorias);
   const listaG = el('div', 'lista lista-geradores');
   const listaM = el('div', 'lista lista-melhorias');
   const listaC = el('div', 'lista lista-contratar');
   const listaP = el('ol', 'lista lista-placar');
   const listaL = el('div', 'lista lista-legado');
   const painel = el('main', 'painel');
-  painel.append(abrir, abas, listaG, listaM, listaC, listaP, listaL);
+  painel.append(abrir, abas, segLoja, listaG, listaM, listaC, listaP, listaL);
 
   const notice = el('div', 'notice');
   notice.setAttribute('role', 'status');
@@ -169,6 +181,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   let prazos: { texto: HTMLElement; fim: number }[] = [];
   // aba Melhorias: à venda ou as já compradas (só apresentação; refaz com o último modelo)
   let verCompradas = false;
+  // aba Loja: Geradores ou Melhorias (só apresentação)
+  let lojaVer: 'geradores' | 'melhorias' = 'geradores';
   // aba Legado: a conquista tocada (mostra a frase e a data); só apresentação
   let conquistaAberta: number | null = null;
   let ultimo: Modelo | null = null;
@@ -334,9 +348,15 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(abas, jogando);
     mostrar(placa, jogando);
     for (const k of Object.keys(botoesAba) as Aba[]) botoesAba[k].classList.toggle('ativa', m.aba === k);
-    mostrar(listaG, jogando && m.aba === 'geradores');
-    mostrar(listaM, jogando && m.aba === 'melhorias');
-    mostrar(listaC, jogando && m.aba === 'contratar');
+    const naLoja = jogando && m.aba === 'loja';
+    mostrar(segLoja, naLoja);
+    for (const [b, v] of [[verGeradores, 'geradores'], [verMelhorias, 'melhorias']] as const) {
+      b.classList.toggle('ativo', lojaVer === v);
+      b.setAttribute('aria-pressed', String(lojaVer === v));
+    }
+    mostrar(listaG, naLoja && lojaVer === 'geradores');
+    mostrar(listaM, naLoja && lojaVer === 'melhorias');
+    mostrar(listaC, jogando && m.aba === 'gente');
     mostrar(listaP, jogando && m.aba === 'placar');
     // Legado: na aba, ou embaixo do "Abrir CNPJ" de quem já vendeu (dá pra gastar os pontos antes de reabrir)
     const verLegado = !!s && ((jogando && m.aba === 'legado') || (m.fase === 'antes' && s.pontos_vida > 0));
@@ -361,6 +381,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const disponiveis = catalogo.melhorias
         .filter((x) => !s.upgrades.includes(x.id) && liberada(catalogo, x, s))
         .sort((x, y) => x.preco - y.preco);
+      verMelhorias.textContent = disponiveis.length ? `Melhorias (${disponiveis.length})` : 'Melhorias';
       const compradas = s.upgrades
         .map((id) => catalogo.melhorias.find((x) => x.id === id))
         .filter((x): x is Melhoria => !!x)
@@ -402,7 +423,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
     // contratar: você no topo (bônus, quem te contratou), depois uma carta por fella que abriu a empresa
     listaC.replaceChildren();
-    if (s && jogando && m.aba === 'contratar') {
+    if (s && jogando && m.aba === 'gente') {
       const agora = Date.parse(s.server_now);
       const nome = (uid: string) => m.placar?.find((r) => r.userId === uid)?.name ?? 'Alguém';
       const topoC = el('div', 'contratos-topo');
