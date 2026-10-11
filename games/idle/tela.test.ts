@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { IdleBoardRow, IdleState } from '../shared/types';
 import type { Desenhar } from './navegador';
 import { instante, sai, tipo, VALIDADE_S } from './oportunidades';
+import { ativos } from './ativos';
 import { catalogo } from './catalogo';
 import { PADRAO } from './personagem';
 import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';
@@ -370,14 +371,29 @@ describe('legado: prestígio, árvore e conquistas', () => {
     expect(det.textContent).toContain('Ter 100 "Você, no notebook da faculdade"');
     expect(det.textContent).not.toContain('Ganhou em');
   });
-  it('sem a arte dos ícones, nó e conquista mostram só a moldura', () => {
-    // a arte dos ícones ainda não chegou ao repositório: ativos.no/conquista devolvem null
+  it('nó e conquista mostram o ícone', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'legado' }));
     for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
       const icone = root.querySelector<HTMLElement>(sel)!;
-      expect(icone.classList.contains('sem-arte'), sel).toBe(true);
-      expect(icone.style.backgroundImage, sel).toBe('');
+      expect(icone.classList.contains('sem-arte'), sel).toBe(false);
+      expect(icone.style.backgroundImage, sel).not.toBe('');
+    }
+  });
+  it('sem a arte dos ícones, nó e conquista mostram só a moldura', () => {
+    const semNo = vi.spyOn(ativos, 'no').mockReturnValue(null);
+    const semConquista = vi.spyOn(ativos, 'conquista').mockReturnValue(null);
+    try {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ aba: 'legado' }));
+      for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
+        const icone = root.querySelector<HTMLElement>(sel)!;
+        expect(icone.classList.contains('sem-arte'), sel).toBe(true);
+        expect(icone.style.backgroundImage, sel).toBe('');
+      }
+    } finally {
+      semNo.mockRestore();
+      semConquista.mockRestore();
     }
   });
   it('aviso de conquista por cima da cena', () => {
@@ -416,14 +432,17 @@ describe('legado: prestígio, árvore e conquistas', () => {
   });
   it('caixinha: o "some em" usa o tamanho da árvore (4 com Print de tudo: sai com a 4ª mais nova)', () => {
     vi.useFakeTimers();
-    const uid = '00000000-0000-0000-0000-00000000000a';
-    const agora = instante(uid, 50) + 5 * 60 * 1000;
-    vi.setSystemTime(agora);
-    const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid, bonus: { arvore: [1, 31, 32], conquistas: 0 } }) }));
-    const com4 = root.querySelector('.modal-caixa .prazo')!.textContent;
-    expect(com4).toBe(prazo(sai(uid, 50, 4) - agora));
-    expect(com4).not.toBe(prazo(sai(uid, 50, 3) - agora));
-    vi.useRealTimers();
+    try {
+      const uid = '00000000-0000-0000-0000-00000000000a';
+      const agora = instante(uid, 50) + 5 * 60 * 1000;
+      vi.setSystemTime(agora);
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid, bonus: { arvore: [1, 31, 32], conquistas: 0 } }) }));
+      const com4 = root.querySelector('.modal-caixa .prazo')!.textContent;
+      expect(com4).toBe(prazo(sai(uid, 50, 4) - agora));
+      expect(com4).not.toBe(prazo(sai(uid, 50, 3) - agora));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

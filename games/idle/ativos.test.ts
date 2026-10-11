@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { ativos } from './ativos';
+import { catalogo } from './catalogo';
 import { CADEIRA, LINHAS_KIT, POSES, QUADROS_POSE, validarVagas, VAGAS_CONTRATADO, type Pose, type Vagas } from './montagem';
 import { CENAS as RITMO, type NomeCena } from './palco';
 
@@ -72,5 +73,26 @@ describe('arte da entrega 2 (contrato de formato)', () => {
     for (const c of ['cena-2', 'cena-3'] as const) {
       expect(ativos.camadas(c).vagas!.vagas.some((g) => g.freela === 'estagiario'), c).toBe(true);
     }
+  });
+});
+
+describe('arte da entrega 3 (ícones das conquistas e da árvore)', () => {
+  const conquista = (id: number) => `conquista-${String(id).padStart(3, '0')}.png`;
+  const no = (id: number) => `no-${String(id).padStart(2, '0')}.png`;
+  it('toda conquista e todo nó do catálogo têm ícone 16x16', () => {
+    for (const c of catalogo.conquistas) {
+      expect(dim(`conquistas/${conquista(c.id)}`), conquista(c.id)).toEqual([16, 16]);
+      expect(ativos.conquista(c.id), conquista(c.id)).not.toBeNull();
+    }
+    for (const n of catalogo.arvore) {
+      expect(dim(`arvore/${no(n.id)}`), no(n.id)).toEqual([16, 16]);
+      expect(ativos.no(n.id), no(n.id)).not.toBeNull();
+    }
+  });
+  it('nenhum ícone sobrando (de id que não existe no catálogo)', () => {
+    const conquistas = new Set(catalogo.conquistas.map((c) => conquista(c.id)));
+    const nos = new Set(catalogo.arvore.map((n) => no(n.id)));
+    expect(readdirSync(resolve(pasta, 'conquistas')).filter((f) => !conquistas.has(f))).toEqual([]);
+    expect(readdirSync(resolve(pasta, 'arvore')).filter((f) => !nos.has(f))).toEqual([]);
   });
 });
