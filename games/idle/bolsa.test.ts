@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GameError, toGameError } from '../shared/errors';
-import { acoes, avisosPo, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
+import { acoes, avisosPo, contaLimite, empresa, empresaDoGerador, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 
 describe('contas e textos da Bolsa', () => {
   it('porcentagem com sinal, uma casa, menos de verdade', () => {
@@ -33,6 +33,16 @@ describe('contas e textos da Bolsa', () => {
     expect(proximaMelhoria('escritorio', 4)).toEqual({ nivel: 5, nome: 'Torre na Berrini', efeito: '+400 ações em cada empresa', segundos: 57600 });
     expect(proximaMelhoria('corretor', 4)!.efeito).toBe('Corretagem 0,5%');
     expect(proximaMelhoria('escritorio', 5)).toBeNull();
+  });
+  it('a conta do limite mostra o gerador ligado (e o Escritório, se tiver)', () => {
+    expect(contaLimite(3, 105, 0)).toBe('Limite: 100 + 5 Curso online');
+    expect(contaLimite(1, 145, 1)).toBe('Limite: 100 + 20 Food truck + 25 do Escritório');
+    expect(contaLimite(6, 100, 0)).toBe('Limite: 100 + 0 Live na Twitch');
+  });
+  it('gerador → empresa ligada (só os 8 da Bolsa)', () => {
+    expect(empresaDoGerador(16)?.codigo).toBe('COCH');
+    expect(empresaDoGerador(11)?.codigo).toBe('PSTL');
+    expect(empresaDoGerador(1)).toBeUndefined();
   });
   it('textos', () => {
     expect(acoes(1)).toBe('1 ação');

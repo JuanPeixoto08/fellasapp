@@ -98,6 +98,8 @@
 .idle .meio { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .idle .meio strong { font-size: 15px; line-height: 1.25; }
 .idle .sub { color: var(--i-mudo); font-size: 13px; }
+/* gerador ligado a uma empresa da Bolsa (Loja) */
+.idle .etq-bolsa { justify-self: start; width: fit-content; margin-top: 3px; padding: 0 6px; font: 400 15px var(--i-pixel); color: var(--i-lilas); background: #2C2940; }
 /* no celular os botões de compra descem para uma linha própria; do tablet pra cima ficam ao lado do nome */
 .idle .gerador { flex-wrap: wrap; }
 .idle .compra { display: flex; gap: 8px; flex: 1 1 100%; }
@@ -354,6 +356,8 @@
 .idle .bts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .idle .bts .rot2 { grid-column: 1 / -1; margin-bottom: -4px; font: 400 16px var(--i-pixel); color: var(--i-mudo); }
 .idle .bts .btn { flex: none; }
+.idle .conta-limite { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--i-mudo); }
+.idle .mini-gerador { flex: none; width: 32px; height: 32px; background: no-repeat 0 0 / 128px 32px; image-rendering: pixelated; }
 .idle .bolsa-detalhe .aviso { margin: 0; font-size: 12px; color: var(--i-mudo); }
 /* celular: o detalhe sobe como cartão por cima da lista */
 .idle .bancada.com-bolsa .bolsa-detalhe { position: sticky; bottom: 0; box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -12px 30px rgba(0, 0, 0, 0.5); }

@@ -19,6 +19,10 @@ describe('patch notes', () => {
     expect(temNovidade(NOVIDADES[NOVIDADES.length - 1].id)).toBe(true);
     expect(temNovidade(NOVIDADES[0].id)).toBe(false);
   });
+  it('a nota da Bolsa explica a ligação com os geradores (sem id novo: não acende a bolinha de novo)', () => {
+    expect(NOVIDADES[0].id).toBe('2026-10-11-bolsa');
+    expect(NOVIDADES[0].itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
+  });
   it('data em pt-BR curta', () => {
     expect(dataNovidade('2026-10-11')).toBe('11/10/2026');
   });

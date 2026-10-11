@@ -4,6 +4,7 @@
 import { button, el } from '../shared/hud/hud';
 import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, MelhoriaBolsa } from '../shared/types';
 import { ativos } from './ativos';
+import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
@@ -293,6 +294,13 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     sprite.style.backgroundImage = `url(${ativos.gerador(gid)})`;
     const meio = el('div', 'meio');
     meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid))} cada`));
+    // ligado a uma empresa da Bolsa: cada um libera +1 ação dela (só depois de abrir a Bolsa)
+    const ligada = (s.generators[18] ?? 0) >= 1 ? empresaDoGerador(gid) : undefined;
+    if (ligada) {
+      const etq = el('span', 'etq-bolsa', `Bolsa: +1 ${ligada.codigo} cada`);
+      etq.title = `Cada ${g.nome} libera +1 ação ${deEmpresa(ligada)} ${ligada.nome} na Bolsa`;
+      meio.append(etq);
+    }
     const cm = custoMult(catalogo, s);
     const botoes = el('div', 'compra');
     const um = button(formatarValor(preco(g.custo, n, 1, cm) * (s.half_price ? 0.5 : 1)), 'btn', () => a.comprar('gerador', gid, 1));

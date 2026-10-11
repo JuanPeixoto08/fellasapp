@@ -11,6 +11,7 @@ export const NOVIDADES: readonly Novidade[] = [
       'Gaveta nova na bancada: a Bolsa. Abre com 1 Grupo de trader.',
       '8 empresas pra investir, do Pastel do Zé à Cripto do Primo. Preço novo todo minuto, igual pra todo mundo.',
       'Empresa na zona de risco pode quebrar. Aí suas ações viram pó.',
+      'Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.',
       'Corretor e Escritório: corretagem mais barata e mais ações por empresa.',
       'No PC a tela cresce junto com a janela. Monitor grande sem espaço sobrando.',
       'Engrenagem no topo: som, seu visual e estas notas.',

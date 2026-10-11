@@ -63,6 +63,16 @@ describe('tela da Fellas Inc.', () => {
     expect(acoes.abrirCnpj).toHaveBeenCalled();
     expect(root.querySelector('.lista-geradores')!.hasAttribute('hidden')).toBe(true);
   });
+  it('Loja: gerador ligado a uma empresa da Bolsa mostra a etiqueta só com a Bolsa aberta (1 Grupo de trader)', () => {
+    const tela = criarTela(root, acoes);
+    const gens = (trader: number) => [1, ...Array(10).fill(1), 0, 0, 0, 0, 0, 0, 0, trader, ...Array(11).fill(0)];
+    tela.renderizar(modelo({ estado: estado({ generators: gens(0) }) }));
+    expect(root.querySelector('.etq-bolsa')).toBeNull();
+    tela.renderizar(modelo({ estado: estado({ generators: gens(1) }) }));
+    const etqs = [...root.querySelectorAll('.etq-bolsa')];
+    expect(etqs.map((e) => e.textContent)).toEqual(['Bolsa: +1 MEME cada', 'Bolsa: +1 SIMA cada', 'Bolsa: +1 PSTL cada']); // 6, 8 e 11
+    expect(etqs[2].getAttribute('title')).toBe('Cada Food truck libera +1 ação do Pastel do Zé na Bolsa');
+  });
   it('lista o gerador 1 e o próximo trancado; botão libera quando o valor chega no preço', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());

@@ -71,6 +71,7 @@ describe('tela da Bolsa', () => {
     const d = document.querySelector('.bolsa-detalhe')!;
     expect(d.textContent).toContain('preço novo em 0:42');
     expect(d.textContent).toContain('Você tem 10 de 120');
+    expect(d.querySelector('.conta-limite')!.textContent).toBe('Limite: 100 + 20 Food truck'); // Pastel ↔ Food truck
     const bts = [...d.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.textContent);
     expect(bts).toEqual(['1', '10', 'Máx', '1', '10', 'Tudo']);
     [...d.querySelectorAll<HTMLButtonElement>('.comprar button')][2].click();

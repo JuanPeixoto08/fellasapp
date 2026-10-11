@@ -1,6 +1,7 @@
 // Contas e textos da tela da Bolsa (puro). Quem decide preço, compra e venda é o banco (0043); aqui só se mostra.
 import { EMPRESAS_BOLSA, MELHORIAS_BOLSA, type EmpresaBolsa } from './bolsaMotor';
 import type { BolsaPosicao, MelhoriaBolsa } from '../shared/types';
+import { GERADORES } from './nomes';
 
 export const empresa = (id: number): EmpresaBolsa => EMPRESAS_BOLSA.find((e) => e.id === id)!;
 
@@ -29,6 +30,16 @@ export function maxCompra(valuation: number, valor: number, r: number, limite: n
   return Math.max(0, Math.min(limite - tem, Math.floor(valuation / unidade)));
 }
 
+/** A empresa da Bolsa ligada a um gerador (undefined pros que não têm). */
+export const empresaDoGerador = (gid: number): EmpresaBolsa | undefined => EMPRESAS_BOLSA.find((e) => e.gerador === gid);
+
+/** De onde vem o limite: "Limite: 100 + 5 Curso online + 25 do Escritório" (o banco manda só o total). */
+export function contaLimite(id: number, limite: number, escritorio: number): string {
+  const bonus = MELHORIAS_BOLSA.escritorio.bonus[escritorio];
+  const gerador = GERADORES[empresa(id).gerador - 1];
+  return `Limite: 100 + ${limite - 100 - bonus} ${gerador}${bonus ? ` + ${bonus} do Escritório` : ''}`;
+}
+
 export const acoes = (n: number) => (n === 1 ? '1 ação' : `${n} ações`);
 
 const porcento = (x: number) => `${(x * 100).toLocaleString('pt-BR')}%`;
@@ -53,10 +64,12 @@ export const textoQuebra = (rjAte: number, tick: number) => `Quebrou · volta em
 
 /** "Suas 120 ações da Cripto do Primo viraram pó." (artigo do nome: "do" para NFT/Uber/Pastel/Açaí, "da" para o resto). */
 const DO = new Set(['MEME', 'JEGU', 'PSTL', 'ACAI', 'COCH']);
+/** "do" ou "da" antes do nome da empresa. */
+export const deEmpresa = (e: EmpresaBolsa) => (DO.has(e.codigo) ? 'do' : 'da');
 export const avisosPo = (po: { empresa: number; qtd: number }[]): string[] =>
   po.map(({ empresa: id, qtd }) => {
     const e = empresa(id);
-    const de = DO.has(e.codigo) ? 'do' : 'da';
+    const de = deEmpresa(e);
     return qtd === 1 ? `Sua 1 ação ${de} ${e.nome} virou pó.` : `Suas ${qtd} ações ${de} ${e.nome} viraram pó.`;
   });
 

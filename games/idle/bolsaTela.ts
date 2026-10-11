@@ -2,7 +2,8 @@
 // tela cheia (CSS). O detalhe aparece com uma empresa escolhida (tocar de novo fecha). Texto sempre por textContent.
 import { button, el } from '../shared/hud/hud';
 import type { BolsaEstado, BolsaPosicao, LadoBolsa, MelhoriaBolsa } from '../shared/types';
-import { acoes, avisosPo, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
+import { acoes, avisosPo, contaLimite, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
+import { ativos } from './ativos';
 import { formatarValor } from './formatar';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -166,6 +167,13 @@ export function criarBolsaTela(a: {
           info.append(i2);
         }
         d.append(info);
+        // de onde vem o limite: o gerador ligado (com o ícone dele) e o Escritório
+        const conta = el('div', 'conta-limite');
+        const icone = el('span', 'mini-gerador');
+        icone.setAttribute('aria-hidden', 'true');
+        icone.style.backgroundImage = `url(${ativos.gerador(e.gerador)})`;
+        conta.append(icone, el('span', undefined, contaLimite(m.id, m.limite, b.escritorio)));
+        d.append(conta);
         if (p) {
           const l2 = el('div', 'linha2');
           const i3 = el('span');
