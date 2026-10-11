@@ -193,33 +193,54 @@ export function liberada(cat: Catalogo, m: Melhoria, s: Estado): boolean {
   return s.generators[m.fonte - 1] >= m.requerFonte && s.generators[m.alvo - 1] >= m.requerAlvo;
 }
 
+/** Quanto dura um Viralizou (ms): a janela é [fim − 60 s, fim). */
+export const VIRAL_MS = 60_000;
+
+/**
+ * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 dentro do bônus da oportunidade e ×10 por Viralizou ativo
+ * (teto ×100); divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0045.
+ */
+export function produzido(r: number, a: number, b: number, boostAteMs: number | null, virais: readonly number[] = []): number {
+  if (b <= a) return 0;
+  const pontos = [a, b];
+  if (boostAteMs !== null && boostAteMs > a && boostAteMs < b) pontos.push(boostAteMs);
+  for (const f of virais) for (const x of [f - VIRAL_MS, f]) if (x > a && x < b) pontos.push(x);
+  pontos.sort((x, y) => x - y);
+  let total = 0;
+  for (let i = 0; i + 1 < pontos.length; i++) {
+    const p = pontos[i];
+    const q = pontos[i + 1];
+    if (q <= p) continue;
+    const meio = (p + q) / 2;
+    const k = virais.filter((f) => f - VIRAL_MS <= meio && f > meio).length;
+    const m = (boostAteMs !== null && boostAteMs > meio ? 5 : 1) * 10 ** Math.min(k, 2);
+    total += (r * m * (q - p)) / 1000;
+  }
+  return total;
+}
+
 /** Valuation depois de render de `desdeMs` até `ateMs` (teto de `tetoS`, 8h sem a árvore; ×5 dentro do bônus que vai
- *  até `boostAteMs`). */
+ *  até `boostAteMs`; ×10 por Viralizou ativo, `virais` = os fins). */
 export function acumular(
-  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null, tetoS = TETO_SEGUNDOS,
+  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null, tetoS = TETO_SEGUNDOS, virais: readonly number[] = [],
 ): number {
   const dt = Math.min(Math.max((ateMs - desdeMs) / 1000, 0), tetoS);
-  let boost = 0;
-  if (boostAteMs !== null && boostAteMs > desdeMs) boost = Math.max(0, Math.min((Math.min(ateMs, boostAteMs) - desdeMs) / 1000, dt));
-  return v + r * dt + r * 4 * boost;
+  return v + produzido(r, desdeMs, desdeMs + dt * 1000, boostAteMs, virais);
 }
 
 /**
  * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
- * começando em `desdeMs`. Igual a idle_settle na 0041: teto de `tetoS` contado de `desdeMs`, ×5 dentro do bônus.
+ * começando em `desdeMs`. Igual a idle_settle: teto de `tetoS` contado de `desdeMs`, ×5 e ×10 em cada trecho.
  */
 export function acumularTrechos(
   v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
-  tetoS = TETO_SEGUNDOS,
+  tetoS = TETO_SEGUNDOS, virais: readonly number[] = [],
 ): number {
   const fim = Math.min(ateMs, desdeMs + tetoS * 1000);
   for (let i = 0; i < trechos.length; i++) {
     const a = Math.max(trechos[i].desdeMs, desdeMs);
     const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : fim, fim);
-    if (b <= a) continue;
-    const r = trechos[i].r;
-    v += (r * (b - a)) / 1000;
-    if (boostAteMs !== null && boostAteMs > a) v += r * 4 * Math.max(0, (Math.min(b, boostAteMs) - a) / 1000);
+    v += produzido(trechos[i].r, a, b, boostAteMs, virais);
   }
   return v;
 }

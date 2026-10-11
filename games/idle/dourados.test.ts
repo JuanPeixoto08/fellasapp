@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { douradoEm, JANELA_S, posicao, TIPOS_DOURADO } from './dourados';
+import { douradoEm, JANELA_S, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -52,5 +52,27 @@ describe('a sorte dos eventos na tela', () => {
     }
     expect(JANELA_S).toBe(12);
     expect(TIPOS_DOURADO).toEqual(['investidor', 'promocao', 'viralizou', 'dupla']);
+  });
+});
+
+describe('selos e textos', () => {
+  const T = Date.parse('2026-10-11T20:00:00.000Z');
+  const em = (s: number) => new Date(T + s * 1000).toISOString();
+  it('Promoção vale até promo_ate', () => {
+    expect(promoAtiva({ promo_ate: em(10) }, T)).toBe(true);
+    expect(promoAtiva({ promo_ate: em(-1) }, T)).toBe(false);
+    expect(promoAtiva({ promo_ate: null }, T)).toBe(false);
+  });
+  it('selo ao lado do F$: ×10, ×100 (dourado, até o primeiro acabar) e Metade, com o tempo que falta', () => {
+    expect(selosBonus({ promo_ate: null, viral: [] }, T)).toEqual([]);
+    expect(selosBonus({ promo_ate: null, viral: [em(42)] }, T)).toEqual([{ texto: '×10 · 0:42', ouro: false }]);
+    expect(selosBonus({ promo_ate: null, viral: [em(15), em(55)] }, T)).toEqual([{ texto: '×100 · 0:15', ouro: true }]);
+    expect(selosBonus({ promo_ate: em(21), viral: [em(-3)] }, T)).toEqual([{ texto: 'Metade · 0:21', ouro: false }]);
+  });
+  it('o texto que sobe ao pegar', () => {
+    expect(textoPegou(0, { ganho: 1_234_567, viral: 0 })).toBe('+F$ 1,23 mi');
+    expect(textoPegou(1, { ganho: 0, viral: 0 })).toBe('Promoção! Tudo pela metade por 30 s');
+    expect(textoPegou(2, { ganho: 0, viral: 1 })).toBe('Viralizou! ×10 por 1 min');
+    expect(textoPegou(3, { ganho: 0, viral: 2 })).toBe('×100!');
   });
 });

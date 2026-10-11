@@ -119,6 +119,8 @@ export type IdleState = {
   user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
+  /** Eventos na tela (0045): fim da Promoção relâmpago (null = não está valendo) e os fins dos Viralizou ativos. */
+  promo_ate: string | null; viral: string[];
   /** Entrega 2 (0038): seu visual (null = nunca salvou), quem você contratou (contratos ativos, do mais recente ao
    *  mais antigo), quem te contratou, o que entra na conta dos contratos, o preço do próximo contrato e o próximo
    *  vencimento que muda a sua taxa (null = nenhum). */

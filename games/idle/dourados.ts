@@ -1,6 +1,7 @@
 // Eventos na tela (tipo cookie dourado): a cada segundo há chance 1/600 de aparecer um, pra quem está com o jogo
 // aberto, e ele some em 12 s. A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
 // (idle_dourado na 0045), que confere o clique. BigInt: os quadrados passam de 2^53.
+import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
 export const TIPOS_DOURADO = ['investidor', 'promocao', 'viralizou', 'dupla'] as const;
@@ -32,4 +33,34 @@ export function posicao(uid: string, s: number, lado = 0): { x: number; y: numbe
   const x = 0.08 + ((h % 1000) / 1000) * 0.7;
   const y = 0.15 + ((Math.floor(h / 1000) % 1000) / 1000) * 0.7;
   return { x: lado === 1 ? Math.min(0.92, x + 0.14) : x, y };
+}
+
+// ---------- o que está valendo (selos) e os textos ----------
+type ComBonus = { promo_ate: string | null; viral?: readonly string[] };
+const mmss = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** Promoção relâmpago valendo agora (o custo das compras cai pela metade). */
+export const promoAtiva = (s: { promo_ate: string | null }, agoraMs: number) => s.promo_ate !== null && Date.parse(s.promo_ate) > agoraMs;
+
+/** Os fins dos Viralizou ainda ativos (ms), em ordem. */
+export const viraisAtivos = (s: ComBonus, agoraMs: number) => (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((a, b) => a - b);
+
+/** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado, até o primeiro Viralizou acabar), "Metade · 0:21". */
+export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro: boolean }[] {
+  const out: { texto: string; ouro: boolean }[] = [];
+  const v = viraisAtivos(s, agoraMs);
+  if (v.length >= 2) out.push({ texto: `×100 · ${mmss(v[0] - agoraMs)}`, ouro: true });
+  else if (v.length === 1) out.push({ texto: `×10 · ${mmss(v[0] - agoraMs)}`, ouro: false });
+  if (promoAtiva(s, agoraMs)) out.push({ texto: `Metade · ${mmss(Date.parse(s.promo_ate!) - agoraMs)}`, ouro: false });
+  return out;
+}
+
+/** O texto que sobe quando pega: quanto ganhou (Investidor), a Promoção, o Viralizou (×100 quando são dois). */
+export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number }): string {
+  if (tipo === 0) return `+${formatarValor(o.ganho)}`;
+  if (tipo === 1) return 'Promoção! Tudo pela metade por 30 s';
+  return o.viral >= 2 ? '×100!' : 'Viralizou! ×10 por 1 min';
 }

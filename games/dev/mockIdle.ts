@@ -43,6 +43,7 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
   call<IdleState>('select public.idle_buy($1, $2, $3) as v', [kind, id, qty]);
 export const idlePickStrategy = (era: number, opcao: number) => call<IdleState>('select public.idle_pick_strategy($1, $2) as v', [era, opcao]);
 export const idleClaim = (window: number) => call<IdleState>('select public.idle_claim_opportunity($1) as v', [window]);
+export const idleDouradoPegar = (seg: number, lado: number) => call<IdleState>('select public.idle_dourado_pegar($1, $2) as v', [seg, lado]);
 export const idleHire = (userId: string) => call<IdleState>('select public.idle_hire($1) as v', [userId]);
 export const idleSetAvatar = (v: IdleVisual) => avatar(v);
 export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');

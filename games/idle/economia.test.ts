@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
 import {
-  abertura, acumular, acumularTrechos, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  abertura, acumular, acumularTrechos, TETO_SEGUNDOS, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
   pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
 } from './economia';
 
@@ -68,6 +68,20 @@ describe('contratos (multContratos)', () => {
   });
   it('entra na taxa como multiplicador global', () => {
     expect(taxa(cat, com([[1, 2]], { social: { contratei: 1, empregos: [] } }))).toBeCloseTo(1 * 1.12, 10);
+  });
+});
+
+describe('Viralizou na conta (igual a idle_settle na 0045)', () => {
+  it('×10 com um, ×100 com dois (teto, mesmo com três), ×50 com o ×5 da oportunidade', () => {
+    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000])).toBeCloseTo(100 + 9 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, 60_000, TETO_SEGUNDOS, [90_000])).toBeCloseTo(1960, 9);
+  });
+  it('trechos: o Viralizou atravessa a troca de taxa', () => {
+    // taxa 1 até 50 s, 2 depois; Viralizou de 30 a 90 s
+    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, null, TETO_SEGUNDOS, [90_000]);
+    expect(v).toBeCloseTo(30 + 20 * 10 + 40 * 2 * 10 + 10 * 2, 9);
   });
 });
 
