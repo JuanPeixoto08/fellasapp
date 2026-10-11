@@ -73,7 +73,7 @@ describe('catálogo e tick (paridade SQL × TS)', () => {
 
 describe('avançar o mercado', () => {
   const precos = (empresa: number) =>
-    q<{ tick: string; valor: number }>('select tick::text, valor from public.idle_bolsa_precos where empresa = $1 order by tick', [empresa]);
+    q<{ tick: string; valor: number }>('select p.tick::text as tick, p.valor from public.idle_bolsa_precos p where p.empresa = $1 order by p.tick', [empresa]);
   const mercado = (empresa: number) => q<Linha & { tick: string }>('select *, tick::text, humor_ate::text, rj_ate::text from public.idle_bolsa_mercado where empresa = $1', [empresa]);
 
   it('primeira vez: cria as 8 no repouso, no tick de agora', async () => {
