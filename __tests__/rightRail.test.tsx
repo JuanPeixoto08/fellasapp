@@ -12,6 +12,10 @@ let mockState: Record<string, unknown> = {};
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, navigate: jest.fn() }) }));
 jest.mock('../lib/auth/SessionProvider', () => ({ useSession: () => ({ session: { user: { id: 'me' } } }) }));
 jest.mock('../lib/useMembers', () => ({ useMembers: () => mockState }));
+const mockNowPlaying = jest.fn();
+jest.mock('../lib/lastfm/api', () => ({ getNowPlaying: (user: string) => mockNowPlaying(user) }));
+
+const track = (name: string) => ({ name, artist: 'SZA', album: null, image: null, url: '', playedAt: null, nowPlaying: true });
 
 const member = (id: string, name: string, birthday: string | null = null) => ({
   id,
@@ -30,6 +34,8 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 beforeEach(() => {
+  require('../lib/lastfm/nowPlayingStore').resetNowPlayingStore();
+  mockNowPlaying.mockReset().mockResolvedValue(null);
   mockPush.mockClear();
   mockReload.mockClear();
   mockState = { members: [], avatars: new Map(), loading: false, error: null, reload: mockReload };
@@ -46,6 +52,28 @@ describe('RightRail', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/@fella0');
     await fireEvent.press(screen.getByLabelText('Ver todos os membros'));
     expect(mockPush).toHaveBeenLastCalledWith('/members');
+  });
+
+  it('quem está ouvindo sobe pro topo com a música do lado; chave desligada não conta', async () => {
+    mockState.members = [
+      member('a', 'Ana'),
+      member('b', 'Bia'),
+      member('c', 'Caio'),
+      member('d', 'Duda'),
+      { ...member('e', 'Edu'), lastfm_user: 'edufm' },
+      { ...member('f', 'Fred'), lastfm_user: 'fredfm', show_now_playing: false },
+    ];
+    mockNowPlaying.mockImplementation(async (user: string) => (user === 'anafm' ? null : track('fue mejor')));
+    await render(<RightRail />, { wrapper: Wrapper });
+    const rows = await screen.findAllByLabelText(/^Ver perfil de /);
+    expect(rows.map((r) => r.props.accessibilityLabel)).toEqual([
+      'Ver perfil de Edu, ouvindo fue mejor, de SZA',
+      'Ver perfil de Ana',
+      'Ver perfil de Bia',
+      'Ver perfil de Caio',
+    ]);
+    expect(screen.getByText('fue mejor')).toBeTruthy();
+    expect(mockNowPlaying).not.toHaveBeenCalledWith('fredfm');
   });
 
   it('selo de verificado ao lado do nome de quem tem', async () => {

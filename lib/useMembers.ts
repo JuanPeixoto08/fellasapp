@@ -6,7 +6,7 @@ import { friendlyError } from './errors';
 import { onLive } from './realtime';
 
 /** O que as telas de membros e a coluna da direita mostram de cada perfil. */
-const SHOWN_FIELDS = ['display_name', 'username', 'avatar_url', 'birthday', 'bio', 'status', 'location'] as const;
+const SHOWN_FIELDS = ['display_name', 'username', 'avatar_url', 'birthday', 'bio', 'status', 'location', 'lastfm_user', 'show_now_playing'] as const;
 
 /** Membros do grupo + avatares assinados numa chamada só. Usado pela tela Membros e pela coluna direita. */
 export function useMembers() {

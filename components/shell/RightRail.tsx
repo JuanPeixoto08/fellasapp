@@ -7,10 +7,12 @@ import { resolveUrl } from '../../lib/api/storage';
 import { useSession } from '../../lib/auth/SessionProvider';
 import { nextBirthdays } from '../../lib/birthdays';
 import { useTheme } from '../../lib/theme';
+import { useNowPlayingMany } from '../../lib/lastfm/useNowPlayingMany';
 import { useMembers } from '../../lib/useMembers';
 import { useToday } from '../../lib/useToday';
 import { Avatar, Button, Heading, Icon, interactiveStyle, NameWithBadge, Text } from '../ui';
 import { profilePath } from '../../lib/openProfile';
+import { NowPlayingLine } from '../music/PostNowPlaying';
 
 const MAX_MEMBERS = 4;
 const MAX_BIRTHDAYS = 4;
@@ -27,6 +29,14 @@ export function RightRail() {
   const allBirthdays = useMemo(() => nextBirthdays(members, today, Infinity), [members, today]);
   const [allShown, setAllShown] = useState(false);
   const birthdays = allShown ? allBirthdays : allBirthdays.slice(0, MAX_BIRTHDAYS);
+  // quem está ouvindo algo sobe pro topo (o resto segue na ordem de sempre) e mostra a música do lado do nome
+  const listenerOf = (m: (typeof members)[number]) => (m.show_now_playing !== false ? m.lastfm_user : null);
+  const tracks = useNowPlayingMany(members.map(listenerOf).filter((u): u is string => !!u));
+  const trackOf = (m: (typeof members)[number]) => {
+    const user = listenerOf(m);
+    return user ? tracks.get(user) : undefined;
+  };
+  const shownMembers = [...members].sort((a, b) => Number(!!trackOf(b)) - Number(!!trackOf(a))).slice(0, MAX_MEMBERS);
   const open = (m: { id: string; username: string }) => router.push(m.id === myId ? '/profile' : profilePath(m.username));
 
   const row = (state: Parameters<typeof interactiveStyle>[1]) => ({
@@ -64,19 +74,23 @@ export function RightRail() {
           </View>
         ) : (
           <>
-            {members.slice(0, MAX_MEMBERS).map((m) => {
+            {shownMembers.map((m) => {
               const name = m.display_name || m.username;
+              const track = trackOf(m);
               return (
                 <Pressable
                   key={m.id}
                   accessibilityRole="link"
-                  accessibilityLabel={`Ver perfil de ${name}`}
+                  accessibilityLabel={`Ver perfil de ${name}${track ? `, ouvindo ${track.name}, de ${track.artist}` : ''}`}
                   onPress={() => open(m)}
                   style={row}
                 >
                   <Avatar name={name} uri={resolveUrl(m.avatar_url, avatars)} size={t.avatarSizes.sm} />
                   <View style={{ flex: 1 }}>
-                    <NameWithBadge name={name} badges={m.badges} featuredBadge={m.featured_badge} variant="small" bold />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
+                      <NameWithBadge name={name} badges={m.badges} featuredBadge={m.featured_badge} variant="small" bold />
+                      {track ? <NowPlayingLine track={track} /> : null}
+                    </View>
                     <Text variant="caption" tone="muted" numberOfLines={1}>
                       @{m.username}
                     </Text>

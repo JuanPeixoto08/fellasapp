@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 
+import type { LastfmTrack } from '../../lib/lastfm/types';
 import { useNowPlaying } from '../../lib/lastfm/useNowPlaying';
 import { useTheme } from '../../lib/theme';
 import { Text } from '../ui';
@@ -17,9 +18,13 @@ type Props = {
  * Só aparece com música tocando; encolhe antes do nome quando falta espaço.
  */
 export function PostNowPlaying({ user, onPress }: Props) {
-  const t = useTheme();
   const track = useNowPlaying(user);
-  if (!track) return null;
+  return track ? <NowPlayingLine track={track} onPress={onPress} /> : null;
+}
+
+/** A linha "ouvindo **Música**" de uma música já conhecida (o post e a coluna "Os fellas" usam). */
+export function NowPlayingLine({ track, onPress }: { track: LastfmTrack; onPress?: () => void }) {
+  const t = useTheme();
 
   const label = `Ouvindo ${track.name}, de ${track.artist}`;
   const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.xs, flexShrink: 3, minWidth: 0 };
