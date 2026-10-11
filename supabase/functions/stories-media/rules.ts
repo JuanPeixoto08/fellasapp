@@ -7,6 +7,8 @@ export type ResourceType = 'image' | 'video';
 
 /** Nome do arquivo no Cloudinary: pasta stories/ + 64 hex aleatórios (o endereço não se adivinha). */
 export const MEDIA_ID_RE = /^stories\/[0-9a-f]{64}$/;
+/** Fotos dos posts, comentários, perfil e banner: pasta fotos/ (a limpeza de 24 h só olha stories/). */
+export const FOTO_ID_RE = /^fotos\/[0-9a-f]{64}$/;
 export const TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Versão reduzida pedida no envio (eager) e usada na entrega (lib/cloudinary.ts tem a mesma). */
@@ -23,6 +25,10 @@ export const resourceType = (kind: Kind): ResourceType => (kind === 'video' ? 'v
 
 export function randomMediaId(uuid: () => string): string {
   return `stories/${(uuid() + uuid()).replace(/-/g, '')}`;
+}
+
+export function randomFotoId(uuid: () => string): string {
+  return `fotos/${(uuid() + uuid()).replace(/-/g, '')}`;
 }
 
 /** O que vai para o SHA-1 (antes da secret): parâmetros em ordem alfabética, "a=1&b=2". */

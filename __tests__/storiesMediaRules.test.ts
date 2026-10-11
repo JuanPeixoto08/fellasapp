@@ -4,7 +4,9 @@ import {
   deleteUrl,
   isExpired,
   listUrl,
+  FOTO_ID_RE,
   MEDIA_ID_RE,
+  randomFotoId,
   randomMediaId,
   resourceType,
   stringToSign,
@@ -19,6 +21,14 @@ describe('regras dos stories (Cloudinary)', () => {
     expect(MEDIA_ID_RE.test(id)).toBe(true);
     expect(MEDIA_ID_RE.test('stories/abc')).toBe(false);
     expect(MEDIA_ID_RE.test(`outra/${'a'.repeat(64)}`)).toBe(false);
+  });
+
+  it('nome aleatório das fotos: fotos/ + 64 hex (fora da pasta que a limpeza de 24 h apaga)', () => {
+    const id = randomFotoId(() => '11111111-2222-3333-4444-555555555555');
+    expect(id).toBe(`fotos/${'11111111222233334444555555555555'.repeat(2)}`);
+    expect(FOTO_ID_RE.test(id)).toBe(true);
+    expect(MEDIA_ID_RE.test(id)).toBe(false);
+    expect(listUrl('c', 'image')).toContain('prefix=stories%2F');
   });
 
   it('texto assinado igual ao exemplo da documentação do Cloudinary (ordem alfabética, sem api_key/file)', () => {

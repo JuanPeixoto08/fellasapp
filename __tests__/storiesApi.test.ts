@@ -43,6 +43,7 @@ import {
   reactToStory,
   STORY_LIMIT_MESSAGE,
   StoryUploadError,
+  uploadFotoCloudinary,
   uploadStoryMedia,
 } from '../lib/api/stories';
 
@@ -57,6 +58,27 @@ const SIGNED = {
 };
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
 const fail = (status: number, body: unknown = {}) => ({ ok: false, status, json: async () => body });
+
+describe('uploadFotoCloudinary', () => {
+  const FOTO = { uploadUrl: 'https://api.cloudinary.com/v1_1/slxposvw/image/upload', fields: { api_key: 'k', timestamp: '1', signature: 's', public_id: `fotos/${'c'.repeat(64)}` } };
+  it('pede a assinatura de foto, manda o arquivo e devolve o nome no Cloudinary', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(ok(FOTO)).mockResolvedValueOnce(ok({ public_id: FOTO.fields.public_id }));
+    globalThis.fetch = fetchMock as never;
+    const blob = new Blob(['x'], { type: 'image/jpeg' });
+    await expect(uploadFotoCloudinary(blob)).resolves.toBe(FOTO.fields.public_id);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ kind: 'foto' });
+    expect(fetchMock.mock.calls[1][0]).toBe(FOTO.uploadUrl);
+    const form = fetchMock.mock.calls[1][1].body as FormData;
+    expect(form.get('public_id')).toBe(FOTO.fields.public_id);
+    expect(form.has('file')).toBe(true);
+  });
+  it('recusas viram mensagem de foto', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValueOnce(fail(403)) as never;
+    await expect(uploadFotoCloudinary(new Blob(['x']))).rejects.toThrow('Só fellas podem enviar foto.');
+    globalThis.fetch = jest.fn().mockResolvedValueOnce(ok(FOTO)).mockResolvedValueOnce(fail(420, { error: { message: 'Rate Limit Exceeded' } })) as never;
+    await expect(uploadFotoCloudinary(new Blob(['x']))).rejects.toThrow('As fotos bateram o limite do mês. Tenta mais tarde.');
+  });
+});
 
 describe('uploadStoryMedia', () => {
   it('assina na função, envia ao Cloudinary com os campos e devolve o nome e a duração do vídeo', async () => {

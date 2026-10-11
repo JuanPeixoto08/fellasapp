@@ -17,13 +17,27 @@ let mockResults: Record<string, unknown> = {};
 const mockSignCalls: string[][] = [];
 const mockRemoved: string[] = [];
 const mockUploaded: string[] = [];
-const mockUploadOpts: unknown[] = [];
+/** Uso de cada foto mandada ao Cloudinary (enviarFoto). */
+const mockUsos: string[] = [];
 /** Índices (como string) das fotos cujo upload deve falhar. */
 let mockUploadFail: string[] = [];
 
 globalThis.fetch = jest.fn(async (uri: string) => ({
-  blob: async () => ({ type: String(uri).endsWith('.gif') ? 'image/gif' : 'image/jpeg' }),
+  blob: async () => ({ type: String(uri).endsWith('.gif') ? 'image/gif' : 'image/jpeg', uri }),
 })) as unknown as typeof fetch;
+
+/** Nome da foto no "Cloudinary" de mentira: o arquivo escolhido, sem o "#reduzida" (file://a.jpg -> a.jpg). */
+const mockNome = (uri: string) => uri.replace('file://', '').replace('#reduzida', '');
+jest.mock('../lib/api/fotos', () => ({
+  enviarFoto: async (blob: { uri: string }, uso: string) => {
+    const nome = mockNome(blob.uri);
+    if (mockUploadFail.includes(nome)) throw new Error('upload falhou');
+    mockUsos.push(uso);
+    const url = `https://res.cloudinary.com/teste/${nome}`;
+    mockUploaded.push(url);
+    return url;
+  },
+}));
 
 jest.mock('../lib/imageUpload', () => ({ shrinkForUpload: async (uri: string) => uri + '#reduzida' }));
 
@@ -51,8 +65,7 @@ jest.mock('../lib/supabase', () => {
       from: (table: string) => makeBuilder(table),
       storage: {
         from: () => ({
-          upload: async (path: string, _blob: unknown, opts: unknown) => {
-            mockUploadOpts.push(opts);
+          upload: async (path: string) => {
             if (mockUploadFail.includes(path.split('-').pop()!.split('.')[0])) {
               return { data: null, error: new Error('upload falhou') };
             }
@@ -130,21 +143,21 @@ describe('fotos (até 4)', () => {
     mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
     await createPost({ body: '', imageUris: ['file://a', 'file://b', 'file://c'] });
     const row = mockCalls.find((c) => c.table === 'posts' && c.op === 'insert')?.args[0] as Record<string, unknown>;
-    expect(row.images).toEqual(mockUploaded);
-    expect(row.image_url).toBe(mockUploaded[0]);
-    expect((row.images as string[]).map((p) => p.split('-').pop())).toEqual(['0.jpg', '1.jpg', '2.jpg']);
+    expect(row.images).toEqual(['a', 'b', 'c'].map((n) => `https://res.cloudinary.com/teste/${n}`));
+    expect(row.image_url).toBe(`https://res.cloudinary.com/teste/a`);
   });
 
-  it('foto do post sobe com cache de 1 ano (nome único, nunca muda)', async () => {
-    mockUploadOpts.length = 0;
+  it('foto do post vai pro Cloudinary no tamanho de post (não usa o Storage do Supabase)', async () => {
+    mockUsos.length = 0;
+    mockResults['posts.insert'] = { data: { id: 'n' }, error: null };
     await createPost({ body: 'oi', imageUris: ['file://a'] });
-    expect(mockUploadOpts[0]).toMatchObject({ cacheControl: '31536000' });
+    expect(mockUsos).toEqual(['post']);
   });
 
-  it('falha de upload apaga as que subiram e não cria o post', async () => {
-    mockUploadFail = ['1'];
+  it('falha de upload não cria o post (as que subiram ficam no Cloudinary: o app não apaga de lá)', async () => {
+    mockUploadFail = ['b'];
     await expect(createPost({ body: '', imageUris: ['file://a', 'file://b'] })).rejects.toThrow('upload falhou');
-    expect(mockRemoved).toEqual(mockUploaded);
+    expect(mockRemoved).toEqual([]);
     expect(mockCalls.some((c) => c.table === 'posts' && c.op === 'insert')).toBe(false);
   });
 
@@ -155,6 +168,7 @@ describe('fotos (até 4)', () => {
     expect(fetched).toContain('file://a.jpg#reduzida');
     expect(fetched).not.toContain('file://b.gif#reduzida');
     expect(mockUploaded.map((p) => p.split('.').pop()).sort()).toEqual(['gif', 'jpg']);
+    expect(mockUploaded).toContain('https://res.cloudinary.com/teste/b.gif');
   });
 
   it('mais de 4 fotos é recusado antes de subir', async () => {
@@ -384,7 +398,7 @@ describe('imagens no comentário', () => {
     expect(MAX_COMMENT_IMAGES).toBe(4);
     expect(inserted()).toMatchObject({ post_id: 'p1', body: 'olha isso' });
     // na ordem escolhida (o GIF sobe mais rápido, mas o comentário guarda pelo índice)
-    expect((inserted().images as string[]).map((p) => p.split('-').pop())).toEqual(['0.jpg', '1.gif']);
+    expect(inserted().images).toEqual(['https://res.cloudinary.com/teste/a.jpg', 'https://res.cloudinary.com/teste/b.gif']);
   });
 
   it('só imagem, sem texto, vale', async () => {
@@ -405,10 +419,10 @@ describe('imagens no comentário', () => {
     expect(mockUploaded).toEqual([]);
   });
 
-  it('o banco recusou: as imagens que subiram são apagadas', async () => {
+  it('o banco recusou: o erro chega e nada do Storage é mexido (a foto fica no Cloudinary)', async () => {
     mockResults['comments.insert'] = { data: null, error: { message: 'caiu' } };
     await expect(addComment('p1', 'x', ['file://a.jpg'])).rejects.toMatchObject({ message: 'caiu' });
-    expect(mockRemoved).toEqual(mockUploaded);
+    expect(mockRemoved).toEqual([]);
   });
 
   it('a lista traz as imagens assinadas', async () => {

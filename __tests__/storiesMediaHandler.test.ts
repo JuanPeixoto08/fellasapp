@@ -54,6 +54,20 @@ describe('POST /sign', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://fellasapp.pages.dev');
   });
 
+  it('foto (post, comentário, perfil, banner): assina na pasta fotos/, sem versão eager (a entrega pede o tamanho)', async () => {
+    const fetch = jest.fn(async (..._args: any[]) => json(true));
+    const res = await handle(post('sign', { kind: 'foto' }, { Authorization: 'Bearer tok' }), env, deps(fetch));
+    expect(res.status).toBe(200);
+    const out = await res.json();
+    expect(out.uploadUrl).toBe('https://api.cloudinary.com/v1_1/cloud/image/upload');
+    expect(out.fields.public_id).toBe(`fotos/${'11111111222233334444555555555555'.repeat(2)}`);
+    expect(out.fields.eager).toBeUndefined();
+    const { api_key, signature, ...signed } = out.fields;
+    expect(api_key).toBe('key');
+    const expected = await sha1Hex(Object.keys(signed).sort().map((k) => `${k}=${signed[k]}`).join('&') + 'secret');
+    expect(signature).toBe(expected);
+  });
+
   it('sem login 401, login inválido 401, não membro 403, kind errado 400', async () => {
     expect((await handle(post('sign', { kind: 'photo' }), env, deps(jest.fn()))).status).toBe(401);
     const bad = jest.fn(async () => json({}, 401));

@@ -51,9 +51,17 @@ async function callFunction(route: 'sign' | 'delete', token: string, body: unkno
   }
 }
 
-async function signUpload(token: string, kind: StoryKind): Promise<Signed> {
+/** Mensagens de recusa de cada tipo de envio (story ou foto de post/perfil). */
+type Recusas = { signErrors: Record<number, string>; limit: string };
+const STORY_RECUSAS: Recusas = { signErrors: SIGN_ERRORS, limit: STORY_LIMIT_MESSAGE };
+const FOTO_RECUSAS: Recusas = {
+  signErrors: { 401: SIGN_ERRORS[401], 403: 'Só fellas podem enviar foto.' },
+  limit: 'As fotos bateram o limite do mês. Tenta mais tarde.',
+};
+
+async function signUpload(token: string, kind: StoryKind | 'foto', recusas: Recusas): Promise<Signed> {
   const res = await callFunction('sign', token, { kind });
-  if (!res.ok) throw new StoryUploadError(SIGN_ERRORS[res.status] ?? GENERIC);
+  if (!res.ok) throw new StoryUploadError(recusas.signErrors[res.status] ?? GENERIC);
   return (await res.json()) as Signed;
 }
 
@@ -64,18 +72,15 @@ async function filePart(uri: string, kind: StoryKind): Promise<Blob> {
   return { uri, name, type: kind === 'video' ? 'video/mp4' : 'image/jpeg' } as unknown as Blob;
 }
 
-/**
- * Envia o arquivo ao Cloudinary em duas etapas: a função assina (só membro) e o app manda direto.
- * Devolve o nome do arquivo e a duração (vídeo: a que o Cloudinary mediu, até 15 s).
- */
-export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ mediaId: string; durationMs: number }> {
+/** Envia ao Cloudinary em duas etapas: a função assina (só membro) e o app manda direto. */
+async function enviar(kind: StoryKind | 'foto', arquivo: () => Promise<Blob>, recusas: Recusas): Promise<Uploaded> {
   for (let attempt = 0; ; attempt++) {
     // dentro do laço: na nova tentativa o login pode ter sido renovado (o token dura 1 h, como a assinatura)
     const token = await sessionToken();
-    const signed = await signUpload(token, kind);
+    const signed = await signUpload(token, kind, recusas);
     const form = new FormData();
     for (const [k, v] of Object.entries(signed.fields)) form.append(k, v);
-    form.append('file', await filePart(uri, kind));
+    form.append('file', await arquivo());
     let res: Response;
     try {
       res = await fetch(signed.uploadUrl, { method: 'POST', body: form });
@@ -83,16 +88,27 @@ export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ 
       throw new StoryUploadError(OFFLINE);
     }
     const out = (await res.json().catch(() => ({}))) as Uploaded & { error?: { message?: string } };
-    if (res.ok) {
-      const durationMs =
-        kind === 'photo' ? STORY_PHOTO_MS : Math.min(MAX_VIDEO_MS, Math.max(1, Math.round((out.duration ?? 0) * 1000)));
-      return { mediaId: out.public_id, durationMs };
-    }
+    if (res.ok) return out;
     const message = out.error?.message ?? '';
     // assinatura vale 1 h: se venceu no caminho, pede outra uma vez
     if (/stale request/i.test(message) && attempt === 0) continue;
-    throw new StoryUploadError(/limit|quota/i.test(message) ? STORY_LIMIT_MESSAGE : GENERIC);
+    throw new StoryUploadError(/limit|quota/i.test(message) ? recusas.limit : GENERIC);
   }
+}
+
+/** Arquivo do story. Devolve o nome do arquivo e a duração (vídeo: a que o Cloudinary mediu, até 15 s). */
+export async function uploadStoryMedia(uri: string, kind: StoryKind): Promise<{ mediaId: string; durationMs: number }> {
+  const out = await enviar(kind, () => filePart(uri, kind), STORY_RECUSAS);
+  const durationMs =
+    kind === 'photo' ? STORY_PHOTO_MS : Math.min(MAX_VIDEO_MS, Math.max(1, Math.round((out.duration ?? 0) * 1000)));
+  return { mediaId: out.public_id, durationMs };
+}
+
+/** Foto de post, comentário, perfil ou banner (pasta fotos/ do Cloudinary, fora da limpeza dos stories). Devolve o nome
+ *  do arquivo; o endereço de cada tamanho sai de lib/cloudinary.ts fotoUrl. Saiu do Storage do Supabase em out/2026: o
+ *  tráfego das fotos estourou o plano grátis. */
+export async function uploadFotoCloudinary(blob: Blob): Promise<string> {
+  return (await enviar('foto', async () => blob, FOTO_RECUSAS)).public_id;
 }
 
 export async function createStory(input: { kind: StoryKind; mediaId: string; durationMs: number; postId?: string }): Promise<void> {

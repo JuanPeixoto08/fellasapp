@@ -3,8 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabase';
 
 export const BUCKET = 'post-images';
-/** Cache do arquivo no navegador: 1 ano. Cada foto sobe num caminho novo e nunca muda. */
-export const UPLOAD_CACHE_CONTROL = '31536000';
 /** 7 dias: o mesmo link a semana toda deixa o navegador reaproveitar a foto já baixada (cada link novo baixa de novo,
  *  e foi isso que estourou o tráfego do plano grátis em out/2026). */
 const SIGNED_URL_TTL = 7 * 24 * 60 * 60;

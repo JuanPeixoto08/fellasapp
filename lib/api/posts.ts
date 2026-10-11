@@ -11,7 +11,8 @@ import {
   type ReactionGroup,
   type ReactionSummary,
 } from './reactions';
-import { BUCKET, resolveUrl, signPaths, UPLOAD_CACHE_CONTROL } from './storage';
+import { enviarFoto } from './fotos';
+import { BUCKET, resolveUrl, signPaths } from './storage';
 
 export const PAGE_SIZE = 10;
 /** Fotos por post (mesmo limite do check posts_images_max). */
@@ -232,18 +233,11 @@ export async function getPost(postId: string): Promise<FeedPost> {
   return post;
 }
 
-async function uploadImage(userId: string, uri: string, index: number): Promise<string> {
+async function uploadImage(uri: string): Promise<string> {
   const original = await (await fetch(uri)).blob();
-  // GIF sobe como está; o resto vai reduzido (lib/imageUpload)
+  // GIF sobe como está; o resto vai reduzido (lib/imageUpload). Vai pro Cloudinary (lib/api/fotos), não pro Storage.
   const blob = original.type === 'image/gif' ? original : await (await fetch(await shrinkForUpload(uri))).blob();
-  const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-  // o índice evita colisão de nome quando várias sobem no mesmo milissegundo
-  const path = `${userId}/${Date.now()}-${index}.${ext}`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, blob, { contentType: blob.type || 'image/jpeg', cacheControl: UPLOAD_CACHE_CONTROL });
-  if (error) throw error;
-  return path;
+  return enviarFoto(blob, 'post');
 }
 
 async function removeImages(paths: string[]): Promise<void> {
@@ -282,7 +276,7 @@ export async function createPost({
   const userId = await currentUserId();
   const place = cleanPlace(location);
 
-  const results = await Promise.allSettled(imageUris.map((uri, i) => uploadImage(userId, uri, i)));
+  const results = await Promise.allSettled(imageUris.map((uri) => uploadImage(uri)));
   const paths = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
   if (failed) {
@@ -444,7 +438,7 @@ export async function addComment(
   if (imageUris.length > MAX_COMMENT_IMAGES) throw new Error(`No máximo ${MAX_COMMENT_IMAGES} imagens por comentário`);
   const userId = await currentUserId();
 
-  const results = await Promise.allSettled(imageUris.map((uri, i) => uploadImage(userId, uri, i)));
+  const results = await Promise.allSettled(imageUris.map((uri) => uploadImage(uri)));
   const paths = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
   if (failed) {

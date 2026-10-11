@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import type { Database } from '../../types/database';
-import { BUCKET, UPLOAD_CACHE_CONTROL } from './storage';
+import { enviarFoto } from './fotos';
+import { BUCKET } from './storage';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Post = Database['public']['Tables']['posts']['Row'];
@@ -108,14 +109,11 @@ export function formatBirthday(iso: string | null | undefined): string {
 
 const emptyToNull = (v: string | null): string | null => (v?.trim() ? v.trim() : null);
 
-/** Sobe a foto num caminho novo a cada troca (o link assinado em cache não mostra a antiga). */
-async function uploadProfileImage(userId: string, kind: 'avatar' | 'banner', uri: string): Promise<string> {
+/** Sobe a foto de perfil (512) ou o banner no Cloudinary (lib/api/fotos), cada troca num endereço novo. GIF sobe como
+ *  está e continua animado. */
+async function uploadProfileImage(kind: 'avatar' | 'banner', uri: string): Promise<string> {
   const blob = await (await fetch(uri)).blob();
-  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
-  const path = `${userId}/${kind}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', cacheControl: UPLOAD_CACHE_CONTROL });
-  if (error) throw error;
-  return path;
+  return enviarFoto(blob, kind === 'avatar' ? 'perfil' : 'banner');
 }
 
 export async function updateMyProfile(input: UpdateProfileInput): Promise<Profile> {
@@ -149,8 +147,8 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<Profil
 
   const uploaded: string[] = [];
   try {
-    if (input.avatarUri) uploaded.push((fields.avatar_url = await uploadProfileImage(userId, 'avatar', input.avatarUri)));
-    if (input.bannerUri) uploaded.push((fields.banner_url = await uploadProfileImage(userId, 'banner', input.bannerUri)));
+    if (input.avatarUri) uploaded.push((fields.avatar_url = await uploadProfileImage('avatar', input.avatarUri)));
+    if (input.bannerUri) uploaded.push((fields.banner_url = await uploadProfileImage('banner', input.bannerUri)));
     else if (input.removeBanner) fields.banner_url = null;
   } catch (e) {
     await removeOwnFiles(userId, uploaded);

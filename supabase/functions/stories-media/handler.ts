@@ -4,6 +4,7 @@ import {
   deleteUrl,
   isExpired,
   listUrl,
+  randomFotoId,
   randomMediaId,
   resourceType,
   stringToSign,
@@ -96,6 +97,15 @@ async function sign(req: Request, env: Env, deps: Deps): Promise<Response> {
   if (member === 'failed') return reply(req, 502, { error: 'is_member falhou' });
   if (!member) return reply(req, 403, { error: 'só membros' });
   const { kind } = await body(req);
+  // foto de post/comentário/perfil/banner: sem eager (a entrega pede o tamanho de cada uso) e fora da limpeza de 24 h
+  if (kind === 'foto') {
+    const fotoParams = { public_id: randomFotoId(deps.uuid), timestamp: String(Math.floor(deps.now().getTime() / 1000)) };
+    const fotoSignature = await deps.sha1Hex(stringToSign(fotoParams) + env.CLOUDINARY_API_SECRET);
+    return reply(req, 200, {
+      uploadUrl: uploadUrl(env.CLOUDINARY_CLOUD_NAME, 'photo'),
+      fields: { ...fotoParams, api_key: env.CLOUDINARY_API_KEY, signature: fotoSignature },
+    });
+  }
   if (kind !== 'photo' && kind !== 'video') return reply(req, 400, { error: 'kind inválido' });
   const params = {
     eager: TRANSFORMATIONS[kind as Kind],

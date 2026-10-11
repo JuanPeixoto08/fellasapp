@@ -44,6 +44,9 @@ jest.mock('../components/music/NowPlayingLine', () => {
 const mockUpdate = jest.fn();
 const mockRpc = jest.fn();
 const mockUpload = jest.fn();
+/** Fotos novas vão pro Cloudinary (lib/api/fotos): devolve o endereço de mentira do uso. */
+const mockEnviar: jest.Mock = jest.fn(async (_blob: { type: string }, uso: string) => `https://res.cloudinary.com/teste/${uso}-${mockEnviar.mock.calls.length}`);
+jest.mock('../lib/api/fotos', () => ({ enviarFoto: (blob: { type: string }, uso: string) => mockEnviar(blob, uso) }));
 const mockEqUpdate = jest.fn();
 const mockRemove = jest.fn();
 /** Fotos já salvas no perfil antes de salvar (o que deve sumir ao trocar). */
@@ -185,26 +188,20 @@ describe('updateMyProfile', () => {
     (globalThis as any).fetch = jest.fn().mockResolvedValue({
       blob: () => Promise.resolve({ type: 'image/png' }),
     });
+    mockEnviar.mockClear();
     await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'file://a.png' });
-    expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/avatar-\d+\.png$/);
-    expect(mockUpdate.mock.calls[0][0].avatar_url).toBe(mockUpload.mock.calls[0][0]);
+    expect(mockEnviar.mock.calls[0][1]).toBe('perfil');
+    expect(mockUpdate.mock.calls[0][0].avatar_url).toBe('https://res.cloudinary.com/teste/perfil-1');
+    expect(mockUpload).not.toHaveBeenCalled(); // nada no Storage do Supabase
   });
 
   it('GIF na foto de perfil sobe como .gif (com o tipo certo, para animar)', async () => {
     (globalThis as any).fetch = jest.fn().mockResolvedValue({
       blob: () => Promise.resolve({ type: 'image/gif' }),
     });
+    mockEnviar.mockClear();
     await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'blob:gif' });
-    expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/avatar-\d+\.gif$/);
-    expect(mockUpload.mock.calls[0][2]).toMatchObject({ contentType: 'image/gif' });
-  });
-
-  it('foto de perfil sobe com cache de 1 ano (nome único, nunca muda: o navegador não baixa de novo)', async () => {
-    (globalThis as any).fetch = jest.fn().mockResolvedValue({
-      blob: () => Promise.resolve({ type: 'image/png' }),
-    });
-    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'file://a.png' });
-    expect(mockUpload.mock.calls[0][2]).toMatchObject({ cacheControl: '31536000' });
+    expect(mockEnviar.mock.calls[0][0].type).toBe('image/gif');
   });
 
   describe('fotos antigas não ficam guardadas à toa', () => {
@@ -247,12 +244,11 @@ describe('updateMyProfile', () => {
       expect(mockRemove).not.toHaveBeenCalled();
     });
 
-    it('salvar falhou: apaga a foto nova que subiu e mantém a antiga', async () => {
+    it('salvar falhou: mantém a antiga (a nova fica no Cloudinary: o app não apaga de lá)', async () => {
       mockCurrent = { avatar_url: 'u1/avatar-1.jpg', banner_url: null };
       mockUpdateError = { message: 'caiu' };
       await expect(updateMyProfile({ ...base, avatarUri: 'blob:gif' })).rejects.toMatchObject({ message: 'caiu' });
-      expect(mockRemove).toHaveBeenCalledTimes(1);
-      expect(mockRemove).toHaveBeenCalledWith([mockUpload.mock.calls[0][0]]);
+      expect(mockRemove).not.toHaveBeenCalled();
     });
   });
 
@@ -260,9 +256,10 @@ describe('updateMyProfile', () => {
     (globalThis as any).fetch = jest.fn().mockResolvedValue({
       blob: () => Promise.resolve({ type: 'image/jpeg' }),
     });
+    mockEnviar.mockClear();
     await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', bannerUri: 'file://praia.jpg' });
-    expect(mockUpload.mock.calls[0][0]).toMatch(/^u1\/banner-\d+\.jpg$/);
-    expect(mockUpdate.mock.calls[0][0].banner_url).toBe(mockUpload.mock.calls[0][0]);
+    expect(mockEnviar.mock.calls[0][1]).toBe('banner');
+    expect(mockUpdate.mock.calls[0][0].banner_url).toBe('https://res.cloudinary.com/teste/banner-1');
     expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty('avatar_url');
   });
 

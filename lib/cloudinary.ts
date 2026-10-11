@@ -20,3 +20,14 @@ export const storyThumbUrl = (mediaId: string, kind: StoryKind) =>
   `${base(kind)}/${kind === 'video' ? `so_0,${THUMB}` : THUMB}/${mediaId}`;
 /** O arquivo como foi enviado (vídeo: enquanto a reduzida ainda processa). */
 export const storyOriginalUrl = (mediaId: string, kind: StoryKind) => `${base(kind)}/${mediaId}`;
+
+/** Fotos de post/comentário, perfil e banner (pasta fotos/): cada uso pede o seu tamanho na entrega. WebP animado: GIF
+ *  continua animado. */
+export type UsoFoto = 'post' | 'perfil' | 'banner';
+export const FOTO_TRANSFORMATIONS: Record<UsoFoto, string> = {
+  post: 'c_limit,w_1600,h_1600,q_auto,f_webp,fl_awebp',
+  perfil: 'c_limit,w_512,h_512,q_auto,f_webp,fl_awebp',
+  banner: 'c_limit,w_1500,h_1500,q_auto,f_webp,fl_awebp',
+};
+export const fotoUrl = (publicId: string, uso: UsoFoto) =>
+  `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${FOTO_TRANSFORMATIONS[uso]}/${publicId}`;
