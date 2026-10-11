@@ -51,6 +51,14 @@ describe('tela da Bolsa', () => {
     tela.relogio(-200);
     expect(r.textContent).toBe('preço novo em 0:00');
   });
+  it('ações que viraram pó: o aviso aparece dentro da Bolsa (a cena fica escondida com ela aberta)', () => {
+    tela.renderizar(B({ viraram_po: [{ empresa: 4, qtd: 120 }] }), 1e9, false);
+    const aviso = document.querySelector('.bolsa-po')!;
+    expect(aviso.getAttribute('role')).toBe('status');
+    expect(aviso.textContent).toContain('Suas 120 ações da Cripto do Primo viraram pó.');
+    tela.renderizar(B(), 1e9, false);
+    expect(document.querySelector('.bolsa-po')).toBeNull();
+  });
   it('topo: carteira e lucro em F$', () => {
     tela.renderizar(B(), 1e9, false);
     expect(document.querySelector('.carteira')!.textContent).toContain('F$ 660'); // 10 × 33 × 2
@@ -84,11 +92,29 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.bolsa-detalhe')!.textContent).toContain('Quebrou · volta em 7 min');
     expect(document.querySelectorAll('.bolsa-detalhe button')).toHaveLength(0);
   });
-  it('devolve os preços dos botões de compra (melhorias e ações) para apagar sem F$', () => {
+  it('a lista do F$ (o atualizarValor acende e apaga) tem os botões de compra que só dependem do F$', () => {
     tela.renderizar(B(), 1e9, false);
     linha(1).click();
-    const precos = tela.renderizar(B(), 1e9, false);
-    expect(precos.map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+    tela.renderizar(B(), 1e9, false);
+    expect(tela.precos().map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+  });
+  it('apagado só por falta de F$ entra na lista (acende quando o dinheiro chega)', () => {
+    tela.renderizar(B(), 0, false);
+    linha(1).click();
+    expect(tela.precos().map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+  });
+  it('no limite ou ocupado, os botões de compra ficam fora da lista do F$ (senão acenderiam sozinhos)', () => {
+    tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 120, custo: 3600 }] }), 1e9, false);
+    linha(1).click();
+    expect(tela.precos().map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2]); // só as melhorias
+    tela.renderizar(B(), 1e9, true);
+    expect(tela.precos()).toEqual([]);
+  });
+  it('escolher outra empresa põe os botões novos do detalhe na lista do F$', () => {
+    tela.renderizar(B(), 1e9, false);
+    expect(tela.precos()).toHaveLength(2);
+    linha(1).click();
+    expect(tela.precos()).toHaveLength(5);
   });
   it('melhorias: nível atual, efeito e o próximo com o preço em F$ (segundos × r); no 5, No máximo', () => {
     tela.renderizar(B({ corretor: 1, escritorio: 5 }), 1e9, false);

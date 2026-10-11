@@ -92,6 +92,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     app.style.height = pc ? `${window.innerHeight / e.zoom}px` : '';
     app.style.width = pc ? `${e.largura}px` : '';
     app.style.marginInline = pc ? 'auto' : '';
+    app.style.setProperty('--zoom', pc ? String(e.zoom) : ''); // o que usa dvh/vh divide por ele (o zoom multiplica)
     app.style.setProperty('--cena-w', pc ? `${(160 * e.cena) / e.zoom}px` : '');
     app.style.setProperty('--cena-h', pc ? `${(96 * e.cena) / e.zoom}px` : '');
   };
@@ -447,7 +448,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     gavetaCaixa.setAttribute('aria-pressed', String(!m.bolsaAberta));
     bancada.classList.toggle('com-bolsa', m.bolsaAberta && jogando);
     if (m.bolsaAberta && jogando && s) {
-      precos.push(...bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado));
+      bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado);
       corpoBancada.replaceChildren(bolsaTela.elemento);
     } else {
       corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
@@ -704,6 +705,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     numero.textContent = formatarValor(valor);
     valorBolsa.textContent = formatarValor(valor);
     atualizarPrazos();
+    for (const p of bolsaTela.precos()) p.botao.disabled = p.preco > valor;
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {

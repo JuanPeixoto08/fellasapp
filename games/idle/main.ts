@@ -6,7 +6,7 @@ import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
 import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
-import { avisosPo, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
+import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
@@ -63,20 +63,29 @@ let bolsaAberta = false;
 let bolsa: BolsaEstado | null = null;
 let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;
+let buscandoBolsa = false;
+// ações que viraram pó desde que a gaveta abriu (o servidor avisa uma vez só; o aviso fica na Bolsa até fechar)
+let poPendentes: BolsaEstado['viraram_po'] = [];
+/** Guarda o mercado que chegou (busca, compra/venda ou melhoria) e os avisos de pó dele. */
+function receberBolsa(b: BolsaEstado) {
+  bolsa = b;
+  bolsaBuscadaEm = Date.now();
+  poPendentes = [...poPendentes, ...b.viraram_po];
+}
 
 async function carregarBolsa() {
   if (timerBolsa !== null) clearTimeout(timerBolsa);
   timerBolsa = null;
   const s = ancora?.estado;
   if (!bolsaAberta || !s || (s.generators[18] ?? 0) < 1) return; // gerador 19 = Grupo de trader
+  buscandoBolsa = true;
   try {
-    bolsa = await api.idleBolsa();
-    bolsaBuscadaEm = Date.now();
-    filaAvisos.adicionar(avisosPo(bolsa.viraram_po));
+    receberBolsa(await api.idleBolsa());
     render();
   } catch {
     // sem rede: tenta de novo na próxima virada
   }
+  buscandoBolsa = false;
   if (bolsaAberta && !document.hidden) timerBolsa = setTimeout(() => void carregarBolsa(), proximaBusca(bolsa?.vira_em_ms ?? 60_000));
 }
 const filaAvisos = criarFilaAvisos((texto) => {
@@ -141,20 +150,19 @@ const tela = criarTela(document.getElementById('app')!, {
   comprarNo: (id) => void guard(async () => aplicar(await api.idleBuyNode(id))),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
+    if (!bolsaAberta) poPendentes = [];
     if (!bolsaAberta && timerBolsa !== null) clearTimeout(timerBolsa);
     render();
     if (bolsaAberta) void carregarBolsa();
   },
   negociar: (empresa, lado, qtd, tick) => void guard(async () => {
     const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick);
-    bolsa = r.bolsa;
-    bolsaBuscadaEm = Date.now();
+    receberBolsa(r.bolsa);
     aplicar(r);
   }),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);
-    bolsa = r.bolsa;
-    bolsaBuscadaEm = Date.now();
+    receberBolsa(r.bolsa);
     aplicar(r);
   }),
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
@@ -214,7 +222,7 @@ function render() {
   tela.renderizar({
     fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
-    bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()) },
+    bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
@@ -232,6 +240,8 @@ function aplicar(estado: IdleState) {
   const novas = detectarNovas(conquistasConhecidas, estado);
   conquistasConhecidas = novas.conhecidas;
   filaAvisos.adicionar(avisos(novas.ids));
+  // o 1º Grupo de trader (ou o de depois de vender a startup) chegou com a gaveta aberta: nada estava marcado, busca já
+  if (buscarBolsaAgora(bolsaAberta, (estado.generators[18] ?? 0) >= 1, timerBolsa !== null || buscandoBolsa)) void carregarBolsa();
 }
 
 async function recarregar() {

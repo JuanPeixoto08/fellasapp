@@ -2,7 +2,7 @@
 // tela cheia (CSS). O detalhe aparece com uma empresa escolhida (tocar de novo fecha). Texto sempre por textContent.
 import { button, el } from '../shared/hud/hud';
 import type { BolsaEstado, BolsaPosicao, LadoBolsa, MelhoriaBolsa } from '../shared/types';
-import { acoes, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
+import { acoes, avisosPo, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 import { formatarValor } from './formatar';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -43,23 +43,26 @@ export function criarBolsaTela(a: {
   let ultimo: [BolsaEstado | null, number, boolean] | null = null;
 
   let relogioEl: HTMLElement | null = null;
+  // botões de compra que só dependem do F$ (o atualizarValor da página acende e apaga a cada 100 ms)
+  let atuais: Precos[] = [];
   /** "preço novo em m:ss" do detalhe aberto, chamado pela página enquanto o minuto corre. */
   function relogio(ms: number) {
     if (!relogioEl) return;
     const s = Math.max(0, Math.ceil(ms / 1000));
     relogioEl.textContent = `preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
-  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): Precos[] {
+  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): void {
     ultimo = [b, valuation, ocupado];
     raiz.replaceChildren();
     relogioEl = null;
+    atuais = [];
     if (!b) {
       raiz.append(el('p', 'vazio', 'Carregando a Bolsa…'));
-      return [];
+      return;
     }
     if (!b.aberta) {
       raiz.append(el('p', 'vazio', 'Compra 1 Grupo de trader pra abrir a Bolsa.'));
-      return [];
+      return;
     }
     const pos = (id: number): BolsaPosicao | undefined => b.carteira.find((p) => p.empresa === id);
 
@@ -73,6 +76,10 @@ export function criarBolsaTela(a: {
     c2.append('Lucro ', el('b', classeVar(lucroTotal), `${lucroTotal >= 0 ? '+' : '−'}${formatarValor(Math.abs(lucroTotal))}`));
     cart.append(c1, c2);
     topo.append(el('h3', 'bolsa-titulo', 'Bolsa da Faria Lima'), cart);
+    // ações que viraram pó (a empresa quebrou): o aviso fica aqui até fechar a gaveta (a página guarda)
+    const po = el('div', 'bolsa-po');
+    po.setAttribute('role', 'status');
+    for (const t of avisosPo(b.viraram_po)) po.append(el('p', undefined, t));
 
     // melhorias da Bolsa: o nível atual e o botão do próximo (preço em segundos × r)
     const melhorias = el('div', 'bolsa-melhorias');
@@ -125,7 +132,7 @@ export function criarBolsaTela(a: {
     }
     const miolo = el('div', 'bolsa-miolo');
     miolo.append(lista);
-    raiz.append(topo, melhorias, miolo);
+    raiz.append(topo, ...(b.viraram_po.length ? [po] : []), melhorias, miolo);
 
     const m = b.empresas.find((x) => x.id === escolhida);
     if (m) {
@@ -174,7 +181,7 @@ export function criarBolsaTela(a: {
         for (const [q, n] of [[1, 1], [10, 10], [0, 1]] as const) {
           const bt = button(q === 0 ? 'Máx' : String(q), 'btn main', () => a.negociar(m.id, 'comprar', q, b.tick));
           bt.disabled = ocupado || cabe < n || maxCompra(valuation, m.valor, b.r, m.limite, tem, b.corretagem) < n;
-          precos.push({ botao: bt, preco: n * unidade });
+          if (!ocupado && cabe >= n) precos.push({ botao: bt, preco: n * unidade }); // no limite fica apagado
           comprar.append(bt);
         }
         const vender = el('div', 'bts vender');
@@ -188,9 +195,10 @@ export function criarBolsaTela(a: {
       }
       miolo.append(d);
     }
-    // botões apagados por F$ não entram no atualizarValor (ficariam acesos sozinhos)
-    return precos.filter((x) => !x.botao.disabled || x.preco <= valuation);
+    atuais = precos;
   }
+  /** Os botões que o F$ acende e apaga (vazio com a Bolsa fora da tela). */
+  const precosAtuais = () => (raiz.isConnected ? atuais : []);
 
-  return { elemento: raiz, renderizar, relogio };
+  return { elemento: raiz, renderizar, relogio, precos: precosAtuais };
 }

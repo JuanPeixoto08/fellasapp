@@ -213,7 +213,7 @@
 
 /* modais: folha que sobe de baixo no celular; janela no meio do PC */
 .idle .modal { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(11, 10, 14, 0.72); color: var(--paper); z-index: 10; }
-.idle .folha { width: 100%; max-height: 85dvh; overflow: auto; display: grid; gap: 4px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: var(--i-painel); box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -8px 24px rgba(0, 0, 0, 0.4); }
+.idle .folha { width: 100%; max-height: calc(85dvh / var(--zoom, 1)); overflow: auto; display: grid; gap: 4px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: var(--i-painel); box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -8px 24px rgba(0, 0, 0, 0.4); }
 @media (min-width: 600px) {
   .idle .modal { align-items: center; padding: 24px; }
   .idle .folha { width: min(460px, 100%); padding: 20px; box-shadow: 0 -2px 0 0 var(--i-borda2), 0 2px 0 0 var(--i-borda2), -2px 0 0 0 var(--i-borda2), 2px 0 0 0 var(--i-borda2), 0 12px 32px rgba(0, 0, 0, 0.5); }
@@ -279,6 +279,8 @@
 .idle .bolsa { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .idle .bolsa-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .idle .bolsa-titulo { margin: 0; font: 400 23px var(--i-pixel); }
+.idle .bolsa-po { display: grid; gap: 2px; padding: 8px 10px; background: #4A1620; color: #FFB3B3; box-shadow: 0 0 0 2px #FF6B6B; font: 400 18px var(--i-pixel); }
+.idle .bolsa-po p { margin: 0; }
 .idle .carteira { display: flex; gap: 14px; font-size: 13px; color: var(--i-mudo); }
 .idle .carteira b { font: 400 18px var(--i-pixel); color: var(--paper); }
 .idle .bolsa-melhorias { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

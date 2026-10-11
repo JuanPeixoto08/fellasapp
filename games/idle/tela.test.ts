@@ -39,6 +39,21 @@ beforeEach(() => {
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
 
 describe('tela da Fellas Inc.', () => {
+  it('PC grande: a página ganha zoom e o --zoom (o que usa dvh divide por ele); celular fica sem', () => {
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    try {
+      Object.assign(window, { innerWidth: 1920, innerHeight: 960 });
+      criarTela(root, acoes);
+      const app = root.querySelector<HTMLElement>('.app')!;
+      expect(Number(app.style.getPropertyValue('--zoom'))).toBeCloseTo(4 / 3);
+      expect(app.style.getPropertyValue('--cena-w')).toBe('480px'); // 4× = 640 na tela
+      Object.assign(window, { innerWidth: 390, innerHeight: 760 });
+      window.dispatchEvent(new Event('resize'));
+      expect(app.style.getPropertyValue('--zoom')).toBe('');
+    } finally {
+      Object.assign(window, { innerWidth: w, innerHeight: h });
+    }
+  });
   it('antes: só o Abrir CNPJ', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
