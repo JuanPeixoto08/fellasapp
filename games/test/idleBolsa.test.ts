@@ -240,4 +240,54 @@ describe('carteira e negociar', () => {
     await expect(t.rpc('idle_bolsa')).rejects.toThrow('not_member');
     await expect(t.asRole('authenticated', 'select public.idle_bolsa_estado($1, 1)', [A])).rejects.toThrow();
   });
+
+  const melhorar = (tipo: string, nivel: number) =>
+    q<{ v: Resp }>('select public.idle_bolsa_melhorar_em($1, $2, $3, $4) as v', [A, tipo, nivel, T]).then((x) => x[0].v);
+
+  it('Corretor 1: custa 1800 s de produção, corretagem cai pra 4% e a próxima compra paga 4%', async () => {
+    const rr = await r();
+    const antes = await valuation();
+    const resp = await melhorar('corretor', 1);
+    expect(antes - resp.valuation).toBeCloseTo(1800 * rr, 3);
+    expect(resp.bolsa).toMatchObject({ corretor: 1, corretagem: 0.04 });
+    // salvar a melhoria confere as conquistas (pode dar +1% cada): a produção da compra é a de agora
+    const rr2 = await r();
+    const v0 = await valuation();
+    const c = await negociar(1, 'comprar', 10);
+    expect(v0 - c.valuation).toBeCloseTo(10 * 30 * rr2 * 1.04, 3);
+    expect(c.bolsa.carteira[0].custo).toBeCloseTo(10 * 30 * 1.04, 9);
+  });
+  it('Escritório: +25 em todas no nível 1, +50 no nível 2 (o do nível, não a soma)', async () => {
+    await melhorar('escritorio', 1);
+    expect((await estado()).empresas[0].limite).toBe(145);
+    await melhorar('escritorio', 2);
+    const b = await estado();
+    expect(b.empresas[0].limite).toBe(170);
+    expect(b.empresas[1].limite).toBe(150);
+  });
+  it('nível fora de ordem, repetido ou depois do 5: idle_bolsa_nivel; sem F$: idle_cant_afford; sem trader: idle_bolsa_fechada', async () => {
+    await expect(melhorar('corretor', 2)).rejects.toThrow('idle_bolsa_nivel');
+    await melhorar('corretor', 1);
+    await expect(melhorar('corretor', 1)).rejects.toThrow('idle_bolsa_nivel');
+    await expect(melhorar('outra', 1)).rejects.toThrow('idle_bad_choice');
+    await q('update public.idle_bolsa_nivel set corretor = 5 where user_id = $1', [A]);
+    await expect(melhorar('corretor', 6)).rejects.toThrow('idle_bolsa_nivel');
+    await q('update public.idle_state set valuation = 1 where user_id = $1', [A]);
+    await expect(melhorar('escritorio', 1)).rejects.toThrow('idle_cant_afford');
+    await q(`update public.idle_state set generators[19] = 0 where user_id = $1`, [A]);
+    await expect(melhorar('escritorio', 1)).rejects.toThrow('idle_bolsa_fechada');
+  });
+  it('as melhorias ficam na venda da startup', async () => {
+    await melhorar('escritorio', 1);
+    await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    expect(await estado()).toMatchObject({ escritorio: 1, corretor: 0 });
+  });
+  it('RPC idle_bolsa_melhorar: membro compra; não membro é recusado', async () => {
+    await q('update public.idle_bolsa_mercado set tick = public.idle_bolsa_agora() - 1 where true');
+    const resp = await t.rpc<Resp>('idle_bolsa_melhorar', { p_tipo: 'corretor', p_nivel: 1 });
+    expect(resp.bolsa.corretor).toBe(1);
+    await t.as(OUT);
+    await expect(t.rpc('idle_bolsa_melhorar', { p_tipo: 'corretor', p_nivel: 2 })).rejects.toThrow('not_member');
+  });
 });
