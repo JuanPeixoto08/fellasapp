@@ -157,7 +157,10 @@ export const VISUAL_NOMES = {
 export type TipoConquista =
   | 'gerador' | 'gerador_exato' | 'taxa' | 'era' | 'melhoria' | 'melhorias' | 'oportunidades' | 'vendas'
   | 'contratei' | 'contratado' | 'estrategia_era' | 'estrategia_todas' | 'aura' | 'brainrot'
-  | 'aura_negativa' | 'sigma' | 'jaula' | 'madrugada' | 'unicornio';
+  | 'aura_negativa' | 'sigma' | 'jaula' | 'madrugada' | 'unicornio'
+  // horta (0048): de estado (contadores e coleção) e de evento (plantou/colheu/descobriu/brotou)
+  | 'horta_plantou' | 'horta_colheu' | 'horta_morreu' | 'horta_colecao'
+  | 'horta_pix' | 'horta_mandioca' | 'horta_coentro' | 'horta_inhame' | 'horta_abacate' | 'horta_morango';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -198,7 +201,7 @@ export type ConquistaTexto = {
   alvo?: number; valor?: number; escondida?: boolean;
 };
 
-/** As outras conquistas: visíveis (31 a 62) e escondidas (101 em diante; só aparecem quando alguém do grupo
+/** As outras conquistas: visíveis (31 a 72) e escondidas (101 em diante; só aparecem quando alguém do grupo
  *  consegue). Conquista nova = id novo e migração nova do catálogo; id nunca muda nem é reaproveitado (o banco guarda
  *  quem ganhou pelo id). */
 export const CONQUISTAS: readonly ConquistaTexto[] = [
@@ -234,6 +237,17 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 60, tipo: 'contratado', valor: 50, nome: 'Funcionário do mês, todo mês', frase: 'Cinquenta contratos. Você trabalha?', condicao: 'Ser contratado 50 vezes' },
   { id: 61, tipo: 'estrategia_era', nome: 'Indeciso profissional', frase: 'Já foi de tudo um pouco.', condicao: 'Usar as 3 estratégias de uma era (uma em cada empresa)' },
   { id: 62, tipo: 'estrategia_todas', nome: 'Conhece todos os caminhos', frase: 'Não tem estratégia que você não testou.', condicao: 'Usar todas as estratégias liberadas' },
+  // horta do Food truck (0048)
+  { id: 63, tipo: 'horta_pix', nome: 'Dinheiro dá em árvore sim', frase: 'Seu pai mentiu pra você.', condicao: 'Plantar o primeiro Pé de Pix' },
+  { id: 64, tipo: 'horta_plantou', valor: 100, nome: 'Agro é pop', frase: 'Agro é tech, agro é pop, agro é tudo.', condicao: 'Plantar 100 plantas' },
+  { id: 65, tipo: 'horta_colheu', valor: 50, nome: 'Colheita Feliz', frase: 'Saudades de roubar ovo do vizinho no Orkut.', condicao: 'Colher 50 plantas' },
+  { id: 66, tipo: 'horta_mandioca', nome: 'Saudando a mandioca', frase: 'Uma das maiores conquistas do Brasil.', condicao: 'Descobrir a Mandioca Turbo' },
+  { id: 67, tipo: 'horta_coentro', nome: 'Coentro é bom sim', frase: 'Alguém tinha que defender.', condicao: 'Colher um Coentro' },
+  { id: 68, tipo: 'horta_inhame', nome: 'Pai rico, pai pobre', frase: 'Já leu o livro? Ele leu a capa.', condicao: 'Descobrir o Inhame do Primo Rico' },
+  { id: 69, tipo: 'horta_abacate', nome: 'Shape inexplicável', frase: 'Treino, dieta e abacate.', condicao: 'Colher um Abacate Proteico' },
+  { id: 70, tipo: 'horta_morreu', valor: 10, nome: 'Planta de plástico era melhor', frase: 'Pelo menos ela não julga.', condicao: 'Deixar 10 plantas morrerem de velhas' },
+  { id: 71, tipo: 'horta_colecao', valor: 8, nome: 'Temos que plantar', frase: 'Ash Ketchum da roça.', condicao: 'Descobrir as 8 plantas da horta' },
+  { id: 72, tipo: 'gerador', alvo: 11, valor: 200, nome: 'Fazendinha do Facebook', frase: 'Convida os amigos pra regar.', condicao: 'Ter 200 "Food truck" (horta 6 × 6)' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -244,6 +258,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 109, escondida: true, tipo: 'sigma', nome: 'Modo sigma', frase: 'Lobo solitário do empreendedorismo.', condicao: 'Vender a startup sem nunca ter contratado ninguém' },
   { id: 110, escondida: true, tipo: 'unicornio', nome: 'Pai tá on', frase: 'O pai tá on.', condicao: 'Ser o unicórnio da semana' },
   { id: 111, escondida: true, tipo: 'brainrot', valor: 60, nome: 'Brainrot', frase: 'Tung tung tung empreendedor.', condicao: 'Pegar 3 oportunidades em menos de 1 minuto' },
+  { id: 112, escondida: true, tipo: 'horta_morango', nome: 'Ele tem pescoço sim', frase: 'Você viu com seus próprios olhos.', condicao: 'Ver um Morango com Pescoço brotar' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
