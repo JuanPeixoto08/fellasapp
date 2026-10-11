@@ -61,6 +61,18 @@ ponto de partida:
 | Tempo | teto do offline 12h · 16h · 24h · 36h · 48h |
 | Gente | contratar 25% mais barato · seus contratados rendem 15% (no lugar de 10%) · contrato dura 10 dias · quem te contrata rende o dobro pra você · contratar 50% mais barato |
 
+Nomes (com referência nacional; aprovados pelo Juan em 11/10), na ordem de cada ramo:
+- Raiz: **Virou MEI**.
+- Produção: Cafezinho de garrafa térmica · Ô loco, bicho! · Turno dobrado · Tema da Vitória · O hexa vem.
+- Recomeço: Porquinho quebrado · Notebook da Positivo · Leva o crachá · Herança da tia rica · Material escolar completo.
+- Oportunidades: Grupo de promoção no zap · Print de tudo · Relâmpago da Shopee · Xepa da feira · Gaveta de tranqueira.
+- Tempo: Soneca pós-almoço · Ponto facultativo · Feriado prolongado · Feriadão emendado · Carnaval.
+- Gente: Placa de "Precisa-se" · Aniversariante do mês · Carteira assinada · Passe de craque · Jovem Aprendiz.
+
+Regras (confirmadas em 11/10): o −50% da Gente substitui o −25% (não soma); os 15% por contratado não somam com a
+Cultura de startup; "Passe de craque" dobra o que quem te contratou rende pra você, mas não o piso de freela; "Leva o
+crachá" mantém, na venda, as melhorias gerais que você tinha.
+
 - Tudo que mexe na produção, no teto ou nos contratos existe igual no banco e em `economia.ts` (paridade).
 - A primeira semana rende uns 15 pontos; completar a árvore leva meses (de propósito).
 - O placar mostra os pontos ganhos na vida ("★ 37").
