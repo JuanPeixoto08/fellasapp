@@ -2,7 +2,7 @@
 // formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio, nós da
 // árvore e conquistas (uma escondida, pra aba Legado mostrar o "???"). Nunca entra no build.
 import {
-  linhaPlacar, type BolsaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type MelhoriaBolsa,
+  linhaPlacar, type BolsaEstado, type HortaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type MelhoriaBolsa,
 } from '../shared/types';
 import { call, dono, FRIENDS, ME } from './mockDb';
 
@@ -44,6 +44,11 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
 export const idlePickStrategy = (era: number, opcao: number) => call<IdleState>('select public.idle_pick_strategy($1, $2) as v', [era, opcao]);
 export const idleClaim = (window: number) => call<IdleState>('select public.idle_claim_opportunity($1) as v', [window]);
 export const idleDouradoPegar = (seg: number, lado: number) => call<IdleState>('select public.idle_dourado_pegar($1, $2) as v', [seg, lado]);
+type ComHorta = IdleState & { horta: HortaEstado; descobriu?: number | null };
+export const idleHorta = () => call<HortaEstado>('select public.idle_horta() as v');
+export const idleHortaPlantar = (canteiro: number, especie: number) => call<ComHorta>('select public.idle_horta_plantar($1, $2) as v', [canteiro, especie]);
+export const idleHortaColher = (canteiro: number) => call<ComHorta>('select public.idle_horta_colher($1) as v', [canteiro]);
+export const idleHortaArrancar = (canteiro: number) => call<ComHorta>('select public.idle_horta_arrancar($1) as v', [canteiro]);
 export const idleHire = (userId: string) => call<IdleState>('select public.idle_hire($1) as v', [userId]);
 export const idleSetAvatar = (v: IdleVisual) => avatar(v);
 export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');
@@ -106,6 +111,42 @@ w.__dourado = async (tipo = 2) => {
   await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
   (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);
 };
+/** Quantos Food trucks o mock tem agora. */
+async function dono2(): Promise<{ ft: number }> {
+  const { ready } = await import('./mockDb');
+  const db = await ready;
+  const r = await db.query<{ ft: number }>('select generators[11] as ft from public.idle_state where user_id = $1', [ME]);
+  return { ft: r.rows[0]?.ft ?? 0 };
+}
+
+// horta no mock: __foodTrucks(n) põe n Food trucks; __hortaAvancar(h) faz a horta "viver" h horas (plantas e passos
+// pra trás); __hortaSorte(true) faz todo cruzamento possível acontecer (false volta ao normal)
+const wh = window as unknown as {
+  __foodTrucks: (n: number) => Promise<void>; __hortaAvancar: (horas: number) => Promise<void>; __hortaSorte: (forcar: boolean) => Promise<void>;
+};
+wh.__foodTrucks = async (n) => {
+  await dono(`update public.idle_state set generators[11] = $2, strategies = '{0,0,0,0}' where user_id = $1`, [ME, n]);
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+wh.__hortaAvancar = async (horas) => {
+  await dono(`update public.idle_horta_plantas set inicio = inicio - make_interval(hours => $2), fim = fim - make_interval(hours => $2) where user_id = $1`, [ME, horas]);
+  await dono(`update public.idle_state set horta_passo = horta_passo - $2 * 12, horta_visto = horta_visto - make_interval(hours => $2) where user_id = $1`, [ME, horas]);
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+wh.__hortaSorte = async (forcar) => {
+  const { ready } = await import('./mockDb');
+  const db = await ready;
+  const ja = await db.query<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'idle_horta_sorte_real'");
+  if (!ja.rows[0].n) {
+    await db.exec(`alter function public.idle_horta_sorte(uuid, int, bigint, int) rename to idle_horta_sorte_real;
+      create table public.mock_horta (forcar boolean not null);
+      insert into public.mock_horta values (false);
+      create function public.idle_horta_sorte(u uuid, c int, t bigint, k int) returns double precision language sql stable as
+        'select case when (select forcar from public.mock_horta) then 0 else public.idle_horta_sorte_real(u, c, t, k) end';`);
+  }
+  await db.query('update public.mock_horta set forcar = $1 where true', [forcar]);
+};
+
 // painel do ?mock pra testar os eventos sem abrir o console (só no dev)
 {
   const painel = document.createElement('div');
@@ -118,6 +159,19 @@ w.__dourado = async (tipo = 2) => {
     b.addEventListener('click', () => void w.__dourado(tipo));
     painel.append(b);
   });
+  const horta: [string, () => Promise<void>][] = [
+    ['+25 Food trucks', async () => wh.__foodTrucks(((await dono2()).ft ?? 0) + 25)],
+    ['Horta +1 h', () => wh.__hortaAvancar(1)],
+    ['Horta +8 h', () => wh.__hortaAvancar(8)],
+    ['Cruzar (sorte)', async () => { await wh.__hortaSorte(true); await wh.__hortaAvancar(0.5); await wh.__hortaSorte(false); }],
+  ];
+  for (const [nome, f] of horta) {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#2E7D3A;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void f());
+    painel.append(b);
+  }
   const t = document.createElement('span');
   t.textContent = 'mock: eventos';
   t.style.cssText = 'color:#aaa;align-self:center';

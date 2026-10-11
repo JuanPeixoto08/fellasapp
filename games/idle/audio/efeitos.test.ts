@@ -13,7 +13,7 @@ describe('efeitos', () => {
   it('todos os momentos da spec têm receita; cada uma agenda, se desliga e diz quanto dura', () => {
     expect([...IDS_EFEITOS].sort()).toEqual(
       ['abrir', 'acaoCompra', 'acaoVende', 'cnpj', 'clique', 'compra', 'compraMuitas', 'conquista', 'contratado', 'dourado',
-        'douradoPego', 'era', 'erro', 'fechar', 'no', 'oportunidade', 'pegar', 'po', 'venda'].sort(),
+        'douradoPego', 'era', 'erro', 'fechar', 'no', 'oportunidade', 'pegar', 'plantar', 'po', 'venda'].sort(),
     );
     for (const id of IDS_EFEITOS) {
       const { c, dura } = tocar(id);

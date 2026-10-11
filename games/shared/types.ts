@@ -121,6 +121,8 @@ export type IdleState = {
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
   /** Eventos na tela (0045): fim da Promoção relâmpago (null = não está valendo) e os fins dos Viralizou ativos. */
   promo_ate: string | null; viral: string[];
+  /** Bônus da horta agora (0048); a página aplica nos preços. */
+  horta_bonus?: BonusHorta;
   /** Entrega 2 (0038): seu visual (null = nunca salvou), quem você contratou (contratos ativos, do mais recente ao
    *  mais antigo), quem te contratou, o que entra na conta dos contratos, o preço do próximo contrato e o próximo
    *  vencimento que muda a sua taxa (null = nenhum). */
@@ -161,6 +163,13 @@ export type IdleVisual = {
 /** Bolsa da Fellas Inc. (0043 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
 export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] };
 export type BolsaPosicao = { empresa: number; qtd: number; custo: number };
+/** Horta do Food truck (0048): os bônus das maduras agora, as plantas vivas, as descobertas. */
+export type BonusHorta = { producao: number; geradores: number; melhorias: number; oportunidades: number };
+export type PlantaHorta = { canteiro: number; especie: number; inicio: string; origem: 'plantada' | 'cruzou' | 'morango' };
+export type HortaEstado = {
+  lado: number; food_trucks: number; plantas: PlantaHorta[]; descobertas: number[]; bonus: BonusHorta; server_now: string;
+};
+
 export type BolsaEstado = {
   tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
   empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[];

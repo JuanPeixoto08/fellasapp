@@ -4,7 +4,7 @@ import { hz, INSTRUMENTOS, ruido } from './instrumentos';
 
 export const IDS_EFEITOS = [
   'compra', 'compraMuitas', 'no', 'acaoCompra', 'acaoVende', 'conquista', 'era', 'venda', 'contratado', 'po', 'oportunidade',
-  'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego',
+  'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar',
 ] as const;
 export type IdEfeito = (typeof IDS_EFEITOS)[number];
 export type OpcoesEfeito = { quantas?: number; lucro?: boolean };
@@ -155,6 +155,12 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     [77, 81, 84, 89, 93, 96].forEach((m, i) => sininho(c, d, t + i * 0.07, m, 0.2, 0.75));
     [96, 98, 96, 98, 96].forEach((m, i) => sininho(c, d, t + 0.45 + i * 0.06, m, 0.1, 0.35));
     return 1.3;
+  },
+  plantar: (c, d, t) => {
+    // "ploc" de terra: um baque grave que cai, com um chiado curto de terra
+    bumbo(c, d, t, 0, 0.15, 0.45);
+    ruidoFiltrado(c, d, t, 'lowpass', 900, 300, 0.12, 0.05);
+    return 0.3;
   },
   douradoPego: (c, d, t) => {
     acorde(c, d, t, [69, 72, 77], 0.5, 0.9);

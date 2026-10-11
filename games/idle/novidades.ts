@@ -4,6 +4,18 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-11-horta',
+    titulo: 'Horta do Food truck',
+    data: '2026-10-11',
+    itens: [
+      'Gaveta nova na bancada: a Horta. Abre com 1 Food truck e cresce com eles (até 6 × 6).',
+      'Planta, espera crescer, e a planta madura dá bônus: produção, geradores e melhorias mais baratos.',
+      'Duas vizinhas maduras às vezes cruzam e nasce uma espécie nova. Colhe pra liberar a semente.',
+      'Planta velha morre. Dizem que onde ela morreu às vezes nasce um morango… com pescoço.',
+      '11 conquistas novas da roça.',
+    ],
+  },
+  {
     id: '2026-10-11-contratos',
     titulo: 'Contrato é contrato',
     data: '2026-10-11',
