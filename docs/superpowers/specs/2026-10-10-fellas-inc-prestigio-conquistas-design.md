@@ -40,8 +40,9 @@ jogo de longo prazo de quem já chegou longe, sem tirar a graça de quem começa
 - A empresa volta para "Abrir CNPJ" (cena "antes"); o "Abrir CNPJ" dá o F$ 10 e o notebook de sempre.
 - Os contratos que você fez vencem na hora (`ends_at = agora`), com a conta dos contratados fechada antes (nada
   retroativo, como na entrega 2). Quem te contratou continua.
-- Ficam: pontos (ganhos e não gastos), nós da árvore, número de vendas, conquistas, personagem, o limite diário de
-  oportunidades (não reabre a cota do dia) e o recorde de F$/s.
+- Ficam: pontos (ganhos e não gastos), nós da árvore, número de vendas, conquistas, personagem e o recorde de F$/s.
+- A cota diária de oportunidades recomeça na venda (0044, pedido do Juan em 11/10: a empresa nova não espera o dia
+  seguinte). As janelas já pegas continuam pegas; vender pede bater o recorde, então não vira jeito de renovar a cota.
 - Os nós do ramo Recomeço valem na hora do novo "Abrir CNPJ" (dinheiro inicial, notebooks, melhorias gerais mantidas…).
 - Confirmação antes: folha com "Vender a startup? Você ganha N pontos pra gastar na árvore e recomeça do zero." e os
   botões "Vender" / "Deixa quieto".

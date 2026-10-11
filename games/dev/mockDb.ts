@@ -17,6 +17,7 @@ import m38 from '../../supabase/migrations/0038_fellas_inc_gente.sql?raw';
 import m40 from '../../supabase/migrations/0040_fellas_inc_catalogo_conquistas.sql?raw';
 import m41 from '../../supabase/migrations/0041_fellas_inc_prestigio.sql?raw';
 import m43 from '../../supabase/migrations/0043_fellas_inc_bolsa.sql?raw';
+import m44 from '../../supabase/migrations/0044_fellas_inc_venda_oportunidades.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 
@@ -30,7 +31,7 @@ export const FRIENDS: [string, string, number][] = [
 export const ready = (async () => {
   const db = new PGlite();
   await db.exec(SKELETON);
-  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43]) await db.exec(m);
+  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44]) await db.exec(m);
   await db.query(`insert into public.profiles (id, username, display_name) values ($1, 'eu', 'Você')`, [ME]);
   for (const [id, name, balance] of FRIENDS) {
     await db.query(`insert into public.profiles (id, username, display_name) values ($1, lower($2), $2)`, [id, name]);

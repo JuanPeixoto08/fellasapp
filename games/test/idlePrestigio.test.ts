@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { abertura, efeitosArvore, pontosTotais } from '../idle/economia';
+import { pendentes } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -18,7 +19,7 @@ const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql,
 
 type Estado = {
   user_id: string; started: boolean; valuation: number; rate: number; era: number; generators: number[]; upgrades: number[];
-  strategies: number[]; boost_until: string | null; half_price: boolean; opp_left: number; server_now: string;
+  strategies: number[]; boost_until: string | null; half_price: boolean; opp_left: number; server_now: string; week_start: string;
   avatar: Record<string, number> | null; equipe: { user_id: string }[]; chefes: { user_id: string; ate: string }[];
   bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
   pontos_venda: number;
@@ -101,7 +102,7 @@ describe('pontos de prestígio', () => {
 });
 
 describe('vender a startup', () => {
-  it('zera a empresa e volta pro Abrir CNPJ; ficam pontos, nós, vendas, conquistas, personagem, a cota do dia e o recorde', async () => {
+  it('zera a empresa e volta pro Abrir CNPJ; ficam pontos, nós, vendas, conquistas, personagem e o recorde; a cota do dia recomeça', async () => {
     await abrir(A);
     await t.rpc('idle_set_avatar', {
       p_pele: V.pele, p_cabelo: V.cabelo, p_cor_cabelo: V.cor_cabelo, p_roupa: V.roupa, p_cor_roupa: V.cor_roupa,
@@ -129,7 +130,7 @@ describe('vender a startup', () => {
     expect(s.generators).toEqual(Array(30).fill(0));
     expect(s).toMatchObject({ pontos: P, pontos_vida: P, bonus: { arvore: [1, 11] } });
     expect(s.recorde).toBeCloseTo(antes.rate, 6);
-    expect(s.opp_left).toBe(6); // 10 por dia sem estratégia, 4 já pegas hoje: a cota não reabre
+    expect(s.opp_left).toBe(10); // a cota do dia recomeça com a empresa nova (10 sem estratégia)
     expect(s.conquistas.map((c) => c.id)).toEqual(expect.arrayContaining(antes.conquistas.map((c) => c.id)));
     expect(s.novas).toEqual(expect.arrayContaining([51, 109])); // Exit; Modo sigma (nunca contratou)
     // Abrir CNPJ de novo: F$ 10, 1 notebook e o bônus valendo
@@ -137,6 +138,21 @@ describe('vender a startup', () => {
     expect(r).toMatchObject({ started: true, valuation: 10, vendas: 1 });
     expect(r.generators[0]).toBe(1);
     expect(r.rate).toBeCloseTo(0.5 * 1.02 * 1.05 * 1.1 * (1 + 0.01 * r.bonus.conquistas), 10); // os nós continuam valendo
+  });
+  it('a cota do dia recomeça, mas a oportunidade já pega não paga de novo', async () => {
+    await abrir(A);
+    await enriquecer(A);
+    const s0 = await t.rpc<Estado>('idle_open');
+    const [w, outra] = pendentes(A, Date.parse(s0.server_now), [], Date.parse(s0.week_start + 'T00:00:00-03:00'));
+    await t.rpc('idle_claim_opportunity', { p_window: w });
+    // gastou a cota inteira do dia (13 com Viralizar)
+    await q(`update public.idle_state set opp_day = public.games_today(), opp_count = 13 where user_id = $1`, [A]);
+    expect((await t.rpc<Estado>('idle_open')).opp_left).toBe(0);
+    await vender();
+    const s = await t.rpc<Estado>('idle_start');
+    expect(s.opp_left).toBe(10);
+    await expect(t.rpc('idle_claim_opportunity', { p_window: w })).rejects.toThrow(/idle_opp_gone/);
+    expect((await t.rpc<Estado>('idle_claim_opportunity', { p_window: outra })).opp_left).toBe(9);
   });
   it('os contratos que você fez vencem na hora, com a conta dos contratados fechada antes; quem te contratou continua', async () => {
     await abrir(A, B, C);

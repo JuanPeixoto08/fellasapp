@@ -4,6 +4,12 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-11-venda-oportunidades',
+    titulo: 'Venda com cota nova',
+    data: '2026-10-11',
+    itens: ['Vender a startup agora recomeça a cota de oportunidades do dia. A empresa nova não precisa esperar até amanhã.'],
+  },
+  {
     id: '2026-10-11-bolsa',
     titulo: 'Bolsa da Faria Lima',
     data: '2026-10-11',
