@@ -61,7 +61,7 @@
 
 /* eventos na tela (tipo cookie dourado): por cima de tudo, num ponto sorteado; brilho, balanço e o anel dos 12 s */
 .idle .dourados { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
-.idle .dourado { position: absolute; width: 72px; height: 72px; margin: -36px 0 0 -36px; padding: 0; border: 0; border-radius: 50%;
+.idle .dourado { position: absolute; left: clamp(40px, var(--x, 50%), calc(100% - 40px)); width: 72px; height: 72px; margin: -36px 0 0 -36px; padding: 0; border: 0; border-radius: 50%;
   background: radial-gradient(circle, rgba(242, 210, 122, 0.45) 0%, rgba(242, 210, 122, 0) 68%); cursor: pointer; pointer-events: auto;
   animation: dourado-balanca 1.1s ease-in-out infinite alternate, dourado-pisca 0.22s steps(2) 9s 14 both; animation-delay: 0s, calc(9s + var(--ja, 0s)); }
 .idle .dourado:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }

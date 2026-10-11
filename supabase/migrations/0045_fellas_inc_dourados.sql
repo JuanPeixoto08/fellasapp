@@ -201,7 +201,8 @@ begin
     raise exception 'idle_strategy_pending' using errcode = 'P0001';
   end if;
   v_cm := public.idle_cost_mult(s);
-  v_promo := s.promo_ate is not null and s.promo_ate > now();
+  -- 1 s de folga: a página troca os preços no passo de 1 s; quem clicou vendo metade paga metade
+  v_promo := s.promo_ate is not null and s.promo_ate > now() - interval '1 second';
   if v_promo then
     v_cm := v_cm / 2; -- Promoção relâmpago: tudo pela metade (preço, 10 e Máx)
   end if;
@@ -346,7 +347,11 @@ begin
   if not s.started then
     raise exception 'idle_not_started' using errcode = 'P0001';
   end if;
-  v_tipo := case when p_seg is null then null else public.idle_dourado(v_me, p_seg) end;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 60 then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  v_tipo := public.idle_dourado(v_me, p_seg);
   v_ini := to_timestamp(p_seg);
   if v_tipo is null or now() < v_ini - interval '2 seconds' or now() > v_ini + interval '15 seconds' then
     raise exception 'idle_dourado_gone' using errcode = 'P0001';

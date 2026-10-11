@@ -83,6 +83,18 @@ describe('pegar um evento', () => {
     await evento(seg, 0);
     await expect(pegar(seg, 1)).rejects.toThrow(/idle_bad_choice/);
   });
+  it('segundo absurdo (bem longe de agora) é "já foi embora", não erro de data', async () => {
+    await expect(pegar(9_000_000_000_000_000)).rejects.toThrow(/idle_dourado_gone/);
+    await expect(pegar(-5)).rejects.toThrow(/idle_dourado_gone/);
+  });
+  it('Promoção que acabou há menos de 1 s ainda vale na compra (o botão mostrava metade)', async () => {
+    await q(`update public.idle_state set promo_ate = now() - interval '500 milliseconds' where user_id = $1`, [A]);
+    await parar();
+    const antes = await linha();
+    const cheio = (await custo2()).p;
+    const depois = await t.rpc<Json>('idle_buy', { p_kind: 'gerador', p_id: 2, p_qty: 1 });
+    expect(antes.valuation - depois.valuation).toBeCloseTo(cheio / 2, 3);
+  });
   it('até 15 s depois de aparecer ainda vale (12 s na tela + a folga da rede)', async () => {
     const seg = await agoraSeg();
     await evento(seg - 14, 1);

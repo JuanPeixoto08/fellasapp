@@ -23,7 +23,7 @@ describe('eventos na tela', () => {
     d.mostrar(ev());
     const b = raiz.querySelector<HTMLButtonElement>('.dourado')!;
     expect(b.getAttribute('aria-label')).toBe('Pegar: Investidor apressado');
-    expect(b.style.left).toBe('30%');
+    expect(b.style.getPropertyValue('--x')).toBe('30%');
     expect(b.style.top).toBe('40%');
     expect(b.querySelector('svg.icone-dourado')).not.toBeNull();
     expect(b.querySelector('.anel')).not.toBeNull();
@@ -40,7 +40,14 @@ describe('eventos na tela', () => {
     d.mostrar(ev({ seg: T / 1000 + 5, tipo: 2, lado: 1, x: 0.44 }));
     expect(raiz.querySelectorAll('.dourado')).toHaveLength(3);
     expect([...raiz.querySelectorAll('.dourado')].at(-1)!.getAttribute('aria-label')).toBe('Pegar: Viralizou');
-    expect([...raiz.querySelectorAll<HTMLElement>('.dourado')].at(-1)!.style.left).toBe('calc(44% + 84px)');
+    expect([...raiz.querySelectorAll<HTMLElement>('.dourado')].at(-1)!.style.getPropertyValue('--x')).toBe('calc(44% + 84px)');
+  });
+  it('a dupla nunca cai pra fora da tela: o segundo ícone vai pro lado que tem espaço', () => {
+    d.mostrar(ev({ seg: 1, tipo: 3, lado: 1, x: 0.3, agoraMs: 1000 }));
+    d.mostrar(ev({ seg: 2, tipo: 3, lado: 1, x: 0.7, agoraMs: 2000 }));
+    const [esq, dir] = [...raiz.querySelectorAll<HTMLElement>('.dourado')];
+    expect(esq.style.getPropertyValue('--x')).toBe('calc(30% + 84px)');
+    expect(dir.style.getPropertyValue('--x')).toBe('calc(70% - 84px)');
   });
   it('clicar chama o pegar uma vez e o ícone sai', () => {
     d.mostrar(ev());
