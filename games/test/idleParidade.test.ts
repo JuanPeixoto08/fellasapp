@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
-import { acumular, acumularTrechos, custoMult, maxCompra, preco, taxa, type Estado } from '../idle/economia';
+import {
+  acumular, acumularTrechos, custoMult, efeitosArvore, maxCompra, pontosTotais, precoContrato, preco, taxa, type Estado,
+} from '../idle/economia';
+import { pendentes } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -27,6 +30,19 @@ async function preparar(s: Estado, extras = '', valores: unknown[] = []) {
 }
 let t: TestDb;
 const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
+
+/** A fica com exatamente n conquistas (ids 1..n; a conta só olha quantas). */
+async function conquistas(n: number) {
+  await q('delete from public.idle_conquistas where true');
+  if (n) await q('insert into public.idle_conquistas (user_id, conquista_id) select $1, g from generate_series(1, $2) g', [A, n]);
+}
+/** A fica com exatamente esses nós da árvore (a conta não confere a ordem dos ramos: isso é do idle_buy_node). */
+async function arvore(nos: number[]) {
+  await q('delete from public.idle_arvore where true');
+  for (const n of nos) await q('insert into public.idle_arvore (user_id, no_id) values ($1, $2)', [A, n]);
+}
+/** Um pedaço sorteado da árvore. */
+const nosAoAcaso = (r: () => number) => catalogo.arvore.filter(() => r() < 0.4).map((n) => n.id);
 
 // gerador pseudoaleatório fixo: os mesmos estados toda vez
 function rng(seed: number) {
@@ -149,5 +165,114 @@ describe('paridade', () => {
       expect(rel(db.v, acumularTrechos(1000, trechos, T0, ate, T0 + 200_000))).toBeLessThan(1e-9);
     }
     await q('delete from public.idle_contracts where true');
+  });
+  it('o que a árvore faz é igual no banco e em economia.ts (cada nó sozinho e pedaços sorteados)', async () => {
+    const r = rng(3);
+    const casos = [[], ...catalogo.arvore.map((n) => [n.id]), ...Array.from({ length: 30 }, () => nosAoAcaso(r))];
+    for (const nos of casos) {
+      await arvore(nos);
+      const [{ e }] = await q<{ e: Record<string, number | boolean> }>('select public.idle_arvore_efeitos($1) as e', [A]);
+      const ts = efeitosArvore(catalogo, nos);
+      expect(Object.keys(e).sort(), String(nos)).toEqual(Object.keys(ts).sort());
+      for (const [k, v] of Object.entries(ts)) {
+        if (typeof v === 'boolean') expect(e[k], `${nos} ${k}`).toBe(v);
+        else expect(rel(e[k] as number, v), `${nos} ${k}`).toBeLessThan(1e-12);
+      }
+    }
+    await arvore([]);
+  });
+  it('taxa com a árvore, as conquistas e os contratos (Aniversariante do mês e Passe de craque)', async () => {
+    const r = rng(5);
+    for (const s of estados(30)) {
+      const bonus = { arvore: nosAoAcaso(r), conquistas: Math.floor(r() * 60) };
+      await preparar(s);
+      await arvore(bonus.arvore);
+      await conquistas(bonus.conquistas);
+      const contratei = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      const chefes = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      for (const u of contratei) await contrato(A, u);
+      for (const u of chefes) await contrato(u, A);
+      const social = { contratei: contratei.length, empregos: chefes.map((u) => (u === C ? 3 : 1)) };
+      const [db] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]);
+      expect(rel(db.r, taxa(catalogo, { ...s, bonus, social }))).toBeLessThan(1e-9);
+    }
+    await arvore([]);
+    await conquistas(0);
+  });
+  it('fechar a conta com a árvore: teto do ramo Tempo, vencimento no meio e bônus', async () => {
+    const T0 = Date.parse('2026-10-12T10:00:00Z');
+    const iso = (ms: number) => `'${new Date(ms).toISOString()}'::timestamptz`;
+    const s = estados(4)[3];
+    for (const nos of [[], [1, 41], [1, 41, 42, 43], [1, 11, 41, 42, 43, 44, 45]]) {
+      const bonus = { arvore: nos, conquistas: 9 };
+      const tetoS = efeitosArvore(catalogo, nos).tetoS;
+      await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
+      await arvore(nos);
+      await conquistas(bonus.conquistas);
+      await contrato(C, A, iso(T0 - 86400_000), iso(T0 + 300_000)); // C (Cultura) contratou A: vence 300 s depois
+      const trechos = [
+        { desdeMs: T0, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [3] } }) },
+        { desdeMs: T0 + 300_000, r: taxa(catalogo, { ...s, bonus, social: { contratei: 0, empregos: [] } }) },
+      ];
+      for (const ate of [T0 + 50_000, T0 + 1000_000, T0 + 10 * 3600_000, T0 + 30 * 3600_000, T0 + 60 * 3600_000]) {
+        const [db] = await q<{ v: number }>(
+          `select (public.idle_settle(s, $2::timestamptz)).valuation as v from public.idle_state s where user_id = $1`,
+          [A, new Date(ate).toISOString()],
+        );
+        expect(rel(db.v, acumularTrechos(1000, trechos, T0, ate, T0 + 200_000, tetoS)), `${nos} ${ate}`).toBeLessThan(1e-9);
+      }
+    }
+    await q('delete from public.idle_contracts where true');
+    await arvore([]);
+    await conquistas(0);
+  });
+  it('caixinha e validade com a árvore: banco e oportunidades.ts concordam', async () => {
+    const s = estados(1)[0];
+    await preparar(s);
+    const [{ agora, semana }] = await q<{ agora: string; semana: string }>(
+      `select now()::text as agora, (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')::text as semana`,
+    );
+    for (const nos of [[], [1, 31], [1, 31, 32], [1, 31, 32, 33, 34, 35]]) {
+      await arvore(nos);
+      const ef = efeitosArvore(catalogo, nos);
+      for (const horas of [0, 3, 5, 7]) {
+        const ts = Date.parse(agora) + horas * 3600_000;
+        const [db] = await q<{ l: string[] }>(
+          'select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1',
+          [A, new Date(ts).toISOString()],
+        );
+        expect(db.l.map(Number), `${nos} +${horas}h`).toEqual(
+          pendentes(A, ts, [], Date.parse(semana), { tamanho: ef.caixinha, validadeS: ef.validadeS }),
+        );
+      }
+    }
+    await arvore([]);
+  });
+  it('preço do contrato com a árvore (e Abrir capital)', async () => {
+    const r = rng(8);
+    for (const s of estados(10)) {
+      const nos = nosAoAcaso(r);
+      await preparar(s);
+      await arvore(nos);
+      const contratei = OUTROS.filter(() => r() < 0.5).map(([u]) => u);
+      for (const u of contratei) await contrato(A, u);
+      const [db] = await q<{ p: number }>('select public.idle_hire_price(s) as p from public.idle_state s where user_id = $1', [A]);
+      const est = { ...s, bonus: { arvore: nos, conquistas: 0 }, social: { contratei: contratei.length, empregos: [] } };
+      expect(rel(db.p, precoContrato(catalogo, est, contratei.length))).toBeLessThan(1e-9);
+    }
+    await arvore([]);
+  });
+  it('pontos de prestígio iguais no banco e em economia.ts, inclusive em cima dos cubos', async () => {
+    const r = rng(11);
+    const valores = [0, -1, 1, 999_999, 1e6, 8e6, 27e6, 1e9, 1e12];
+    for (let i = 0; i < 150; i++) valores.push(10 ** (r() * 16));
+    for (let n = 1; n <= 150; n++) {
+      const cubo = n ** 3 * 1e6;
+      valores.push(cubo, cubo * (1 - 2 ** -52), cubo * (1 + 2 ** -52));
+    }
+    for (const v of valores) {
+      const [db] = await q<{ n: number }>('select public.idle_prestige_total($1) as n', [v]);
+      expect(db.n, String(v)).toBe(pontosTotais(v));
+    }
   });
 });

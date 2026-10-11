@@ -18,6 +18,7 @@ export const MIGRATIONS: string[] = [
   '0037_fellas_inc_catalogo_gente.sql',
   '0038_fellas_inc_gente.sql',
   '0040_fellas_inc_catalogo_conquistas.sql',
+  '0041_fellas_inc_prestigio.sql',
 ];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;

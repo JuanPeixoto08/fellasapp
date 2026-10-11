@@ -1,7 +1,7 @@
 // Fórmulas da Fellas Inc. Iguais às do banco (0034, 0038, 0041): o banco decide, a tela só anima. Um teste de paridade
 // (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
 import type { Catalogo, Estrategia, Melhoria, No } from './catalogo';
-import { CAIXA_PADRAO, LIMITE_DIA } from './oportunidades';
+import { CAIXA_PADRAO } from './oportunidades';
 
 /** O que muda a produção pelos contratos ATIVOS: quantos você contratou e, para cada empresa que te contratou, quanto
  *  ela paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */

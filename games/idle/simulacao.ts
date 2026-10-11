@@ -104,8 +104,8 @@ export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
 }
 
 // o que não acelera o jogador sozinho da simulação: o ramo Gente (ninguém o contrata) e a validade das oportunidades
-// (o limite dele é o tamanho da caixinha, não o prazo: ele pega o que cabe a cada sessão). A simulação também ignora a
-// Viralizar (ela só vale por 1 hora e o jogador da simulação não a usa).
+// (o limite dele é o tamanho da caixinha, não o prazo: ele pega o que cabe a cada sessão). A simulação ESCOLHE a Viralizar
+// na era 3, mas a conta em TS não aplica oppExtra/oppBonusMult de estratégia (só os dos nós da árvore); o banco aplica.
 const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'validade'];
 
 /** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */
