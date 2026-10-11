@@ -129,8 +129,8 @@ wh.__foodTrucks = async (n) => {
   document.dispatchEvent(new Event('visibilitychange'));
 };
 wh.__hortaAvancar = async (horas) => {
-  await dono(`update public.idle_horta_plantas set inicio = inicio - make_interval(hours => $2), fim = fim - make_interval(hours => $2) where user_id = $1`, [ME, horas]);
-  await dono(`update public.idle_state set horta_passo = horta_passo - $2 * 12, horta_visto = horta_visto - make_interval(hours => $2) where user_id = $1`, [ME, horas]);
+  await dono(`update public.idle_horta_plantas set inicio = inicio - make_interval(secs => $2::float8 * 3600), fim = fim - make_interval(secs => $2::float8 * 3600) where user_id = $1`, [ME, horas]);
+  await dono(`update public.idle_state set horta_passo = horta_passo - round($2::float8 * 12)::bigint, horta_visto = horta_visto - make_interval(secs => $2::float8 * 3600) where user_id = $1`, [ME, horas]);
   document.dispatchEvent(new Event('visibilitychange'));
 };
 wh.__hortaSorte = async (forcar) => {
