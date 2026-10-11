@@ -10,6 +10,7 @@ import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, prec
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
+import { iconeFechar } from './icones';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
@@ -68,23 +69,6 @@ export function restam(ms: number) {
   if (h < 24) return `por mais ${h} h`;
   const d = Math.floor(h / 24);
   return d === 1 ? 'por mais 1 dia' : `por mais ${d} dias`;
-}
-
-/** X desenhado (não glifo), traço de 2px. */
-function iconeFechar() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 20 20');
-  svg.setAttribute('width', '20');
-  svg.setAttribute('height', '20');
-  svg.setAttribute('aria-hidden', 'true');
-  const p = document.createElementNS(ns, 'path');
-  p.setAttribute('d', 'M5 5l10 10M15 5L5 15');
-  p.setAttribute('stroke', 'currentColor');
-  p.setAttribute('stroke-width', '2');
-  p.setAttribute('stroke-linecap', 'round');
-  svg.append(p);
-  return svg;
 }
 
 export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
