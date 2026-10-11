@@ -8,6 +8,7 @@ import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
+import { douradoEm, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { temNovidade } from './novidades';
@@ -56,6 +57,9 @@ let volumeMusica = lerVolumeMusica();
 const audio = criarAudio();
 audio.chaves({ musica: volumeMusica, efeitos: chaves.efeitos });
 let vivoSoou: number | null = null;
+// eventos na tela: o último segundo já olhado e se a Promoção valia no último passo (acabou: os preços voltam)
+let segVisto = 0;
+let promoValia = false;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
@@ -146,6 +150,28 @@ const tela = criarTela(document.getElementById('app')!, {
     render();
   },
   efeito: (id) => audio.tocar(id),
+  // fora do guard: pegar não espera outra compra terminar (o evento some em 12 s)
+  pegarDourado: (seg, lado) => void (async () => {
+    const s0 = ancora?.estado;
+    const tipo = s0 ? douradoEm(s0.user_id, seg) : null;
+    if (!s0 || tipo === null) return;
+    const p = posicao(s0.user_id, seg, lado);
+    try {
+      const s = await api.idleDouradoPegar(seg, lado);
+      aplicar(s);
+      audio.tocar('douradoPego');
+      if (chaves.avisos) tela.dourados.subirTexto(textoPegou(tipo, { ganho: s0.rate * 1200, viral: s.viral.length }), p.x, p.y);
+    } catch (e) {
+      const err = toGameError(e);
+      if (err.code === 'no_session') fase = 'sem_sessao';
+      else if (err.code !== 'idle_dourado_pego') {
+        audio.tocar('erro');
+        aviso = err.message;
+      }
+      await recarregar().catch(() => undefined);
+      render();
+    }
+  })(),
   // arrastando a barra: só o som muda (sem render: a barra fica na mão)
   volumeMusica: (v) => {
     volumeMusica = v;
@@ -270,13 +296,29 @@ function vivoAgora(s: IdleState, agora: number): number | null {
   return w;
 }
 
+/** Um evento na tela (a dupla são dois ícones lado a lado) e o som característico. */
+function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number) {
+  const uid = ancora?.estado.user_id;
+  if (!uid) return;
+  for (const lado of tipo === 3 ? [0, 1] : [0]) {
+    const p = posicao(uid, seg, lado);
+    tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs });
+  }
+  audio.tocar('dourado');
+}
+// dev (?mock): __dourado(tipo) força um evento agora
+if (import.meta.env.DEV) {
+  (window as unknown as { __mostrarDourado: (seg: number, tipo: TipoDourado) => void }).__mostrarDourado = (seg, tipo) =>
+    mostrarDourado(seg, tipo, agoraSrv());
+}
+
 function render() {
   const s = ancora?.estado ?? null;
   const agora = agoraSrv();
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });
@@ -374,6 +416,23 @@ async function guard(trabalho: () => Promise<void>) {
 setInterval(() => {
   if (document.hidden || !ancora) return;
   tela.atualizarValor(valuationAgora(ancora, Date.now()));
+  // eventos na tela: tira os que passaram, anda os selos e olha os segundos novos (só jogando, com a aba visível)
+  const agoraMs = agoraSrv();
+  tela.dourados.tick(agoraMs);
+  tela.relogioBonus(ancora.estado, agoraMs);
+  const seg = Math.floor(agoraMs / 1000);
+  if (fase === 'jogando' && ancora.estado.started && seg !== segVisto) {
+    for (let x = Math.max(segVisto + 1, seg - (JANELA_S - 1)); x <= seg; x++) {
+      const d = douradoEm(ancora.estado.user_id, x);
+      if (d !== null) mostrarDourado(x, d, agoraMs);
+    }
+    segVisto = seg;
+  }
+  const promo = promoAtiva(ancora.estado, agoraMs);
+  if (promo !== promoValia) {
+    promoValia = promo;
+    render();
+  }
   if (bolsaAberta && bolsa) tela.relogioBolsa(faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()));
   const vivo = vivoAgora(ancora.estado, agoraSrv());
   if (vivo !== null && vivo !== vivoSoou) {

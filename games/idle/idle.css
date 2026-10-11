@@ -53,6 +53,29 @@
 .idle .taxa { font: 400 20px var(--i-pixel); color: var(--mint); }
 .idle .bonus { flex-basis: 100%; color: var(--gold); font-size: 13px; }
 .idle .bonus:empty { display: none; }
+/* Viralizou / Promoção valendo: selos com o tempo que falta; o ×100 é dourado */
+.idle .selos { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; justify-content: center; }
+.idle .selos:empty { display: none; }
+.idle .selo-bonus { padding: 1px 8px; font: 400 18px var(--i-pixel); color: var(--paper); background: var(--i-roxo); box-shadow: 0 0 0 2px var(--i-roxo-borda); font-variant-numeric: tabular-nums; }
+.idle .selo-bonus.ouro { color: #2A1D05; background: var(--gold); box-shadow: 0 0 0 2px #FFF1B8, 0 0 18px rgba(242, 210, 122, 0.6); }
+
+/* eventos na tela (tipo cookie dourado): por cima de tudo, num ponto sorteado; brilho, balanço e o anel dos 12 s */
+.idle .dourados { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.idle .dourado { position: absolute; width: 72px; height: 72px; margin: -36px 0 0 -36px; padding: 0; border: 0; border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 210, 122, 0.45) 0%, rgba(242, 210, 122, 0) 68%); cursor: pointer; pointer-events: auto;
+  animation: dourado-balanca 1.1s ease-in-out infinite alternate, dourado-pisca 0.22s steps(2) 9s 14 both; animation-delay: 0s, calc(9s + var(--ja, 0s)); }
+.idle .dourado:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
+.idle .dourado .icone-dourado { position: absolute; inset: 12px; width: 48px; height: 48px; filter: drop-shadow(0 0 6px rgba(242, 210, 122, 0.9)); }
+.idle .dourado .anel { position: absolute; inset: 0; width: 72px; height: 72px; transform: rotate(-90deg); }
+.idle .dourado .anel circle { fill: none; stroke: var(--gold); stroke-width: 3; stroke-dasharray: 100; stroke-dashoffset: 0;
+  animation: dourado-anel 12s linear forwards; animation-delay: var(--ja, 0s); }
+@keyframes dourado-balanca { from { transform: translateY(-4px) rotate(-4deg); } to { transform: translateY(4px) rotate(4deg); } }
+@keyframes dourado-anel { to { stroke-dashoffset: 100; } }
+@keyframes dourado-pisca { 50% { opacity: 0.35; } }
+.idle .dourado-texto { position: absolute; z-index: 1; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  font: 400 26px var(--i-pixel); color: var(--gold); text-shadow: 2px 2px 0 #000, 0 0 12px rgba(242, 210, 122, 0.6);
+  animation: dourado-sobe 1.5s ease-out forwards; }
+@keyframes dourado-sobe { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -60px; } }
 .idle .info { display: none; }
 .idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 12px 8px 4px; color: var(--paper); }
 .idle .abrir p { margin: 0; font: 400 22px var(--i-pixel); }
@@ -451,6 +474,8 @@ body:has(.idle) { background: #121212; }
 
 @media (prefers-reduced-motion: reduce) {
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
+  .idle .dourado { animation: none; }
+  .idle .dourado-texto { animation-duration: 0.01s; animation-delay: 1.2s; }
   .idle .no-arvore.pode { animation: none; filter: drop-shadow(0 0 8px rgba(184, 162, 255, 0.65)); }
   .idle .btn:active:not(:disabled) { transform: none; }
 }

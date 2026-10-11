@@ -68,7 +68,7 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 // console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
 // __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres; __trader(3) abre a Bolsa (3 traders e F$ de sobra)
 const w = window as unknown as {
-  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
+  __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -90,6 +90,21 @@ w.__vendavel = async (foguetes = 150) => {
 w.__pontos = async (n) => {
   await dono('update public.idle_state set prestige_earned = prestige_spent + $2 where user_id = $1', [ME, n]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
+};
+// __dourado(2) põe um evento na tela agora (0 Investidor, 1 Promoção, 2 Viralizou, 3 dupla); o banco do mock aceita
+w.__dourado = async (tipo = 2) => {
+  const { ready } = await import('./mockDb');
+  const db = await ready;
+  const seg = Math.floor(Date.now() / 1000);
+  const ja = await db.query<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'idle_dourado_sorte'");
+  if (!ja.rows[0].n) {
+    await db.exec(`alter function public.idle_dourado(uuid, bigint) rename to idle_dourado_sorte;
+      create table public.mock_dourado (s bigint primary key, tipo int);
+      create function public.idle_dourado(u uuid, s bigint) returns int language sql stable as
+        'select coalesce((select tipo from public.mock_dourado m where m.s = idle_dourado.s), public.idle_dourado_sorte(u, s))';`);
+  }
+  await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
+  (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);
 };
 w.__trader = async (n = 3) => {
   // os traders e um pouco de cada gerador ligado às empresas (o limite de cada uma cresce com ele)

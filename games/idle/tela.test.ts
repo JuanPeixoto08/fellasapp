@@ -35,7 +35,7 @@ beforeEach(() => {
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
-    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(),
+    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -72,6 +72,42 @@ describe('tela da Fellas Inc.', () => {
     const etqs = [...root.querySelectorAll('.etq-bolsa')];
     expect(etqs.map((e) => e.textContent)).toEqual(['Bolsa: +1 MEME cada', 'Bolsa: +1 SIMA cada', 'Bolsa: +1 PSTL cada']); // 6, 8 e 11
     expect(etqs[2].getAttribute('title')).toBe('Cada Food truck libera +1 ação do Pastel do Zé na Bolsa');
+  });
+  it('a oportunidade não passa mais na cena (fica só na Caixinha)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aoVivo: 3 }));
+    expect(root.querySelector('.palco .vivo')).toBeNull();
+  });
+  it('eventos na tela: o clique chama pegarDourado; o selo do bônus mostra o tempo que falta', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    tela.dourados.mostrar({ seg: T / 1000, lado: 0, tipo: 2, x: 0.5, y: 0.5, agoraMs: T });
+    root.querySelector<HTMLButtonElement>('.dourado')!.click();
+    expect(acoes.pegarDourado).toHaveBeenCalledWith(T / 1000, 0);
+    const em = (s: number) => new Date(T + s * 1000).toISOString();
+    tela.relogioBonus(estado({ viral: [em(15), em(55)], promo_ate: em(21) }), T);
+    const selos = [...root.querySelectorAll('.selo-bonus')];
+    expect(selos.map((s) => s.textContent)).toEqual(['×100 · 0:15', 'Metade · 0:21']);
+    expect(selos[0].classList.contains('ouro')).toBe(true);
+    tela.relogioBonus(estado(), T);
+    expect(root.querySelectorAll('.selo-bonus')).toHaveLength(0);
+  });
+  it('Promoção valendo: os preços da Loja saem pela metade (e a meia-preço da Caixinha não soma)', () => {
+    const tela = criarTela(root, acoes);
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const preco1 = () => root.querySelector<HTMLButtonElement>('.gerador button[data-qtd="1"]')!.textContent;
+    tela.renderizar(modelo({ agora }));
+    const cheio = preco1();
+    tela.renderizar(modelo({ agora, estado: estado({ promo_ate: new Date(agora + 20_000).toISOString() }) }));
+    const promo = preco1();
+    tela.renderizar(modelo({ agora, estado: estado({ half_price: true }) }));
+    expect(promo).toBe(preco1()); // Promoção sozinha = meia-preço sozinha
+    expect(promo).not.toBe(cheio);
+    tela.renderizar(modelo({ agora, estado: estado({ promo_ate: new Date(agora + 20_000).toISOString(), half_price: true }) }));
+    expect(preco1()).toBe(promo); // as duas juntas não viram um quarto
+    tela.renderizar(modelo({ agora, estado: estado({ promo_ate: new Date(agora - 1000).toISOString() }) }));
+    expect(preco1()).toBe(cheio); // acabou
   });
   it('lista o gerador 1 e o próximo trancado; botão libera quando o valor chega no preço', () => {
     const tela = criarTela(root, acoes);
