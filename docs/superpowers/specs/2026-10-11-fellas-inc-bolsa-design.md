@@ -48,7 +48,7 @@ Cookie e fica aceito.
 - O pedido leva o minuto do preço que a pessoa viu (`tick`). Se o minuto já virou, o servidor recusa com
   `idle_bolsa_preco_mudou` ("O preço mudou, confere de novo") e a tela mostra o preço novo.
 - Empresa em recuperação judicial não negocia (`idle_bolsa_rj`).
-- Sem F$ para 1 ação: `idle_cash` (o erro que a Loja já usa). Sem espaço no limite: `idle_bolsa_limite`. Bolsa fechada
+- Sem F$ para 1 ação: `idle_cant_afford` (o erro que a Loja já usa, "Valuation não cobre essa compra"). Sem espaço no limite: `idle_bolsa_limite`. Bolsa fechada
   (sem trader): `idle_bolsa_fechada`. Vender sem ter: `idle_bolsa_sem_acoes`.
 - Antes de mexer no F$, o servidor fecha a conta da produção (`idle_settle`), como a Loja.
 
