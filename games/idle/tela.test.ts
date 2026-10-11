@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { IdleBoardRow, IdleState } from '../shared/types';
 import type { Desenhar } from './navegador';
-import { instante, VALIDADE_S } from './oportunidades';
+import { instante, tipo, VALIDADE_S } from './oportunidades';
 import { PADRAO } from './personagem';
 import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';
 
@@ -68,6 +68,24 @@ describe('tela da Fellas Inc.', () => {
     tela.renderizar(modelo({ aviso: 'Valuation não cobre essa compra', pendentes: [3, 2] }));
     expect(root.querySelector('.notice')!.textContent).toContain('Valuation não cobre essa compra');
     expect(root.querySelector('.caixinha')!.textContent).toBe('Oportunidades (2)');
+  });
+  it('caixinha: com uma meia-preço guardada, outra meia-preço fica apagada com o aviso; os outros tipos não', () => {
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    const janela = (k: 0 | 1 | 2) => { let w = 50; while (tipo(uid, w) !== k) w++; return w; };
+    const meia = janela(2);
+    const outra = janela(0);
+    const tela = criarTela(root, acoes);
+    const linhas = (half: boolean) => {
+      tela.renderizar(modelo({ caixaAberta: true, pendentes: [meia, outra], estado: estado({ user_id: uid, half_price: half }) }));
+      return [...root.querySelectorAll('.modal-caixa .escolha')];
+    };
+    const [m1, o1] = linhas(true);
+    expect(m1.querySelector('button')!.disabled).toBe(true);
+    expect(m1.textContent).toContain('Usa a que você já tem primeiro');
+    expect(o1.querySelector('button')!.disabled).toBe(false);
+    const [m2] = linhas(false);
+    expect(m2.querySelector('button')!.disabled).toBe(false);
+    expect(m2.textContent).not.toContain('Usa a que você já tem primeiro');
   });
   it('caixinha: uma linha por oportunidade com o boneco, o prazo e Pegar; X fecha; sem pega no dia, botões apagados', () => {
     vi.useFakeTimers();
