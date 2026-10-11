@@ -69,11 +69,12 @@ describe('tela da Fellas Inc.', () => {
     [...modal.querySelectorAll('button')].find((b) => b.textContent === 'Escolher' && !b.disabled)!.click();
     expect(acoes.escolher).toHaveBeenCalledWith(3, 0);
   });
-  it('aviso aparece; caixinha mostra quantas tem', () => {
+  it('aviso aparece; a gaveta Caixinha mostra quantas tem', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aviso: 'Valuation não cobre essa compra', pendentes: [3, 2] }));
     expect(root.querySelector('.notice')!.textContent).toContain('Valuation não cobre essa compra');
-    expect(root.querySelector('.caixinha')!.textContent).toBe('Oportunidades (2)');
+    expect(root.querySelector('.gaveta .selo')!.textContent).toBe('2');
+    expect(root.querySelector('.caixinha')).toBeNull();
   });
   it('caixinha: com uma meia-preço guardada, outra meia-preço fica apagada com o aviso; os outros tipos não', () => {
     const uid = '00000000-0000-0000-0000-00000000000a';
@@ -464,5 +465,75 @@ describe('legado: prestígio, árvore e conquistas', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('empresa, resumo e bancada', () => {
+  it('topo: Mudar visual abre o editor', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    root.querySelector<HTMLButtonElement>('.top .topo-visual')!.click();
+    expect(acoes.editor).toHaveBeenCalledWith('abrir');
+  });
+  it('resumo: era, contratados e o bônus das conquistas (some o que for zero)', () => {
+    const tela = criarTela(root, acoes);
+    const ate = '2026-10-19T12:00:00.000Z';
+    tela.renderizar(modelo({ estado: estado({
+      era: 3,
+      equipe: [{ user_id: 'b', cargo: 'CEO de nada', avatar: null, ate }, { user_id: 'c', cargo: 'Estagiário', avatar: null, ate }],
+      bonus: { arvore: [], conquistas: 12 },
+    }) }));
+    expect([...root.querySelectorAll('.valor .info span')].map((x) => x.textContent))
+      .toEqual(['Era 3 · Escritório', '2 contratados', '+12% das conquistas']);
+    tela.renderizar(modelo());
+    expect([...root.querySelectorAll('.valor .info span')].map((x) => x.textContent)).toEqual(['Era 1 · Quarto']);
+  });
+  it('gaveta Caixinha no celular abre a folha; sem nada guardado o selo some', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ pendentes: [3] }));
+    root.querySelector<HTMLButtonElement>('.gaveta')!.click();
+    expect(acoes.caixa).toHaveBeenCalledWith(true);
+    tela.renderizar(modelo({ pendentes: [] }));
+    expect(root.querySelector('.gaveta .selo')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.gaveta-corpo')!.textContent).toContain('Nada guardado agora. Volta mais tarde.');
+  });
+  it('no PC a gaveta não abre a folha (a lista já está na bancada)', () => {
+    const larga = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+    try {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ pendentes: [3] }));
+      root.querySelector<HTMLButtonElement>('.gaveta')!.click();
+      expect(acoes.caixa).not.toHaveBeenCalled();
+    } finally {
+      larga.mockRestore();
+    }
+  });
+  it('a gaveta aberta lista as guardadas com Pegar, com as mesmas regras da folha', () => {
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    const janela = (k: 0 | 1 | 2) => { let w = 50; while (tipo(uid, w) !== k) w++; return w; };
+    const meia = janela(2);
+    const outra = janela(0);
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ pendentes: [meia, outra], estado: estado({ user_id: uid, half_price: true }) }));
+    const [m1, o1] = [...root.querySelectorAll('.bancada .escolha')];
+    expect(m1.querySelector('button')!.disabled).toBe(true);
+    expect(m1.textContent).toContain('Usa a que você já tem primeiro');
+    o1.querySelector('button')!.click();
+    expect(acoes.pegar).toHaveBeenCalledWith(outra);
+    tela.renderizar(modelo({ pendentes: [outra], estado: estado({ user_id: uid, opp_left: 0 }) }));
+    expect(root.querySelector('.gaveta-corpo')!.textContent).toContain('Já pegou todas de hoje. Amanhã tem mais.');
+    expect(root.querySelector<HTMLButtonElement>('.bancada .escolha button')!.disabled).toBe(true);
+    tela.renderizar(modelo({ pendentes: [outra], estado: estado({ user_id: uid }), ocupado: true }));
+    expect(root.querySelector<HTMLButtonElement>('.bancada .escolha button')!.disabled).toBe(true);
+  });
+  it('antes do Abrir CNPJ: sem bancada; sem Legado o painel some', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    expect(root.querySelector('.bancada')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.app')!.classList.contains('sem-painel')).toBe(true);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false, pontos: 5, pontos_vida: 5 }) }));
+    expect(root.querySelector('.app')!.classList.contains('sem-painel')).toBe(false);
+    tela.renderizar(modelo());
+    expect(root.querySelector('.app')!.classList.contains('sem-painel')).toBe(false);
   });
 });

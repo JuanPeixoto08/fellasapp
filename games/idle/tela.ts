@@ -92,8 +92,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
-  const caixinha = button('Oportunidades (0)', 'btn caixinha', () => a.caixa(true));
-  topo.append(voltar, el('span', undefined, 'Fellas Inc.'), caixinha);
+  const mudarVisual = button('Mudar visual', 'btn topo-visual', () => a.editor('abrir'));
+  topo.append(voltar, el('span', 'marca', 'Fellas Inc.'), mudarVisual);
 
   const palco = el('div', 'palco');
   const canvas = el('canvas', 'cena');
@@ -106,7 +106,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const numero = el('div', 'numero', 'F$ 0');
   const taxaTxt = el('div', 'taxa', '');
   const bonus = el('div', 'bonus', '');
-  placa.append(numero, taxaTxt, bonus);
+  // resumo (o PC mostra do lado da cena; o celular esconde .info pelo CSS)
+  const info = el('div', 'info');
+  placa.append(numero, taxaTxt, bonus, info);
 
   const abrir = el('div', 'abrir');
   abrir.append(
@@ -114,6 +116,30 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     button('Abrir CNPJ', 'btn main', a.abrirCnpj),
     button('Mudar visual', 'btn', () => a.editor('abrir')),
   );
+  // a empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e a bancada embaixo
+  const cartaoEmpresa = el('div', 'cartao-empresa');
+  cartaoEmpresa.append(palco, placa, abrir);
+  // bancada: uma gaveta por coisa que acontece (por enquanto só a Caixinha; os minigames entram aqui depois)
+  const larga = () => window.matchMedia?.('(min-width: 1100px)').matches === true;
+  const gavetaCaixa = button('', 'gaveta', () => {
+    if (!larga()) a.caixa(true); // no PC a lista já está aberta na bancada
+  });
+  gavetaCaixa.setAttribute('aria-pressed', 'true');
+  const caixaIcone = el('span', 'gaveta-caixa');
+  const iconeOpp = el('span', 'gaveta-icone');
+  iconeOpp.style.backgroundImage = `url(${ativos.oportunidade(0)})`;
+  const selo = el('span', 'selo', '0');
+  caixaIcone.append(iconeOpp, selo);
+  gavetaCaixa.append(caixaIcone, el('span', 'gaveta-nome', 'Caixinha'));
+  const gavetas = el('div', 'gavetas');
+  gavetas.append(gavetaCaixa);
+  const corpoBancada = el('div', 'gaveta-corpo');
+  const bancada = el('section', 'bancada');
+  bancada.setAttribute('aria-label', 'Bancada');
+  bancada.append(gavetas, corpoBancada);
+  const empresa = el('div', 'empresa');
+  empresa.append(cartaoEmpresa, bancada);
+
 
   const abas = el('nav', 'abas');
   const botoesAba: Record<Aba, HTMLButtonElement> = {
@@ -142,7 +168,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const listaP = el('ol', 'lista lista-placar');
   const listaL = el('div', 'lista lista-legado');
   const painel = el('main', 'painel');
-  painel.append(abrir, abas, segLoja, listaG, listaM, listaC, listaP, listaL);
+  painel.append(abas, segLoja, listaG, listaM, listaC, listaP, listaL);
 
   const notice = el('div', 'notice');
   notice.setAttribute('role', 'status');
@@ -172,7 +198,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     return h;
   };
 
-  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV, modalP);
+  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -338,6 +364,36 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     listaL.append(grid);
   }
 
+  /** O miolo da caixinha: quantas ainda dá pra pegar hoje e uma linha por guardada. Serve pra folha do celular e pra
+   *  gaveta da bancada no PC (mesmas regras de botão apagado). */
+  function itensCaixinha(s: IdleState, m: Modelo): HTMLElement[] {
+    const out: HTMLElement[] = [el('p', 'sub', s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}.` : 'Já pegou todas de hoje. Amanhã tem mais.')];
+    if (!m.pendentes.length) {
+      out.push(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
+      return out;
+    }
+    const lista = el('ul', 'escolhas');
+    for (const w of m.pendentes) {
+      const k = tipoOportunidade(s.user_id, w);
+      const li = el('li', 'escolha');
+      const bonequinho = el('div', 'boneco');
+      bonequinho.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
+      const texto = el('div', 'escolha-texto');
+      const quando = el('span', 'sub prazo', '');
+      texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+      prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
+      // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
+      const repetida = meiaPrecoRepetida(k, s);
+      if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
+      const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
+      b.disabled = m.ocupado || s.opp_left <= 0 || repetida;
+      li.append(bonequinho, texto, b);
+      lista.append(li);
+    }
+    out.push(lista);
+    return out;
+  }
+
   function renderizar(m: Modelo) {
     ultimo = m;
     const s = m.estado;
@@ -360,14 +416,23 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(listaP, jogando && m.aba === 'placar');
     // Legado: na aba, ou embaixo do "Abrir CNPJ" de quem já vendeu (dá pra gastar os pontos antes de reabrir)
     const verLegado = !!s && ((jogando && m.aba === 'legado') || (m.fase === 'antes' && s.pontos_vida > 0));
+    // bancada: a gaveta Caixinha com quantas tem; no PC o corpo mostra a lista
+    selo.textContent = String(m.pendentes.length);
+    mostrar(selo, m.pendentes.length > 0);
+    gavetaCaixa.setAttribute('aria-label', `Caixinha: ${m.pendentes.length} ${m.pendentes.length === 1 ? 'oportunidade guardada' : 'oportunidades guardadas'}`);
+    mostrar(bancada, jogando);
+    corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
+    mostrar(mudarVisual, jogando);
+    app.classList.toggle('sem-painel', !jogando && !verLegado);
     mostrar(listaL, verLegado);
-    caixinha.textContent = `Oportunidades (${m.pendentes.length})`;
-    mostrar(caixinha, jogando);
 
     listaG.replaceChildren();
     listaM.replaceChildren();
     if (s && jogando) {
       taxaTxt.textContent = formatarTaxa(s.rate);
+      info.replaceChildren(el('span', undefined, `Era ${s.era} · ${ERAS[s.era - 1]}`));
+      if (s.equipe.length) info.append(el('span', undefined, s.equipe.length === 1 ? '1 contratado' : `${s.equipe.length} contratados`));
+      if (s.bonus.conquistas > 0) info.append(el('span', undefined, `+${s.bonus.conquistas}% das conquistas`));
       const agoraBoost = s.boost_until && Date.parse(s.boost_until) > Date.parse(s.server_now);
       bonus.textContent = agoraBoost ? 'Produção ×5 por alguns segundos' : s.half_price ? 'Próxima compra pela metade' : '';
       for (let gid = 1; gid <= 30; gid++) {
@@ -527,27 +592,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       fechar.setAttribute('aria-label', 'Fechar');
       fechar.append(iconeFechar());
       topo.append(titulo('idle-titulo-caixa', 'Oportunidades guardadas'), fechar);
-      folha.append(topo, el('p', 'sub', s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}.` : 'Já pegou todas de hoje. Amanhã tem mais.'));
-      if (!m.pendentes.length) folha.append(el('p', 'vazio', 'Nada guardado agora. Volta mais tarde.'));
-      const lista = el('ul', 'escolhas');
-      for (const w of m.pendentes) {
-        const k = tipoOportunidade(s.user_id, w);
-        const li = el('li', 'escolha');
-        const bonequinho = el('div', 'boneco');
-        bonequinho.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
-        const texto = el('div', 'escolha-texto');
-        const quando = el('span', 'sub prazo', '');
-        texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
-        prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
-        // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
-        const repetida = meiaPrecoRepetida(k, s);
-        if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
-        const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
-        b.disabled = m.ocupado || s.opp_left <= 0 || repetida;
-        li.append(bonequinho, texto, b);
-        lista.append(li);
-      }
-      if (m.pendentes.length) folha.append(lista);
+      folha.append(topo, ...itensCaixinha(s, m));
       modalC.append(folha);
       atualizarPrazos();
     }
