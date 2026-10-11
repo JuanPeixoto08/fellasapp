@@ -42,8 +42,10 @@ export type Modelo = {
   bolsaAberta: boolean;
   /** Folha de Configurações: fechada, o menu ou as patch notes. */
   config: TelaConfig;
-  /** Chaves de som e avisos (guardadas no aparelho). */
+  /** Chaves de efeitos e avisos (guardadas no aparelho). */
   chaves: Record<ChaveSom, boolean>;
+  /** Volume da música, de 0 (desligada) a 1. */
+  volumeMusica: number;
   /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
   novidadeNova: boolean;
 };
@@ -55,7 +57,7 @@ export type Acoes = {
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
-  config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void;
+  config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
 };
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
 
@@ -115,6 +117,26 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   app.addEventListener('click', (e) => {
     if (e.target instanceof Element && e.target.closest(CLIQUE)) a.efeito('clique');
   });
+  // volume da música: a barra é criada uma vez só (refazer no meio do arraste soltaria o dedo)
+  const linhaVolume = el('div', 'config-item config-volume');
+  const barraVolume = el('input', 'volume');
+  barraVolume.type = 'range';
+  barraVolume.min = '0';
+  barraVolume.max = '100';
+  barraVolume.step = '5';
+  barraVolume.setAttribute('aria-label', 'Volume da música');
+  const valorVolume = el('span', 'volume-valor');
+  const textoVolume = (pct: number) => (pct === 0 ? 'Desligada' : `${pct}%`);
+  const mostrarVolume = (pct: number) => {
+    valorVolume.textContent = textoVolume(pct);
+    barraVolume.setAttribute('aria-valuetext', textoVolume(pct));
+  };
+  barraVolume.addEventListener('input', () => {
+    const pct = Number(barraVolume.value);
+    mostrarVolume(pct);
+    a.volumeMusica(pct / 100);
+  });
+  linhaVolume.append(el('span', 'rotulo', 'Música'), barraVolume, valorVolume);
   // folha abrindo e fechando ("fuu" subindo e descendo); a 1ª vez só registra
   const folhaVisivel = new WeakMap<HTMLElement, boolean>();
   const mostrarFolha = (modal: HTMLElement, visivel: boolean) => {
@@ -726,6 +748,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     }
 
     // configurações: menu (som, visual, patch notes) ou as patch notes
+    const naBarra = document.activeElement === barraVolume; // refazer a folha tira o foco: guarda e devolve
     modalCfg.replaceChildren();
     mostrarFolha(modalCfg, m.config !== 'fechada');
     if (m.config !== 'fechada') {
@@ -736,6 +759,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       fechar.append(iconeFechar());
       if (m.config === 'menu') {
         topoCfg.append(titulo('idle-titulo-config', 'Configurações'), fechar);
+        if (!naBarra) {
+          const pct = Math.round(m.volumeMusica * 100);
+          barraVolume.value = String(pct);
+          mostrarVolume(pct);
+        }
         const chaveSom = (qual: ChaveSom, rotulo: string, ligado: string, desligado: string) => {
           const linha = el('div', 'config-item');
           const on = m.chaves[qual];
@@ -757,7 +785,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         };
         folha.append(
           topoCfg,
-          chaveSom('musica', 'Música', 'Ligada', 'Desligada'),
+          linhaVolume,
           chaveSom('efeitos', 'Efeitos sonoros', 'Ligados', 'Desligados'),
           chaveSom('avisos', 'Avisos', 'Ligados', 'Desligados'),
           item('Mudar visual', 'Seu boneco nas cenas e no placar', () => { a.config('fechada'); a.editor('abrir'); }),
@@ -779,6 +807,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         folha.append(topoCfg, lista);
       }
       modalCfg.append(folha);
+      if (naBarra && barraVolume.isConnected) barraVolume.focus();
     }
 
     avisoConquista.textContent = m.conquistaAviso ?? '';

@@ -10,7 +10,7 @@ export const NOVIDADES: readonly Novidade[] = [
     itens: [
       'Música swing que cresce junto com a empresa: cada era tem a sua.',
       'Efeitos pra compra, venda, conquista, era nova, oportunidade e mais.',
-      'Nas Configurações: música, efeitos e avisos, cada um liga e desliga separado.',
+      'Nas Configurações: volume da música, e efeitos e avisos que ligam e desligam separado.',
     ],
   },
   {

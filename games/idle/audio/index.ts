@@ -5,7 +5,8 @@ import { criarMotor } from './motor';
 import { criarSequenciador } from './sequenciador';
 
 export type { IdEfeito, OpcoesEfeito } from './efeitos';
-export type ChavesSom = { musica: boolean; efeitos: boolean };
+/** `musica` = volume de 0 (desligada) a 1. */
+export type ChavesSom = { musica: number; efeitos: boolean };
 export type Audio = {
   tocar(id: IdEfeito, o?: OpcoesEfeito): void;
   /** Era da música (0 = antes do Abrir CNPJ); troca no fim do giro. */
@@ -17,11 +18,11 @@ export function criarAudio(fabrica: () => AudioContext = () => new AudioContext(
   const motor = criarMotor(fabrica);
   const seq = criarSequenciador({ ctx: motor.ctx, destino: () => motor.saida()?.musica ?? null });
   const limite = criarLimite();
-  let chaves: ChavesSom = { musica: true, efeitos: true };
+  let chaves: ChavesSom = { musica: 1, efeitos: true };
   let eraAtual = 0;
   const ajustarMusica = () => {
     motor.musica(chaves.musica);
-    if (!chaves.musica) seq.parar();
+    if (chaves.musica <= 0) seq.parar();
     else if (motor.ligado() && !alvo.hidden) seq.tocar(eraAtual);
   };
   const toque = () => {

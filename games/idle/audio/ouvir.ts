@@ -19,7 +19,7 @@ const EFEITOS: [string, IdEfeito, OpcoesEfeito?][] = [
 
 const raiz = document.getElementById('ouvir')!;
 const audio = criarAudio();
-audio.chaves({ musica: false, efeitos: true });
+audio.chaves({ musica: 0, efeitos: true });
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, texto = '') => {
   const e = document.createElement(tag);
@@ -45,8 +45,8 @@ const ativos: HTMLButtonElement[] = [];
 ERAS.forEach((nome, era) => {
   const b = botao(nome, () => {
     audio.era(era);
-    audio.chaves({ musica: false, efeitos: true });
-    audio.chaves({ musica: true, efeitos: true }); // recomeça já na era escolhida
+    audio.chaves({ musica: 0, efeitos: true });
+    audio.chaves({ musica: 1, efeitos: true }); // recomeça já na era escolhida
     ativos.forEach((x) => x.classList.toggle('ativo', x === b));
   });
   ativos.push(b);
@@ -54,7 +54,7 @@ ERAS.forEach((nome, era) => {
   mudar.append(botao(`→ ${nome}`, () => audio.era(era)));
 });
 const parar = botao('Parar a música', () => {
-  audio.chaves({ musica: false, efeitos: true });
+  audio.chaves({ musica: 0, efeitos: true });
   ativos.forEach((x) => x.classList.remove('ativo'));
 });
 musica.append(el('h2', 'Música'), el('p', 'Começar numa era:'), comecar, el('p', 'Trocar como no jogo (no fim do giro):'), mudar, parar);

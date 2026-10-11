@@ -46,11 +46,13 @@ describe('motor', () => {
     vi.advanceTimersByTime(400);
     expect(c.state).toBe('running');
   });
-  it('música desligada: volume vai a zero e abaixar não mexe nela', () => {
+  it('volume da música: metade é metade; zero desliga e abaixar não mexe nela', () => {
     const c = new ContextoFalso();
     const m = criarMotor(() => comoContexto(c));
     m.ligar();
-    m.musica(false);
+    m.musica(0.5);
+    expect(volume(m).value).toBeCloseTo(VOL_MUSICA * 0.5);
+    m.musica(0);
     expect(volume(m).value).toBe(0);
     m.abaixarMusica(2);
     expect(volume(m).value).toBe(0);

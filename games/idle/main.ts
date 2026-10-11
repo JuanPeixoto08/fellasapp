@@ -15,7 +15,7 @@ import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
-import { gravarChave, lerChave, lerVista, marcarVista, type ChaveSom } from './preferencias';
+import { gravarChave, gravarVolumeMusica, lerChave, lerVista, lerVolumeMusica, marcarVista, type ChaveSom } from './preferencias';
 import {
   agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
@@ -50,10 +50,11 @@ let ocupado = false;
 let caixaAberta = false;
 // configurações: a folha, o som e a bolinha de patch note não lida (tudo no aparelho)
 let config: TelaConfig = 'fechada';
-let chaves: Record<ChaveSom, boolean> = { musica: lerChave('musica'), efeitos: lerChave('efeitos'), avisos: lerChave('avisos') };
+let chaves: Record<ChaveSom, boolean> = { efeitos: lerChave('efeitos'), avisos: lerChave('avisos') };
+let volumeMusica = lerVolumeMusica();
 // o som: liga no 1º toque; a música segue a era (0 = antes do Abrir CNPJ)
 const audio = criarAudio();
-audio.chaves(chaves);
+audio.chaves({ musica: volumeMusica, efeitos: chaves.efeitos });
 let vivoSoou: number | null = null;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
@@ -140,11 +141,17 @@ const tela = criarTela(document.getElementById('app')!, {
   chave: (qual, ligada) => {
     chaves = { ...chaves, [qual]: ligada };
     gravarChave(qual, ligada);
-    audio.chaves(chaves);
+    audio.chaves({ musica: volumeMusica, efeitos: chaves.efeitos });
     if (qual === 'avisos' && !ligada) conquistaAviso = null; // some na hora
     render();
   },
   efeito: (id) => audio.tocar(id),
+  // arrastando a barra: só o som muda (sem render: a barra fica na mão)
+  volumeMusica: (v) => {
+    volumeMusica = v;
+    gravarVolumeMusica(v);
+    audio.chaves({ musica: v, efeitos: chaves.efeitos });
+  },
   tentarDeNovo: () => {
     if (placar === null) void carregarPlacar();
     void guard(recarregar);
@@ -269,7 +276,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, chaves, novidadeNova,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });

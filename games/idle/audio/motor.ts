@@ -33,8 +33,8 @@ export type Motor = {
   ligado(): boolean;
   ctx(): BaseAudioContext | null;
   saida(): Saida | null;
-  /** Chave da música (o volume segue chave + aba visível). */
-  musica(ligada: boolean): void;
+  /** Volume da música, de 0 (desligada) a 1 (o segue a aba visível). */
+  musica(volume: number): void;
   visivel(sim: boolean): void;
   abaixarMusica(segundos: number): void;
 };
@@ -42,9 +42,9 @@ export type Motor = {
 export function criarMotor(fabrica: () => AudioContext): Motor {
   let ctx: AudioContext | null = null;
   let s: Saida | null = null;
-  let musicaLigada = true;
+  let volume = 1;
   let aVista = true;
-  const alvo = () => (musicaLigada && aVista ? VOL_MUSICA : 0);
+  const alvo = () => (aVista ? VOL_MUSICA * volume : 0);
   const fade = (segundos: number) => {
     if (!ctx || !s) return;
     const g = s.musica.gain;
@@ -65,9 +65,9 @@ export function criarMotor(fabrica: () => AudioContext): Motor {
     ligado: () => ctx !== null,
     ctx: () => ctx,
     saida: () => s,
-    musica(ligada) {
-      musicaLigada = ligada;
-      fade(ligada ? 1.5 : 0.4);
+    musica(v) {
+      volume = Math.max(0, Math.min(1, v));
+      fade(0.3);
     },
     visivel(sim) {
       aVista = sim;

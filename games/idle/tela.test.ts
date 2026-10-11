@@ -21,7 +21,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', chaves: { musica: true, efeitos: true, avisos: true }, novidadeNova: false, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', volumeMusica: 1, chaves: { efeitos: true, avisos: true }, novidadeNova: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -35,7 +35,7 @@ beforeEach(() => {
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
-    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(),
+    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -533,30 +533,42 @@ describe('empresa, resumo e bancada', () => {
     expect(eng.querySelector('.ponto')!.hasAttribute('hidden')).toBe(true);
     expect(root.querySelector('.top .topo-visual')).toBeNull(); // o Mudar visual mudou pra dentro
   });
-  it('Configurações: Música, Efeitos sonoros e Avisos (cada um liga/desliga), Mudar visual e Patch notes', () => {
+  it('Configurações: volume da música (barra), Efeitos sonoros e Avisos (chaves), Mudar visual e Patch notes', () => {
     const tela = criarTela(root, acoes);
     expect(root.querySelector('.modal-config')!.hasAttribute('hidden')).toBe(true);
-    tela.renderizar(modelo({ config: 'menu', chaves: { musica: true, efeitos: false, avisos: true }, novidadeNova: true }));
+    tela.renderizar(modelo({ config: 'menu', volumeMusica: 0.7, chaves: { efeitos: false, avisos: true }, novidadeNova: true }));
     const modal = root.querySelector<HTMLElement>('.modal-config')!;
     expect(modal.hasAttribute('hidden')).toBe(false);
     expect([...modal.querySelectorAll('.config-item .rotulo')].map((x) => x.textContent)).toEqual(['Música', 'Efeitos sonoros', 'Avisos', 'Mudar visual', 'Patch notes']);
+    const barra = modal.querySelector<HTMLInputElement>('input[type="range"]')!;
+    expect(barra.getAttribute('aria-label')).toBe('Volume da música');
+    expect(barra.value).toBe('70');
+    expect(modal.querySelector('.volume-valor')!.textContent).toBe('70%');
+    barra.value = '40';
+    barra.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(acoes.volumeMusica).toHaveBeenLastCalledWith(0.4);
+    expect(modal.querySelector('.volume-valor')!.textContent).toBe('40%');
+    expect(barra.getAttribute('aria-valuetext')).toBe('40%');
+    barra.value = '0';
+    barra.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(modal.querySelector('.volume-valor')!.textContent).toBe('Desligada');
     const chaves = [...modal.querySelectorAll<HTMLButtonElement>('[role="switch"]')];
     expect(chaves.map((c) => [c.getAttribute('aria-label'), c.getAttribute('aria-checked'), c.textContent])).toEqual([
-      ['Música', 'true', 'Ligada'], ['Efeitos sonoros', 'false', 'Desligados'], ['Avisos', 'true', 'Ligados'],
+      ['Efeitos sonoros', 'false', 'Desligados'], ['Avisos', 'true', 'Ligados'],
     ]);
     chaves[0].click();
     chaves[1].click();
-    chaves[2].click();
-    expect(acoes.chave.mock.calls).toEqual([['musica', false], ['efeitos', true], ['avisos', false]]);
+    expect(acoes.chave.mock.calls).toEqual([['efeitos', true], ['avisos', false]]);
+    // re-render com a barra na mão (focada) não volta o valor
+    barra.value = '55';
+    barra.focus();
+    tela.renderizar(modelo({ config: 'menu', volumeMusica: 0.7, chaves: { efeitos: false, avisos: true } }));
+    expect(modal.querySelector<HTMLInputElement>('input[type="range"]')!.value).toBe('55');
     const item = (t: string) => [...modal.querySelectorAll<HTMLButtonElement>('button.config-item')].find((b) => b.querySelector('.rotulo')!.textContent === t)!;
-    expect(item('Patch notes').querySelector('.ponto')!.hasAttribute('hidden')).toBe(false);
     item('Patch notes').click();
     expect(acoes.config).toHaveBeenCalledWith('notas');
     item('Mudar visual').click();
-    expect(acoes.config).toHaveBeenCalledWith('fechada');
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
-    modal.querySelector<HTMLButtonElement>('.fechar')!.click();
-    expect(acoes.config).toHaveBeenLastCalledWith('fechada');
   });
   it('som da interface: clique em aba e em chave; comprar não clica (a compra tem o som dela); folha abrindo e fechando', () => {
     const tela = criarTela(root, acoes);

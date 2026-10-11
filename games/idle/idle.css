@@ -243,6 +243,15 @@
   font: 400 19px var(--i-pixel); color: var(--i-mudo); background: var(--i-fundo2); --c: var(--i-borda2);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
 .idle .chave.ligada { color: #fff; background: var(--i-roxo); --c: var(--i-roxo-borda); }
+/* volume da música: barra de pixel (trilho afundado, pegador quadrado roxo) */
+.idle .config-volume .rotulo { flex: none; }
+.idle .volume { flex: 1; min-width: 0; height: 40px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; accent-color: var(--i-roxo); }
+.idle .volume::-webkit-slider-runnable-track { height: 8px; background: var(--i-fundo2); box-shadow: 0 0 0 2px var(--i-borda2); }
+.idle .volume::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 24px; margin-top: -8px; border: 0; border-radius: 0; background: var(--i-roxo); box-shadow: 0 0 0 2px var(--i-roxo-borda); }
+.idle .volume::-moz-range-track { height: 8px; background: var(--i-fundo2); box-shadow: 0 0 0 2px var(--i-borda2); }
+.idle .volume::-moz-range-thumb { width: 20px; height: 24px; border: 0; border-radius: 0; background: var(--i-roxo); box-shadow: 0 0 0 2px var(--i-roxo-borda); }
+.idle .volume:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 4px; }
+.idle .volume-valor { flex: none; min-width: 84px; text-align: right; font: 400 19px var(--i-pixel); color: var(--i-mudo); }
 .idle .voltar-config { flex: none; min-height: 36px; padding: 0 12px; font-size: 18px; }
 .idle .folha-config .folha-topo h2 { flex: 1; }
 /* patch notes: da mais nova pra mais antiga, a mais nova com o contorno lilás */

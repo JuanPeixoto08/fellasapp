@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { dataNovidade, NOVIDADES, temNovidade } from './novidades';
-import { gravarChave, lerChave, lerVista, marcarVista } from './preferencias';
+import { gravarChave, gravarVolumeMusica, lerChave, lerVista, lerVolumeMusica, marcarVista } from './preferencias';
 
 describe('patch notes', () => {
   it('da mais nova pra mais antiga, ids únicos, toda versão com título e pelo menos uma linha', () => {
@@ -34,16 +34,26 @@ describe('patch notes', () => {
 describe('preferências no aparelho', () => {
   beforeEach(() => localStorage.clear());
   it('música, efeitos e avisos começam ligados e cada um lembra o desligado', () => {
-    for (const q of ['musica', 'efeitos', 'avisos'] as const) {
+    for (const q of ['efeitos', 'avisos'] as const) {
       expect(lerChave(q)).toBe(true);
       gravarChave(q, false);
       expect(lerChave(q)).toBe(false);
       gravarChave(q, true);
       expect(lerChave(q)).toBe(true);
     }
-    gravarChave('musica', false);
-    expect(lerChave('efeitos')).toBe(true);
-    expect(localStorage.getItem('fellas:idle-musica')).toBe('0');
+    gravarChave('efeitos', false);
+    expect(lerChave('avisos')).toBe(true);
+    expect(localStorage.getItem('fellas:idle-efeitos')).toBe('0');
+  });
+  it('volume da música: começa em 100%, lembra o escolhido; quem tinha desligado a música começa em 0', () => {
+    expect(lerVolumeMusica()).toBe(1);
+    gravarVolumeMusica(0.4);
+    expect(lerVolumeMusica()).toBe(0.4);
+    localStorage.clear();
+    localStorage.setItem('fellas:idle-musica', '0');
+    expect(lerVolumeMusica()).toBe(0);
+    gravarVolumeMusica(2);
+    expect(lerVolumeMusica()).toBe(1);
   });
   it('a versão lida fica guardada', () => {
     expect(lerVista()).toBeNull();

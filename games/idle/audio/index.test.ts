@@ -23,19 +23,19 @@ describe('som da Fellas Inc.', () => {
   });
   it('depois do toque: efeito toca; efeitos desligados não', () => {
     const { c, audio, tocar } = montar();
-    audio.chaves({ musica: false, efeitos: true });
+    audio.chaves({ musica: 0, efeitos: true });
     tocar();
     const antes = c.osciladores().length;
     audio.tocar('compra');
     expect(c.osciladores().length).toBeGreaterThan(antes);
-    audio.chaves({ musica: false, efeitos: false });
+    audio.chaves({ musica: 0, efeitos: false });
     const depois = c.osciladores().length;
     audio.tocar('pegar');
     expect(c.osciladores().length).toBe(depois);
   });
   it('clicar rápido não empilha o mesmo efeito', () => {
     const { c, audio, tocar } = montar();
-    audio.chaves({ musica: false, efeitos: true });
+    audio.chaves({ musica: 0, efeitos: true });
     tocar();
     audio.tocar('clique');
     const um = c.osciladores().length;
@@ -50,7 +50,7 @@ describe('som da Fellas Inc.', () => {
     vi.advanceTimersByTime(100);
     expect(a.c.osciladores().length).toBeGreaterThan(0);
     const b = montar();
-    b.audio.chaves({ musica: false, efeitos: true });
+    b.audio.chaves({ musica: 0, efeitos: true });
     b.tocar();
     vi.advanceTimersByTime(100);
     expect(b.c.osciladores()).toHaveLength(0);
