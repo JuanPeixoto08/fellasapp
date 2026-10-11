@@ -154,7 +154,7 @@ describe('vender a startup', () => {
     await expect(t.rpc('idle_claim_opportunity', { p_window: w })).rejects.toThrow(/idle_opp_gone/);
     expect((await t.rpc<Estado>('idle_claim_opportunity', { p_window: outra })).opp_left).toBe(9);
   });
-  it('os contratos que você fez vencem na hora, com a conta dos contratados fechada antes; quem te contratou continua', async () => {
+  it('vender não encerra contrato nenhum (vencem no horário); a conta dos contratados fecha antes (as estratégias de quem vendeu somem)', async () => {
     await abrir(A, B, C);
     // A com Cultura de startup (era 4, opção 2): quem A contrata ganha o triplo
     await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,2,0}', valuation = 1e15 where user_id = $1`, [A]);
@@ -168,17 +168,17 @@ describe('vender a startup', () => {
     await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '1000 seconds' where user_id = $1`, [B]);
     const [{ r: rB }] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [B]);
     const s = await vender();
-    expect(s.equipe).toEqual([]);
+    expect(s.equipe.map((c) => c.user_id)).toEqual([B]); // o contrato que A fez continua (0046)
     expect(s.chefes.map((c) => c.user_id)).toEqual([C]);
     // B rendeu as 1000 s com o triplo de Cultura de startup (a regra de antes da venda)
     const [{ valuation }] = await q<{ valuation: number }>('select valuation from public.idle_state where user_id = $1', [B]);
     expect(valuation / (rB * 1000)).toBeCloseTo(1, 3);
     expect(await q('select employer_id, ends_at <= now() as vencido from public.idle_contracts order by employer_id'))
-      .toEqual([{ employer_id: A, vencido: true }, { employer_id: C, vencido: false }]);
+      .toEqual([{ employer_id: A, vencido: false }, { employer_id: C, vencido: false }]);
     await t.as(B);
     const b = await t.rpc<Estado>('idle_open');
-    expect(b.chefes).toEqual([]);
-    expect(b.rate).toBeLessThan(rB); // voltou pro piso de freela
+    expect(b.chefes.map((c) => c.user_id)).toEqual([A]);
+    expect(b.rate).toBeLessThan(rB); // continua contratado, mas sem o triplo da Cultura de startup (A recomeçou sem estratégia)
   });
   it('contrato que já venceu, com o contratado sem fechar a conta desde antes: fecha antes também (o triplo não some pra trás)', async () => {
     await abrir(A, B);
@@ -272,5 +272,35 @@ describe('a migração 0041 conta o que já aconteceu', () => {
     await t.db.exec(sql);
     expect(await contar()).toEqual(depois);
     expect(await q('select user_id, conquista_id from public.idle_conquistas order by 1, 2')).toEqual(conquistas);
+  });
+});
+
+describe('devolver os contratos cortados pelas vendas de antes da 0046', () => {
+  it('volta ao fim original (início + 7 dias) quem foi cortado; a conta fecha antes (nada retroativo); quem recontratou ou já venceria fica como está', async () => {
+    await abrir(A, B, C);
+    // 1: cortado (A→B, começou há 1 dia, cortado há 1 h) → volta pra +7 dias
+    // 2: cortado (A→C), mas A recontratou C depois (3) → fica
+    // 4: cortado (C→B) com o fim original já no passado → fica
+    // 5: normal, venceu no horário (C→A) → fica
+    await q(`insert into public.idle_contracts (employer_id, employee_id, cargo, created_at, ends_at) values
+      ($1, $2, 'x', now() - interval '1 day', now() - interval '1 hour'),
+      ($1, $3, 'x', now() - interval '1 day', now() - interval '1 hour'),
+      ($1, $3, 'x', now() - interval '30 minutes', now() + interval '6 days 23 hours 30 minutes'),
+      ($3, $2, 'x', now() - interval '8 days', now() - interval '7 days 12 hours'),
+      ($3, $1, 'x', now() - interval '9 days', now() - interval '2 days')`, [A, B, C]);
+    await q(`update public.idle_state set settled_at = now() - interval '2 hours' where user_id in ($1, $2, $3)`, [A, B, C]);
+    const n = (await q<{ n: number }>('select public.idle_devolver_contratos_cortados() as n'))[0].n;
+    expect(n).toBe(1);
+    const fins = await q<{ id: string; dias: number }>(
+      `select id::text, round(extract(epoch from ends_at - created_at) / 86400.0, 3)::float8 as dias from public.idle_contracts order by id`);
+    expect(fins.map((f) => f.dias)).toEqual([7, 0.958, 7, 0.5, 7]) // o 2 fica cortado (23 h);
+    // as contas dos envolvidos fecharam agora: o tempo cortado não é pago de volta
+    const fechadas = await q<{ ok: boolean }>(`select settled_at > now() - interval '1 minute' as ok from public.idle_state where user_id in ($1, $2) order by user_id`, [A, B]);
+    expect(fechadas.every((f) => f.ok)).toBe(true);
+    // rodar de novo não devolve nada
+    expect((await q<{ n: number }>('select public.idle_devolver_contratos_cortados() as n'))[0].n).toBe(0);
+  });
+  it('só a migração chama', async () => {
+    await expect(t.asRole('authenticated', 'select public.idle_devolver_contratos_cortados()')).rejects.toThrow();
   });
 });

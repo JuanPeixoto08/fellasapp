@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-11-contratos',
+    titulo: 'Contrato é contrato',
+    data: '2026-10-11',
+    itens: [
+      'Vender a startup não cancela mais os contratos que você fez: eles seguem até vencer.',
+      'Quem teve contrato cortado por uma venda ganhou ele de volta, até o fim original.',
+    ],
+  },
+  {
     id: '2026-10-11-sorte',
     titulo: 'Sorte na tela',
     data: '2026-10-11',
