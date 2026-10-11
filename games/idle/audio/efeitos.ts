@@ -105,7 +105,7 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     return 2.1;
   },
   oportunidade: (c, d, t) => {
-    sininho(c, d, t, 84, 0.2, 0.5);
+    sininho(c, d, t, 84, 0.2, 0.9);
     return 0.7;
   },
   pegar: (c, d, t) => {
@@ -140,15 +140,15 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     return 0.3;
   },
   clique: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'highpass', 2500, 2500, 0.03, 0.04);
+    ruidoFiltrado(c, d, t, 'highpass', 2500, 2500, 0.03, 0.07);
     return 0.05;
   },
   abrir: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'bandpass', 600, 2400, 0.18, 0.04);
+    ruidoFiltrado(c, d, t, 'bandpass', 600, 2400, 0.18, 0.08);
     return 0.2;
   },
   fechar: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'bandpass', 2400, 600, 0.18, 0.04);
+    ruidoFiltrado(c, d, t, 'bandpass', 2400, 600, 0.18, 0.08);
     return 0.2;
   },
   dourado: (c, d, t) => {

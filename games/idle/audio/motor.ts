@@ -1,6 +1,6 @@
 // Motor de áudio: o contexto (criado no 1º toque: o navegador não deixa antes), os barramentos música / efeitos /
 // geral até o limitador, o fade com a aba e o "abaixa a música" dos momentos grandes.
-export const VOL_MUSICA = 0.32;
+export const VOL_MUSICA = 0.22; // medido na página de audição: a música fica uns 10 dB abaixo dos efeitos principais
 export const VOL_EFEITOS = 0.8;
 const ABAIXADA = 0.4; // ~−8 dB
 

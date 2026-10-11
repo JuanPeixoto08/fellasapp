@@ -123,7 +123,7 @@ const sininho: Toque = (ctx, d, t, m, dur, f) => {
 };
 /** Só dos efeitos: moedinha de videogame (sobe uma quarta no meio). */
 const moeda: Toque = (ctx, d, t, m, _dur, f) => {
-  const o = osc(ctx, 'square', hz(m), filtro(ctx, 'lowpass', 3500, 0.7, envelope(ctx, d, t, 0.07 * f, 0.002, 0.28)), t, t + 0.28);
+  const o = osc(ctx, 'square', hz(m), filtro(ctx, 'lowpass', 3500, 0.7, envelope(ctx, d, t, 0.16 * f, 0.002, 0.28)), t, t + 0.28);
   o.frequency.setValueAtTime(hz(m + 5), t + 0.06);
 };
 
