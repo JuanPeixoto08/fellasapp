@@ -133,8 +133,18 @@
 .idle .no .btn { flex: none; min-height: 44px; }
 .idle .no-status { flex: none; max-width: 40%; text-align: right; font-size: 12px; color: #A8A398; }
 .idle .no.comprado .no-status { color: var(--mint); }
-@media (min-width: 700px) {
-  .idle .arvore { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (min-width: 600px) {
+  .idle .arvore { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .idle .ramo { min-width: 0; }
+  .idle .ramo.raiz { grid-column: 1 / -1; justify-self: center; width: min(100%, 320px); }
+  .idle .ramo:not(.raiz) .no { flex-direction: column; text-align: center; min-width: 0; }
+  .idle .ramo:not(.raiz) .no .meio { min-width: 0; overflow-wrap: anywhere; }
+  .idle .ramo:not(.raiz) .no strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .idle .ramo:not(.raiz) .no .btn { width: 100%; padding: 0 8px; }
+  .idle .ramo:not(.raiz) .no-status { max-width: none; text-align: center; }
+}
+.idle .no .btn { white-space: nowrap; }
+.idle .lista-legado { overflow-x: hidden; }
   .idle .ramo.raiz { grid-column: 1 / -1; justify-self: center; width: min(100%, 320px); }
   .idle .ramo:not(.raiz) .no { flex-direction: column; text-align: center; }
   .idle .ramo:not(.raiz) .no .btn { width: 100%; padding: 0 6px; white-space: normal; }
