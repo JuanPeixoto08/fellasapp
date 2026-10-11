@@ -58,9 +58,9 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 }
 
 // console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
-// __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas)
+// __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres
 const w = window as unknown as {
-  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>;
+  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -77,5 +77,9 @@ w.__meContrata = async () => {
 };
 w.__vendavel = async (foguetes = 150) => {
   await dono(`update public.idle_state set generators[30] = $2, strategies = '{0,0,0,0}' where user_id = $1`, [ME, foguetes]);
+  document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
+};
+w.__pontos = async (n) => {
+  await dono('update public.idle_state set prestige_earned = prestige_spent + $2 where user_id = $1', [ME, n]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
 };
