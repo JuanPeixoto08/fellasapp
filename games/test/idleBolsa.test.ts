@@ -1,0 +1,72 @@
+// Banco da Bolsa (minigame 1): migrações reais no PGlite.
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { EMPRESAS_BOLSA, escolherHumor, inicial, normal, tick, type Mercado } from '../idle/bolsaMotor';
+import { freshDb, type TestDb } from './db';
+
+let t: TestDb;
+const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
+
+beforeEach(async () => {
+  t = await freshDb();
+});
+
+type Linha = { valor: number; delta: number; humor: number; humor_ate: string; geracao: number; rj_ate: string | null };
+const paraTs = (l: Linha): Mercado => ({
+  valor: l.valor, delta: l.delta, humor: l.humor, humorAte: Number(l.humor_ate), geracao: l.geracao,
+  rjAte: l.rj_ate === null ? null : Number(l.rj_ate),
+});
+
+/** Roda o tick em SQL com o estado m (como linha de idle_bolsa_mercado). */
+async function tickSql(m: Mercado, empresa: number, tt: number, u: number[]): Promise<Mercado> {
+  const [r] = await q<Linha>(
+    `select (x).valor, (x).delta, (x).humor, (x).humor_ate::text, (x).geracao, (x).rj_ate::text from (
+       select public.idle_bolsa_tick(row($1::int, $2::bigint, $3::float8, $4::float8, $5::int, $6::bigint, $7::int, $8::bigint)::public.idle_bolsa_mercado, c, $9::bigint, $10::double precision[]) as x
+       from public.idle_cat_bolsa c where c.id = $1) s`,
+    [empresa, tt - 1, m.valor, m.delta, m.humor, m.humorAte, m.geracao, m.rjAte, tt, u],
+  );
+  return paraTs(r);
+}
+
+describe('catálogo e tick (paridade SQL × TS)', () => {
+  it('o catálogo do banco é o mesmo da página', async () => {
+    const rows = await q<{ id: number; codigo: string; nome: string; gerador: number; repouso: number; vol: number; pesos: number[]; quebra: number }>(
+      'select id, codigo, nome, gerador, repouso, vol, pesos, quebra from public.idle_cat_bolsa order by id');
+    expect(rows).toEqual(EMPRESAS_BOLSA.map((e) => ({ ...e, pesos: [...e.pesos] })));
+  });
+  it('normal e humor iguais', async () => {
+    for (const [a, b] of [[0, 0], [0.3, 0.6], [0.999, 0.25], [0.5, 0.9]]) {
+      const [r] = await q<{ n: number }>('select public.idle_bolsa_normal($1, $2) as n', [a, b]);
+      expect(Math.abs(r.n - normal(a, b))).toBeLessThan(1e-9);
+    }
+    for (const u of [0, 0.1, 0.33, 0.5, 0.77, 0.999]) {
+      const [r] = await q<{ h: number }>('select public.idle_bolsa_humor($1::double precision[], $2) as h', [EMPRESAS_BOLSA[3].pesos, u]);
+      expect(r.h).toBe(escolherHumor(EMPRESAS_BOLSA[3].pesos, u));
+    }
+  });
+  it('200 ticks de cada empresa com os mesmos sorteios dão o mesmo mercado (< 1e-9)', async () => {
+    let s = 7;
+    const u = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
+    for (const e of EMPRESAS_BOLSA) {
+      let ts = inicial(e, 0);
+      let sql = inicial(e, 0);
+      for (let tt = 1; tt <= 200; tt++) {
+        const sorteio = [u(), u(), u(), u(), u(), u(), u()];
+        // força a zona de risco de vez em quando, pra exercitar a quebra
+        if (tt % 50 === 0) { ts = { ...ts, valor: e.repouso * 0.1 }; sql = { ...sql, valor: e.repouso * 0.1 }; sorteio[6] = 0; }
+        ts = tick(ts, e, tt, sorteio);
+        sql = await tickSql(sql, e.id, tt, sorteio);
+        expect(Math.abs(sql.valor - ts.valor), `${e.codigo} t${tt}`).toBeLessThan(1e-9 * Math.max(1, ts.valor));
+        expect(Math.abs(sql.delta - ts.delta)).toBeLessThan(1e-9);
+        expect({ ...sql, valor: 0, delta: 0 }).toEqual({ ...ts, valor: 0, delta: 0 });
+      }
+    }
+  });
+  it('catálogo: membro lê, anônimo não', async () => {
+    await t.member('00000000-0000-0000-0000-00000000000a');
+    await t.as('00000000-0000-0000-0000-00000000000a');
+    expect(await t.asRole('authenticated', 'select id from public.idle_cat_bolsa')).toHaveLength(8);
+    await expect(t.asRole('anon', 'select id from public.idle_cat_bolsa')).rejects.toThrow();
+    await expect(t.asRole('authenticated', 'select * from public.idle_bolsa_mercado')).rejects.toThrow();
+  });
+});
