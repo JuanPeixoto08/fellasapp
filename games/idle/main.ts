@@ -6,12 +6,13 @@ import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
 import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
+import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
 import {
-  agoraServidor, ancorar, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+  agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -19,13 +20,17 @@ import { vigiarVersao } from '../shared/atualizar';
 // aba aberta há tempo recarrega sozinha quando sai versão nova (no dev o Vite já recarrega)
 if (!import.meta.env.DEV) vigiarVersao();
 
-type Api = Pick<typeof realApi, 'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'hasSession'>;
+type Api = Pick<
+  typeof realApi,
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'hasSession'
+>;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
 
 const RECARREGA = [
   'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
-  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open',
+  'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open', 'idle_prestige_low', 'idle_points_low',
+  'idle_node_owned',
 ];
 // contratar recusado: o placar (quem já trabalha pra quem) também ficou velho
 const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];
@@ -47,6 +52,15 @@ let editorFechado = false;
 let desenhar: Desenhar = () => undefined;
 // o vencimento de contrato que já pediu um "bater o ponto" (pede uma vez por vencimento)
 let vencimentoPedido: string | null = null;
+// folha "Vender a startup?" aberta; aviso de conquista na cena (um de cada vez, 3 s cada)
+let vendaAberta = false;
+let conquistaAviso: string | null = null;
+// as conquistas que a página já conhecia (null = ainda não carregou): avisa só as que aparecem depois
+let conquistasConhecidas: number[] | null = null;
+const filaAvisos = criarFilaAvisos((texto) => {
+  conquistaAviso = texto;
+  render();
+});
 
 const tela = criarTela(document.getElementById('app')!, {
   abrirCnpj: () => void guard(abrirCnpj),
@@ -88,6 +102,20 @@ const tela = criarTela(document.getElementById('app')!, {
     rascunho = { ...rascunho, [campo]: valor };
     render();
   },
+  vender: (acao) => {
+    if (acao === 'confirmar') {
+      vendaAberta = false; // fecha já: deu certo, a cena volta pro "antes"; deu errado, o aviso diz por quê
+      void guard(async () => {
+        aplicar(await api.idlePrestige());
+        aba = 'geradores'; // quando reabrir a empresa, começa comprando
+        await carregarPlacar();
+      });
+      return;
+    }
+    vendaAberta = acao === 'abrir';
+    render();
+  },
+  comprarNo: (id) => void guard(async () => aplicar(await api.idleBuyNode(id))),
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
 // o palco recebe o kit como função (tenta de novo quando falha); o editor e as cartas esperam o mesmo kit
 const palco = criarPalco(tela.canvas, ativos.camadas, carregarKit);
@@ -132,7 +160,7 @@ function agoraSrv() {
 /** A oportunidade passando agora, só se o banco ainda aceita: não pega e não é de antes do início da semana. */
 function vivoAgora(s: IdleState, agora: number): number | null {
   if (fase !== 'jogando' || s.opp_left <= 0) return null;
-  const w = aoVivo(s.user_id, agora, segundosOportunidade(s));
+  const w = aoVivo(s.user_id, agora, segundosOportunidade(s, s.bonus.arvore));
   if (w === null || s.opp_claimed.map(Number).includes(w) || instante(s.user_id, w) < inicioSemana(s)) return null;
   return w;
 }
@@ -140,9 +168,12 @@ function vivoAgora(s: IdleState, agora: number): number | null {
 function render() {
   const s = ancora?.estado ?? null;
   const agora = agoraSrv();
-  const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s)) : [];
+  const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
-  tela.renderizar({ fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual });
+  tela.renderizar({
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
+    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso,
+  });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
 
@@ -155,6 +186,10 @@ function aplicar(estado: IdleState) {
   if (deveAbrirEditor(estado, fase, editorFechado, rascunho !== null)) rascunho = { ...PADRAO };
   if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
   render();
+  // avisa as novas da chamada e as que apareceram sem estar nelas (ser contratado, "Pai tá on"); a 1ª carga não avisa o histórico
+  const novas = detectarNovas(conquistasConhecidas, estado);
+  conquistasConhecidas = novas.conhecidas;
+  filaAvisos.adicionar(avisos(novas.ids));
 }
 
 async function recarregar() {
@@ -206,7 +241,10 @@ async function guard(trabalho: () => Promise<void>) {
     await trabalho();
   } catch (e) {
     const err = toGameError(e);
-    if (err.code === 'no_session') fase = 'sem_sessao';
+    if (err.code === 'no_session') {
+      fase = 'sem_sessao';
+      filaAvisos.parar();
+    }
     else {
       aviso = err.message;
       if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
@@ -246,6 +284,7 @@ void (async () => {
   await document.fonts.ready;
   if (!(await api.hasSession())) {
     fase = 'sem_sessao';
+    filaAvisos.parar();
     render();
     return;
   }

@@ -31,6 +31,7 @@ describe('âncora no relógio do banco', () => {
   it('caixinha: 3 por 4h, ou o tamanho que o ramo Oportunidades der (a validade é sempre 4h)', () => {
     expect(caixa(base())).toEqual({ tamanho: 3, validadeS: 4 * 3600 });
     expect(caixa(base({ bonus: { arvore: [1, 31, 32], conquistas: 0 } }))).toEqual({ tamanho: 4, validadeS: 4 * 3600 });
+    expect(caixa(base({ bonus: { arvore: [1, 31, 32, 33, 34, 35], conquistas: 0 } }))).toEqual({ tamanho: 5, validadeS: 4 * 3600 });
   });
   it('início da semana: segunda 00:00 de Brasília', () => {
     expect(inicioSemana(base({ week_start: '2026-10-12' }))).toBe(Date.parse('2026-10-12T03:00:00Z'));

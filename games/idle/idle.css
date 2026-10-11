@@ -113,3 +113,43 @@
 .idle .cor[aria-pressed='true'] { border-color: #B8A2FF; box-shadow: 0 0 0 2px #B8A2FF; }
 .idle .chip:focus-visible, .idle .cor:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
 .idle .editor-fim { display: flex; gap: 12px; justify-content: flex-end; padding-top: 12px; }
+/* entrega 3: no celular as 5 abas rolam de lado (cada uma do tamanho do texto) */
+@media (max-width: 599px) {
+  .idle .abas { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .idle .abas::-webkit-scrollbar { display: none; }
+  .idle .aba { flex: 1 0 auto; padding: 0 14px; }
+}
+/* aba Legado: card de prestígio, árvore (ramos empilhados no celular, lado a lado no tablet e no PC) e conquistas */
+.idle .prestigio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); }
+.idle .prestigio .btn { flex: 1 1 100%; min-height: 44px; height: auto; white-space: nowrap; }
+@media (min-width: 600px) { .idle .prestigio .btn { flex: none; padding: 0 16px; } }
+.idle .legado-titulo { margin: 12px 0 0; font: 700 15px var(--font); color: var(--paper); }
+.idle .arvore { display: grid; gap: 12px; }
+.idle .ramo { display: grid; gap: 6px; align-content: start; }
+.idle .ramo-nome { margin: 0; font: 700 13px var(--font); color: #A8A398; }
+.idle .no { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: var(--paper); }
+.idle .no.comprado { border-color: #5B3FD9; background: #262431; }
+.idle .no.trancado { opacity: 0.5; }
+.idle .no .btn { flex: none; min-height: 44px; }
+.idle .no-status { flex: none; max-width: 40%; text-align: right; font-size: 12px; color: #A8A398; }
+.idle .no.comprado .no-status { color: var(--mint); }
+@media (min-width: 700px) {
+  .idle .arvore { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .idle .ramo.raiz { grid-column: 1 / -1; justify-self: center; width: min(100%, 320px); }
+  .idle .ramo:not(.raiz) .no { flex-direction: column; text-align: center; }
+  .idle .ramo:not(.raiz) .no .btn { width: 100%; padding: 0 6px; white-space: normal; }
+  .idle .ramo:not(.raiz) .no-status { max-width: none; text-align: center; }
+}
+.idle .grade-conquistas { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+.idle .conquista { display: grid; justify-items: center; align-content: start; gap: 6px; min-height: 44px; padding: 8px 4px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: #A8A398; font: 600 12px/1.25 var(--font); text-align: center; cursor: pointer; }
+.idle .conquista.ganha { color: var(--paper); border-color: #5B3FD9; }
+.idle .conquista:not(.ganha) .icone-legado, .idle .no.trancado .icone-legado { opacity: 0.35; filter: grayscale(1); }
+.idle .conquista[aria-pressed='true'], .idle .conquista:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 2px; }
+.idle .icone-legado { flex: none; width: 48px; height: 48px; background: no-repeat 0 0 / 48px 48px; image-rendering: pixelated; }
+.idle .icone-legado.sem-arte { border-radius: 6px; border: 3px solid #6B6874; }
+.idle .conquista-detalhe { display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; background: #262431; color: var(--paper); }
+/* aviso de conquista: pílula por cima da cena, 3 s (main.ts) */
+.idle .conquista-aviso { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 999px; border: 1px solid #B8A2FF; background: #3A2A66; color: #DDD2FF; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; animation: conquista-entra 0.25s ease-out; }
+@keyframes conquista-entra { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .idle .conquista-aviso { animation: none; } }
+.idle .lista-placar .pontos { grid-row: 2; grid-column: 4; justify-self: end; color: var(--gold); font-size: 13px; font-weight: 700; }

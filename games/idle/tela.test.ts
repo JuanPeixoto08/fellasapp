@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { IdleBoardRow, IdleState } from '../shared/types';
 import type { Desenhar } from './navegador';
-import { instante, tipo, VALIDADE_S } from './oportunidades';
+import { instante, sai, tipo, VALIDADE_S } from './oportunidades';
+import { catalogo } from './catalogo';
 import { PADRAO } from './personagem';
 import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';
 
@@ -17,7 +18,8 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
   ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
-  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false, ...x,
+  fase: 'jogando', estado: estado(), aba: 'geradores', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
+  vendaAberta: false, conquistaAviso: null, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -29,6 +31,7 @@ beforeEach(() => {
     abrirCnpj: vi.fn<Acoes['abrirCnpj']>(), comprar: vi.fn<Acoes['comprar']>(), escolher: vi.fn<Acoes['escolher']>(), pegar: vi.fn<Acoes['pegar']>(),
     trocarAba: vi.fn<Acoes['trocarAba']>(), caixa: vi.fn<Acoes['caixa']>(), tentarDeNovo: vi.fn<Acoes['tentarDeNovo']>(),
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
+    vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -161,8 +164,11 @@ describe('tela da Fellas Inc.', () => {
   });
   it('modais com aria-modal e título', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)] }), caixaAberta: true, editor: { ...PADRAO } }));
-    for (const sel of ['.modal-estrategia', '.modal-caixa', '.modal-visual']) {
+    tela.renderizar(modelo({
+      estado: estado({ era: 2, generators: [1, 1, 1, 1, 1, 1, 1, ...Array(23).fill(0)], pontos_venda: 1 }),
+      caixaAberta: true, editor: { ...PADRAO }, vendaAberta: true,
+    }));
+    for (const sel of ['.modal-estrategia', '.modal-caixa', '.modal-visual', '.modal-venda']) {
       const modal = root.querySelector(sel)!;
       expect(modal.getAttribute('aria-modal')).toBe('true');
       expect(root.querySelector(`#${modal.getAttribute('aria-labelledby')}`)!.tagName).toBe('H2');
@@ -287,5 +293,137 @@ describe('editor de personagem', () => {
     expect(root.querySelector('.modal-visual')!.hasAttribute('hidden')).toBe(true);
     [...root.querySelectorAll<HTMLButtonElement>('.abrir button')].find((x) => x.textContent === 'Mudar visual')!.click();
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
+  });
+});
+
+describe('legado: prestígio, árvore e conquistas', () => {
+  const EM = '2026-10-12T15:00:00.000Z';
+  it('card: pontos pra gastar, ganhos na vida e recorde; sem ponto a ganhar, "Ainda não compensa" apagado', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, pontos_vida: 12, vendas: 2, recorde: 1234.5 }) }));
+    const card = root.querySelector('.prestigio')!;
+    expect(card.textContent).toContain('★ 3 pontos pra gastar');
+    expect(card.textContent).toContain('12 ganhos na vida · recorde +F$ 1,23 mil/s · vendeu 2 vezes');
+    const b = card.querySelector('button')!;
+    expect(b.textContent).toBe('Ainda não compensa');
+    expect(b.disabled).toBe(true);
+  });
+  it('vender: o botão diz quantos pontos e abre a folha; a folha confirma ou fecha', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }) }));
+    const b = root.querySelector<HTMLButtonElement>('.prestigio button')!;
+    expect(b.textContent).toBe('Vender a startup · +5 pontos');
+    b.click();
+    expect(acoes.vender).toHaveBeenCalledWith('abrir');
+    expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true }));
+    const folha = root.querySelector('.modal-venda')!;
+    expect(folha.hasAttribute('hidden')).toBe(false);
+    expect(folha.textContent).toContain('Vender a startup?');
+    expect(folha.textContent).toContain('Você ganha 5 pontos pra gastar na árvore e recomeça do zero.');
+    [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Vender')!.click();
+    [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Deixa quieto')!.click();
+    expect(acoes.vender.mock.calls.map((c) => c[0])).toEqual(['abrir', 'confirmar', 'fechar']);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true, ocupado: true }));
+    expect([...root.querySelectorAll<HTMLButtonElement>('.modal-venda button')].find((x) => x.textContent === 'Vender')!.disabled).toBe(true);
+    // não compensa mais (o banco recusou e a tela recarregou): a folha some
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 0 }), vendaAberta: true }));
+    expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('árvore: raiz e 5 ramos; comprado aceso, disponível com "Comprar · N ★" (apagado sem pontos), trancado com o que falta', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }) }));
+    expect([...root.querySelectorAll('.ramo .ramo-nome')].map((h) => h.textContent)).toEqual(
+      ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'],
+    );
+    const no = (nome: string) => [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === nome)!;
+    expect(no('Cafezinho de garrafa térmica').classList.contains('comprado')).toBe(true);
+    expect(no('Cafezinho de garrafa térmica').textContent).toContain('Comprado');
+    expect(no('Ô loco, bicho!').querySelector('button')!.textContent).toBe('Comprar · 4 ★');
+    expect(no('Ô loco, bicho!').querySelector('button')!.disabled).toBe(true); // custa 4, tem 3
+    const pe = no('Porquinho quebrado').querySelector('button')!;
+    expect(pe.disabled).toBe(false);
+    pe.click();
+    expect(acoes.comprarNo).toHaveBeenCalledWith(21);
+    expect(no('Turno dobrado').classList.contains('trancado')).toBe(true);
+    expect(no('Turno dobrado').textContent).toContain('Libera com Ô loco, bicho!');
+    expect(no('Turno dobrado').querySelector('button')).toBeNull();
+  });
+  it('conquistas: N/total; tocar mostra a condição ou a frase e a data; escondida só quando alguém conseguiu', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({
+      aba: 'legado',
+      estado: estado({ conquistas: [{ id: 7, em: EM }], descobertas: [102], bonus: { arvore: [], conquistas: 1 } }),
+    }));
+    const lista = root.querySelector('.lista-legado')!;
+    expect(lista.hasAttribute('hidden')).toBe(false);
+    expect(lista.textContent).toContain(`Conquistas 1/${catalogo.conquistas.length} · +1% de produção`);
+    const celulas = [...lista.querySelectorAll<HTMLButtonElement>('.conquista')];
+    expect(celulas.map((c) => c.textContent)).toContain('???');
+    expect(celulas.map((c) => c.textContent)).not.toContain('Aura negativa');
+    celulas.find((c) => c.textContent === 'Estágio não remunerado em escala')!.click();
+    let det = root.querySelector('.conquista-detalhe')!;
+    expect(det.textContent).toContain('Cem estagiários, uma cafeteira.');
+    expect(det.textContent).toContain('Ganhou em 12/10/2026');
+    [...root.querySelectorAll<HTMLButtonElement>('.conquista')].find((c) => c.textContent === 'Cem abas abertas')!.click();
+    det = root.querySelector('.conquista-detalhe')!;
+    expect(det.textContent).toContain('Ter 100 "Você, no notebook da faculdade"');
+    expect(det.textContent).not.toContain('Ganhou em');
+  });
+  it('sem a arte dos ícones, nó e conquista mostram só a moldura', () => {
+    // a arte dos ícones ainda não chegou ao repositório: ativos.no/conquista devolvem null
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'legado' }));
+    for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
+      const icone = root.querySelector<HTMLElement>(sel)!;
+      expect(icone.classList.contains('sem-arte'), sel).toBe(true);
+      expect(icone.style.backgroundImage, sel).toBe('');
+    }
+  });
+  it('aviso de conquista por cima da cena', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ conquistaAviso: 'Conquista: 6-7' }));
+    const aviso = root.querySelector('.palco .conquista-aviso')!;
+    expect(aviso.hasAttribute('hidden')).toBe(false);
+    expect(aviso.textContent).toBe('Conquista: 6-7');
+    tela.renderizar(modelo());
+    expect(root.querySelector('.palco .conquista-aviso')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('placar: ★ N (ganhos na vida) ao lado do F$/s de quem tem', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'placar', placar: [linha({ pontos: 12 }), linha({ userId: 'c', name: 'Teteu' })] }));
+    const itens = root.querySelectorAll('.lista-placar li');
+    expect(itens[0].querySelector('.pontos')!.textContent).toBe('★ 12');
+    expect(itens[1].querySelector('.pontos')).toBeNull();
+    expect(itens[0].querySelector('.v')!.textContent).toContain('/s');
+  });
+  it('depois de vender, antes do Abrir CNPJ: o Legado aparece embaixo pra gastar os pontos', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(true); // nunca vendeu
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false, pontos: 5, pontos_vida: 5 }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(false);
+    const fundador = [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === 'Virou MEI')!;
+    fundador.querySelector('button')!.click();
+    expect(acoes.comprarNo).toHaveBeenCalledWith(1);
+  });
+  it('cinco abas, Legado por último', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    expect([...root.querySelectorAll('.abas .aba')].map((b) => b.textContent)).toEqual(['Geradores', 'Melhorias', 'Contratar', 'Placar', 'Legado']);
+    porTexto('Legado').click();
+    expect(acoes.trocarAba).toHaveBeenCalledWith('legado');
+  });
+  it('caixinha: o "some em" usa o tamanho da árvore (4 com Print de tudo: sai com a 4ª mais nova)', () => {
+    vi.useFakeTimers();
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    const agora = instante(uid, 50) + 5 * 60 * 1000;
+    vi.setSystemTime(agora);
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid, bonus: { arvore: [1, 31, 32], conquistas: 0 } }) }));
+    const com4 = root.querySelector('.modal-caixa .prazo')!.textContent;
+    expect(com4).toBe(prazo(sai(uid, 50, 4) - agora));
+    expect(com4).not.toBe(prazo(sai(uid, 50, 3) - agora));
+    vi.useRealTimers();
   });
 });

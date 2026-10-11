@@ -44,20 +44,43 @@ export const pontos = (n: number): string => `${n} ${n === 1 ? 'ponto' : 'pontos
 /** O texto da folha de confirmação da venda. */
 export const textoVenda = (n: number): string => `Você ganha ${pontos(n)} pra gastar na árvore e recomeça do zero.`;
 
-/** Fila dos avisos de conquista: um de cada vez, `ms` cada. `mostrar(null)` = nenhum na tela. */
+/**
+ * Quais conquistas avisar depois de carregar o estado. `conhecidas` = os ids que a página já conhecia (null = primeira
+ * carga: só as `novas` da chamada, não o histórico todo). Depois, avisa também as que apareceram no estado sem estar nas
+ * `novas` (ganhas pela ação de outra pessoa: ser contratado, "Pai tá on"). Devolve os ids a avisar e a lista nova de conhecidas.
+ */
+export function detectarNovas(conhecidas: readonly number[] | null, estado: IdleState): { ids: number[]; conhecidas: number[] } {
+  const agora = estado.conquistas.map((c) => c.id);
+  const ids = estado.novas.filter((id) => !conhecidas?.includes(id));
+  if (conhecidas !== null) {
+    for (const id of agora) if (!conhecidas.includes(id) && !ids.includes(id)) ids.push(id);
+  }
+  return { ids, conhecidas: [...new Set([...agora, ...estado.novas])] };
+}
+
+/** Fila dos avisos de conquista: um de cada vez, `ms` cada. `mostrar(null)` = nenhum na tela. `parar` limpa tudo. */
 export function criarFilaAvisos(mostrar: (texto: string | null) => void, ms = 3000) {
   const fila: string[] = [];
   let ativo = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const proximo = () => {
+    timer = null;
     const t = fila.shift();
     ativo = t !== undefined;
     mostrar(t ?? null);
-    if (t !== undefined) setTimeout(proximo, ms);
+    if (t !== undefined) timer = setTimeout(proximo, ms);
   };
   return {
     adicionar(textos: string[]) {
       fila.push(...textos);
       if (!ativo && fila.length) proximo();
+    },
+    parar() {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      fila.length = 0;
+      if (ativo) mostrar(null);
+      ativo = false;
     },
   };
 }

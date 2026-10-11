@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { avisos, criarFilaAvisos, falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS } from './legado';
+import { avisos, criarFilaAvisos, detectarNovas, falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS } from './legado';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
@@ -74,6 +74,32 @@ describe('fila de avisos', () => {
     expect(vistos.at(-1)).toBeNull();
     fila.adicionar([]);
     expect(vistos.at(-1)).toBeNull();
+  });
+  it('parar limpa o que está na tela, a fila e os timers', () => {
+    vi.useFakeTimers();
+    const vistos: (string | null)[] = [];
+    const fila = criarFilaAvisos((t) => vistos.push(t));
+    fila.adicionar(['A', 'B']);
+    fila.parar();
+    expect(vistos).toEqual(['A', null]);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10_000);
+    expect(vistos).toEqual(['A', null]);
+    fila.adicionar(['C']); // continua utilizável
+    expect(vistos.at(-1)).toBe('C');
+  });
+});
+
+describe('detectarNovas (o que avisar ao recarregar)', () => {
+  it('primeira carga: só as novas da chamada, não o histórico', () => {
+    const e = estado({ conquistas: [{ id: 1, em: EM }, { id: 2, em: EM }], novas: [2] });
+    expect(detectarNovas(null, e)).toEqual({ ids: [2], conhecidas: [1, 2] });
+  });
+  it('depois: avisa a que apareceu sem estar nas novas (ser contratado, Pai tá on) e não repete', () => {
+    const e = estado({ conquistas: [{ id: 1, em: EM }, { id: 9, em: EM }, { id: 4, em: EM }], novas: [4] });
+    const r = detectarNovas([1], e);
+    expect(r.ids).toEqual([4, 9]);
+    expect(detectarNovas(r.conhecidas, e).ids).toEqual([]);
   });
 });
 

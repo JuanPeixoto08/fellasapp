@@ -5,6 +5,7 @@ import { button, el } from '../shared/hud/hud';
 import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { catalogo, type Melhoria } from './catalogo';
+import { falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
 import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
@@ -12,9 +13,9 @@ import type { Desenhar } from './navegador';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
-import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
+import { caixa, estrategiaPendente, segundosOportunidade, type Fase } from './store';
 
-export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar';
+export type Aba = 'geradores' | 'melhorias' | 'contratar' | 'placar' | 'legado';
 export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
 export type Modelo = {
   fase: Fase; estado: IdleState | null; aba: Aba; placar: IdleBoardRow[] | null; aviso: string | null;
@@ -23,11 +24,16 @@ export type Modelo = {
   placarFalhou: boolean;
   /** Rascunho do editor de personagem (null = fechado). */
   editor: IdleVisual | null;
+  /** Folha "Vender a startup?" aberta. */
+  vendaAberta: boolean;
+  /** O aviso de conquista na cena agora ("Conquista: 6-7"); null = nenhum. */
+  conquistaAviso: string | null;
 };
 export type Acoes = {
   abrirCnpj(): void; comprar(tipo: 'gerador' | 'melhoria', id: number, qtd: 0 | 1 | 10): void; escolher(era: number, opcao: number): void;
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
+  vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
 };
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
 
@@ -92,7 +98,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const palco = el('div', 'palco');
   const canvas = el('canvas', 'cena');
   const vivo = button('', 'vivo', () => undefined);
-  palco.append(canvas, vivo);
+  const avisoConquista = el('div', 'conquista-aviso');
+  avisoConquista.setAttribute('role', 'status');
+  palco.append(canvas, vivo, avisoConquista);
 
   const placa = el('div', 'valor');
   const numero = el('div', 'numero', 'F$ 0');
@@ -113,14 +121,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     melhorias: button('Melhorias', 'aba', () => a.trocarAba('melhorias')),
     contratar: button('Contratar', 'aba', () => a.trocarAba('contratar')),
     placar: button('Placar', 'aba', () => a.trocarAba('placar')),
+    legado: button('Legado', 'aba', () => a.trocarAba('legado')),
   };
-  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar);
+  abas.append(botoesAba.geradores, botoesAba.melhorias, botoesAba.contratar, botoesAba.placar, botoesAba.legado);
   const listaG = el('div', 'lista lista-geradores');
   const listaM = el('div', 'lista lista-melhorias');
   const listaC = el('div', 'lista lista-contratar');
   const listaP = el('ol', 'lista lista-placar');
+  const listaL = el('div', 'lista lista-legado');
   const painel = el('main', 'painel');
-  painel.append(abrir, abas, listaG, listaM, listaC, listaP);
+  painel.append(abrir, abas, listaG, listaM, listaC, listaP, listaL);
 
   const notice = el('div', 'notice');
   notice.setAttribute('role', 'status');
@@ -136,7 +146,10 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const modalE = el('div', 'modal modal-estrategia');
   const modalC = el('div', 'modal modal-caixa');
   const modalV = el('div', 'modal modal-visual');
-  for (const [modal, titulo] of [[modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual']] as const) {
+  const modalP = el('div', 'modal modal-venda');
+  for (const [modal, titulo] of [
+    [modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual'], [modalP, 'idle-titulo-venda'],
+  ] as const) {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', titulo);
@@ -147,7 +160,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     return h;
   };
 
-  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV);
+  app.append(topo, palco, placa, painel, notice, overlay, modalE, modalC, modalV, modalP);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -156,6 +169,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   let prazos: { texto: HTMLElement; fim: number }[] = [];
   // aba Melhorias: à venda ou as já compradas (só apresentação; refaz com o último modelo)
   let verCompradas = false;
+  // aba Legado: a conquista tocada (mostra a frase e a data); só apresentação
+  let conquistaAberta: number | null = null;
   let ultimo: Modelo | null = null;
 
   /** Personagem num canvas pequeno (o CSS amplia). rotulo null = decorativo (o nome já está do lado). */
@@ -240,6 +255,75 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     return box;
   }
 
+  /** Ícone 16x16 ampliado; sem a arte, só a moldura. */
+  function iconeLegado(url: string | null) {
+    const box = el('div', 'icone-legado');
+    if (url) box.style.backgroundImage = `url(${url})`;
+    else box.classList.add('sem-arte');
+    return box;
+  }
+
+  /** Aba Legado: o card de prestígio, a árvore (raiz e 5 ramos) e a grade de conquistas (tocar mostra a frase e a data). */
+  function legado(s: IdleState, ocupado: boolean) {
+    const card = el('div', 'prestigio');
+    const meio = el('div', 'meio');
+    const vezes = s.vendas === 1 ? 'vendeu 1 vez' : `vendeu ${s.vendas} vezes`;
+    meio.append(
+      el('strong', undefined, `★ ${pontos(s.pontos)} pra gastar`),
+      el('span', 'sub', `${s.pontos_vida} ganhos na vida · recorde ${formatarTaxa(s.recorde)}${s.vendas ? ` · ${vezes}` : ''}`),
+    );
+    const vender = button(
+      s.pontos_venda >= 1 ? `Vender a startup · +${pontos(s.pontos_venda)}` : 'Ainda não compensa',
+      'btn main', () => a.vender('abrir'),
+    );
+    vender.disabled = s.pontos_venda < 1 || ocupado;
+    card.append(meio, vender);
+
+    const arvore = el('div', 'arvore');
+    for (const r of RAMOS_ARVORE) {
+      const ramo = el('section', r.ramo === 0 ? 'ramo raiz' : 'ramo');
+      ramo.append(el('h3', 'ramo-nome', r.nome));
+      for (const n of r.nos) {
+        const sit = situacao(n, s.bonus.arvore);
+        const no = el('div', `no ${sit}`);
+        const texto = el('div', 'meio');
+        texto.append(el('strong', undefined, n.nome), el('span', 'sub', n.efeito));
+        no.append(iconeLegado(ativos.no(n.id)), texto);
+        if (sit === 'comprado') no.append(el('span', 'no-status', 'Comprado'));
+        else if (sit === 'trancado') no.append(el('span', 'no-status', falta(n)));
+        else {
+          const b = button(`Comprar · ${n.custo} ★`, 'btn compacto', () => a.comprarNo(n.id));
+          b.disabled = ocupado || s.pontos < n.custo;
+          no.append(b);
+        }
+        ramo.append(no);
+      }
+      arvore.append(ramo);
+    }
+
+    const celulas = grade(s);
+    const topoQ = el('h3', 'legado-titulo', `Conquistas ${s.conquistas.length}/${TOTAL_CONQUISTAS} · +${s.bonus.conquistas}% de produção`);
+    const grid = el('div', 'grade-conquistas');
+    for (const c of celulas) {
+      const b = button('', c.ganhou ? 'conquista ganha' : 'conquista', () => {
+        conquistaAberta = conquistaAberta === c.conquista.id ? null : c.conquista.id;
+        if (ultimo) renderizar(ultimo);
+      });
+      b.setAttribute('aria-pressed', String(conquistaAberta === c.conquista.id));
+      b.append(iconeLegado(ativos.conquista(c.conquista.id)), el('span', 'conquista-nome', c.nome));
+      grid.append(b);
+    }
+    listaL.append(card, el('h3', 'legado-titulo', 'Árvore de habilidades'), arvore, topoQ);
+    const aberta = celulas.find((c: Celula) => c.conquista.id === conquistaAberta);
+    if (aberta) {
+      const det = el('div', 'conquista-detalhe');
+      det.append(el('strong', undefined, aberta.nome), el('span', 'sub', aberta.texto));
+      if (aberta.em) det.append(el('span', 'sub', ganhouEm(aberta.em)));
+      listaL.append(det);
+    }
+    listaL.append(grid);
+  }
+
   function renderizar(m: Modelo) {
     ultimo = m;
     const s = m.estado;
@@ -254,6 +338,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(listaM, jogando && m.aba === 'melhorias');
     mostrar(listaC, jogando && m.aba === 'contratar');
     mostrar(listaP, jogando && m.aba === 'placar');
+    // Legado: na aba, ou embaixo do "Abrir CNPJ" de quem já vendeu (dá pra gastar os pontos antes de reabrir)
+    const verLegado = !!s && ((jogando && m.aba === 'legado') || (m.fase === 'antes' && s.pontos_vida > 0));
+    mostrar(listaL, verLegado);
     caixinha.textContent = `Oportunidades (${m.pendentes.length})`;
     mostrar(caixinha, jogando);
 
@@ -351,6 +438,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       }
     }
 
+    listaL.replaceChildren();
+    if (s && verLegado) legado(s, m.ocupado);
+
     listaP.replaceChildren();
     if (!m.placar) listaP.append(el('li', 'vazio', m.placarFalhou ? ERRO_GALERA : 'Carregando…'));
     else {
@@ -362,6 +452,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
           el('span', 'pos', `${i + 1}º`), boneco(r.avatar, null), el('span', 'nome', r.name),
           el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)),
         );
+        if (r.pontos > 0) li.append(el('span', 'pontos', `★ ${r.pontos}`));
         if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
         listaP.append(li);
       });
@@ -373,7 +464,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     if (s && m.aoVivo !== null) {
       const w = m.aoVivo;
       vivo.style.backgroundImage = `url(${ativos.oportunidade(tipoOportunidade(s.user_id, w))})`;
-      vivo.style.animationDuration = `${segundosOportunidade(s)}s`;
+      vivo.style.animationDuration = `${segundosOportunidade(s, s.bonus.arvore)}s`;
       vivo.setAttribute('aria-label', `Pegar oportunidade: ${TEXTO_TIPO[tipoOportunidade(s.user_id, w)]}`);
       vivo.onclick = () => a.pegar(w);
     }
@@ -426,7 +517,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const texto = el('div', 'escolha-texto');
         const quando = el('span', 'sub prazo', '');
         texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
-        prazos.push({ texto: quando, fim: sai(s.user_id, w) });
+        prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
         // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
         const repetida = meiaPrecoRepetida(k, s);
         if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
@@ -472,6 +563,28 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       folha.append(fim);
       modalV.append(folha);
     }
+
+    // vender a startup: confirmação (só com pelo menos 1 ponto a ganhar)
+    modalP.replaceChildren();
+    const ganho = s && m.vendaAberta && jogando ? s.pontos_venda : 0;
+    mostrar(modalP, ganho >= 1);
+    if (ganho >= 1) {
+      const folha = el('div', 'folha');
+      const topoP = el('div', 'folha-topo');
+      const fechar = button('', 'fechar', () => a.vender('fechar'));
+      fechar.setAttribute('aria-label', 'Fechar');
+      fechar.append(iconeFechar());
+      topoP.append(titulo('idle-titulo-venda', 'Vender a startup?'), fechar);
+      const fim = el('div', 'editor-fim');
+      const sim = button('Vender', 'btn main', () => a.vender('confirmar'));
+      sim.disabled = m.ocupado;
+      fim.append(button('Deixa quieto', 'btn', () => a.vender('fechar')), sim);
+      folha.append(topoP, el('p', 'sub', textoVenda(ganho)), fim);
+      modalP.append(folha);
+    }
+
+    avisoConquista.textContent = m.conquistaAviso ?? '';
+    mostrar(avisoConquista, m.conquistaAviso !== null);
 
     noticeTxt.textContent = m.aviso ?? '';
     mostrar(notice, !!m.aviso);
