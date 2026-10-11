@@ -1,6 +1,11 @@
 // Catálogo da Fellas Inc. montado a partir dos textos (nomes.ts) e dos parâmetros de balanceamento.
 // É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
-import { CARGOS, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS } from './nomes';
+import {
+  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista,
+  type TipoNo,
+} from './nomes';
+
+export type { TipoConquista, TipoNo } from './nomes';
 
 /** Balanceamento (ajustado pela simulação, Task 2). custo_g = custoInicial·crescimentoCusto^(g-1);
  *  renda_g = custo_g / (retornoInicial·crescimentoRetorno^(g-1)) (segundos pra se pagar).
@@ -17,6 +22,10 @@ export const PRECO_GERAL = [20, 40, 80, 160] as const;
 /** Sinergia: preço (× custo do alvo) e quantas unidades de cada lado pedem. */
 export const PRECO_SINERGIA = 100;
 export const REQUER_SINERGIA = 15;
+/** Árvore de habilidades: custo em pontos de prestígio por posição no ramo (1 a 5); a raiz custa 1. */
+export const CUSTO_NO = [2, 4, 8, 15, 30] as const;
+export const CUSTO_RAIZ = 1;
+export const RAIZ = 1;
 
 export type Gerador = { id: number; era: number; nome: string; custo: number; renda: number };
 export type Melhoria =
@@ -32,7 +41,18 @@ export type Estrategia = {
   oppBonusMult: number; oppExtra: number; oppSegundos: number; porGeradorDistinto: number;
   sociais: Record<string, number>;
 };
-export type Catalogo = { geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[] };
+export type Conquista = {
+  id: number; nome: string; frase: string; condicao: string; tipo: TipoConquista;
+  alvo: number | null; valor: number | null; escondida: boolean;
+};
+/** Nó da árvore. requer = o nó anterior do ramo (a raiz, para o 1º; null na raiz). */
+export type No = {
+  id: number; ramo: number; posicao: number; nome: string; efeito: string; custo: number; tipo: TipoNo; valor: number;
+  requer: number | null;
+};
+export type Catalogo = {
+  geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[]; conquistas: Conquista[]; arvore: No[];
+};
 
 export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
   const geradores: Gerador[] = GERADORES.map((nome, i) => {
@@ -71,7 +91,22 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
     custoMult: e.custoMult ?? 1, oppBonusMult: e.oppBonusMult ?? 1, oppExtra: e.oppExtra ?? 0,
     oppSegundos: e.oppSegundos ?? 10, porGeradorDistinto: e.porGeradorDistinto ?? 0, sociais: e.sociais ?? {},
   }));
-  return { geradores, melhorias, estrategias, cargos: [...CARGOS] };
+  const conquistas: Conquista[] = [
+    ...CONQUISTAS_GERADOR.map(([nome, frase], i): Conquista => ({
+      id: i + 1, nome, frase, condicao: `Ter 100 "${geradores[i].nome}"`, tipo: 'gerador', alvo: i + 1, valor: 100,
+      escondida: false,
+    })),
+    ...CONQUISTAS.map((c): Conquista => ({
+      id: c.id, nome: c.nome, frase: c.frase, condicao: c.condicao, tipo: c.tipo, alvo: c.alvo ?? null,
+      valor: c.valor ?? null, escondida: c.escondida ?? false,
+    })),
+  ];
+  const arvore: No[] = ARVORE.map((n) => ({
+    id: n.ramo * 10 + n.posicao, ramo: n.ramo, posicao: n.posicao, nome: n.nome, efeito: n.efeito,
+    custo: n.ramo === 0 ? CUSTO_RAIZ : CUSTO_NO[n.posicao - 1], tipo: n.tipo, valor: n.valor,
+    requer: n.ramo === 0 ? null : n.posicao === 1 ? RAIZ : n.ramo * 10 + n.posicao - 1,
+  }));
+  return { geradores, melhorias, estrategias, cargos: [...CARGOS], conquistas, arvore };
 }
 
 export const catalogo = montarCatalogo();
@@ -91,8 +126,16 @@ export function catalogoSql(cat: Catalogo = catalogo): string {
       `  (${e.era}, ${e.opcao}, ${txt(e.nome)}, ${txt(e.frase)}, ${e.ativa}, ${e.requer ? txt(e.requer) : 'null'}, ${num(e.genDe)}, ${num(e.genAte)}, ${num(e.genMult)}, ${num(e.prodMult)}, ${num(e.custoMult)}, ${num(e.oppBonusMult)}, ${num(e.oppExtra)}, ${num(e.oppSegundos)}, ${num(e.porGeradorDistinto)}, ${txt(JSON.stringify(e.sociais))}::jsonb)`,
   );
   const car = cat.cargos.map((nome, i) => `  (${i + 1}, ${txt(nome)})`);
+  const con = cat.conquistas.map(
+    (c) =>
+      `  (${c.id}, ${txt(c.nome)}, ${txt(c.frase)}, ${txt(c.condicao)}, ${txt(c.tipo)}, ${num(c.alvo)}, ${num(c.valor)}, ${c.escondida})`,
+  );
+  const nos = cat.arvore.map(
+    (n) =>
+      `  (${n.id}, ${n.ramo}, ${n.posicao}, ${txt(n.nome)}, ${txt(n.efeito)}, ${n.custo}, ${txt(n.tipo)}, ${num(n.valor)}, ${num(n.requer)})`,
+  );
   const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
-  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias e cargos. Idempotente.
+  return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias, cargos, conquistas e a árvore. Idempotente.
 -- GERADO por games/idle/catalogo.ts: não edite à mão. Mudou o catálogo? Crie uma migração NOVA NNNN_fellas_inc_catalogo_<nome>.sql com ATUALIZAR_CATALOGO=NNNN_fellas_inc_catalogo_<nome>.sql npx vitest run idle/catalogo.test.ts (em games/) e acrescente o arquivo em games/test/db.ts e games/dev/mockDb.ts.
 
 create table if not exists public.idle_cat_gen (
@@ -111,13 +154,23 @@ create table if not exists public.idle_cat_est (
   primary key (era, opcao)
 );
 create table if not exists public.idle_cat_cargo (id int primary key, nome text not null);
+create table if not exists public.idle_cat_conquista (
+  id int primary key, nome text not null, frase text not null, condicao text not null, tipo text not null,
+  alvo int, valor double precision, escondida boolean not null
+);
+create table if not exists public.idle_cat_no (
+  id int primary key, ramo int not null, posicao int not null, nome text not null, efeito text not null, custo int not null,
+  tipo text not null, valor double precision not null, requer int
+);
 
 alter table public.idle_cat_gen enable row level security;
 alter table public.idle_cat_upg enable row level security;
 alter table public.idle_cat_est enable row level security;
 alter table public.idle_cat_cargo enable row level security;
-revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo from anon, authenticated;
-grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo to authenticated;
+alter table public.idle_cat_conquista enable row level security;
+alter table public.idle_cat_no enable row level security;
+revoke all on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista, public.idle_cat_no from anon, authenticated;
+grant select on public.idle_cat_gen, public.idle_cat_upg, public.idle_cat_est, public.idle_cat_cargo, public.idle_cat_conquista, public.idle_cat_no to authenticated;
 drop policy if exists "idle_cat_gen_select_members" on public.idle_cat_gen;
 create policy "idle_cat_gen_select_members" on public.idle_cat_gen for select to authenticated using (public.is_member());
 drop policy if exists "idle_cat_upg_select_members" on public.idle_cat_upg;
@@ -126,11 +179,17 @@ drop policy if exists "idle_cat_est_select_members" on public.idle_cat_est;
 create policy "idle_cat_est_select_members" on public.idle_cat_est for select to authenticated using (public.is_member());
 drop policy if exists "idle_cat_cargo_select_members" on public.idle_cat_cargo;
 create policy "idle_cat_cargo_select_members" on public.idle_cat_cargo for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_conquista_select_members" on public.idle_cat_conquista;
+create policy "idle_cat_conquista_select_members" on public.idle_cat_conquista for select to authenticated using (public.is_member());
+drop policy if exists "idle_cat_no_select_members" on public.idle_cat_no;
+create policy "idle_cat_no_select_members" on public.idle_cat_no for select to authenticated using (public.is_member());
 
 delete from public.idle_cat_gen where true;
 delete from public.idle_cat_upg where true;
 delete from public.idle_cat_est where true;
 delete from public.idle_cat_cargo where true;
+delete from public.idle_cat_conquista where true;
+delete from public.idle_cat_no where true;
 
 insert into public.idle_cat_gen (id, era, nome, custo, renda) values
 ${lista(gen)}
@@ -139,5 +198,9 @@ ${lista(upg)}
 insert into public.idle_cat_est (era, opcao, nome, frase, ativa, requer, gen_de, gen_ate, gen_mult, prod_mult, custo_mult, opp_bonus_mult, opp_extra, opp_segundos, por_gerador_distinto, sociais) values
 ${lista(est)}
 insert into public.idle_cat_cargo (id, nome) values
-${lista(car)}`;
+${lista(car)}
+insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, escondida) values
+${lista(con)}
+insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values
+${lista(nos)}`;
 }

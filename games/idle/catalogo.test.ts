@@ -44,6 +44,43 @@ describe('catálogo', () => {
     expect(catalogo.cargos).toContain('CEO de nada');
   });
 
+  it('conquistas: 62 visíveis e 10 escondidas, ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
+    const c = catalogo.conquistas;
+    expect(c.filter((x) => !x.escondida)).toHaveLength(62);
+    expect(c.filter((x) => x.escondida)).toHaveLength(10);
+    expect(new Set(c.map((x) => x.id)).size).toBe(c.length);
+    for (let g = 1; g <= 30; g++) expect(c.find((x) => x.id === g)).toMatchObject({ tipo: 'gerador', alvo: g, valor: 100, escondida: false });
+    expect(c.find((x) => x.id === 7)!.nome).toBe('Estágio não remunerado em escala');
+    for (const x of c) {
+      expect(x.nome.length, x.nome).toBeGreaterThan(0);
+      expect(x.nome.length, x.nome).toBeLessThanOrEqual(34);
+      expect(x.frase.length, x.nome).toBeGreaterThan(0);
+      expect(x.condicao.length, x.nome).toBeGreaterThan(0);
+    }
+  });
+  it('escondidas: as da spec; a Guiana Brasileira é a Filial em Portugal (a melhoria 283, que mudou de nome)', () => {
+    expect(catalogo.conquistas.filter((x) => x.escondida).map((x) => x.nome)).toEqual([
+      '6-7', 'Farmou aura', 'Aura negativa', 'Tá saindo da jaula', 'Guiana Brasileira', 'Fez o L', '3h06',
+      'Modo sigma', 'Pai tá on', 'Brainrot',
+    ]);
+    expect(catalogo.melhorias.find((m) => m.id === 283)).toMatchObject({ nome: 'Filial em Portugal', gerador: 28, requer: 25 });
+    expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });
+    expect(catalogo.conquistas.some((x) => x.id === 104)).toBe(false); // o limaumdoc saiu; o id não é reaproveitado
+  });
+  it('árvore: a raiz e 5 ramos de 5 nós; custos 1 · 2 · 4 · 8 · 15 · 30; cada nó exige o anterior (o 1º, a raiz)', () => {
+    const a = catalogo.arvore;
+    expect(a).toHaveLength(26);
+    expect(a[0]).toMatchObject({ id: 1, ramo: 0, nome: 'Virou MEI', custo: 1, requer: null, tipo: 'producao', valor: 1.05 });
+    for (let r = 1; r <= 5; r++) {
+      const ramo = a.filter((n) => n.ramo === r);
+      expect(ramo.map((n) => n.id)).toEqual([1, 2, 3, 4, 5].map((p) => r * 10 + p));
+      expect(ramo.map((n) => n.custo)).toEqual([2, 4, 8, 15, 30]);
+      expect(ramo.map((n) => n.requer)).toEqual([1, r * 10 + 1, r * 10 + 2, r * 10 + 3, r * 10 + 4]);
+    }
+    expect(a.reduce((t, n) => t + n.custo, 0)).toBe(296);
+    expect(a.filter((n) => n.ramo === 4).map((n) => n.valor)).toEqual([12, 16, 24, 36, 48]);
+    for (const n of a) expect(n.nome.length, n.nome).toBeLessThanOrEqual(30);
+  });
   it('montarCatalogo usa os parâmetros', () => {
     const c = montarCatalogo({ ...PARAMETROS, custoInicial: 20 });
     expect(c.geradores[0].custo).toBe(20);
@@ -71,12 +108,21 @@ describe('catálogo no banco (migração mais recente)', () => {
   });
   it('escapa aspas simples nos textos', () => {
     expect(catalogoSql()).toContain("'Selo de \"open to work\"'");
-    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [], cargos: [] }))
+    expect(catalogoSql({ geradores: [{ id: 1, era: 1, nome: "Pão d'água", custo: 1, renda: 1 }], melhorias: [], estrategias: [], cargos: [], conquistas: [], arvore: [] }))
       .toContain("'Pão d''água'");
   });
   it('cargos entram no SQL gerado', () => {
     expect(catalogoSql()).toContain('insert into public.idle_cat_cargo (id, nome) values');
     expect(catalogoSql()).toContain("(1, 'estagiário')");
+  });
+  it('conquistas entram no SQL gerado', () => {
+    expect(catalogoSql()).toContain('insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, escondida) values');
+    expect(catalogoSql()).toContain("(101, '6-7', 'Seis sete. Ninguém sabe por quê.', 'Ter exatamente 67 de algum gerador', 'gerador_exato', null, 67, true)");
+  });
+  it('a árvore entra no SQL gerado', () => {
+    expect(catalogoSql()).toContain('insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values');
+    expect(catalogoSql()).toContain("(41, 4, 1, 'Soneca pós-almoço', 'A empresa rende até 12h com o jogo fechado.', 2, 'teto', 12, 1)");
+    expect(catalogoSql()).toContain(`(51, 5, 1, 'Placa de "Precisa-se"', 'Contratar custa 25% menos.', 2, 'contrato_preco', 0.75, 1)`);
   });
   it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', () => {
     expect(catalogo.melhorias.find((x) => x.id === 2006)?.frase).toContain('+0,5%');
