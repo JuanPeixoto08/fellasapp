@@ -90,12 +90,15 @@ describe('tela da Fellas Inc.', () => {
   it('caixinha: uma linha por oportunidade com o boneco, o prazo e Pegar; X fecha; sem pega no dia, botões apagados', () => {
     vi.useFakeTimers();
     const uid = '00000000-0000-0000-0000-00000000000a';
-    vi.setSystemTime(instante(uid, 50) + 60 * 60 * 1000); // 1h depois de a janela 50 aparecer
+    const agora = instante(uid, 50) + 5 * 60 * 1000; // 5 min depois de a janela 50 aparecer
+    vi.setSystemTime(agora);
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ caixaAberta: true, pendentes: [50], estado: estado({ user_id: uid }) }));
     const linha = root.querySelector('.modal-caixa .escolha')!;
     expect((linha.querySelector('.boneco') as HTMLElement).style.backgroundImage).toContain('url(');
-    expect(linha.querySelector('.prazo')!.textContent).toBe('some em 3h00');
+    // sai quando aparece a 3ª mais nova (janela 53), bem antes das 4h
+    expect(linha.querySelector('.prazo')!.textContent).toBe(prazo(instante(uid, 53) - agora));
+    expect(linha.querySelector('.prazo')!.textContent).not.toMatch(/h/);
     linha.querySelector('button')!.click();
     expect(acoes.pegar).toHaveBeenCalledWith(50);
     root.querySelector<HTMLButtonElement>('.modal-caixa .fechar')!.click();

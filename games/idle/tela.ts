@@ -10,7 +10,7 @@ import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import { ERAS, VISUAL_NOMES } from './nomes';
-import { instante, TEXTO_TIPO, tipo as tipoOportunidade, VALIDADE_S } from './oportunidades';
+import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { estrategiaPendente, segundosOportunidade, type Fase } from './store';
 
@@ -426,7 +426,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const texto = el('div', 'escolha-texto');
         const quando = el('span', 'sub prazo', '');
         texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
-        prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
+        prazos.push({ texto: quando, fim: sai(s.user_id, w) });
         // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
         const repetida = meiaPrecoRepetida(k, s);
         if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));

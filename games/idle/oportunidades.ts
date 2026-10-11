@@ -49,3 +49,10 @@ export function aoVivo(uid: string, agoraMs: number, duracaoS: number): number |
   }
   return null;
 }
+
+/**
+ * Quando a oportunidade da janela w sai da caixinha (ms): a caixinha guarda só as `tamanho` mais recentes, então ela
+ * sai quando aparece a `tamanho`-ésima mais nova (ou na validade, o que vier antes). O "some em" da tela usa isto.
+ */
+export const sai = (uid: string, w: number, tamanho = 3) =>
+  Math.min(instante(uid, w) + VALIDADE_S * 1000, instante(uid, w + tamanho));
