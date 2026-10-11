@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Bolsa da Faria Lima: 8 empresas com preço que muda a cada minuto (o mesmo para o grupo), comprar e vender com F$, quebra de empresa, na gaveta Bolsa da bancada (PC) e em tela cheia no celular.
+**Goal:** A Bolsa da Faria Lima: 8 empresas com preço que muda a cada minuto (o mesmo para o grupo), cada uma ligada a um gerador (o limite cresce com ele), comprar e vender com F$, quebra de empresa, melhorias da Bolsa (Corretor e Escritório), na gaveta Bolsa da bancada (PC) e em tela cheia no celular.
 
 **Architecture:** O motor de preço é uma função pura de um tick (`tick(mercado, empresa, t, u[7])`) escrita igual em TS (`games/idle/bolsaMotor.ts`, usada na simulação de 30 dias que calibra os números) e em SQL (`idle_bolsa_tick`, usada pelo servidor com `random()`); um teste de paridade garante que são iguais. O servidor gera os minutos sob demanda (`idle_bolsa_avancar`), guarda o estado, o histórico de 7 dias e as carteiras, e negocia (`idle_bolsa_negociar`). A página mostra lista + detalhe (`bolsaTela.ts`) dentro da bancada; no celular a bancada vira tela cheia.
 
@@ -14,11 +14,12 @@
 
 - Nova migração `supabase/migrations/0042_fellas_inc_bolsa.sql`; 0033–0041 nunca são editadas. Idempotente (`create table if not exists`, `create or replace`, `on conflict`), UTF-8 sem BOM (o teste `games/test/migracoesUtf8.test.ts` pega).
 - RLS em toda tabela nova; o catálogo `idle_cat_bolsa` é lido por `authenticated` com `public.is_member()`; mercado, preços e carteira sem acesso direto (só pelas funções). Funções que mexem em dados: `security definer set search_path = public`. Internas: `revoke all ... from public, anon, authenticated`. RPCs: `revoke all ... from public, anon` + `grant execute ... to authenticated`.
-- Erros: `raise exception '<codigo>' using errcode = 'P0001'`; não membro: `raise exception 'not_member' using errcode = '42501'`. Códigos novos: `idle_bolsa_preco_mudou`, `idle_bolsa_rj`, `idle_bolsa_limite`, `idle_bolsa_fechada`, `idle_bolsa_sem_acoes`. Sem F$: `idle_cant_afford` (já existe).
+- Erros: `raise exception '<codigo>' using errcode = 'P0001'`; não membro: `raise exception 'not_member' using errcode = '42501'`. Códigos novos: `idle_bolsa_preco_mudou`, `idle_bolsa_rj`, `idle_bolsa_limite`, `idle_bolsa_fechada`, `idle_bolsa_sem_acoes`, `idle_bolsa_nivel`. Sem F$: `idle_cant_afford` (já existe).
 - Todo `update public.`/`delete from public.` com `where` (safeupdate).
 - Fellas Inc. não toca nos créditos do cassino. Grupo de trader = `generators[19]`.
 - Preço em segundos de produção; em F$ = `valor × r`, `r = public.idle_rate(s)` (sem o ×5).
-- Constantes: piso `0,05 × repouso`; zona de risco `< 0,15 × repouso`; recuperação judicial 10 ticks; humor dura 10 a 120 ticks; corretagem 5% na compra; limite `100 + 10 × generators[19]`; histórico 60 ticks; guarda 10080 ticks; atraso máximo 1440 ticks.
+- Constantes: piso `0,05 × repouso`; zona de risco `< 0,15 × repouso`; recuperação judicial 10 ticks; humor dura 10 a 120 ticks; histórico 60 ticks; guarda 10080 ticks; atraso máximo 1440 ticks.
+- Limite da empresa = `100 + generators[gerador ligado] + escritório[nível]`, escritório = `[0, 25, 50, 100, 200, 400]`. Corretagem = `[0.05, 0.04, 0.03, 0.02, 0.01, 0.005][corretor]`. Custos em segundos: Corretor `[1800, 3600, 7200, 14400, 28800]`, Escritório `[3600, 7200, 14400, 28800, 57600]` (nível 1..5). Ligações: PSTL↔11, ACAI↔14, COCH↔16, PRMO↔19, JEGU↔15, MEME↔6, IRMA↔20, SIMA↔8.
 - Texto de usuário por `textContent`; pt-BR; "F$"; sem emoji como ícone; números em `Jersey 10` (`var(--i-pixel)`).
 - Commits sem `Co-Authored-By`/marca de IA. Não fazer push nem `supabase db push` (o Juan roda o db push; a main só sobe depois das tabelas conferidas).
 - Windows + Git Bash: `cd <dir> && ...` em cada comando. Suítes: `cd games && npx tsc --noEmit && npx vitest run`; raiz: `npx tsc --noEmit && npx jest`.
@@ -28,8 +29,8 @@
 - Duas chamadas ao mesmo tempo avançando o mercado não geram o mesmo minuto duas vezes nem pulam minuto (trava). Teste na Task 3 (avançar duas vezes no mesmo tick não muda nada).
 - Comprar com o F$ exato do preço (corretagem incluída) passa; um centavo a menos é `idle_cant_afford`. Teste na Task 4.
 - Ações de uma geração antiga (empresa quebrou) nunca entram na conta da venda nem do limite. Teste na Task 4.
-- Página aberta na virada do minuto: o pedido com o tick velho é recusado e a tela recarrega o mercado. Teste na Task 7 (main recarrega a bolsa em `idle_bolsa_preco_mudou`).
-- Sem Grupo de trader (empresa nova depois de vender a startup): a gaveta fica apagada e nada busca o mercado. Teste na Task 6.
+- Página aberta na virada do minuto: o pedido com o tick velho é recusado e a tela recarrega o mercado. Teste na Task 8 (main recarrega a bolsa em `idle_bolsa_preco_mudou`).
+- Sem Grupo de trader (empresa nova depois de vender a startup): a gaveta fica apagada e nada busca o mercado. Teste na Task 7.
 
 ---
 
@@ -56,9 +57,10 @@
 
 **Interfaces:**
 - Produces:
-  - `type EmpresaBolsa = { id: number; codigo: string; nome: string; repouso: number; vol: number; pesos: readonly number[]; quebra: number }`
+  - `type EmpresaBolsa = { id: number; codigo: string; nome: string; gerador: number; repouso: number; vol: number; pesos: readonly number[]; quebra: number }`
   - `EMPRESAS_BOLSA: readonly EmpresaBolsa[]` (ids 1..8 na ordem da spec)
-  - `BOLSA = { piso: 0.05, zonaRisco: 0.15, rj: 10, durMin: 10, durMax: 120, corretagem: 0.05, limiteBase: 100, limitePorTrader: 10, historico: 60, retencao: 10080, maxAtraso: 1440 } as const`
+  - `BOLSA = { piso: 0.05, zonaRisco: 0.15, rj: 10, durMin: 10, durMax: 120, corretagem: 0.05, limiteBase: 100, historico: 60, retencao: 10080, maxAtraso: 1440 } as const`
+  - `MELHORIAS_BOLSA = { corretor: { nomes, corretagem: [0.05, 0.04, 0.03, 0.02, 0.01, 0.005], custo: [1800, 3600, 7200, 14400, 28800] }, escritorio: { nomes, bonus: [0, 25, 50, 100, 200, 400], custo: [3600, 7200, 14400, 28800, 57600] } }`
   - `type Mercado = { valor: number; delta: number; humor: number; humorAte: number; geracao: number; rjAte: number | null }`
   - `normal(a: number, b: number): number` (Box-Muller com `1 − a`)
   - `escolherHumor(pesos: readonly number[], u: number): number`
@@ -73,7 +75,7 @@
 ```ts
 import { describe, expect, it } from 'vitest';
 
-import { BOLSA, EMPRESAS_BOLSA, escolherHumor, inicial, normal, simular, tick } from './bolsaMotor';
+import { BOLSA, EMPRESAS_BOLSA, escolherHumor, inicial, MELHORIAS_BOLSA, normal, simular, tick } from './bolsaMotor';
 
 const e = (codigo: string) => EMPRESAS_BOLSA.find((x) => x.codigo === codigo)!;
 const U = [0.3, 0.6, 0.4, 0.2, 0.5, 0.5, 0.99];
@@ -85,6 +87,13 @@ describe('catálogo', () => {
     for (const x of EMPRESAS_BOLSA) expect(x.pesos).toHaveLength(6);
     expect(e('IRMA').nome).toBe('Funerária 1 Irmão');
     expect(e('SIMA').nome).toBe('Mecânica Simas');
+    expect(EMPRESAS_BOLSA.map((x) => x.gerador)).toEqual([11, 14, 16, 19, 15, 6, 20, 8]);
+  });
+  it('melhorias: 5 níveis de Corretor e de Escritório', () => {
+    expect(MELHORIAS_BOLSA.corretor.nomes).toEqual(['Primo que entende de ação', 'Assessor do banco', 'Mesa de operações', 'Robô de trade', 'Insider (shh)']);
+    expect(MELHORIAS_BOLSA.escritorio.nomes).toEqual(['Mesa na sala', 'Salinha comercial', 'Andar na Faria Lima', 'Prédio espelhado', 'Torre na Berrini']);
+    expect(MELHORIAS_BOLSA.corretor.corretagem).toEqual([0.05, 0.04, 0.03, 0.02, 0.01, 0.005]);
+    expect(MELHORIAS_BOLSA.escritorio.bonus).toEqual([0, 25, 50, 100, 200, 400]);
   });
 });
 
@@ -209,25 +218,41 @@ Expected: FAIL (módulo não existe).
 // Preço em segundos de produção. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-bolsa-design.md.
 
 export type EmpresaBolsa = {
-  id: number; codigo: string; nome: string; repouso: number; vol: number; pesos: readonly number[]; quebra: number;
+  /** gerador: o gerador ligado (o limite de ações da empresa cresce com quantos dele você tem). */
+  id: number; codigo: string; nome: string; gerador: number; repouso: number; vol: number; pesos: readonly number[]; quebra: number;
 };
 
 /** Pesos dos humores: 0 parada · 1 sobe devagar · 2 cai devagar · 3 sobe forte · 4 despenca · 5 maluca. Mudou aqui:
  *  mude também o insert da 0042 (o teste de paridade compara). */
 export const EMPRESAS_BOLSA: readonly EmpresaBolsa[] = [
-  { id: 1, codigo: 'PSTL', nome: 'Pastel do Zé', repouso: 30, vol: 0.6, pesos: [30, 30, 15, 10, 5, 10], quebra: 0.01 },
-  { id: 2, codigo: 'ACAI', nome: 'Açaí Gourmet', repouso: 120, vol: 0.5, pesos: [35, 30, 15, 8, 4, 8], quebra: 0.01 },
-  { id: 3, codigo: 'COCH', nome: 'Coach Quântico', repouso: 50, vol: 1.2, pesos: [10, 15, 10, 30, 25, 10], quebra: 0.05 },
-  { id: 4, codigo: 'PRMO', nome: 'Cripto do Primo', repouso: 20, vol: 1.6, pesos: [5, 10, 10, 15, 15, 45], quebra: 0.05 },
-  { id: 5, codigo: 'JEGU', nome: 'Uber de Jegue', repouso: 8, vol: 1.2, pesos: [15, 15, 20, 10, 15, 25], quebra: 0.05 },
-  { id: 6, codigo: 'MEME', nome: 'NFT de Meme', repouso: 5, vol: 1.6, pesos: [5, 10, 10, 15, 15, 45], quebra: 0.05 },
-  { id: 7, codigo: 'IRMA', nome: 'Funerária 1 Irmão', repouso: 80, vol: 0.3, pesos: [70, 10, 10, 4, 3, 3], quebra: 0.01 },
-  { id: 8, codigo: 'SIMA', nome: 'Mecânica Simas', repouso: 40, vol: 1.0, pesos: [20, 20, 20, 15, 15, 10], quebra: 0.02 },
+  { id: 1, codigo: 'PSTL', nome: 'Pastel do Zé', gerador: 11, repouso: 30, vol: 0.6, pesos: [30, 30, 15, 10, 5, 10], quebra: 0.01 },
+  { id: 2, codigo: 'ACAI', nome: 'Açaí Gourmet', gerador: 14, repouso: 120, vol: 0.5, pesos: [35, 30, 15, 8, 4, 8], quebra: 0.01 },
+  { id: 3, codigo: 'COCH', nome: 'Coach Quântico', gerador: 16, repouso: 50, vol: 1.2, pesos: [10, 15, 10, 30, 25, 10], quebra: 0.05 },
+  { id: 4, codigo: 'PRMO', nome: 'Cripto do Primo', gerador: 19, repouso: 20, vol: 1.6, pesos: [5, 10, 10, 15, 15, 45], quebra: 0.05 },
+  { id: 5, codigo: 'JEGU', nome: 'Uber de Jegue', gerador: 15, repouso: 8, vol: 1.2, pesos: [15, 15, 20, 10, 15, 25], quebra: 0.05 },
+  { id: 6, codigo: 'MEME', nome: 'NFT de Meme', gerador: 6, repouso: 5, vol: 1.6, pesos: [5, 10, 10, 15, 15, 45], quebra: 0.05 },
+  { id: 7, codigo: 'IRMA', nome: 'Funerária 1 Irmão', gerador: 20, repouso: 80, vol: 0.3, pesos: [70, 10, 10, 4, 3, 3], quebra: 0.01 },
+  { id: 8, codigo: 'SIMA', nome: 'Mecânica Simas', gerador: 8, repouso: 40, vol: 1.0, pesos: [20, 20, 20, 15, 15, 10], quebra: 0.02 },
 ];
 
 export const BOLSA = {
-  piso: 0.05, zonaRisco: 0.15, rj: 10, durMin: 10, durMax: 120, corretagem: 0.05, limiteBase: 100, limitePorTrader: 10,
+  piso: 0.05, zonaRisco: 0.15, rj: 10, durMin: 10, durMax: 120, corretagem: 0.05, limiteBase: 100,
   historico: 60, retencao: 10080, maxAtraso: 1440,
+} as const;
+
+/** Melhorias da Bolsa: índice = nível (0 = sem). Custo do nível n (1..5) = custo[n − 1] segundos de produção. Iguais às
+ *  funções idle_bolsa_corretagem/idle_bolsa_escritorio/idle_bolsa_custo da 0042. */
+export const MELHORIAS_BOLSA = {
+  corretor: {
+    nomes: ['Primo que entende de ação', 'Assessor do banco', 'Mesa de operações', 'Robô de trade', 'Insider (shh)'],
+    corretagem: [0.05, 0.04, 0.03, 0.02, 0.01, 0.005],
+    custo: [1800, 3600, 7200, 14400, 28800],
+  },
+  escritorio: {
+    nomes: ['Mesa na sala', 'Salinha comercial', 'Andar na Faria Lima', 'Prédio espelhado', 'Torre na Berrini'],
+    bonus: [0, 25, 50, 100, 200, 400],
+    custo: [3600, 7200, 14400, 28800, 57600],
+  },
 } as const;
 
 export type Mercado = { valor: number; delta: number; humor: number; humorAte: number; geracao: number; rjAte: number | null };
@@ -332,7 +357,7 @@ git commit -m "Fellas Inc.: motor de preço da Bolsa e a simulação de 30 dias 
 
 **Interfaces:**
 - Consumes (Task 1): `EMPRESAS_BOLSA`, `inicial`, `tick`, `normal`, `escolherHumor`.
-- Produces (SQL): tabelas `idle_cat_bolsa(id, codigo, nome, repouso, vol, pesos double precision[], quebra)` e `idle_bolsa_mercado(empresa, tick, valor, delta, humor, humor_ate, geracao, rj_ate)`; funções imutáveis `idle_bolsa_normal(a, b)`, `idle_bolsa_humor(p double precision[], u)`, `idle_bolsa_tick(m idle_bolsa_mercado, c idle_cat_bolsa, t bigint, u double precision[]) returns idle_bolsa_mercado`.
+- Produces (SQL): tabelas `idle_cat_bolsa(id, codigo, nome, gerador, repouso, vol, pesos double precision[], quebra)` e `idle_bolsa_mercado(empresa, tick, valor, delta, humor, humor_ate, geracao, rj_ate)`; funções imutáveis `idle_bolsa_normal(a, b)`, `idle_bolsa_humor(p double precision[], u)`, `idle_bolsa_tick(m idle_bolsa_mercado, c idle_cat_bolsa, t bigint, u double precision[]) returns idle_bolsa_mercado`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -371,8 +396,8 @@ async function tickSql(m: Mercado, empresa: number, tt: number, u: number[]): Pr
 
 describe('catálogo e tick (paridade SQL × TS)', () => {
   it('o catálogo do banco é o mesmo da página', async () => {
-    const rows = await q<{ id: number; codigo: string; nome: string; repouso: number; vol: number; pesos: number[]; quebra: number }>(
-      'select id, codigo, nome, repouso, vol, pesos, quebra from public.idle_cat_bolsa order by id');
+    const rows = await q<{ id: number; codigo: string; nome: string; gerador: number; repouso: number; vol: number; pesos: number[]; quebra: number }>(
+      'select id, codigo, nome, gerador, repouso, vol, pesos, quebra from public.idle_cat_bolsa order by id');
     expect(rows).toEqual(EMPRESAS_BOLSA.map((e) => ({ ...e, pesos: [...e.pesos] })));
   });
   it('normal e humor iguais', async () => {
@@ -429,6 +454,7 @@ create table if not exists public.idle_cat_bolsa (
   id      int primary key,
   codigo  text not null,
   nome    text not null,
+  gerador int not null,
   repouso double precision not null,
   vol     double precision not null,
   pesos   double precision[] not null,
@@ -440,17 +466,17 @@ grant select on public.idle_cat_bolsa to authenticated;
 drop policy if exists "idle_cat_bolsa_select_members" on public.idle_cat_bolsa;
 create policy "idle_cat_bolsa_select_members" on public.idle_cat_bolsa for select to authenticated using (public.is_member());
 
-insert into public.idle_cat_bolsa (id, codigo, nome, repouso, vol, pesos, quebra) values
-  (1, 'PSTL', 'Pastel do Zé', 30, 0.6, '{30,30,15,10,5,10}', 0.01),
-  (2, 'ACAI', 'Açaí Gourmet', 120, 0.5, '{35,30,15,8,4,8}', 0.01),
-  (3, 'COCH', 'Coach Quântico', 50, 1.2, '{10,15,10,30,25,10}', 0.05),
-  (4, 'PRMO', 'Cripto do Primo', 20, 1.6, '{5,10,10,15,15,45}', 0.05),
-  (5, 'JEGU', 'Uber de Jegue', 8, 1.2, '{15,15,20,10,15,25}', 0.05),
-  (6, 'MEME', 'NFT de Meme', 5, 1.6, '{5,10,10,15,15,45}', 0.05),
-  (7, 'IRMA', 'Funerária 1 Irmão', 80, 0.3, '{70,10,10,4,3,3}', 0.01),
-  (8, 'SIMA', 'Mecânica Simas', 40, 1.0, '{20,20,20,15,15,10}', 0.02)
-on conflict (id) do update set codigo = excluded.codigo, nome = excluded.nome, repouso = excluded.repouso, vol = excluded.vol,
-  pesos = excluded.pesos, quebra = excluded.quebra;
+insert into public.idle_cat_bolsa (id, codigo, nome, gerador, repouso, vol, pesos, quebra) values
+  (1, 'PSTL', 'Pastel do Zé', 11, 30, 0.6, '{30,30,15,10,5,10}', 0.01),
+  (2, 'ACAI', 'Açaí Gourmet', 14, 120, 0.5, '{35,30,15,8,4,8}', 0.01),
+  (3, 'COCH', 'Coach Quântico', 16, 50, 1.2, '{10,15,10,30,25,10}', 0.05),
+  (4, 'PRMO', 'Cripto do Primo', 19, 20, 1.6, '{5,10,10,15,15,45}', 0.05),
+  (5, 'JEGU', 'Uber de Jegue', 15, 8, 1.2, '{15,15,20,10,15,25}', 0.05),
+  (6, 'MEME', 'NFT de Meme', 6, 5, 1.6, '{5,10,10,15,15,45}', 0.05),
+  (7, 'IRMA', 'Funerária 1 Irmão', 20, 80, 0.3, '{70,10,10,4,3,3}', 0.01),
+  (8, 'SIMA', 'Mecânica Simas', 8, 40, 1.0, '{20,20,20,15,15,10}', 0.02)
+on conflict (id) do update set codigo = excluded.codigo, nome = excluded.nome, gerador = excluded.gerador, repouso = excluded.repouso,
+  vol = excluded.vol, pesos = excluded.pesos, quebra = excluded.quebra;
 
 -- ---------- estado do mercado (uma linha por empresa) ----------
 create table if not exists public.idle_bolsa_mercado (
@@ -729,8 +755,8 @@ git commit -m "Fellas Inc.: Bolsa no banco, parte 2: o mercado anda sozinho (min
 **Interfaces:**
 - Consumes: `idle_lock(uuid)`, `idle_settle(idle_state)`, `idle_save(idle_state)`, `idle_json(idle_state)`, `idle_rate(idle_state)` (0034–0041), `is_member()`.
 - Produces:
-  - tabela `idle_bolsa_carteira(user_id, empresa, qtd, custo, geracao)`;
-  - `idle_bolsa_estado(p_user uuid, p_agora bigint) returns jsonb` (interna): `{ tick, vira_em_ms, r, limite, aberta, empresas: [{ id, valor, risco, rj_ate, historico }], carteira: [{ empresa, qtd, custo }], viraram_po: [{ empresa, qtd }] }` — apaga as posições de geração antiga e as devolve uma vez em `viraram_po`;
+  - tabela `idle_bolsa_carteira(user_id, empresa, qtd, custo, geracao)`; tabela `idle_bolsa_nivel(user_id, corretor, escritorio)` e as funções imutáveis `idle_bolsa_corretagem(n int)`, `idle_bolsa_escritorio(n int)`, `idle_bolsa_custo(p_tipo text, n int)`;
+  - `idle_bolsa_estado(p_user uuid, p_agora bigint) returns jsonb` (interna): `{ tick, vira_em_ms, r, aberta, corretor, escritorio, corretagem, empresas: [{ id, valor, limite, risco, rj_ate, historico }], carteira: [{ empresa, qtd, custo }], viraram_po: [{ empresa, qtd }] }` — apaga as posições de geração antiga e as devolve uma vez em `viraram_po`;
   - `idle_bolsa_negociar_em(p_user, p_empresa int, p_lado text, p_qtd int, p_tick bigint, p_agora bigint) returns jsonb` (interna): devolve `idle_json(s) || { bolsa: idle_bolsa_estado(...) }`;
   - RPCs `idle_bolsa() returns jsonb` e `idle_bolsa_negociar(p_empresa int, p_lado text, p_qtd int, p_tick bigint) returns jsonb`.
 
@@ -743,8 +769,8 @@ describe('carteira e negociar', () => {
   const A = '00000000-0000-0000-0000-00000000000a';
   const OUT = '00000000-0000-0000-0000-0000000000ff';
   type Bolsa = {
-    tick: number; vira_em_ms: number; r: number; limite: number; aberta: boolean;
-    empresas: { id: number; valor: number; risco: boolean; rj_ate: number | null; historico: number[] }[];
+    tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
+    empresas: { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] }[];
     carteira: { empresa: number; qtd: number; custo: number }[]; viraram_po: { empresa: number; qtd: number }[];
   };
   type Resp = { valuation: number; bolsa: Bolsa };
@@ -760,19 +786,22 @@ describe('carteira e negociar', () => {
     await t.member(OUT, { isMember: false });
     await t.as(A);
     await t.rpc('idle_start');
-    // 2 Grupos de trader e F$ de sobra; mercado criado no tick T, Pastel (1) a 30 s
-    await q(`update public.idle_state set generators[19] = 2, generators[1] = 10, valuation = 1e12 where user_id = $1`, [A]);
+    // 2 Grupos de trader, 20 Food trucks (o Pastel é ligado a eles: limite 120) e F$ de sobra; mercado no tick T, Pastel (1) a 30 s
+    await q(`update public.idle_state set generators[19] = 2, generators[11] = 20, generators[1] = 10, valuation = 1e12 where user_id = $1`, [A]);
     await q('select public.idle_bolsa_avancar_ate($1)', [T]);
   });
 
-  it('estado: aberta com trader, limite 100 + 10 por trader, preços e histórico', async () => {
+  it('estado: aberta com trader, limite de cada empresa = 100 + o gerador ligado, corretagem 5%, preços e histórico', async () => {
     const b = await estado();
     expect(b.aberta).toBe(true);
-    expect(b.limite).toBe(120);
+    expect(b.empresas[0].limite).toBe(120); // Pastel ↔ 20 Food trucks
+    expect(b.empresas[3].limite).toBe(102); // Cripto ↔ 2 Grupos de trader
+    expect(b.empresas[1].limite).toBe(100); // Açaí ↔ nenhum Influencer
+    expect(b).toMatchObject({ corretor: 0, escritorio: 0, corretagem: 0.05 });
     expect(b.tick).toBe(T);
     expect(b.r).toBeCloseTo(await r(), 9);
     expect(b.empresas).toHaveLength(8);
-    expect(b.empresas[0]).toMatchObject({ id: 1, valor: 30, risco: false, rj_ate: null, historico: [30] });
+    expect(b.empresas[0]).toMatchObject({ id: 1, valor: 30, limite: 120, risco: false, rj_ate: null, historico: [30] });
     expect(b.carteira).toEqual([]);
   });
   it('comprar 10: paga 10 × valor × r × 1,05 e guarda o custo em segundos', async () => {
@@ -802,7 +831,7 @@ describe('carteira e negociar', () => {
     await q('update public.idle_state set valuation = $2 where user_id = $1', [A, um - 0.01]);
     await expect(negociar(1, 'comprar', 1)).rejects.toThrow('idle_cant_afford');
   });
-  it('limite: 120 com 2 traders; acima disso idle_bolsa_limite', async () => {
+  it('limite: 120 com 20 Food trucks no Pastel; acima disso idle_bolsa_limite', async () => {
     await negociar(1, 'comprar', 0);
     expect((await estado()).carteira[0].qtd).toBe(120);
     await expect(negociar(1, 'comprar', 1)).rejects.toThrow('idle_bolsa_limite');
@@ -826,7 +855,7 @@ describe('carteira e negociar', () => {
     expect(b.carteira).toEqual([]);
     expect((await estado()).viraram_po).toEqual([]);
     const resp = await negociar(4, 'comprar', 0);
-    expect(resp.bolsa.carteira[0].qtd).toBe(120);
+    expect(resp.bolsa.carteira[0].qtd).toBe(102); // Cripto ↔ 2 Grupos de trader
   });
   it('a carteira atravessa a venda da startup', async () => {
     await negociar(1, 'comprar', 10);
@@ -868,19 +897,53 @@ create table if not exists public.idle_bolsa_carteira (
 alter table public.idle_bolsa_carteira enable row level security;
 revoke all on public.idle_bolsa_carteira from anon, authenticated;
 
+-- ---------- melhorias da Bolsa (níveis 0..5; ficam na venda da startup) ----------
+create table if not exists public.idle_bolsa_nivel (
+  user_id    uuid primary key references public.idle_state (user_id) on delete cascade,
+  corretor   int not null default 0 check (corretor between 0 and 5),
+  escritorio int not null default 0 check (escritorio between 0 and 5)
+);
+alter table public.idle_bolsa_nivel enable row level security;
+revoke all on public.idle_bolsa_nivel from anon, authenticated;
+
+-- iguais a games/idle/bolsaMotor.ts MELHORIAS_BOLSA
+create or replace function public.idle_bolsa_corretagem(n int)
+returns double precision language sql immutable set search_path = public as $$
+  select (array[0.05, 0.04, 0.03, 0.02, 0.01, 0.005]::double precision[])[n + 1]
+$$;
+create or replace function public.idle_bolsa_escritorio(n int)
+returns int language sql immutable set search_path = public as $$
+  select (array[0, 25, 50, 100, 200, 400])[n + 1]
+$$;
+-- custo do nível n (1..5) em segundos de produção
+create or replace function public.idle_bolsa_custo(p_tipo text, n int)
+returns double precision language sql immutable set search_path = public as $$
+  select case p_tipo
+    when 'corretor' then (array[1800, 3600, 7200, 14400, 28800]::double precision[])[n]
+    else (array[3600, 7200, 14400, 28800, 57600]::double precision[])[n]
+  end
+$$;
+revoke all on function public.idle_bolsa_corretagem(int) from public, anon, authenticated;
+revoke all on function public.idle_bolsa_escritorio(int) from public, anon, authenticated;
+revoke all on function public.idle_bolsa_custo(text, int) from public, anon, authenticated;
+
 -- o que a página precisa: mercado, histórico da hora, carteira; ações de geração antiga (empresa quebrou) saem da
 -- carteira e voltam uma vez em viraram_po
 create or replace function public.idle_bolsa_estado(p_user uuid, p_agora bigint)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
-  s     public.idle_state;
-  v_po  jsonb;
-  v_tr  int := 0;
+  s      public.idle_state;
+  v_po   jsonb;
+  v_tr   int := 0;
+  v_corr int := 0;
+  v_esc  int := 0;
 begin
   select * into s from public.idle_state where user_id = p_user;
   if found then
     v_tr := coalesce(s.generators[19], 0);
   end if;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
   with po as (
     delete from public.idle_bolsa_carteira k
      using public.idle_bolsa_mercado m
@@ -893,11 +956,14 @@ begin
     'tick', p_agora,
     'vira_em_ms', greatest(0, (p_agora + 1) * 60000 - floor(extract(epoch from now()) * 1000)::bigint),
     'r', case when s.user_id is null then 0 else public.idle_rate(s) end,
-    'limite', 100 + 10 * v_tr,
     'aberta', v_tr >= 1 and coalesce(s.started, false),
+    'corretor', v_corr,
+    'escritorio', v_esc,
+    'corretagem', public.idle_bolsa_corretagem(v_corr),
     'empresas', (
       select coalesce(jsonb_agg(jsonb_build_object(
         'id', m.empresa, 'valor', m.valor,
+        'limite', 100 + coalesce(s.generators[c.gerador], 0) + public.idle_bolsa_escritorio(v_esc),
         'risco', m.rj_ate is null and m.valor < 0.15 * c.repouso,
         'rj_ate', m.rj_ate,
         'historico', (select coalesce(jsonb_agg(p.valor order by p.tick), '[]'::jsonb) from public.idle_bolsa_precos p
@@ -925,6 +991,9 @@ declare
   v_preco  double precision;
   v_cabe   int;
   v_n      int;
+  v_corr   int := 0;
+  v_esc    int := 0;
+  v_fee    double precision;
 begin
   if p_tick is distinct from p_agora then
     raise exception 'idle_bolsa_preco_mudou' using errcode = 'P0001';
@@ -953,25 +1022,28 @@ begin
     v_tem := k.qtd;
     v_custo := k.custo;
   end if;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
+  v_fee := 1 + public.idle_bolsa_corretagem(v_corr);
   v_r := public.idle_rate(s);
   v_preco := m.valor * v_r;
 
   if p_lado = 'comprar' then
-    v_cabe := 100 + 10 * s.generators[19] - v_tem;
+    v_cabe := 100 + coalesce(s.generators[c.gerador], 0) + public.idle_bolsa_escritorio(v_esc) - v_tem;
     if v_cabe <= 0 or (p_qtd > 0 and p_qtd > v_cabe) then
       raise exception 'idle_bolsa_limite' using errcode = 'P0001';
     end if;
     if p_qtd = 0 then
-      v_n := least(v_cabe, floor(s.valuation / (v_preco * 1.05))::int);
+      v_n := least(v_cabe, floor(s.valuation / (v_preco * v_fee))::int);
     else
       v_n := p_qtd;
     end if;
-    if v_preco <= 0 or v_n < 1 or v_n * v_preco * 1.05 > s.valuation then
+    if v_preco <= 0 or v_n < 1 or v_n * v_preco * v_fee > s.valuation then
       raise exception 'idle_cant_afford' using errcode = 'P0001';
     end if;
-    s.valuation := greatest(s.valuation - v_n * v_preco * 1.05, 0);
+    s.valuation := greatest(s.valuation - v_n * v_preco * v_fee, 0);
     insert into public.idle_bolsa_carteira (user_id, empresa, qtd, custo, geracao)
-    values (p_user, p_empresa, v_tem + v_n, v_custo + v_n * m.valor * 1.05, m.geracao)
+    values (p_user, p_empresa, v_tem + v_n, v_custo + v_n * m.valor * v_fee, m.geracao)
     on conflict (user_id, empresa) do update set qtd = excluded.qtd, custo = excluded.custo, geracao = excluded.geracao;
   else
     if v_tem < 1 then
@@ -1032,7 +1104,148 @@ git commit -m "Fellas Inc.: Bolsa no banco, parte 3: carteira, estado da Bolsa e
 
 ---
 
-### Task 5: Página — tipos, API, erros, mock e as contas da tela
+### Task 5: Migração 0042, parte 4 — comprar as melhorias da Bolsa
+
+**Files:**
+- Modify: `supabase/migrations/0042_fellas_inc_bolsa.sql` (acrescentar no fim)
+- Test: `games/test/idleBolsa.test.ts` (dentro do `describe('carteira e negociar')`)
+
+**Interfaces:**
+- Consumes (Task 4): `idle_bolsa_nivel`, `idle_bolsa_custo`, `idle_bolsa_estado`, `idle_lock`, `idle_settle`, `idle_save`, `idle_json`, `idle_rate`.
+- Produces: `idle_bolsa_melhorar_em(p_user uuid, p_tipo text, p_nivel int, p_agora bigint) returns jsonb` (interna) e a RPC `idle_bolsa_melhorar(p_tipo text, p_nivel int) returns jsonb` (devolve `idle_json(s) || { bolsa }`).
+
+- [ ] **Step 1: Write the failing tests**
+
+Acrescente dentro do `describe('carteira e negociar', ...)`, depois do último `it`:
+
+```ts
+  const melhorar = (tipo: string, nivel: number) =>
+    q<{ v: Resp }>('select public.idle_bolsa_melhorar_em($1, $2, $3, $4) as v', [A, tipo, nivel, T]).then((x) => x[0].v);
+
+  it('Corretor 1: custa 1800 s de produção, corretagem cai pra 4% e a próxima compra paga 4%', async () => {
+    const rr = await r();
+    const antes = await valuation();
+    const resp = await melhorar('corretor', 1);
+    expect(antes - resp.valuation).toBeCloseTo(1800 * rr, 3);
+    expect(resp.bolsa).toMatchObject({ corretor: 1, corretagem: 0.04 });
+    const v0 = await valuation();
+    const c = await negociar(1, 'comprar', 10);
+    expect(v0 - c.valuation).toBeCloseTo(10 * 30 * rr * 1.04, 3);
+    expect(c.bolsa.carteira[0].custo).toBeCloseTo(10 * 30 * 1.04, 9);
+  });
+  it('Escritório: +25 em todas no nível 1, +50 no nível 2 (o do nível, não a soma)', async () => {
+    await melhorar('escritorio', 1);
+    expect((await estado()).empresas[0].limite).toBe(145);
+    await melhorar('escritorio', 2);
+    const b = await estado();
+    expect(b.empresas[0].limite).toBe(170);
+    expect(b.empresas[1].limite).toBe(150);
+  });
+  it('nível fora de ordem, repetido ou depois do 5: idle_bolsa_nivel; sem F$: idle_cant_afford; sem trader: idle_bolsa_fechada', async () => {
+    await expect(melhorar('corretor', 2)).rejects.toThrow('idle_bolsa_nivel');
+    await melhorar('corretor', 1);
+    await expect(melhorar('corretor', 1)).rejects.toThrow('idle_bolsa_nivel');
+    await expect(melhorar('outra', 1)).rejects.toThrow('idle_bad_choice');
+    await q('update public.idle_bolsa_nivel set corretor = 5 where user_id = $1', [A]);
+    await expect(melhorar('corretor', 6)).rejects.toThrow('idle_bolsa_nivel');
+    await q('update public.idle_state set valuation = 1 where user_id = $1', [A]);
+    await expect(melhorar('escritorio', 1)).rejects.toThrow('idle_cant_afford');
+    await q(`update public.idle_state set generators[19] = 0 where user_id = $1`, [A]);
+    await expect(melhorar('escritorio', 1)).rejects.toThrow('idle_bolsa_fechada');
+  });
+  it('as melhorias ficam na venda da startup', async () => {
+    await melhorar('escritorio', 1);
+    await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    expect(await estado()).toMatchObject({ escritorio: 1, corretor: 0 });
+  });
+  it('RPC idle_bolsa_melhorar: membro compra; não membro é recusado', async () => {
+    await q('update public.idle_bolsa_mercado set tick = public.idle_bolsa_agora() - 1 where true');
+    const resp = await t.rpc<Resp>('idle_bolsa_melhorar', { p_tipo: 'corretor', p_nivel: 1 });
+    expect(resp.bolsa.corretor).toBe(1);
+    await t.as(OUT);
+    await expect(t.rpc('idle_bolsa_melhorar', { p_tipo: 'corretor', p_nivel: 2 })).rejects.toThrow('not_member');
+  });
+```
+
+Run: `cd games && npx vitest run test/idleBolsa.test.ts`
+Expected: FAIL (`idle_bolsa_melhorar_em` não existe).
+
+- [ ] **Step 2: Append to the migration**
+
+```sql
+-- ---------- comprar a próxima melhoria (Corretor ou Escritório) ----------
+create or replace function public.idle_bolsa_melhorar_em(p_user uuid, p_tipo text, p_nivel int, p_agora bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  n       public.idle_bolsa_nivel;
+  v_atual int;
+  v_custo double precision;
+begin
+  if p_tipo not in ('corretor', 'escritorio') then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_lock(p_user);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.generators[19], 0) < 1 then
+    raise exception 'idle_bolsa_fechada' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  insert into public.idle_bolsa_nivel (user_id) values (p_user) on conflict (user_id) do nothing;
+  select * into n from public.idle_bolsa_nivel where user_id = p_user for update;
+  v_atual := case p_tipo when 'corretor' then n.corretor else n.escritorio end;
+  if p_nivel is distinct from v_atual + 1 or p_nivel > 5 then
+    raise exception 'idle_bolsa_nivel' using errcode = 'P0001';
+  end if;
+  v_custo := public.idle_bolsa_custo(p_tipo, p_nivel) * public.idle_rate(s);
+  if v_custo <= 0 or v_custo > s.valuation then
+    raise exception 'idle_cant_afford' using errcode = 'P0001';
+  end if;
+  s.valuation := greatest(s.valuation - v_custo, 0);
+  if p_tipo = 'corretor' then
+    update public.idle_bolsa_nivel set corretor = p_nivel where user_id = p_user;
+  else
+    update public.idle_bolsa_nivel set escritorio = p_nivel where user_id = p_user;
+  end if;
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('bolsa', public.idle_bolsa_estado(p_user, p_agora));
+end;
+$$;
+
+create or replace function public.idle_bolsa_melhorar(p_tipo text, p_nivel int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  return public.idle_bolsa_melhorar_em(auth.uid(), p_tipo, p_nivel, public.idle_bolsa_avancar());
+end;
+$$;
+
+revoke all on function public.idle_bolsa_melhorar_em(uuid, text, int, bigint) from public, anon, authenticated;
+revoke all on function public.idle_bolsa_melhorar(text, int) from public, anon;
+grant execute on function public.idle_bolsa_melhorar(text, int) to authenticated;
+```
+
+- [ ] **Step 3: Run tests**
+
+Run: `cd games && npx vitest run test/idleBolsa.test.ts test/migracoesUtf8.test.ts`
+Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd games && npx tsc --noEmit && npx vitest run
+git add ../supabase/migrations/0042_fellas_inc_bolsa.sql test/idleBolsa.test.ts
+git commit -m "Fellas Inc.: Bolsa no banco, parte 4: melhorias da Bolsa (Corretor e Escritório)"
+```
+
+---
+
+### Task 6: Página — tipos, API, erros, mock e as contas da tela
 
 **Files:**
 - Modify: `games/shared/types.ts`, `games/shared/api.ts`, `games/shared/errors.ts`, `games/dev/mockIdle.ts`
@@ -1042,9 +1255,9 @@ git commit -m "Fellas Inc.: Bolsa no banco, parte 3: carteira, estado da Bolsa e
 **Interfaces:**
 - Consumes (Task 1): `EMPRESAS_BOLSA`, `BOLSA`.
 - Produces:
-  - em `types.ts`: `BolsaEmpresa = { id: number; valor: number; risco: boolean; rj_ate: number | null; historico: number[] }`, `BolsaPosicao = { empresa: number; qtd: number; custo: number }`, `BolsaEstado = { tick: number; vira_em_ms: number; r: number; limite: number; aberta: boolean; empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[] }`, `LadoBolsa = 'comprar' | 'vender'`;
-  - em `api.ts`: `idleBolsa(): Promise<BolsaEstado>`, `idleBolsaNegociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): Promise<IdleState & { bolsa: BolsaEstado }>`;
-  - em `bolsa.ts`: `pct(x: number): string`, `variacao(historico: number[]): { minuto: number; hora: number }`, `lucro(valor: number, p: BolsaPosicao): number`, `maxCompra(valuation: number, valor: number, r: number, limite: number, tem: number): number`, `acoes(n: number): string`, `textoQuebra(rjAte: number, tick: number): string`, `avisosPo(po: { empresa: number; qtd: number }[]): string[]`, `empresa(id: number): EmpresaBolsa`.
+  - em `types.ts`: `BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] }`, `BolsaPosicao = { empresa: number; qtd: number; custo: number }`, `BolsaEstado = { tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number; empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[] }`, `LadoBolsa = 'comprar' | 'vender'`, `MelhoriaBolsa = 'corretor' | 'escritorio'`;
+  - em `api.ts`: `idleBolsa(): Promise<BolsaEstado>`, `idleBolsaNegociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): Promise<IdleState & { bolsa: BolsaEstado }>`, `idleBolsaMelhorar(tipo: MelhoriaBolsa, nivel: number): Promise<IdleState & { bolsa: BolsaEstado }>`;
+  - em `bolsa.ts`: `pct(x: number): string`, `variacao(historico: number[]): { minuto: number; hora: number }`, `lucro(valor: number, p: BolsaPosicao): number`, `maxCompra(valuation: number, valor: number, r: number, limite: number, tem: number, corretagem: number): number`, `proximaMelhoria(tipo: MelhoriaBolsa, nivel: number): { nivel: number; nome: string; efeito: string; segundos: number } | null`, `melhoriaAtual(tipo: MelhoriaBolsa, nivel: number): { nome: string; efeito: string }`, `acoes(n: number): string`, `textoQuebra(rjAte: number, tick: number): string`, `avisosPo(po: { empresa: number; qtd: number }[]): string[]`, `empresa(id: number): EmpresaBolsa`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1054,7 +1267,7 @@ git commit -m "Fellas Inc.: Bolsa no banco, parte 3: carteira, estado da Bolsa e
 import { describe, expect, it } from 'vitest';
 
 import { GameError, toGameError } from '../shared/errors';
-import { acoes, avisosPo, empresa, lucro, maxCompra, pct, textoQuebra, variacao } from './bolsa';
+import { acoes, avisosPo, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 
 describe('contas e textos da Bolsa', () => {
   it('porcentagem com sinal, uma casa, menos de verdade', () => {
@@ -1072,10 +1285,20 @@ describe('contas e textos da Bolsa', () => {
     expect(lucro(33, { empresa: 1, qtd: 10, custo: 300 })).toBeCloseTo(0.1, 12);
   });
   it('Máx: o que o F$ (com a corretagem) e o limite deixam, nunca negativo', () => {
-    expect(maxCompra(1000, 10, 2, 120, 0)).toBe(Math.floor(1000 / (10 * 2 * 1.05)));
-    expect(maxCompra(1e12, 10, 2, 120, 100)).toBe(20);
-    expect(maxCompra(1e12, 10, 2, 120, 130)).toBe(0);
-    expect(maxCompra(0, 10, 2, 120, 0)).toBe(0);
+    expect(maxCompra(1000, 10, 2, 120, 0, 0.05)).toBe(Math.floor(1000 / (10 * 2 * 1.05)));
+    expect(maxCompra(1000, 10, 2, 120, 0, 0.01)).toBe(Math.floor(1000 / (10 * 2 * 1.01)));
+    expect(maxCompra(1e12, 10, 2, 120, 100, 0.05)).toBe(20);
+    expect(maxCompra(1e12, 10, 2, 120, 130, 0.05)).toBe(0);
+    expect(maxCompra(0, 10, 2, 120, 0, 0.05)).toBe(0);
+  });
+  it('melhorias: o nível atual e o próximo (nome, efeito, custo em segundos); no 5 não tem próximo', () => {
+    expect(melhoriaAtual('corretor', 0)).toEqual({ nome: 'Sem corretor', efeito: 'Corretagem 5%' });
+    expect(melhoriaAtual('corretor', 2)).toEqual({ nome: 'Assessor do banco', efeito: 'Corretagem 3%' });
+    expect(melhoriaAtual('escritorio', 0)).toEqual({ nome: 'Sem escritório', efeito: '+0 ações em cada empresa' });
+    expect(proximaMelhoria('corretor', 0)).toEqual({ nivel: 1, nome: 'Primo que entende de ação', efeito: 'Corretagem 4%', segundos: 1800 });
+    expect(proximaMelhoria('escritorio', 4)).toEqual({ nivel: 5, nome: 'Torre na Berrini', efeito: '+400 ações em cada empresa', segundos: 57600 });
+    expect(proximaMelhoria('corretor', 4)!.efeito).toBe('Corretagem 0,5%');
+    expect(proximaMelhoria('escritorio', 5)).toBeNull();
   });
   it('textos', () => {
     expect(acoes(1)).toBe('1 ação');
@@ -1089,6 +1312,7 @@ describe('contas e textos da Bolsa', () => {
   });
   it('erros novos do banco viram frase', () => {
     const casos: [string, string][] = [
+      ['idle_bolsa_nivel', 'Essa melhoria já mudou. Confere de novo'],
       ['idle_bolsa_preco_mudou', 'O preço mudou, confere de novo'],
       ['idle_bolsa_rj', 'Essa empresa quebrou. Volta em alguns minutos'],
       ['idle_bolsa_limite', 'Chegou no limite de ações dessa empresa'],
@@ -1114,8 +1338,8 @@ Expected: FAIL.
 
 ```ts
 // Contas e textos da tela da Bolsa (puro). Quem decide preço, compra e venda é o banco (0042); aqui só se mostra.
-import { BOLSA, EMPRESAS_BOLSA, type EmpresaBolsa } from './bolsaMotor';
-import type { BolsaPosicao } from '../shared/types';
+import { EMPRESAS_BOLSA, MELHORIAS_BOLSA, type EmpresaBolsa } from './bolsaMotor';
+import type { BolsaPosicao, MelhoriaBolsa } from '../shared/types';
 
 export const empresa = (id: number): EmpresaBolsa => EMPRESAS_BOLSA.find((e) => e.id === id)!;
 
@@ -1138,13 +1362,31 @@ export function variacao(h: number[]): { minuto: number; hora: number } {
 export const lucro = (valor: number, p: BolsaPosicao): number => valor / (p.custo / p.qtd) - 1;
 
 /** Quantas dá pra comprar agora: o F$ (com a corretagem) e o espaço no limite. */
-export function maxCompra(valuation: number, valor: number, r: number, limite: number, tem: number): number {
-  const unidade = valor * r * (1 + BOLSA.corretagem);
+export function maxCompra(valuation: number, valor: number, r: number, limite: number, tem: number, corretagem: number): number {
+  const unidade = valor * r * (1 + corretagem);
   if (unidade <= 0) return 0;
   return Math.max(0, Math.min(limite - tem, Math.floor(valuation / unidade)));
 }
 
 export const acoes = (n: number) => (n === 1 ? '1 ação' : `${n} ações`);
+
+const porcento = (x: number) => `${(x * 100).toLocaleString('pt-BR')}%`;
+const efeito = (tipo: MelhoriaBolsa, nivel: number) =>
+  tipo === 'corretor'
+    ? `Corretagem ${porcento(MELHORIAS_BOLSA.corretor.corretagem[nivel])}`
+    : `+${MELHORIAS_BOLSA.escritorio.bonus[nivel]} ações em cada empresa`;
+
+/** O nível que você tem: nome e efeito ("Sem corretor · Corretagem 5%"). */
+export function melhoriaAtual(tipo: MelhoriaBolsa, nivel: number): { nome: string; efeito: string } {
+  const nome = nivel === 0 ? (tipo === 'corretor' ? 'Sem corretor' : 'Sem escritório') : MELHORIAS_BOLSA[tipo].nomes[nivel - 1];
+  return { nome, efeito: efeito(tipo, nivel) };
+}
+
+/** O próximo nível (custo em segundos de produção), ou null no 5. */
+export function proximaMelhoria(tipo: MelhoriaBolsa, nivel: number) {
+  if (nivel >= 5) return null;
+  return { nivel: nivel + 1, nome: MELHORIAS_BOLSA[tipo].nomes[nivel], efeito: efeito(tipo, nivel + 1), segundos: MELHORIAS_BOLSA[tipo].custo[nivel] };
+}
 
 export const textoQuebra = (rjAte: number, tick: number) => `Quebrou · volta em ${Math.max(1, rjAte - tick)} min`;
 
@@ -1162,26 +1404,30 @@ export const avisosPo = (po: { empresa: number; qtd: number }[]): string[] =>
 
 ```ts
 /** Bolsa da Fellas Inc. (0042 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
-export type BolsaEmpresa = { id: number; valor: number; risco: boolean; rj_ate: number | null; historico: number[] };
+export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] };
 export type BolsaPosicao = { empresa: number; qtd: number; custo: number };
 export type BolsaEstado = {
-  tick: number; vira_em_ms: number; r: number; limite: number; aberta: boolean;
+  tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
   empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[];
 };
 export type LadoBolsa = 'comprar' | 'vender';
+export type MelhoriaBolsa = 'corretor' | 'escritorio';
 ```
 
-`games/shared/api.ts` — acrescente `BolsaEstado` e `LadoBolsa` ao `import type {...} from './types'` e, depois de `idleBuyNode`:
+`games/shared/api.ts` — acrescente `BolsaEstado`, `LadoBolsa` e `MelhoriaBolsa` ao `import type {...} from './types'` e, depois de `idleBuyNode`:
 
 ```ts
 export const idleBolsa = () => rpc<BolsaEstado>('idle_bolsa');
 export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number) =>
   rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_negociar', { p_empresa: empresa, p_lado: lado, p_qtd: qtd, p_tick: tick });
+export const idleBolsaMelhorar = (tipo: MelhoriaBolsa, nivel: number) =>
+  rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_melhorar', { p_tipo: tipo, p_nivel: nivel });
 ```
 
-`games/shared/errors.ts`: no tipo `GameErrorCode` acrescente `| 'idle_bolsa_preco_mudou' | 'idle_bolsa_rj' | 'idle_bolsa_limite' | 'idle_bolsa_fechada' | 'idle_bolsa_sem_acoes'`; em `ERROR_TEXT` acrescente:
+`games/shared/errors.ts`: no tipo `GameErrorCode` acrescente `| 'idle_bolsa_preco_mudou' | 'idle_bolsa_rj' | 'idle_bolsa_limite' | 'idle_bolsa_fechada' | 'idle_bolsa_sem_acoes' | 'idle_bolsa_nivel'`; em `ERROR_TEXT` acrescente:
 
 ```ts
+  idle_bolsa_nivel: 'Essa melhoria já mudou. Confere de novo',
   idle_bolsa_preco_mudou: 'O preço mudou, confere de novo',
   idle_bolsa_rj: 'Essa empresa quebrou. Volta em alguns minutos',
   idle_bolsa_limite: 'Chegou no limite de ações dessa empresa',
@@ -1189,7 +1435,7 @@ export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 |
   idle_bolsa_sem_acoes: 'Você não tem ações dessa empresa',
 ```
 
-e na lista `FROM_DB` acrescente os cinco códigos. **Atenção à ordem:** `toGameError` acha o primeiro código contido na mensagem; nenhum código existente é prefixo destes (conferir com `grep "'idle_bolsa" shared/errors.ts`).
+e na lista `FROM_DB` acrescente os seis códigos. **Atenção à ordem:** `toGameError` acha o primeiro código contido na mensagem; nenhum código existente é prefixo destes (conferir com `grep "'idle_bolsa" shared/errors.ts`).
 
 `games/dev/mockIdle.ts` — depois de `idleBuyNode`:
 
@@ -1197,13 +1443,17 @@ e na lista `FROM_DB` acrescente os cinco códigos. **Atenção à ordem:** `toGa
 export const idleBolsa = () => call<BolsaEstado>('select public.idle_bolsa() as v');
 export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number) =>
   call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_negociar($1, $2, $3, $4) as v', [empresa, lado, qtd, tick]);
+export const idleBolsaMelhorar = (tipo: MelhoriaBolsa, nivel: number) =>
+  call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_melhorar($1, $2) as v', [tipo, nivel]);
 ```
 
-(acrescente `BolsaEstado`, `LadoBolsa` ao import de `../shared/types`), e a ajuda do console `__trader(n = 3)` (põe `n` Grupos de trader e F$ 1e15):
+(acrescente `BolsaEstado`, `LadoBolsa`, `MelhoriaBolsa` ao import de `../shared/types`), e a ajuda do console `__trader(n = 3)` (põe `n` Grupos de trader e F$ 1e15):
 
 ```ts
 w.__trader = async (n = 3) => {
-  await dono(`update public.idle_state set generators[19] = $2, generators[18] = greatest(generators[18], 1), valuation = 1e15 where user_id = $1`, [ME, n]);
+  // os traders e um pouco de cada gerador ligado às empresas (o limite de cada uma cresce com ele)
+  await dono(`update public.idle_state set generators[19] = $2, generators[18] = greatest(generators[18], 1),
+    generators[11] = greatest(generators[11], 20), generators[16] = greatest(generators[16], 5), valuation = 1e15 where user_id = $1`, [ME, n]);
   document.dispatchEvent(new Event('visibilitychange'));
 };
 ```
@@ -1225,7 +1475,7 @@ git commit -m "Fellas Inc.: Bolsa na página: tipos, chamadas, erros, mock e as 
 
 ---
 
-### Task 6: A tela da Bolsa e a gaveta na bancada
+### Task 7: A tela da Bolsa e a gaveta na bancada
 
 **Files:**
 - Create: `games/idle/bolsaTela.ts`
@@ -1233,11 +1483,11 @@ git commit -m "Fellas Inc.: Bolsa na página: tipos, chamadas, erros, mock e as 
 - Modify: `games/idle/tela.ts` (+ `games/idle/tela.test.ts`)
 
 **Interfaces:**
-- Consumes (Task 5): tipos, `bolsa.ts`; `formatarValor` de `./formatar`; `iconeFechar` de `./icones`.
+- Consumes (Task 6): tipos, `bolsa.ts`; `formatarValor` de `./formatar`; `iconeFechar` de `./icones`.
 - Produces:
-  - `criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void }): { elemento: HTMLElement; renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): Precos[] }` onde `Precos = { botao: HTMLButtonElement; preco: number }` (os botões de compra, para o `atualizarValor` apagar sem F$).
-  - DOM: `.bolsa` > `.bolsa-topo` (`.bolsa-titulo`, `.carteira`) + `.bolsa-miolo` > `.bolsa-lista` (`button.acao[data-empresa]`, classes `escolhida`, `quebrada`; `.etq.risco` / `.etq.rj`; `svg.mini`) + `.bolsa-detalhe` (só com uma escolhida).
-  - Em `tela.ts`: `Modelo` ganha `bolsa: BolsaEstado | null` e `bolsaAberta: boolean`; `Acoes` ganha `bolsa(acao: 'abrir' | 'fechar'): void` e `negociar(empresa, lado, qtd, tick): void`. Gaveta `button.gaveta.gaveta-bolsa` (com `.trancada` sem trader). A `section.bancada` ganha a classe `com-bolsa` quando `m.bolsaAberta` (no PC o corpo mostra a Bolsa; no celular o CSS vira tela cheia) e um `.bancada-topo` (✕ "Bolsa" + valor) que só aparece no celular.
+  - `criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void; melhorar(tipo: MelhoriaBolsa, nivel: number): void }): { elemento: HTMLElement; renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): Precos[] }` onde `Precos = { botao: HTMLButtonElement; preco: number }` (os botões de compra, para o `atualizarValor` apagar sem F$).
+  - DOM: `.bolsa` > `.bolsa-topo` (`.bolsa-titulo`, `.carteira`) + `.bolsa-melhorias` (dois `.melhoria-bolsa[data-tipo]`, cada um com o nível atual, o efeito e o botão do próximo ou "No máximo") + `.bolsa-miolo` > `.bolsa-lista` (`button.acao[data-empresa]`, classes `escolhida`, `quebrada`; `.etq.risco` / `.etq.rj`; `svg.mini`) + `.bolsa-detalhe` (só com uma escolhida).
+  - Em `tela.ts`: `Modelo` ganha `bolsa: BolsaEstado | null` e `bolsaAberta: boolean`; `Acoes` ganha `bolsa(acao: 'abrir' | 'fechar'): void`, `negociar(empresa, lado, qtd, tick): void` e `melhorar(tipo: MelhoriaBolsa, nivel: number): void`. Gaveta `button.gaveta.gaveta-bolsa` (com `.trancada` sem trader). A `section.bancada` ganha a classe `com-bolsa` quando `m.bolsaAberta` (no PC o corpo mostra a Bolsa; no celular o CSS vira tela cheia) e um `.bancada-topo` (✕ "Bolsa" + valor) que só aparece no celular.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1251,22 +1501,24 @@ import type { BolsaEstado } from '../shared/types';
 import { criarBolsaTela } from './bolsaTela';
 
 const B = (x: Partial<BolsaEstado> = {}): BolsaEstado => ({
-  tick: 1000, vira_em_ms: 42_000, r: 2, limite: 120, aberta: true,
+  tick: 1000, vira_em_ms: 42_000, r: 2, aberta: true, corretor: 0, escritorio: 0, corretagem: 0.05,
   empresas: [
-    { id: 1, valor: 33, risco: false, rj_ate: null, historico: [30, 32, 33] },
-    { id: 4, valor: 2, risco: true, rj_ate: null, historico: [20, 2] },
-    { id: 6, valor: 5, risco: false, rj_ate: 1007, historico: [5] },
+    { id: 1, valor: 33, limite: 120, risco: false, rj_ate: null, historico: [30, 32, 33] },
+    { id: 4, valor: 2, limite: 102, risco: true, rj_ate: null, historico: [20, 2] },
+    { id: 6, valor: 5, limite: 100, risco: false, rj_ate: 1007, historico: [5] },
   ],
   carteira: [{ empresa: 1, qtd: 10, custo: 300 }],
   viraram_po: [],
   ...x,
 });
 const negociar = vi.fn();
+const melhorar = vi.fn();
 let tela: ReturnType<typeof criarBolsaTela>;
 beforeEach(() => {
   document.body.innerHTML = '';
   negociar.mockClear();
-  tela = criarBolsaTela({ negociar });
+  melhorar.mockClear();
+  tela = criarBolsaTela({ negociar, melhorar });
   document.body.append(tela.elemento);
 });
 const linha = (id: number) => document.querySelector<HTMLButtonElement>(`.acao[data-empresa="${id}"]`)!;
@@ -1307,7 +1559,7 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.bolsa-detalhe')).toBeNull();
   });
   it('apagados: ocupado, sem F$, no limite, sem ações, empresa quebrada', () => {
-    tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 120, custo: 3600 }] }), 1e9, false);
+    tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 120, custo: 3600 }] }), 1e9, false); // limite do Pastel: 120
     linha(1).click();
     const comprar = () => [...document.querySelectorAll<HTMLButtonElement>('.comprar button')];
     expect(comprar().every((b) => b.disabled)).toBe(true); // no limite
@@ -1319,11 +1571,27 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.bolsa-detalhe')!.textContent).toContain('Quebrou · volta em 7 min');
     expect(document.querySelectorAll('.bolsa-detalhe button')).toHaveLength(0);
   });
-  it('devolve os preços dos botões de compra para apagar sem F$', () => {
+  it('devolve os preços dos botões de compra (melhorias e ações) para apagar sem F$', () => {
     tela.renderizar(B(), 1e9, false);
     linha(1).click();
     const precos = tela.renderizar(B(), 1e9, false);
-    expect(precos.map((p) => p.preco)).toEqual([33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+    expect(precos.map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+  });
+  it('melhorias: nível atual, efeito e o próximo com o preço em F$ (segundos × r); no 5, No máximo', () => {
+    tela.renderizar(B({ corretor: 1, escritorio: 5 }), 1e9, false);
+    const corr = document.querySelector('.melhoria-bolsa[data-tipo="corretor"]')!;
+    expect(corr.textContent).toContain('Primo que entende de ação');
+    expect(corr.textContent).toContain('Corretagem 4%');
+    const b = corr.querySelector('button')!;
+    expect(b.textContent).toBe('Assessor do banco · F$ 7,2 mil'); // 3600 s × r 2
+    b.click();
+    expect(melhorar).toHaveBeenCalledWith('corretor', 2);
+    const esc = document.querySelector('.melhoria-bolsa[data-tipo="escritorio"]')!;
+    expect(esc.textContent).toContain('Torre na Berrini');
+    expect(esc.textContent).toContain('No máximo');
+    expect(esc.querySelector('button')).toBeNull();
+    tela.renderizar(B({ corretor: 1 }), 100, false);
+    expect(document.querySelector<HTMLButtonElement>('.melhoria-bolsa[data-tipo="corretor"] button')!.disabled).toBe(true);
   });
   it('sem trader: só o aviso pra abrir', () => {
     tela.renderizar(B({ aberta: false }), 1e9, false);
@@ -1337,7 +1605,7 @@ describe('tela da Bolsa', () => {
 });
 ```
 
-Em `games/idle/tela.test.ts`: acrescente `bolsa: null, bolsaAberta: false,` no `modelo()` e `bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(),` no `acoes`. Acrescente no `describe('empresa, resumo e bancada')`:
+Em `games/idle/tela.test.ts`: acrescente `bolsa: null, bolsaAberta: false,` no `modelo()` e `bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),` no `acoes`. Acrescente no `describe('empresa, resumo e bancada')`:
 
 ```ts
   it('gaveta Bolsa: apagada sem Grupo de trader; com trader abre a Bolsa', () => {
@@ -1378,9 +1646,8 @@ Expected: FAIL.
 // Tela da Bolsa (lista + detalhe), em DOM puro. No PC fica no corpo da gaveta Bolsa; no celular a bancada inteira vira
 // tela cheia (CSS). O detalhe aparece com uma empresa escolhida (tocar de novo fecha). Texto sempre por textContent.
 import { button, el } from '../shared/hud/hud';
-import type { BolsaEstado, BolsaPosicao, LadoBolsa } from '../shared/types';
-import { acoes, empresa, lucro, maxCompra, pct, textoQuebra, variacao } from './bolsa';
-import { BOLSA } from './bolsaMotor';
+import type { BolsaEstado, BolsaPosicao, LadoBolsa, MelhoriaBolsa } from '../shared/types';
+import { acoes, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 import { formatarValor } from './formatar';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -1412,7 +1679,10 @@ function grafico(cls: string, h: number[]) {
 
 const classeVar = (x: number) => (x > 0.0005 ? 'sobe' : x < -0.0005 ? 'cai' : '');
 
-export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void }) {
+export function criarBolsaTela(a: {
+  negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
+  melhorar(tipo: MelhoriaBolsa, nivel: number): void;
+}) {
   const raiz = el('div', 'bolsa');
   let escolhida: number | null = null;
   let ultimo: [BolsaEstado | null, number, boolean] | null = null;
@@ -1441,6 +1711,30 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
     cart.append(c1, c2);
     topo.append(el('h3', 'bolsa-titulo', 'Bolsa da Faria Lima'), cart);
 
+    // melhorias da Bolsa: o nível atual e o botão do próximo (preço em segundos × r)
+    const melhorias = el('div', 'bolsa-melhorias');
+    const precos: Precos[] = [];
+    for (const tipo of ['corretor', 'escritorio'] as const) {
+      const nivel = tipo === 'corretor' ? b.corretor : b.escritorio;
+      const atual = melhoriaAtual(tipo, nivel);
+      const card = el('div', 'melhoria-bolsa');
+      card.dataset.tipo = tipo;
+      const txt = el('div', 'meio');
+      txt.append(el('strong', undefined, atual.nome), el('span', 'sub', atual.efeito));
+      card.append(txt);
+      const prox = proximaMelhoria(tipo, nivel);
+      if (!prox) card.append(el('span', 'no-feito', 'No máximo'));
+      else {
+        const custo = prox.segundos * b.r;
+        const bt = button(`${prox.nome} · ${formatarValor(custo)}`, 'btn', () => a.melhorar(tipo, prox.nivel));
+        bt.setAttribute('aria-label', `Comprar ${prox.nome}: ${prox.efeito}, ${formatarValor(custo)}`);
+        bt.disabled = ocupado || custo > valuation;
+        if (!ocupado) precos.push({ botao: bt, preco: custo });
+        card.append(bt);
+      }
+      melhorias.append(card);
+    }
+
     const lista = el('div', 'bolsa-lista');
     for (const m of b.empresas) {
       const e = empresa(m.id);
@@ -1468,9 +1762,8 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
     }
     const miolo = el('div', 'bolsa-miolo');
     miolo.append(lista);
-    raiz.append(topo, miolo);
+    raiz.append(topo, melhorias, miolo);
 
-    const precos: Precos[] = [];
     const m = b.empresas.find((x) => x.id === escolhida);
     if (m) {
       const e = empresa(m.id);
@@ -1493,7 +1786,7 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
         d.append(linhaPreco, grafico('graf', m.historico));
         const info = el('div', 'linha2');
         const i1 = el('span');
-        i1.append('Você tem ', el('b', undefined, `${tem} de ${b.limite}`));
+        i1.append('Você tem ', el('b', undefined, `${tem} de ${m.limite}`));
         info.append(i1);
         if (p) {
           const i2 = el('span');
@@ -1509,13 +1802,13 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
           l2.append(i3, el('span', classeVar(l), `${pct(l)} de lucro`));
           d.append(l2);
         }
-        const unidade = m.valor * b.r * (1 + BOLSA.corretagem);
-        const cabe = b.limite - tem;
+        const unidade = m.valor * b.r * (1 + b.corretagem);
+        const cabe = m.limite - tem;
         const comprar = el('div', 'bts comprar');
-        comprar.append(el('div', 'rot2', `Comprar (+${Math.round(BOLSA.corretagem * 100)}% de corretagem)`));
+        comprar.append(el('div', 'rot2', `Comprar (+${(b.corretagem * 100).toLocaleString('pt-BR')}% de corretagem)`));
         for (const [q, n] of [[1, 1], [10, 10], [0, 1]] as const) {
           const bt = button(q === 0 ? 'Máx' : String(q), 'btn main', () => a.negociar(m.id, 'comprar', q, b.tick));
-          bt.disabled = ocupado || cabe < n || maxCompra(valuation, m.valor, b.r, b.limite, tem) < n;
+          bt.disabled = ocupado || cabe < n || maxCompra(valuation, m.valor, b.r, m.limite, tem, b.corretagem) < n;
           precos.push({ botao: bt, preco: n * unidade });
           comprar.append(bt);
         }
@@ -1544,7 +1837,7 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
 
 1. Imports: `import type { BolsaEstado, LadoBolsa } from '../shared/types';` (junto do import de tipos existente) e `import { criarBolsaTela } from './bolsaTela';`.
 2. `Modelo`: acrescente `/** Estado da Bolsa (null = ainda não buscou). */ bolsa: BolsaEstado | null;` e `/** Gaveta Bolsa aberta (PC: no corpo da bancada; celular: tela cheia). */ bolsaAberta: boolean;`.
-3. `Acoes`: acrescente `bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;`.
+3. `Acoes`: acrescente `bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void; melhorar(tipo: MelhoriaBolsa, nivel: number): void;` (importe `MelhoriaBolsa`).
 4. Em `criarTela`, depois da gaveta Caixinha:
 
 ```ts
@@ -1556,7 +1849,7 @@ export function criarBolsaTela(a: { negociar(empresa: number, lado: LadoBolsa, q
   bolsaCaixa.append(iconeBolsa);
   gavetaBolsa.append(bolsaCaixa, el('span', 'gaveta-nome', 'Bolsa'));
   gavetas.append(gavetaBolsa);
-  const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t) => a.negociar(e, l, q, t) });
+  const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t) => a.negociar(e, l, q, t), melhorar: (tp, n) => a.melhorar(tp, n) });
   // topo da Bolsa em tela cheia (só no celular, pelo CSS)
   const bancadaTopo = el('div', 'bancada-topo');
   const fecharBolsa = button('', 'fechar', () => a.bolsa('fechar'));
@@ -1612,7 +1905,7 @@ git commit -m "Fellas Inc.: tela da Bolsa (lista e detalhe) e a gaveta Bolsa na 
 
 ---
 
-### Task 7: Ligar no main (buscar, negociar, avisos), visual e conferência
+### Task 8: Ligar no main (buscar, negociar, avisos), visual e conferência
 
 **Files:**
 - Modify: `games/idle/main.ts`, `games/idle/idle.css`
@@ -1651,12 +1944,12 @@ Run: `cd games && npx vitest run idle/bolsaMain.test.ts` → FAIL.
 /** Quando buscar o mercado de novo: logo depois da virada do minuto (nunca antes de 1 s). */
 export const proximaBusca = (viraEmMs: number) => Math.max(1000, viraEmMs + 300);
 /** Recusas da Bolsa que querem o mercado (e a carteira) de novo. */
-export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada'];
+export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada', 'idle_bolsa_nivel'];
 ```
 
 - [ ] **Step 3: Wire `main.ts`**
 
-1. Acrescente `'idleBolsa' | 'idleBolsaNegociar'` ao `Pick` do `type Api`; importe `avisosPo, proximaBusca, RECARREGA_BOLSA` de `./bolsa` e `type BolsaEstado` de `../shared/types`.
+1. Acrescente `'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar'` ao `Pick` do `type Api`; importe `avisosPo, proximaBusca, RECARREGA_BOLSA` de `./bolsa` e `type BolsaEstado` de `../shared/types`.
 2. Estado:
 
 ```ts
@@ -1695,6 +1988,11 @@ async function carregarBolsa() {
     bolsa = r.bolsa;
     aplicar(r);
   }),
+  melhorar: (tipo, nivel) => void guard(async () => {
+    const r = await api.idleBolsaMelhorar(tipo, nivel);
+    bolsa = r.bolsa;
+    aplicar(r);
+  }),
 ```
 
 4. No `guard`, depois de `if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();`: `if (RECARREGA_BOLSA.includes(err.code)) await carregarBolsa();`.
@@ -1725,6 +2023,11 @@ Acrescente antes do bloco `/* PC: ... */`:
 .idle .bolsa-titulo { margin: 0; font: 400 23px var(--i-pixel); }
 .idle .carteira { display: flex; gap: 14px; font-size: 13px; color: var(--i-mudo); }
 .idle .carteira b { font: 400 18px var(--i-pixel); color: var(--paper); }
+.idle .bolsa-melhorias { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.idle .melhoria-bolsa { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--i-linha); --c: #2A2833;
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .melhoria-bolsa strong { font: 400 17px var(--i-pixel); }
+.idle .melhoria-bolsa .btn { flex: none; min-height: 40px; font-size: 15px; white-space: normal; text-align: center; }
 .idle .bolsa-miolo { display: grid; gap: 12px; min-height: 0; }
 .idle .bolsa-lista { display: flex; flex-direction: column; gap: 6px; }
 .idle .acao { display: grid; grid-template-columns: 104px 56px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 10px; border: 0; text-align: left; color: var(--paper); background: var(--i-linha); cursor: pointer; --c: #2A2833;
@@ -1789,7 +2092,8 @@ git commit -m "Fellas Inc.: Bolsa ligada no jogo (buscar na virada do minuto, co
 `cd games && npx vite --port 5199` e `http://localhost:5199/games/idle/?mock`. No console: abrir o CNPJ, `__trader(3)`. Conferir em 390 × 844, 844 × 390 e 1280 × 800:
 - gaveta Bolsa (apagada antes do `__trader`, acesa depois);
 - lista com as 8, minigráfico, etiquetas (forçar no console: `update public.idle_bolsa_mercado set valor = 1 where empresa = 4` via `dono`);
-- detalhe: comprar 1, 10, Máx; vender 1, Tudo; lucro mudando; "preço novo em" contando;
+- detalhe: comprar 1, 10, Máx; vender 1, Tudo; lucro mudando; "preço novo em" contando; "Você tem N de L" com L = 100 + o gerador ligado;
+- melhorias: comprar Corretor 1 (a corretagem do detalhe vira 4%) e Escritório 1 (os limites sobem 25);
 - virada do minuto: os preços mudam sozinhos;
 - celular: tela cheia, ✕ fecha, detalhe como cartão.
 Corrigir num commit `Fellas Inc.: ajustes da conferência visual da Bolsa`.

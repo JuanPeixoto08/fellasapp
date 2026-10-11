@@ -12,7 +12,13 @@ atenção compra barato e vende caro; quem aposta no fundo do poço pode ver a e
 ## Decisões do Juan
 
 - Mercado **o mesmo para todos** do grupo.
-- Libera com **1 Grupo de trader** (gerador 19). Limite por empresa: **100 + 10 × Grupos de trader**.
+- Libera com **1 Grupo de trader** (gerador 19).
+- **Cada empresa ligada a um gerador** (como os prédios do Cookie): o limite daquela empresa cresce com quantos desse
+  gerador você tem. Pastel do Zé ↔ Food truck (11) · Açaí Gourmet ↔ Influencer parceiro (14) · Coach Quântico ↔ Curso
+  online (16) · Cripto do Primo ↔ Grupo de trader (19) · Uber de Jegue ↔ App na App Store (15) · NFT de Meme ↔ Live na
+  Twitch (6) · Funerária 1 Irmão ↔ Investidor anjo (20) · Mecânica Simas ↔ Impressora 3D (8).
+- **Melhorias da Bolsa** compradas com F$ na própria Bolsa (preço em horas de produção), que ficam na venda da startup:
+  Corretor (menos corretagem) e Escritório (mais ações em todas).
 - As ações **atravessam a venda da startup** (prestígio). Não quebra o jogo porque o preço é em segundos de produção.
 - Risco: a empresa **pode quebrar** quando o preço cai muito.
 - Empresas (código · nome · jeito): PSTL Pastel do Zé (firme, sobe devagar) · ACAI Açaí Gourmet (firme e cara) · COCH
@@ -31,19 +37,19 @@ nos créditos do cassino.
 O preço de uma ação é guardado em **segundos de produção** (`valor`). Em F$, para uma pessoa, vale `valor × r`, com
 `r = idle_rate(s)`: o F$/s sem o ×5 das oportunidades (o mesmo `r` da venda da startup). Quando a produção cresce, todos os
 preços em F$ crescem juntos; a variação em % e o gráfico não mudam. Comprar barato numa empresa pequena e vender numa
-empresa grande dá ganho limitado pelo limite de ações (até ~(100 + 10·n) × repouso segundos de produção) — é o mesmo do
+empresa grande dá ganho limitado pelo limite de ações (até ~limite × repouso segundos de produção) — é o mesmo do
 Cookie e fica aceito.
 
 ### Abrir e limite
 
 - A gaveta **Bolsa** aparece sempre; sem Grupo de trader fica apagada com "Compra 1 Grupo de trader pra abrir a Bolsa".
-- Com `generators[19] ≥ 1`: abre. Limite por empresa = `100 + 10 × generators[19]`. Acima do limite (depois de vender a
+- Com `generators[19] ≥ 1`: abre. Limite da empresa = `100 + generators[gerador ligado] + bônus do Escritório`. Acima do limite (depois de vender a
   startup, por exemplo) só dá pra vender.
 
 ### Comprar e vender
 
 - Botões Comprar 1 · 10 · Máx e Vender 1 · 10 · Tudo, no detalhe da empresa.
-- Compra: paga `qtd × valor × r × 1,05` (5% de corretagem). Máx = o máximo que o F$ e o limite permitem.
+- Compra: paga `qtd × valor × r × (1 + corretagem)`; corretagem 5% sem Corretor (ver Melhorias). Máx = o máximo que o F$ e o limite permitem.
 - Venda: recebe `qtd × valor × r`, sem taxa.
 - O pedido leva o minuto do preço que a pessoa viu (`tick`). Se o minuto já virou, o servidor recusa com
   `idle_bolsa_preco_mudou` ("O preço mudou, confere de novo") e a tela mostra o preço novo.
@@ -63,6 +69,24 @@ Cookie e fica aceito.
 
 A carteira não muda. A gaveta fica apagada até o primeiro Grupo de trader da empresa nova; aí as ações estão lá, valendo
 segundos da produção nova.
+
+### Melhorias da Bolsa
+
+Duas linhas de 5 níveis, compradas em ordem no topo da tela da Bolsa. O preço é em segundos de produção (em F$ = segundos
+× `r` na hora da compra). Ficam na venda da startup (como a carteira), guardadas em `idle_bolsa_nivel`.
+
+| nível | Corretor (corretagem) | custo | Escritório (+ações em cada empresa) | custo |
+|---|---|---|---|---|
+| 0 | — (5%) | — | — (+0) | — |
+| 1 | Primo que entende de ação (4%) | 1800 s (30 min) | Mesa na sala (+25) | 3600 s (1 h) |
+| 2 | Assessor do banco (3%) | 3600 s | Salinha comercial (+50) | 7200 s |
+| 3 | Mesa de operações (2%) | 7200 s | Andar na Faria Lima (+100) | 14400 s |
+| 4 | Robô de trade (1%) | 14400 s | Prédio espelhado (+200) | 28800 s |
+| 5 | Insider (shh) (0,5%) | 28800 s | Torre na Berrini (+400) | 57600 s |
+
+O bônus do Escritório é o do nível atual (não soma os anteriores). Comprar pede o nível seguinte
+(`idle_bolsa_melhorar(p_tipo, p_nivel)`); nível errado (toque duplo, já comprado, passou do 5) é `idle_bolsa_nivel`; sem
+F$ é `idle_cant_afford`; sem trader é `idle_bolsa_fechada`.
 
 ## Como o preço anda
 
@@ -101,7 +125,7 @@ do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
 
 ## Banco (migração `0042_fellas_inc_bolsa.sql`)
 
-- `idle_cat_bolsa` (catálogo: id, código, nome, repouso, vol, pesos `double precision[6]`, quebra) — lido pela página
+- `idle_cat_bolsa` (catálogo: id, código, nome, gerador, repouso, vol, pesos `double precision[6]`, quebra) — lido pela página
   (select para `authenticated` com `is_member()`).
 - `idle_bolsa_mercado` (uma linha por empresa: `empresa`, `tick`, `valor`, `delta`, `humor`, `humor_ate`, `geracao`,
   `rj_ate`) — o estado atual.
@@ -111,7 +135,9 @@ do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
 - Funções:
   - `idle_bolsa_passo(...)` (imutável, pura): o passo de um tick com os sorteios como argumentos.
   - `idle_bolsa_avancar()` (interna): gera os ticks que faltam, quebras, poda.
-  - `idle_bolsa()` (RPC): avança e devolve `{ tick, vira_em_ms, r, limite, aberta, empresas: [{ id, valor, risco, rj_ate,
+  - `idle_bolsa_nivel` (`user_id`, `corretor`, `escritorio`) — os níveis das melhorias.
+  - `idle_bolsa_melhorar(p_tipo text, p_nivel int)` (RPC): compra o próximo nível.
+  - `idle_bolsa()` (RPC): avança e devolve `{ tick, vira_em_ms, r, aberta, corretor, escritorio, corretagem, empresas: [{ id, valor, limite, risco, rj_ate,
     historico (60 últimos valores) }], carteira: [{ empresa, qtd, custo }], viraram_po: [{ empresa, qtd }] }`. Ações de
     uma geração antiga entram uma vez em `viraram_po` e são apagadas da carteira na mesma chamada.
   - `idle_bolsa_negociar(p_empresa int, p_lado text, p_qtd int, p_tick bigint)` (RPC): `p_lado` 'comprar'|'vender',
@@ -131,7 +157,9 @@ do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
   etiqueta vermelha "Pode quebrar" na zona de risco; apagada com "Quebrou · volta em N min" na recuperação.
 - Detalhe: código + nome, "preço novo em 0:42", preço grande + variação no minuto e na hora, gráfico de 60 barras (a última
   verde se subiu, vermelha se caiu), "Você tem N de L", "Pagou em média F$ X", "Vale agora F$ Y", lucro, Comprar 1 · 10 ·
-  Máx (roxo, "+5% de corretagem") e Vender 1 · 10 · Tudo.
+  Máx (roxo, "+N% de corretagem") e Vender 1 · 10 · Tudo.
+- Melhorias: uma faixa no topo da Bolsa com Corretor e Escritório (nível atual, efeito, o próximo com o preço em F$ e
+  Comprar; no nível 5, "No máximo").
 - Atualiza ao abrir a gaveta/tela e a cada virada de minuto enquanto aberta (um `idle_bolsa()` por minuto). Fechada, não
   busca.
 - "Suas N ações da Cripto do Primo viraram pó." entra na fila de avisos da cena (a mesma das conquistas).
@@ -151,6 +179,8 @@ do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
 - SQL (PGlite): avançar gera os ticks que faltam e não duplica; 1 dia no máximo; poda de 7 dias; quebra muda a geração,
   recuperação de 10 ticks e volta no repouso; negociar compra/vende com corretagem, fecha a conta antes, respeita limite,
   F$, recuperação, preço mudou, sem trader; carteira atravessa a venda da startup; ações antigas viram pó uma vez.
+- Melhorias (PGlite): compra em ordem, custo em segundos × r, nível errado recusado, corretagem e limite mudam, ficam
+  na venda da startup; limite da empresa cresce com o gerador ligado.
 - Tela (happy-dom): gaveta apagada sem trader; lista, etiquetas, detalhe, botões chamando `negociar` com o tick visto;
   aviso de "viraram pó".
 - Suítes da raiz e dos jogos verdes; conferência visual no `?mock` (celular, deitado, PC 1280 e 1920).
