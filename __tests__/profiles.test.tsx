@@ -199,6 +199,14 @@ describe('updateMyProfile', () => {
     expect(mockUpload.mock.calls[0][2]).toMatchObject({ contentType: 'image/gif' });
   });
 
+  it('foto de perfil sobe com cache de 1 ano (nome único, nunca muda: o navegador não baixa de novo)', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      blob: () => Promise.resolve({ type: 'image/png' }),
+    });
+    await updateMyProfile({ display_name: 'Ana', username: 'ana_01', bio: '', avatarUri: 'file://a.png' });
+    expect(mockUpload.mock.calls[0][2]).toMatchObject({ cacheControl: '31536000' });
+  });
+
   describe('fotos antigas não ficam guardadas à toa', () => {
     const base = { display_name: 'Ana', username: 'ana_01', bio: '' };
     beforeEach(() => {

@@ -17,6 +17,7 @@ let mockResults: Record<string, unknown> = {};
 const mockSignCalls: string[][] = [];
 const mockRemoved: string[] = [];
 const mockUploaded: string[] = [];
+const mockUploadOpts: unknown[] = [];
 /** Índices (como string) das fotos cujo upload deve falhar. */
 let mockUploadFail: string[] = [];
 
@@ -50,7 +51,8 @@ jest.mock('../lib/supabase', () => {
       from: (table: string) => makeBuilder(table),
       storage: {
         from: () => ({
-          upload: async (path: string) => {
+          upload: async (path: string, _blob: unknown, opts: unknown) => {
+            mockUploadOpts.push(opts);
             if (mockUploadFail.includes(path.split('-').pop()!.split('.')[0])) {
               return { data: null, error: new Error('upload falhou') };
             }
@@ -74,8 +76,8 @@ jest.mock('../lib/supabase', () => {
   };
 });
 
-beforeEach(() => {
-  clearSignedUrlCache();
+beforeEach(async () => {
+  await clearSignedUrlCache();
   mockCalls.length = 0;
   mockSignCalls.length = 0;
   mockRemoved.length = 0;
@@ -131,6 +133,12 @@ describe('fotos (até 4)', () => {
     expect(row.images).toEqual(mockUploaded);
     expect(row.image_url).toBe(mockUploaded[0]);
     expect((row.images as string[]).map((p) => p.split('-').pop())).toEqual(['0.jpg', '1.jpg', '2.jpg']);
+  });
+
+  it('foto do post sobe com cache de 1 ano (nome único, nunca muda)', async () => {
+    mockUploadOpts.length = 0;
+    await createPost({ body: 'oi', imageUris: ['file://a'] });
+    expect(mockUploadOpts[0]).toMatchObject({ cacheControl: '31536000' });
   });
 
   it('falha de upload apaga as que subiram e não cria o post', async () => {

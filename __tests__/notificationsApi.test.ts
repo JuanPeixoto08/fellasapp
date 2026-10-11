@@ -40,8 +40,8 @@ const row = (over: Record<string, unknown>) => ({
   ...over,
 });
 
-beforeEach(() => {
-  clearSignedUrlCache();
+beforeEach(async () => {
+  await clearSignedUrlCache();
   jest.clearAllMocks();
   mockTables = {
     profiles: [

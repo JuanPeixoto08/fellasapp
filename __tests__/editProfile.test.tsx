@@ -131,11 +131,11 @@ describe('Editar perfil: foto com recorte', () => {
     expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: 'blob:gif' }));
   });
 
-  it('GIF grande demais: avisa e não troca a foto', async () => {
-    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'blob:gif', mimeType: 'image/gif', fileSize: 6 * 1024 * 1024 }] });
+  it('GIF de perfil acima de 1 MB: avisa e não troca a foto', async () => {
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'blob:gif', mimeType: 'image/gif', fileSize: 2 * 1024 * 1024 }] });
     await renderScreen();
     await fireEvent.press(screen.getByLabelText('Escolher foto'));
-    expect(await screen.findByText('Esse GIF passa de 5 MB. Escolhe um menor.')).toBeTruthy();
+    expect(await screen.findByText('GIF de perfil pode ter até 1 MB. Escolhe um menor.')).toBeTruthy();
     expect(screen.queryByTestId('cropper-stub')).toBeNull();
   });
 

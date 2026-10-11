@@ -11,7 +11,7 @@ import {
   type ReactionGroup,
   type ReactionSummary,
 } from './reactions';
-import { BUCKET, resolveUrl, signPaths } from './storage';
+import { BUCKET, resolveUrl, signPaths, UPLOAD_CACHE_CONTROL } from './storage';
 
 export const PAGE_SIZE = 10;
 /** Fotos por post (mesmo limite do check posts_images_max). */
@@ -241,7 +241,7 @@ async function uploadImage(userId: string, uri: string, index: number): Promise<
   const path = `${userId}/${Date.now()}-${index}.${ext}`;
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', cacheControl: UPLOAD_CACHE_CONTROL });
   if (error) throw error;
   return path;
 }

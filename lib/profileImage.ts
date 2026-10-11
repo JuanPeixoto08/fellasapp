@@ -13,3 +13,12 @@ export function isGif(asset: Picked): boolean {
 export function gifProblem(asset: Picked): string | null {
   return asset.fileSize && asset.fileSize > GIF_MAX_BYTES ? 'Esse GIF passa de 5 MB. Escolhe um menor.' : null;
 }
+
+/** Foto de perfil em GIF: no máximo 1 MB. Ela aparece em todo lugar (feed, stories, comentários, notificações) e o GIF
+ *  sobe sem reduzir; dois GIFs de 3 MB ajudaram a estourar o tráfego do plano grátis em out/2026. */
+export const AVATAR_GIF_MAX_BYTES = 1024 * 1024;
+
+/** Motivo para recusar o GIF da foto de perfil, ou null. Tamanho desconhecido passa. */
+export function avatarGifProblem(asset: Picked): string | null {
+  return asset.fileSize && asset.fileSize > AVATAR_GIF_MAX_BYTES ? 'GIF de perfil pode ter até 1 MB. Escolhe um menor.' : null;
+}

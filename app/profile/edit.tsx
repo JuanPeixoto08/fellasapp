@@ -24,7 +24,7 @@ import { getUserInfo, hasLastfmKey, LastfmError } from '../../lib/lastfm/api';
 import { isValidLastfmUser } from '../../lib/lastfm/map';
 import { friendlyError, isUniqueViolation } from '../../lib/errors';
 import { useTheme } from '../../lib/theme';
-import { gifProblem, isGif } from '../../lib/profileImage';
+import { avatarGifProblem, isGif } from '../../lib/profileImage';
 
 const BIRTHDAY_ERROR = 'Essa data não rola. Usa DD/MM/AAAA, tipo 20/05/1999.';
 /** Mesmo formato do check de profiles.letterboxd_user (0026). */
@@ -104,7 +104,7 @@ export default function EditProfileScreen() {
     const asset = res.assets[0];
     // GIF na foto de perfil sobe como está: o ajuste salva em JPEG e a animação se perderia
     if (shape === 'circle' && isGif(asset)) {
-      const problem = gifProblem(asset);
+      const problem = avatarGifProblem(asset);
       if (problem) return setError(problem);
       setError(null);
       setAvatarUri(asset.uri);

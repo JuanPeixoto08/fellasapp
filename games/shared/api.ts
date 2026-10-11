@@ -1,5 +1,6 @@
 // Chamadas ao banco da mesa. Toda falha sai como GameError (código + frase).
 import { toGameError } from './errors';
+import { assinarFotos } from './fotos';
 import { supabase } from './supabase';
 import { linhaPlacar } from './types';
 import type {
@@ -66,7 +67,7 @@ export const idleSetAvatar = (v: IdleVisual) =>
 
 const isUrl = (p: string) => /^https?:\/\//.test(p);
 
-/** Nome e foto dos fellas. Avatar no bucket privado: link assinado por 1 h (como o app faz). */
+/** Nome e foto dos fellas. Avatar no bucket privado: link assinado guardado no aparelho por dias (shared/fotos.ts). */
 export async function fellas(ids: string[]): Promise<Fella[]> {
   if (!ids.length) return [];
   const { data, error } = await supabase.from('profiles').select('id, display_name, username, avatar_url').in('id', ids);
@@ -74,11 +75,8 @@ export async function fellas(ids: string[]): Promise<Fella[]> {
   type Row = { id: string; display_name: string | null; username: string | null; avatar_url: string | null };
   const rows = (data ?? []) as Row[];
   const paths = rows.map((r) => r.avatar_url).filter((p): p is string => !!p && !isUrl(p));
-  const signed = new Map<string, string>();
-  if (paths.length) {
-    const { data: urls } = await supabase.storage.from('post-images').createSignedUrls(paths, 3600);
-    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
-  }
+  const signed = await assinarFotos(paths, async (faltam, ttl) =>
+    (await supabase.storage.from('post-images').createSignedUrls(faltam, ttl)).data ?? []);
   return rows.map((r) => ({
     id: r.id,
     name: r.display_name || r.username || 'Alguém',

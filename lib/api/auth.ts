@@ -2,6 +2,7 @@ import type { Session, Subscription } from '@supabase/supabase-js';
 
 import { supabase } from '../supabase';
 import type { Tables } from '../../types/database';
+import { clearSignedUrlCache } from './storage';
 
 export type Profile = Tables<'profiles'>;
 
@@ -63,6 +64,8 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  // os links das fotos ficam guardados no aparelho por dias: quem entrar depois não herda
+  await clearSignedUrlCache();
 }
 
 /** Traduz erros do Supabase para mensagens em PT-BR. */

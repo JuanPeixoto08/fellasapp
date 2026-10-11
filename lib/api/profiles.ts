@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../../types/database';
-import { BUCKET } from './storage';
+import { BUCKET, UPLOAD_CACHE_CONTROL } from './storage';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Post = Database['public']['Tables']['posts']['Row'];
@@ -113,7 +113,7 @@ async function uploadProfileImage(userId: string, kind: 'avatar' | 'banner', uri
   const blob = await (await fetch(uri)).blob();
   const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
   const path = `${userId}/${kind}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', cacheControl: UPLOAD_CACHE_CONTROL });
   if (error) throw error;
   return path;
 }
