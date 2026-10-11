@@ -76,6 +76,24 @@ describe('som da Fellas Inc.', () => {
       expect(c.state, tipo).toBe('running');
     }
   });
+  it('PC: aba escondida não desliga a música (agenda o giro à frente); celular: suspende como antes', () => {
+    for (const pc of [true, false]) {
+      const c = new ContextoFalso();
+      const doc = document.implementation.createHTMLDocument('x');
+      let escondida = false;
+      Object.defineProperty(doc, 'hidden', { get: () => escondida, configurable: true });
+      criarAudio(() => comoContexto(c), doc, { segundoPlano: pc });
+      doc.dispatchEvent(new Event('pointerup'));
+      const antes = c.osciladores().length;
+      escondida = true;
+      doc.dispatchEvent(new Event('visibilitychange'));
+      if (pc) {
+        expect(c.state).toBe('running');
+        expect(c.osciladores().length).toBeGreaterThan(antes + 100); // agendou o giro
+      }
+      else expect(c.osciladores().length).toBe(antes);
+    }
+  });
   it('momento grande abaixa a música', () => {
     const { c, audio, tocar } = montar();
     tocar();

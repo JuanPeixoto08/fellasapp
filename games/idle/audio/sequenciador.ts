@@ -12,7 +12,11 @@ export type Sequenciador = { tocar(era: number): void; mudarEra(era: number): vo
 
 export function criarSequenciador(
   f: Fonte,
-  opcoes: { notas?: (era: number, giro: number) => Nota[]; toques?: Record<Instrumento, Toque>; relogio?: boolean } = {},
+  opcoes: {
+    notas?: (era: number, giro: number) => Nota[]; toques?: Record<Instrumento, Toque>; relogio?: boolean;
+    /** Quanto agendar à frente (s); com a aba escondida no PC o giro inteiro (o navegador quase não acorda a aba). */
+    adiante?: () => number;
+  } = {},
 ): Sequenciador {
   const notas = opcoes.notas ?? notasDoGiro;
   const toques = opcoes.toques ?? INSTRUMENTOS;
@@ -24,14 +28,16 @@ export function criarSequenciador(
   let lista: Nota[] = [];
   let i = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
+  // canal próprio de cada rodada: parar desliga ele e corta o que já estava agendado
+  let canal: GainNode | null = null;
   const spb = () => 60 / bpm(era);
 
   function passo() {
     const ctx = f.ctx();
-    const dest = f.destino();
+    const dest = canal;
     if (!ativo || !ctx || !dest) return;
     const agora = ctx.currentTime;
-    const ate = agora + ADIANTE_S;
+    const ate = agora + (opcoes.adiante?.() ?? ADIANTE_S);
     for (;;) {
       while (i < lista.length && inicio + lista[i].t * spb() < ate) {
         const n = lista[i++];
@@ -56,7 +62,10 @@ export function criarSequenciador(
         return;
       }
       const ctx = f.ctx();
-      if (!ctx) return;
+      const destino = f.destino();
+      if (!ctx || !destino) return;
+      canal = ctx.createGain();
+      canal.connect(destino);
       era = eraNova = eraMusica(e);
       ativo = true;
       giro = 0;
@@ -71,6 +80,8 @@ export function criarSequenciador(
     },
     parar() {
       ativo = false;
+      canal?.disconnect();
+      canal = null;
       if (timer) clearInterval(timer);
       timer = null;
     },

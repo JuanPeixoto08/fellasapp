@@ -39,7 +39,8 @@ export type Motor = {
   abaixarMusica(segundos: number): void;
 };
 
-export function criarMotor(fabrica: () => AudioContext): Motor {
+/** `segundoPlano`: a música segue com a aba escondida (PC); sem ele (celular) apaga e suspende. */
+export function criarMotor(fabrica: () => AudioContext, opcoes: { segundoPlano?: boolean } = {}): Motor {
   let ctx: AudioContext | null = null;
   let s: Saida | null = null;
   let volume = 1;
@@ -70,6 +71,7 @@ export function criarMotor(fabrica: () => AudioContext): Motor {
       fade(0.3);
     },
     visivel(sim) {
+      if (!sim && opcoes.segundoPlano) return; // PC: a música continua com outra janela por cima
       aVista = sim;
       if (!ctx) return;
       const c = ctx;

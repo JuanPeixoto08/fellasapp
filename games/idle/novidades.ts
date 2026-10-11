@@ -23,6 +23,7 @@ export const NOVIDADES: readonly Novidade[] = [
       'Música swing que cresce junto com a empresa: cada era tem a sua.',
       'Efeitos pra compra, venda, conquista, era nova, oportunidade e mais.',
       'Nas Configurações: volume da música, e efeitos e avisos que ligam e desligam separado.',
+      'No PC a música continua tocando com outra janela ou aba por cima.',
     ],
   },
   {

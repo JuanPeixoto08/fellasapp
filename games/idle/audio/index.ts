@@ -2,7 +2,7 @@
 // e a era, e toca os efeitos.
 import { criarLimite, GRANDES, RECEITAS, type IdEfeito, type OpcoesEfeito } from './efeitos';
 import { criarMotor } from './motor';
-import { criarSequenciador } from './sequenciador';
+import { ADIANTE_S, criarSequenciador } from './sequenciador';
 
 export type { IdEfeito, OpcoesEfeito } from './efeitos';
 /** `musica` = volume de 0 (desligada) a 1. */
@@ -14,9 +14,19 @@ export type Audio = {
   chaves(c: ChavesSom): void;
 };
 
-export function criarAudio(fabrica: () => AudioContext = () => new AudioContext(), alvo: Document = document): Audio {
-  const motor = criarMotor(fabrica);
-  const seq = criarSequenciador({ ctx: motor.ctx, destino: () => motor.saida()?.musica ?? null });
+/** No PC a música segue com a aba escondida; no celular (toque como forma principal) pausa, como a maioria dos jogos. */
+const SEGUNDO_PLANO = typeof matchMedia === 'function' ? !matchMedia('(pointer: coarse)').matches : true;
+const GIRO_A_FRENTE_S = 70; // um giro inteiro (53–64 s) e um pouco: a aba escondida pode acordar só 1 vez por minuto
+
+export function criarAudio(
+  fabrica: () => AudioContext = () => new AudioContext(), alvo: Document = document, opcoes: { segundoPlano?: boolean } = {},
+): Audio {
+  const segundoPlano = opcoes.segundoPlano ?? SEGUNDO_PLANO;
+  const motor = criarMotor(fabrica, { segundoPlano });
+  const seq = criarSequenciador(
+    { ctx: motor.ctx, destino: () => motor.saida()?.musica ?? null },
+    { adiante: () => (segundoPlano && alvo.hidden ? GIRO_A_FRENTE_S : ADIANTE_S) },
+  );
   const limite = criarLimite();
   let chaves: ChavesSom = { musica: 1, efeitos: true };
   let eraAtual = 0;
@@ -35,6 +45,7 @@ export function criarAudio(fabrica: () => AudioContext = () => new AudioContext(
   alvo.addEventListener('visibilitychange', () => {
     motor.visivel(!alvo.hidden);
     if (!alvo.hidden) ajustarMusica();
+    else if (segundoPlano) seq.passo(); // já agenda o giro à frente, antes do navegador frear a aba
   });
   return {
     tocar(id, o = {}) {

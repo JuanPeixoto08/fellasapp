@@ -69,3 +69,31 @@ describe('sequenciador', () => {
     expect(b.tocadas).toHaveLength(0);
   });
 });
+
+describe('música em segundo plano (PC)', () => {
+  it('com a janela à frente maior, agenda o giro inteiro de uma vez (o navegador quase não acorda a aba escondida)', () => {
+    const c = new ContextoFalso();
+    c.state = 'running';
+    const tempos: number[] = [];
+    const toques = Object.fromEntries(['baixo', 'escovinha', 'conducao', 'bumbo', 'caixa', 'piano', 'vibrafone', 'metais']
+      .map((k) => [k, ((_c, _d, t) => tempos.push(t)) as Toque])) as Record<Instrumento, Toque>;
+    const notas = (): Nota[] => [0, 32, 64, 100].map((t) => ({ inst: 'baixo', t, dur: 1, altura: 41, forca: 1 }));
+    let adiante = 0.12;
+    const s = criarSequenciador({ ctx: () => comoContexto(c), destino: () => destinoFalso(c) }, { notas, toques, relogio: false, adiante: () => adiante });
+    s.tocar(1); // 120 bpm: as notas em 0,1 / 16,1 / 32,1 / 50,1 s
+    expect(tempos).toHaveLength(1);
+    adiante = 70;
+    s.passo();
+    expect(tempos).toHaveLength(5); // o giro todo (4) + a 1ª do giro seguinte (64,1 s)
+  });
+  it('parar corta o que já estava agendado (canal próprio de cada rodada)', () => {
+    const c = new ContextoFalso();
+    c.state = 'running';
+    const s = criarSequenciador({ ctx: () => comoContexto(c), destino: () => destinoFalso(c) }, { relogio: false });
+    s.tocar(1);
+    const canal = c.ganhos()[0];
+    expect(canal.ligados).toContain(c.destination); // o canal da rodada ligado na saída da música
+    s.parar();
+    expect(canal.ligados).toHaveLength(0); // desligado do destino: as notas agendadas não soam
+  });
+});

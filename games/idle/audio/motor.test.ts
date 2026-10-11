@@ -36,6 +36,16 @@ describe('motor', () => {
     expect(c.state).toBe('running');
     expect(volume(m).value).toBe(VOL_MUSICA);
   });
+  it('em segundo plano (PC): esconder a aba não apaga a música nem suspende', () => {
+    vi.useFakeTimers();
+    const c = new ContextoFalso();
+    const m = criarMotor(() => comoContexto(c), { segundoPlano: true });
+    m.ligar();
+    m.visivel(false);
+    vi.advanceTimersByTime(400);
+    expect(c.state).toBe('running');
+    expect(volume(m).value).toBe(VOL_MUSICA);
+  });
   it('voltou antes do suspend: não suspende', () => {
     vi.useFakeTimers();
     const c = new ContextoFalso();
