@@ -249,12 +249,12 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
 export const RAMOS: readonly string[] = ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'];
 
-/** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult), horas (teto, validade),
+/** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult), horas (teto), segundos (segundos: quanto a oportunidade fica na cena),
  *  quantidade (caixinha, opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado)
  *  ou 1 (inicio_era1, manter_gerais: só ter o nó). */
 export type TipoNo =
   | 'producao' | 'inicio_valuation' | 'inicio_notebooks' | 'manter_gerais' | 'inicio_era1'
-  | 'caixinha' | 'validade' | 'opp_extra' | 'opp_bonus' | 'teto'
+  | 'caixinha' | 'segundos' | 'opp_extra' | 'opp_bonus' | 'teto'
   | 'contrato_preco' | 'por_contratado' | 'contrato_dias' | 'emprego_mult';
 
 export type NoTexto = { ramo: number; posicao: number; nome: string; efeito: string; tipo: TipoNo; valor: number };
@@ -274,7 +274,7 @@ export const ARVORE: readonly NoTexto[] = [
   { ramo: 2, posicao: 4, tipo: 'inicio_valuation', valor: 1e6, nome: 'Herança da tia rica', efeito: 'O Abrir CNPJ começa com F$ 1 mi.' },
   { ramo: 2, posicao: 5, tipo: 'inicio_era1', valor: 1, nome: 'Material escolar completo', efeito: 'O Abrir CNPJ começa com 1 de cada gerador da era 1.' },
   { ramo: 3, posicao: 1, tipo: 'caixinha', valor: 4, nome: 'Grupo de promoção no zap', efeito: 'A caixinha guarda 4 oportunidades.' },
-  { ramo: 3, posicao: 2, tipo: 'validade', valor: 6, nome: 'Print de tudo', efeito: 'Oportunidade guardada dura 6h.' },
+  { ramo: 3, posicao: 2, tipo: 'segundos', valor: 30, nome: 'Print de tudo', efeito: 'Oportunidades passam 30 s na cena.' },
   { ramo: 3, posicao: 3, tipo: 'opp_extra', valor: 3, nome: 'Relâmpago da Shopee', efeito: '+3 oportunidades por dia.' },
   { ramo: 3, posicao: 4, tipo: 'opp_bonus', valor: 2, nome: 'Xepa da feira', efeito: 'Oportunidades rendem o dobro.' },
   { ramo: 3, posicao: 5, tipo: 'caixinha', valor: 5, nome: 'Gaveta de tranqueira', efeito: 'A caixinha guarda 5 oportunidades.' },

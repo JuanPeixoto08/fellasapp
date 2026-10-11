@@ -19,10 +19,13 @@ export const POR_EMPREGO = 0.02;
 export const POR_CONQUISTA = 0.01;
 /** K do prestígio (medido em simulacao.test.ts): pontos totais = floor(cbrt(F$/s ÷ K)). Igual a idle_prestige_total. */
 export const K_PRESTIGIO = 1e6;
+const MAX_PONTOS = 1e9;
 
 export const CRESCIMENTO = 1.15;
 export const TETO_SEGUNDOS = 8 * 3600;
 const VALUATION_INICIAL = 10;
+/** Quanto uma oportunidade fica na cena (s) sem estratégia nem nó (igual ao padrão de opp_segundos do catálogo). */
+export const OPP_SEGUNDOS_PADRAO = 10;
 
 export function era(cat: Catalogo, gens: number[]): number {
   let e = 1;
@@ -34,7 +37,7 @@ export function era(cat: Catalogo, gens: number[]): number {
  *  mesmo tipo: produção e bônus das oportunidades multiplicam, +por dia soma, preço do contrato fica o menor e o resto
  *  fica o maior. */
 export type EfeitosArvore = {
-  producao: number; tetoS: number; caixinha: number; validadeS: number; oppExtra: number; oppBonus: number;
+  producao: number; tetoS: number; caixinha: number; oppSegundos: number; oppExtra: number; oppBonus: number;
   contratoPreco: number; porContratado: number; contratoDias: number; empregoMult: number;
   inicioValuation: number; inicioNotebooks: number; inicioEra1: boolean; manterGerais: boolean;
 };
@@ -50,7 +53,7 @@ export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArv
     producao: mult('producao'),
     tetoS: 3600 * max('teto', TETO_SEGUNDOS / 3600),
     caixinha: max('caixinha', CAIXA_PADRAO.tamanho),
-    validadeS: 3600 * max('validade', CAIXA_PADRAO.validadeS / 3600),
+    oppSegundos: max('segundos', OPP_SEGUNDOS_PADRAO),
     oppExtra: valores('opp_extra').reduce((a, v) => a + v, 0),
     oppBonus: mult('opp_bonus'),
     contratoPreco: Math.min(1, ...valores('contrato_preco')),
@@ -72,7 +75,8 @@ export function multBonus(cat: Catalogo, s: Estado): number {
 
 /** Quantos pontos de prestígio um F$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
 export function pontosTotais(r: number): number {
-  if (!Number.isFinite(r) || r <= 0) return 0;
+  if (Number.isNaN(r) || r <= 0) return 0;
+  if (r >= MAX_PONTOS ** 3 * K_PRESTIGIO) return MAX_PONTOS; // trava em 1e9 (cabe em int no banco)
   let n = Math.floor(Math.cbrt(r / K_PRESTIGIO));
   while (n > 0 && n ** 3 * K_PRESTIGIO > r) n--; // sem divisão, como o banco: n³·K ≤ r
   while ((n + 1) ** 3 * K_PRESTIGIO <= r) n++;

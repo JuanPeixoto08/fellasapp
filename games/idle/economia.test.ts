@@ -140,7 +140,7 @@ describe('árvore de habilidades e conquistas', () => {
   const comArvore = (s: Estado, arvore: number[], conquistas = 0): Estado => ({ ...s, bonus: { arvore, conquistas } });
   it('sem nó: o jogo de sempre', () => {
     expect(efeitosArvore(cat, [])).toEqual({
-      producao: 1, tetoS: 8 * 3600, caixinha: 3, validadeS: 4 * 3600, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
+      producao: 1, tetoS: 8 * 3600, caixinha: 3, oppSegundos: 10, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
       porContratado: 0.1, contratoDias: 7, empregoMult: 1, inicioValuation: 10, inicioNotebooks: 1, inicioEra1: false,
       manterGerais: false,
     });
@@ -149,6 +149,8 @@ describe('árvore de habilidades e conquistas', () => {
     const e = efeitosArvore(cat, [1, 11, 12, 13, 14, 15, 31, 33, 35, 41, 43, 51, 55]);
     expect(e.producao).toBeCloseTo(1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 12);
     expect(e).toMatchObject({ tetoS: 24 * 3600, caixinha: 5, oppExtra: 3, contratoPreco: 0.5 });
+    expect(efeitosArvore(cat, [1, 31]).oppSegundos).toBe(10);
+    expect(efeitosArvore(cat, [1, 31, 32]).oppSegundos).toBe(30);
     expect(efeitosArvore(cat, [999]).producao).toBe(1); // nó que a página não conhece não faz nada
   });
   it('produção: nós de produção × (1 + 1% por conquista); ponto guardado não conta', () => {

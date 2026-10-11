@@ -2,7 +2,7 @@
 // celular. O número anima com a mesma conta do banco (economia.ts acumular).
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { acumular, estrategiasAtivas } from './economia';
+import { acumular, efeitosArvore, estrategiasAtivas } from './economia';
 import type { NomeCena } from './palco';
 
 export type Fase = 'carregando' | 'sem_sessao' | 'antes' | 'abrindo' | 'jogando';
@@ -42,8 +42,9 @@ export function deveAbrirEditor(estado: IdleState, fase: Fase, editorFechado: bo
   return fase === 'jogando' && estrategiaPendente(estado) === null;
 }
 
-export function segundosOportunidade(estado: IdleState): number {
-  return Math.max(10, ...estrategiasAtivas(catalogo, estado).map((e) => e.oppSegundos));
+/** Quanto a oportunidade fica na cena (s): o maior entre o da estratégia (Rolê eterno) e o dos nós da árvore (Print de tudo). */
+export function segundosOportunidade(estado: IdleState, arvore: readonly number[] = []): number {
+  return Math.max(efeitosArvore(catalogo, arvore).oppSegundos, ...estrategiasAtivas(catalogo, estado).map((e) => e.oppSegundos));
 }
 
 /** Um contrato seu venceu (o relógio do servidor passou de muda_em): a taxa mudou e a tela precisa bater o ponto. */

@@ -60,6 +60,8 @@ describe('fase e cena', () => {
   it('Rolê eterno: oportunidade fica 30 s', () => {
     expect(segundosOportunidade(base())).toBe(10);
     expect(segundosOportunidade(base({ strategies: [0, 0, 0, 2] }))).toBe(30);
+    expect(segundosOportunidade(base(), [1, 31, 32])).toBe(30); // Print de tudo
+    expect(segundosOportunidade(base(), [1, 31])).toBe(10);
   });
 });
 

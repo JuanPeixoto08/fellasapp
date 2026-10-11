@@ -407,7 +407,7 @@ insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, va
   (24, 2, 4, 'Herança da tia rica', 'O Abrir CNPJ começa com F$ 1 mi.', 15, 'inicio_valuation', 1000000, 23),
   (25, 2, 5, 'Material escolar completo', 'O Abrir CNPJ começa com 1 de cada gerador da era 1.', 30, 'inicio_era1', 1, 24),
   (31, 3, 1, 'Grupo de promoção no zap', 'A caixinha guarda 4 oportunidades.', 2, 'caixinha', 4, 1),
-  (32, 3, 2, 'Print de tudo', 'Oportunidade guardada dura 6h.', 4, 'validade', 6, 31),
+  (32, 3, 2, 'Print de tudo', 'Oportunidades passam 30 s na cena.', 4, 'segundos', 30, 31),
   (33, 3, 3, 'Relâmpago da Shopee', '+3 oportunidades por dia.', 8, 'opp_extra', 3, 32),
   (34, 3, 4, 'Xepa da feira', 'Oportunidades rendem o dobro.', 15, 'opp_bonus', 2, 33),
   (35, 3, 5, 'Gaveta de tranqueira', 'A caixinha guarda 5 oportunidades.', 30, 'caixinha', 5, 34),

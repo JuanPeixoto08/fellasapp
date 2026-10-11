@@ -103,10 +103,10 @@ export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
   return m.amostras.find((a) => pontosTotais(a.taxa) >= minimo) ?? null;
 }
 
-// o que não acelera o jogador sozinho da simulação: o ramo Gente (ninguém o contrata) e a validade das oportunidades
-// (o limite dele é o tamanho da caixinha, não o prazo: ele pega o que cabe a cada sessão). A simulação ESCOLHE a Viralizar
+// o que não acelera o jogador sozinho da simulação: o ramo Gente (ninguém o contrata) e o tempo das oportunidades na cena
+// (é só o tempo na tela: o limite dele é a caixinha). A simulação ESCOLHE a Viralizar
 // na era 3, mas a conta em TS não aplica oppExtra/oppBonusMult de estratégia (só os dos nós da árvore); o banco aplica.
-const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'validade'];
+const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'segundos'];
 
 /** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */
 export function gastar(cat: Catalogo, pontos: number, ja: readonly number[] = []): { arvore: number[]; sobra: number } {

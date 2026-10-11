@@ -56,39 +56,40 @@ returns int[] language sql immutable as $$
   select coalesce(array_agg((k + 1) * 10 + p[k] order by k), '{}') from generate_subscripts(p, 1) k where p[k] >= 0
 $$;
 
--- o valor dos nós de um tipo que alguém comprou, juntados por p_agg ('mult', 'max', 'min' ou 'soma'); sem nó desse
--- tipo, p_padrao (igual a economia.ts efeitosArvore). Cada nó conta uma vez (a chave primária de idle_arvore).
+-- o valor dos nós de um tipo que alguém comprou, juntados por p_agg ('mult', 'max', 'min' ou 'soma') já com o padrão
+-- dentro: 'max' e 'min' nunca passam de p_padrao pro lado errado e sem nó desse tipo sai p_padrao (igual a economia.ts
+-- efeitosArvore). Cada nó conta uma vez (a chave primária de idle_arvore).
 create or replace function public.idle_arv(u uuid, p_tipo text, p_agg text, p_padrao double precision)
 returns double precision language sql stable set search_path = public as $$
-  select coalesce(case p_agg
-                    when 'mult' then exp(sum(ln(c.valor)))
-                    when 'max' then max(c.valor)
-                    when 'min' then min(c.valor)
-                    else sum(c.valor)
-                  end, p_padrao)
+  select case p_agg
+           when 'mult' then coalesce(exp(sum(ln(c.valor))), p_padrao)
+           when 'max' then greatest(p_padrao, max(c.valor))
+           when 'min' then least(p_padrao, min(c.valor))
+           else coalesce(sum(c.valor), p_padrao)
+         end
     from public.idle_arvore a
     join public.idle_cat_no c on c.id = a.no_id
    where a.user_id = u and c.tipo = p_tipo
 $$;
 
 -- tudo que a árvore de alguém faz, com os nomes de economia.ts efeitosArvore (teste de paridade). Os padrões são os de
--- economia.ts: teto 8h (TETO_SEGUNDOS), caixinha 3 e validade 4h (CAIXA_PADRAO), +0 por dia (o 10 de LIMITE_DIA está em
--- idle_opp_cap).
+-- economia.ts: teto 8h (TETO_SEGUNDOS), caixinha 3 (CAIXA_PADRAO), 10 s na cena (OPP_SEGUNDOS_PADRAO), +0 por dia
+-- (o 10 de LIMITE_DIA está em idle_opp_cap).
 create or replace function public.idle_arvore_efeitos(u uuid)
 returns jsonb language sql stable set search_path = public as $$
   select jsonb_build_object(
     'producao', public.idle_arv(u, 'producao', 'mult', 1),
     'tetoS', 3600 * public.idle_arv(u, 'teto', 'max', 8),
     'caixinha', public.idle_arv(u, 'caixinha', 'max', 3),
-    'validadeS', 3600 * public.idle_arv(u, 'validade', 'max', 4),
+    'oppSegundos', public.idle_arv(u, 'segundos', 'max', 10),
     'oppExtra', public.idle_arv(u, 'opp_extra', 'soma', 0),
     'oppBonus', public.idle_arv(u, 'opp_bonus', 'mult', 1),
-    'contratoPreco', least(1, public.idle_arv(u, 'contrato_preco', 'min', 1)),
-    'porContratado', greatest(0.1, public.idle_arv(u, 'por_contratado', 'max', 0.1)),
-    'contratoDias', greatest(7, public.idle_arv(u, 'contrato_dias', 'max', 7)),
-    'empregoMult', greatest(1, public.idle_arv(u, 'emprego_mult', 'max', 1)),
-    'inicioValuation', greatest(10, public.idle_arv(u, 'inicio_valuation', 'max', 10)),
-    'inicioNotebooks', greatest(1, public.idle_arv(u, 'inicio_notebooks', 'max', 1)),
+    'contratoPreco', public.idle_arv(u, 'contrato_preco', 'min', 1),
+    'porContratado', public.idle_arv(u, 'por_contratado', 'max', 0.1),
+    'contratoDias', public.idle_arv(u, 'contrato_dias', 'max', 7),
+    'empregoMult', public.idle_arv(u, 'emprego_mult', 'max', 1),
+    'inicioValuation', public.idle_arv(u, 'inicio_valuation', 'max', 10),
+    'inicioNotebooks', public.idle_arv(u, 'inicio_notebooks', 'max', 1),
     'inicioEra1', public.idle_arv(u, 'inicio_era1', 'max', 0) > 0,
     'manterGerais', public.idle_arv(u, 'manter_gerais', 'max', 0) > 0)
 $$;
@@ -130,8 +131,12 @@ returns int language plpgsql immutable as $$
 declare
   n int;
 begin
-  if r is null or r <= 0 or r = 'Infinity'::double precision then
+  -- nulo, NaN, zero e negativo não valem nada; de 1e9 pontos pra cima trava (cabe em int), como economia.ts pontosTotais
+  if r is null or r = 'NaN'::double precision or r <= 0 then
     return 0;
+  end if;
+  if r >= 1e33 then
+    return 1000000000;
   end if;
   n := floor(cbrt(r / 1e6))::int;
   while n > 0 and n::double precision ^ 3 * 1e6 > r loop
@@ -203,12 +208,12 @@ begin
 end;
 $$;
 
--- caixinha (a da 0034) com a árvore: guarda as `caixinha` mais recentes (3 sem o ramo Oportunidades) que têm menos de
--- `validade` (4h) e são desta semana; só depois tira as pegas (igual a oportunidades.ts pendentes)
+-- caixinha (a da 0034) com a árvore: guarda as `caixinha` mais recentes (3 sem o ramo Oportunidades) que têm menos de 4h
+-- (VALIDADE_S) e são desta semana; só depois tira as pegas (igual a oportunidades.ts pendentes)
 create or replace function public.idle_opp_list(s public.idle_state, ts timestamptz default now())
 returns bigint[] language sql stable set search_path = public as $$
   with v as (
-    select make_interval(secs => 3600 * public.idle_arv(s.user_id, 'validade', 'max', 4)) as validade
+    select make_interval(secs => 4 * 3600) as validade
   )
   select coalesce(array_agg(w order by w desc), '{}') from (
     select w
@@ -239,7 +244,7 @@ returns double precision language sql stable set search_path = public as $$
        * coalesce((select exp(sum(ln((e.sociais ->> 'contratoCustoMult')::double precision)))
                      from public.idle_cat_est e
                     where e.opcao = s.strategies[e.era - 1] and (e.sociais ->> 'contratoCustoMult') is not null), 1)
-       * least(1, public.idle_arv(s.user_id, 'contrato_preco', 'min', 1))
+       * public.idle_arv(s.user_id, 'contrato_preco', 'min', 1)
 $$;
 
 revoke all on function public.idle_est_codigos(smallint[]) from public, anon, authenticated;

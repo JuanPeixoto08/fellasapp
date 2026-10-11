@@ -2,9 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import {
-  acumular, acumularTrechos, custoMult, efeitosArvore, maxCompra, pontosTotais, precoContrato, preco, taxa, type Estado,
+  acumular, acumularTrechos, custoMult, efeitosArvore, estrategiasAtivas, maxCompra, pontosTotais, precoContrato, preco, taxa, type Estado,
 } from '../idle/economia';
-import { pendentes } from '../idle/oportunidades';
+import { CAIXA_PADRAO, LIMITE_DIA, pendentes } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -203,7 +203,7 @@ describe('paridade', () => {
     const T0 = Date.parse('2026-10-12T10:00:00Z');
     const iso = (ms: number) => `'${new Date(ms).toISOString()}'::timestamptz`;
     const s = estados(4)[3];
-    for (const nos of [[], [1, 41], [1, 41, 42, 43], [1, 11, 41, 42, 43, 44, 45]]) {
+    for (const nos of [[], [1, 41], [1, 41, 42, 43], [1, 11, 41, 42, 43, 44, 45, 54]]) {
       const bonus = { arvore: nos, conquistas: 9 };
       const tetoS = efeitosArvore(catalogo, nos).tetoS;
       await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
@@ -226,25 +226,39 @@ describe('paridade', () => {
     await arvore([]);
     await conquistas(0);
   });
-  it('caixinha e validade com a árvore: banco e oportunidades.ts concordam', async () => {
+  it('caixinha com a árvore: banco e oportunidades.ts concordam (a validade segue 4h)', async () => {
     const s = estados(1)[0];
     await preparar(s);
-    const [{ agora, semana }] = await q<{ agora: string; semana: string }>(
-      `select now()::text as agora, (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')::text as semana`,
+    const [{ semana }] = await q<{ semana: string }>(
+      `select (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo')::text as semana`,
     );
+    const base = Date.parse(semana) + 2 * 86400_000; // um instante fixo, dois dias dentro da semana
     for (const nos of [[], [1, 31], [1, 31, 32], [1, 31, 32, 33, 34, 35]]) {
       await arvore(nos);
       const ef = efeitosArvore(catalogo, nos);
       for (const horas of [0, 3, 5, 7]) {
-        const ts = Date.parse(agora) + horas * 3600_000;
+        const ts = base + horas * 3600_000;
         const [db] = await q<{ l: string[] }>(
           'select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1',
           [A, new Date(ts).toISOString()],
         );
         expect(db.l.map(Number), `${nos} +${horas}h`).toEqual(
-          pendentes(A, ts, [], Date.parse(semana), { tamanho: ef.caixinha, validadeS: ef.validadeS }),
+          pendentes(A, ts, [], Date.parse(semana), { tamanho: ef.caixinha, validadeS: CAIXA_PADRAO.validadeS }),
         );
       }
+    }
+    await arvore([]);
+  });
+  it('limite de oportunidades por dia: 10 + a estratégia + o nó Relâmpago da Shopee', async () => {
+    const s = estados(1)[0];
+    for (const [nos, strategies, esperado] of [[[], [-1, -1, -1, -1], 10], [[1, 31, 33], [-1, -1, -1, -1], 13], [[1, 31, 33], [-1, 0, -1, -1], 16]] as const) {
+      const est = { ...s, strategies: [...strategies] };
+      await preparar(est);
+      await arvore([...nos]);
+      const [db] = await q<{ c: number }>('select public.idle_opp_cap(s) as c from public.idle_state s where user_id = $1', [A]);
+      expect(db.c, `${nos} ${strategies}`).toBe(esperado);
+      const ts = LIMITE_DIA + estrategiasAtivas(catalogo, est).reduce((a, e) => a + e.oppExtra, 0) + efeitosArvore(catalogo, [...nos]).oppExtra;
+      expect(db.c).toBe(ts);
     }
     await arvore([]);
   });
@@ -264,7 +278,7 @@ describe('paridade', () => {
   });
   it('pontos de prestígio iguais no banco e em economia.ts, inclusive em cima dos cubos', async () => {
     const r = rng(11);
-    const valores = [0, -1, 1, 999_999, 1e6, 8e6, 27e6, 1e9, 1e12];
+    const valores = [0, -1, NaN, Infinity, 1e40, 1e33, 1, 999_999, 1e6, 8e6, 27e6, 1e9, 1e12];
     for (let i = 0; i < 150; i++) valores.push(10 ** (r() * 16));
     for (let n = 1; n <= 150; n++) {
       const cubo = n ** 3 * 1e6;
