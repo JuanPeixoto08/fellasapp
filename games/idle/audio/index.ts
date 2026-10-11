@@ -12,6 +12,10 @@ export type Audio = {
   /** Era da música (0 = antes do Abrir CNPJ); troca no fim do giro. */
   era(era: number): void;
   chaves(c: ChavesSom): void;
+  /** Agenda o efeito pra daqui a `atrasoS` no relógio do áudio (aba escondida no PC: o navegador quase não acorda a página). */
+  tocarEm(id: IdEfeito, atrasoS: number, o?: OpcoesEfeito): void;
+  /** Cancela os agendados que ainda não tocaram (a aba voltou: a página toca na hora). */
+  cancelarAgendados(): void;
 };
 
 /** No PC a música segue com a aba escondida; no celular (toque como forma principal) pausa, como a maioria dos jogos. */
@@ -30,6 +34,7 @@ export function criarAudio(
   const limite = criarLimite();
   let chaves: ChavesSom = { musica: 1, efeitos: true };
   let eraAtual = 0;
+  let agendados: GainNode | null = null; // canal dos agendados: cancelar desliga ele
   const ajustarMusica = () => {
     motor.musica(chaves.musica);
     if (chaves.musica <= 0) seq.parar();
@@ -59,6 +64,20 @@ export function criarAudio(
     era(e) {
       eraAtual = e;
       seq.mudarEra(e);
+    },
+    tocarEm(id, atrasoS, o = {}) {
+      const ctx = motor.ctx();
+      const s = motor.saida();
+      if (!chaves.efeitos || !ctx || !s || ctx.state !== 'running') return;
+      if (!agendados) {
+        agendados = ctx.createGain();
+        agendados.connect(s.efeitos);
+      }
+      RECEITAS[id](ctx, agendados, ctx.currentTime + Math.max(0, atrasoS), o);
+    },
+    cancelarAgendados() {
+      agendados?.disconnect();
+      agendados = null;
     },
     chaves(c) {
       chaves = c;

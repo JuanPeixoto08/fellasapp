@@ -27,6 +27,16 @@ export function douradoEm(uid: string, s: number): TipoDourado | null {
   return r < 2 ? 3 : r < 20 ? 2 : r < 55 ? 1 : 0;
 }
 
+/** Os eventos de [de, ate) (segundos): pra agendar o som com a aba escondida. */
+export function douradosEntre(uid: string, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {
+  const out: { seg: number; tipo: TipoDourado }[] = [];
+  for (let s = de; s < ate; s++) {
+    const tipo = douradoEm(uid, s);
+    if (tipo !== null) out.push({ seg: s, tipo });
+  }
+  return out;
+}
+
 /** Onde aparece (fração da tela, longe das bordas); só da página. Na dupla os dois lados usam o mesmo ponto e a tela
  *  põe o lado 1 um ícone ao lado (douradoTela). */
 export function posicao(uid: string, s: number, _lado = 0): { x: number; y: number } {

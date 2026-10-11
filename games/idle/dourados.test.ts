@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { douradoEm, JANELA_S, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
+import { douradoEm, douradosEntre, JANELA_S, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -76,5 +76,19 @@ describe('selos e textos', () => {
     expect(textoPegou(2, { ganho: 0, viral: 1 })).toBe('Viralizou! ×10 por 1 min');
     expect(textoPegou(3, { ganho: 0, viral: 2 })).toBe('×100!');
     expect(textoPegou(2, { ganho: 0, viral: 3 })).toBe('×1.000!');
+  });
+});
+
+describe('agenda do fundo', () => {
+  it('lista os eventos de um intervalo de segundos (pra agendar o som com a aba escondida)', () => {
+    const ini = 1_760_000_000;
+    const lista = douradosEntre(U, ini, ini + 60_000);
+    const esperado: { seg: number; tipo: number }[] = [];
+    for (let s = ini; s < ini + 60_000; s++) {
+      const d = douradoEm(U, s);
+      if (d !== null) esperado.push({ seg: s, tipo: d });
+    }
+    expect(lista).toEqual(esperado);
+    expect(lista.length).toBeGreaterThan(50);
   });
 });

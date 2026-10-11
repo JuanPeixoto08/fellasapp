@@ -8,7 +8,7 @@ import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { douradoEm, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { douradoEm, douradosEntre, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { temNovidade } from './novidades';
@@ -60,6 +60,29 @@ let vivoSoou: number | null = null;
 // eventos na tela: o último segundo já olhado e se a Promoção valia no último passo (acabou: os preços voltam)
 let segVisto = 0;
 const mostrados = new Map<number, TipoDourado>(); // segundo → tipo do que está/esteve na tela
+// aba escondida (PC): o som de cada evento fica agendado no relógio do áudio (a página quase não acorda); os que já
+// soaram não tocam de novo quando você volta e o ícone ainda está na tela
+const somNoFundo = new Set<number>();
+const jaSoou = new Set<number>();
+const SOM_A_FRENTE_S = 75;
+function agendarDouradosNoFundo() {
+  const s = ancora?.estado;
+  if (!s || fase !== 'jogando' || !s.started) return;
+  const agora = agoraSrv();
+  const de = Math.floor(agora / 1000);
+  for (const ev of douradosEntre(s.user_id, de, de + SOM_A_FRENTE_S)) {
+    if (somNoFundo.has(ev.seg)) continue;
+    somNoFundo.add(ev.seg);
+    audio.tocarEm('dourado', (ev.seg * 1000 - agora) / 1000);
+  }
+}
+function voltouDoFundo() {
+  const agora = agoraSrv();
+  for (const seg of somNoFundo) if (seg * 1000 <= agora) jaSoou.add(seg);
+  for (const seg of jaSoou) if (seg * 1000 < agora - 60_000) jaSoou.delete(seg);
+  somNoFundo.clear();
+  audio.cancelarAgendados();
+}
 let promoValia = false;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
@@ -302,12 +325,13 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number) {
   const uid = ancora?.estado.user_id;
   if (!uid) return;
   mostrados.set(seg, tipo);
+  const soou = jaSoou.has(seg); // já tocou com a aba escondida
   for (const k of mostrados.keys()) if (k < seg - 60) mostrados.delete(k);
   for (const lado of tipo === 3 ? [0, 1] : [0]) {
     const p = posicao(uid, seg, lado);
     tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs });
   }
-  audio.tocar('dourado');
+  if (!soou) audio.tocar('dourado');
 }
 // dev (?mock): __dourado(tipo) força um evento agora
 if (import.meta.env.DEV) {
@@ -417,7 +441,11 @@ async function guard(trabalho: () => Promise<void>) {
 
 // número subindo e a oportunidade ao vivo (só com a aba visível)
 setInterval(() => {
-  if (document.hidden || !ancora) return;
+  if (!ancora) return;
+  if (document.hidden) {
+    agendarDouradosNoFundo(); // o som dos eventos segue agendado no fundo (PC)
+    return;
+  }
   tela.atualizarValor(valuationAgora(ancora, Date.now()));
   // eventos na tela: tira os que passaram, anda os selos e olha os segundos novos (só jogando, com a aba visível)
   const agoraMs = agoraSrv();
@@ -455,6 +483,8 @@ setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'gente'
 
 // voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) agendarDouradosNoFundo();
+  else voltouDoFundo();
   if (!document.hidden) void prepararDesenhista();
   if (!document.hidden && bolsaAberta) void carregarBolsa();
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);

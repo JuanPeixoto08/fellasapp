@@ -22,6 +22,7 @@ export const NOVIDADES: readonly Novidade[] = [
       'Promoção relâmpago: geradores e melhorias pela metade por 30 s.',
       'Viralizou: produção ×10 por 1 minuto. Pegou outro no meio? ×100. E não para por aí.',
       'As oportunidades agora ficam só na Caixinha.',
+      'No PC, o som do evento toca mesmo com a aba em segundo plano: dá tempo de voltar e pegar.',
     ],
   },
   {

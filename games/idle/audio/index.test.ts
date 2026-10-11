@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { comoContexto, ContextoFalso, type ParamFalso } from './falso';
+import { comoContexto, ContextoFalso, GanhoFalso, OscFalso, type ParamFalso } from './falso';
 import { criarAudio } from './index';
 
 afterEach(() => vi.useRealTimers());
@@ -93,6 +93,30 @@ describe('som da Fellas Inc.', () => {
       }
       else expect(c.osciladores().length).toBe(antes);
     }
+  });
+  it('som agendado pra daqui a pouco (aba escondida): toca no relógio do áudio; voltar cancela os que faltam', () => {
+    const { c, audio, tocar } = montar();
+    audio.chaves({ musica: 0, efeitos: true });
+    tocar();
+    c.currentTime = 100;
+    const idx = c.criados.length;
+    audio.tocarEm('dourado', 30);
+    const novos = c.criados.slice(idx);
+    const oscs = novos.filter((n): n is OscFalso => n instanceof OscFalso);
+    expect(oscs.length).toBeGreaterThan(0);
+    expect(Math.min(...oscs.map((o) => o.inicio!))).toBeCloseTo(130, 3);
+    const canal = novos.find((n) => n instanceof GanhoFalso)!; // o canal dos agendados vem primeiro
+    expect(canal.ligados.length).toBe(1);
+    audio.cancelarAgendados();
+    expect(canal.ligados).toHaveLength(0); // desligado: o que faltava não soa
+  });
+  it('efeitos desligados: nada agendado', () => {
+    const { c, audio, tocar } = montar();
+    audio.chaves({ musica: 0, efeitos: false });
+    tocar();
+    const antes = c.osciladores().length;
+    audio.tocarEm('dourado', 10);
+    expect(c.osciladores().length).toBe(antes);
   });
   it('momento grande abaixa a música', () => {
     const { c, audio, tocar } = montar();
