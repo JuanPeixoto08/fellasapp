@@ -59,6 +59,7 @@ audio.chaves({ musica: volumeMusica, efeitos: chaves.efeitos });
 let vivoSoou: number | null = null;
 // eventos na tela: o último segundo já olhado e se a Promoção valia no último passo (acabou: os preços voltam)
 let segVisto = 0;
+const mostrados = new Map<number, TipoDourado>(); // segundo → tipo do que está/esteve na tela
 let promoValia = false;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
@@ -153,7 +154,7 @@ const tela = criarTela(document.getElementById('app')!, {
   // fora do guard: pegar não espera outra compra terminar (o evento some em 12 s)
   pegarDourado: (seg, lado) => void (async () => {
     const s0 = ancora?.estado;
-    const tipo = s0 ? douradoEm(s0.user_id, seg) : null;
+    const tipo = mostrados.get(seg) ?? null;
     if (!s0 || tipo === null) return;
     const p = posicao(s0.user_id, seg, lado);
     try {
@@ -300,6 +301,8 @@ function vivoAgora(s: IdleState, agora: number): number | null {
 function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number) {
   const uid = ancora?.estado.user_id;
   if (!uid) return;
+  mostrados.set(seg, tipo);
+  for (const k of mostrados.keys()) if (k < seg - 60) mostrados.delete(k);
   for (const lado of tipo === 3 ? [0, 1] : [0]) {
     const p = posicao(uid, seg, lado);
     tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs });

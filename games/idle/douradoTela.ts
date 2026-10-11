@@ -87,7 +87,7 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
       b.type = 'button';
       b.className = `dourado dourado-${tipo}`;
       b.setAttribute('aria-label', `Pegar: ${NOME_DOURADO[tipo]}`);
-      b.style.left = `${Math.round(e.x * 100)}%`;
+      b.style.left = e.lado === 1 ? `calc(${Math.round(e.x * 100)}% + 84px)` : `${Math.round(e.x * 100)}%`; // a dupla lado a lado
       b.style.top = `${Math.round(e.y * 100)}%`;
       b.style.setProperty('--ja', `-${Math.max(0, Math.round((e.agoraMs - e.seg * 1000) / 1000))}s`);
       b.append(anel(), icone(tipo));

@@ -40,6 +40,7 @@ describe('eventos na tela', () => {
     d.mostrar(ev({ seg: T / 1000 + 5, tipo: 2, lado: 1, x: 0.44 }));
     expect(raiz.querySelectorAll('.dourado')).toHaveLength(3);
     expect([...raiz.querySelectorAll('.dourado')].at(-1)!.getAttribute('aria-label')).toBe('Pegar: Viralizou');
+    expect([...raiz.querySelectorAll<HTMLElement>('.dourado')].at(-1)!.style.left).toBe('calc(44% + 84px)');
   });
   it('clicar chama o pegar uma vez e o ícone sai', () => {
     d.mostrar(ev());

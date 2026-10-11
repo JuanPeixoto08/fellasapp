@@ -106,6 +106,24 @@ w.__dourado = async (tipo = 2) => {
   await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
   (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);
 };
+// painel do ?mock pra testar os eventos sem abrir o console (só no dev)
+{
+  const painel = document.createElement('div');
+  painel.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;display:flex;gap:6px;flex-wrap:wrap;padding:6px;background:#000c;font:12px sans-serif';
+  const nomes = ['Investidor', 'Promoção', 'Viralizou', 'Dupla ×100'];
+  nomes.forEach((nome, tipo) => {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#5B3FD9;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void w.__dourado(tipo));
+    painel.append(b);
+  });
+  const t = document.createElement('span');
+  t.textContent = 'mock: eventos';
+  t.style.cssText = 'color:#aaa;align-self:center';
+  painel.prepend(t);
+  document.body.append(painel);
+}
 w.__trader = async (n = 3) => {
   // os traders e um pouco de cada gerador ligado às empresas (o limite de cada uma cresce com ele)
   await dono(`update public.idle_state set generators[19] = $2, generators[18] = greatest(generators[18], 1),

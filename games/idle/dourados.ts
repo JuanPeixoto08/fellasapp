@@ -27,12 +27,11 @@ export function douradoEm(uid: string, s: number): TipoDourado | null {
   return r < 2 ? 3 : r < 20 ? 2 : r < 55 ? 1 : 0;
 }
 
-/** Onde aparece (fração da tela, longe das bordas); só da página. Na dupla, o lado 1 fica ao lado do 0. */
-export function posicao(uid: string, s: number, lado = 0): { x: number; y: number } {
+/** Onde aparece (fração da tela, longe das bordas); só da página. Na dupla os dois lados usam o mesmo ponto e a tela
+ *  põe o lado 1 um ícone ao lado (douradoTela). */
+export function posicao(uid: string, s: number, _lado = 0): { x: number; y: number } {
   const h = Number(mistura(mistura(mistura(h1(uid, s)))));
-  const x = 0.08 + ((h % 1000) / 1000) * 0.7;
-  const y = 0.15 + ((Math.floor(h / 1000) % 1000) / 1000) * 0.7;
-  return { x: lado === 1 ? Math.min(0.92, x + 0.14) : x, y };
+  return { x: 0.08 + ((h % 1000) / 1000) * 0.7, y: 0.15 + ((Math.floor(h / 1000) % 1000) / 1000) * 0.7 };
 }
 
 // ---------- o que está valendo (selos) e os textos ----------
