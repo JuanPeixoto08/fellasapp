@@ -164,6 +164,14 @@ describe('árvore de habilidades e conquistas', () => {
     expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [1, 3] } })).toBeCloseTo(1 + 0.02 * 2 * 4, 12);
     expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [] } })).toBeCloseTo(1.02, 12);
   });
+  it('Aniversariante do mês não soma com a Cultura de startup: fica o maior dos dois', () => {
+    const s = { ...comArvore(com([[1, 1]]), [1, 51, 52]), strategies: [-1, -1, 2, -1], social: { contratei: 2, empregos: [] } };
+    expect(multContratos(cat, s)).toBeCloseTo(1 + 0.15 * 2 + 0.02, 12);
+    expect(multContratos(cat, s)).not.toBeCloseTo(1 + 0.3 * 2 + 0.02, 6); // somar daria outro valor
+  });
+  it('nó repetido conta uma vez só', () => {
+    expect(efeitosArvore(cat, [11, 11])).toEqual(efeitosArvore(cat, [11]));
+  });
   it('preço do contrato: 30 min de produção × 1,5 por contrato ativo × o desconto da árvore', () => {
     const s = { ...comArvore(com([[1, 2]]), [1, 51]), social: { contratei: 1, empregos: [] } };
     expect(precoContrato(cat, s, 1)).toBeCloseTo(taxa(cat, s) * 1800 * 1.5 * 0.75, 6);

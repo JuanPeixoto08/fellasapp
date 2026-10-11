@@ -3,6 +3,7 @@
 // oportunidades guardadas (15 min de produção), escolhe a primeira estratégia ativa e compra, de 5 em 5 segundos,
 // sempre o que tem o melhor ganho de taxa por real.
 import { catalogo as padrao, type Catalogo, type No } from './catalogo';
+import { LIMITE_DIA } from './oportunidades';
 import {
   abertura, acumular, custoMult, efeitosArvore, era, liberada, podeComprarGerador, pontosTotais, preco, SEM_BONUS, SOLO, taxa,
   taxaPorUnidade, type Bonus, type Estado,
@@ -83,7 +84,7 @@ export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BON
     const d = Math.floor(ini / DIA);
     if (d !== dia) { dia = d; oppHoje = 0; }
     if (ini > 0) {
-      const pegar = Math.min(ef.caixinha, 10 + ef.oppExtra - oppHoje);
+      const pegar = Math.min(ef.caixinha, LIMITE_DIA + ef.oppExtra - oppHoje);
       for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900 * ef.oppBonus;
       oppHoje += pegar;
     }
@@ -102,7 +103,9 @@ export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
   return m.amostras.find((a) => pontosTotais(a.taxa) >= minimo) ?? null;
 }
 
-// o que não acelera o jogador sozinho da simulação: o ramo Gente e a validade das oportunidades (ele pega na hora)
+// o que não acelera o jogador sozinho da simulação: o ramo Gente (ninguém o contrata) e a validade das oportunidades
+// (o limite dele é o tamanho da caixinha, não o prazo: ele pega o que cabe a cada sessão). A simulação também ignora a
+// Viralizar (ela só vale por 1 hora e o jogador da simulação não a usa).
 const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'validade'];
 
 /** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */

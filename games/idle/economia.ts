@@ -1,6 +1,7 @@
 // Fórmulas da Fellas Inc. Iguais às do banco (0034, 0038, 0041): o banco decide, a tela só anima. Um teste de paridade
 // (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
 import type { Catalogo, Estrategia, Melhoria, No } from './catalogo';
+import { CAIXA_PADRAO, LIMITE_DIA } from './oportunidades';
 
 /** O que muda a produção pelos contratos ATIVOS: quantos você contratou e, para cada empresa que te contratou, quanto
  *  ela paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */
@@ -21,6 +22,7 @@ export const K_PRESTIGIO = 1e6;
 
 export const CRESCIMENTO = 1.15;
 export const TETO_SEGUNDOS = 8 * 3600;
+const VALUATION_INICIAL = 10;
 
 export function era(cat: Catalogo, gens: number[]): number {
   let e = 1;
@@ -40,21 +42,22 @@ const porNo = new WeakMap<Catalogo, Map<number, No>>();
 export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArvore {
   let mapa = porNo.get(cat);
   if (!mapa) porNo.set(cat, (mapa = new Map(cat.arvore.map((n) => [n.id, n]))));
-  const valores = (tipo: No['tipo']) => nos.map((id) => mapa.get(id)).filter((n): n is No => n?.tipo === tipo).map((n) => n.valor);
+  const unicos = [...new Set(nos)]; // nó repetido não conta duas vezes
+  const valores = (tipo: No['tipo']) => unicos.map((id) => mapa.get(id)).filter((n): n is No => n?.tipo === tipo).map((n) => n.valor);
   const mult = (tipo: No['tipo']) => valores(tipo).reduce((a, v) => a * v, 1);
   const max = (tipo: No['tipo'], padrao: number) => Math.max(padrao, ...valores(tipo));
   return {
     producao: mult('producao'),
-    tetoS: 3600 * max('teto', 8),
-    caixinha: max('caixinha', 3),
-    validadeS: 3600 * max('validade', 4),
+    tetoS: 3600 * max('teto', TETO_SEGUNDOS / 3600),
+    caixinha: max('caixinha', CAIXA_PADRAO.tamanho),
+    validadeS: 3600 * max('validade', CAIXA_PADRAO.validadeS / 3600),
     oppExtra: valores('opp_extra').reduce((a, v) => a + v, 0),
     oppBonus: mult('opp_bonus'),
     contratoPreco: Math.min(1, ...valores('contrato_preco')),
     porContratado: max('por_contratado', POR_CONTRATADO),
     contratoDias: max('contrato_dias', 7),
     empregoMult: max('emprego_mult', 1),
-    inicioValuation: max('inicio_valuation', 10),
+    inicioValuation: max('inicio_valuation', VALUATION_INICIAL),
     inicioNotebooks: max('inicio_notebooks', 1),
     inicioEra1: valores('inicio_era1').length > 0,
     manterGerais: valores('manter_gerais').length > 0,
@@ -69,10 +72,10 @@ export function multBonus(cat: Catalogo, s: Estado): number {
 
 /** Quantos pontos de prestígio um F$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
 export function pontosTotais(r: number): number {
-  const x = Number.isFinite(r) && r > 0 ? r / K_PRESTIGIO : 0;
-  let n = Math.floor(Math.cbrt(x));
-  while (n > 0 && n ** 3 > x) n--;
-  while ((n + 1) ** 3 <= x) n++;
+  if (!Number.isFinite(r) || r <= 0) return 0;
+  let n = Math.floor(Math.cbrt(r / K_PRESTIGIO));
+  while (n > 0 && n ** 3 * K_PRESTIGIO > r) n--; // sem divisão, como o banco: n³·K ≤ r
+  while ((n + 1) ** 3 * K_PRESTIGIO <= r) n++;
   return n;
 }
 

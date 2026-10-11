@@ -43,7 +43,8 @@ describe('ritmo da semana', () => {
 // (0,7 d, era 3), 5 pontos com 2,7 d (era 4), 10 pontos com 5,5 d (11 pontos, era 5) e 15 no fim da semana.
 // Vendendo com 11 e gastando 9 na árvore (Virou MEI, Cafezinho de garrafa térmica, Porquinho quebrado, Grupo de promoção no zap, Soneca pós-almoço), a era 5
 // chega com 2,7 d (era 3,0 d) e a era 2 com 520 s (era 895 s). Se algum número sair do alvo, NÃO mexa em PARAMETROS
-// nem em K: pare e avise.
+// nem em K: pare e avise. A razão 0,90 é quantizada pelas sessões (3 por dia: a era só chega no fim de uma), e a 2ª
+// empresa recomeça com a cota de oportunidades do dia zerada.
 describe('ritmo do prestígio', () => {
   const m = simular(catalogo, 14);
   it('K é 1 milhão (o mesmo de idle_prestige_total na 0041)', () => expect(K_PRESTIGIO).toBe(1e6));

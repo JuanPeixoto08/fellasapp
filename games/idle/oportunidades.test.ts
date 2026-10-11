@@ -6,6 +6,16 @@ const U = '00000000-0000-0000-0000-00000000000a';
 const V = '1234abcd-0000-0000-0000-000000000000';
 
 describe('oportunidades', () => {
+  it('Caixa maior: 5 janelas com 6h; uma de 5h atrás entra com 6h e fica fora com 4h', () => {
+    const agora = 2_980_100 * 600_000 + 300_000;
+    expect(pendentes(V, agora, [], 0, { tamanho: 5, validadeS: 6 * 3600 })).toHaveLength(5);
+    const w = Array.from({ length: 40 }, (_, i) => 2_980_100 - 30 + i).find((x) => {
+      const t = instante(V, x);
+      return t <= agora - 4.2 * 3600_000 && t >= agora - 5.8 * 3600_000;
+    })!;
+    expect(pendentes(V, agora, [], 0, { tamanho: 100, validadeS: 6 * 3600 })).toContain(w);
+    expect(pendentes(V, agora, [], 0, { tamanho: 100, validadeS: 4 * 3600 })).not.toContain(w);
+  });
   it('semente = 7 primeiros hex do uuid', () => {
     expect(semente(U)).toBe(0);
     expect(semente(V)).toBe(0x1234abc);

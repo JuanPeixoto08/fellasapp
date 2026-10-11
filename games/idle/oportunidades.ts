@@ -2,6 +2,8 @@
 // banco: idle_opp_at / idle_opp_kind na 0034). Não precisa ser segredo: o banco confere a janela antes de pagar.
 export const JANELA_S = 600;
 export const VALIDADE_S = 4 * 3600;
+/** Quantas oportunidades dá pra pegar por dia (igual ao banco). */
+export const LIMITE_DIA = 10;
 
 export const semente = (uid: string) => parseInt(uid.replace(/-/g, '').slice(0, 7), 16);
 
