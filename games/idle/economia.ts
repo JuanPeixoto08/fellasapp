@@ -198,7 +198,7 @@ export const VIRAL_MS = 60_000;
 
 /**
  * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 dentro do bônus da oportunidade e ×10 por Viralizou ativo
- * (teto ×100); divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0045.
+ * (sem teto); divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0045.
  */
 export function produzido(r: number, a: number, b: number, boostAteMs: number | null, virais: readonly number[] = []): number {
   if (b <= a) return 0;
@@ -213,7 +213,7 @@ export function produzido(r: number, a: number, b: number, boostAteMs: number | 
     if (q <= p) continue;
     const meio = (p + q) / 2;
     const k = virais.filter((f) => f - VIRAL_MS <= meio && f > meio).length;
-    const m = (boostAteMs !== null && boostAteMs > meio ? 5 : 1) * 10 ** Math.min(k, 2);
+    const m = (boostAteMs !== null && boostAteMs > meio ? 5 : 1) * 10 ** k; // sem teto: dois ×100, três ×1000
     total += (r * m * (q - p)) / 1000;
   }
   return total;

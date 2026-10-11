@@ -41,18 +41,20 @@ const mmss = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+/** 10^k em pt-BR: 10, 100, 1.000… (cada Viralizou ativo multiplica ×10, sem teto). */
+const vezes = (k: number) => (10 ** k).toLocaleString('pt-BR');
+
 /** Promoção relâmpago valendo agora (o custo das compras cai pela metade). */
 export const promoAtiva = (s: { promo_ate: string | null }, agoraMs: number) => s.promo_ate !== null && Date.parse(s.promo_ate) > agoraMs;
 
 /** Os fins dos Viralizou ainda ativos (ms), em ordem. */
 export const viraisAtivos = (s: ComBonus, agoraMs: number) => (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((a, b) => a - b);
 
-/** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado, até o primeiro Viralizou acabar), "Metade · 0:21". */
+/** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21". */
 export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro: boolean }[] {
   const out: { texto: string; ouro: boolean }[] = [];
   const v = viraisAtivos(s, agoraMs);
-  if (v.length >= 2) out.push({ texto: `×100 · ${mmss(v[0] - agoraMs)}`, ouro: true });
-  else if (v.length === 1) out.push({ texto: `×10 · ${mmss(v[0] - agoraMs)}`, ouro: false });
+  if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
   if (promoAtiva(s, agoraMs)) out.push({ texto: `Metade · ${mmss(Date.parse(s.promo_ate!) - agoraMs)}`, ouro: false });
   return out;
 }
@@ -61,5 +63,5 @@ export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro:
 export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number }): string {
   if (tipo === 0) return `+${formatarValor(o.ganho)}`;
   if (tipo === 1) return 'Promoção! Tudo pela metade por 30 s';
-  return o.viral >= 2 ? '×100!' : 'Viralizou! ×10 por 1 min';
+  return o.viral >= 2 ? `×${vezes(o.viral)}!` : 'Viralizou! ×10 por 1 min';
 }

@@ -1,6 +1,6 @@
 -- fellasapp: Fellas Inc., eventos na tela (tipo cookie dourado). A cada segundo há chance 1/600 de aparecer um evento
 -- pra quem está com o jogo aberto; fica 12 s na tela. Três tipos: Investidor apressado (20 min de produção), Promoção
--- relâmpago (30 s de compras pela metade) e Viralizou (×10 por 1 min; dois se multiplicam, ×100). A sorte tem semente
+-- relâmpago (30 s de compras pela metade) e Viralizou (×10 por 1 min; se multiplicam: dois ×100, três ×1000...). A sorte tem semente
 -- (id + segundo) e é a mesma conta da página (games/idle/dourados.ts, teste de paridade); o banco confere o clique.
 -- As oportunidades não mudam aqui (só deixam de passar na cena, na página). Idempotente.
 
@@ -43,7 +43,7 @@ alter table public.idle_dourados_pegos enable row level security;
 revoke all on public.idle_dourados_pegos from anon, authenticated;
 
 -- fecha a conta até ts (a da 0041) + os Viralizou: em cada trecho de taxa, divide nos pontos em que o ×5 da
--- oportunidade ou um Viralizou ([fim − 60 s, fim)) começa/acaba; multiplicador = (×5 se oportunidade) × 10^min(k, 2).
+-- oportunidade ou um Viralizou ([fim − 60 s, fim)) começa/acaba; multiplicador = (×5 se oportunidade) × 10^k (sem teto).
 -- Igual a economia.ts acumularTrechos.
 create or replace function public.idle_settle(s public.idle_state, ts timestamptz default now())
 returns public.idle_state language plpgsql stable set search_path = public as $$
@@ -84,7 +84,7 @@ begin
     loop
       v_meio := v_p + (v_q - v_p) / 2;
       v_k := (select count(*) from unnest(s.viral_ate) v where v - interval '60 seconds' <= v_meio and v > v_meio);
-      v_mult := (case when s.boost_until is not null and s.boost_until > v_meio then 5 else 1 end) * 10 ^ least(v_k, 2);
+      v_mult := (case when s.boost_until is not null and s.boost_until > v_meio then 5 else 1 end) * 10 ^ v_k; -- sem teto: cada Viralizou ativo multiplica ×10
       s.valuation := s.valuation + v_rate * v_mult * extract(epoch from v_q - v_p);
       v_p := v_q;
     end loop;

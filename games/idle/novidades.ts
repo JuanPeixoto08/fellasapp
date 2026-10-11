@@ -11,7 +11,7 @@ export const NOVIDADES: readonly Novidade[] = [
       'De vez em quando aparece um evento na tela: pega antes que suma (12 s).',
       'Investidor apressado: 20 minutos de produção na hora.',
       'Promoção relâmpago: geradores e melhorias pela metade por 30 s.',
-      'Viralizou: produção ×10 por 1 minuto. Dois juntos? ×100.',
+      'Viralizou: produção ×10 por 1 minuto. Pegou outro no meio? ×100. E não para por aí.',
       'As oportunidades agora ficam só na Caixinha.',
     ],
   },

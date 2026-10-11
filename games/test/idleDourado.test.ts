@@ -132,7 +132,7 @@ describe('pegar um evento', () => {
     await expect(pegar(seg, 1)).rejects.toThrow(/idle_dourado_pego/);
     expect(dois.recorde).toBeCloseTo(dois.rate, 6);
   });
-  it('a conta: ×10 com um Viralizou, ×100 com dois (teto), ×50 com o ×5 da oportunidade', async () => {
+  it('a conta: ×10 por Viralizou ativo, sem teto (três = ×1000); ×50 com o ×5 da oportunidade', async () => {
     const r = await taxa();
     const ganho = async (viral: string, boost = 'null') => {
       await q(`update public.idle_state set settled_at = now() - interval '100 seconds', viral_ate = ${viral}, boost_until = ${boost} where user_id = $1`, [A]);
@@ -143,7 +143,7 @@ describe('pegar um evento', () => {
     perto(await ganho("'{}'"), 100);
     perto(await ganho(`array[${dez}]`), 100 + 9 * 60);
     perto(await ganho(`array[${dez}, ${dez}]`), 100 + 99 * 60);
-    perto(await ganho(`array[${dez}, ${dez}, ${dez}]`), 100 + 99 * 60);
+    perto(await ganho(`array[${dez}, ${dez}, ${dez}]`), 100 + 999 * 60);
     // ×5 de 100 a 40 s atrás + ×10 de 70 a 10 s atrás: 30 s a ×5, 30 s a ×50, 30 s a ×10, 10 s a ×1 = 1960
     perto(await ganho(`array[${dez}]`, "now() - interval '40 seconds'"), 100 + 4 * 60 + 9 * 60 + 36 * 30);
   });

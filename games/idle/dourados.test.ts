@@ -67,6 +67,7 @@ describe('selos e textos', () => {
     expect(selosBonus({ promo_ate: null, viral: [] }, T)).toEqual([]);
     expect(selosBonus({ promo_ate: null, viral: [em(42)] }, T)).toEqual([{ texto: '×10 · 0:42', ouro: false }]);
     expect(selosBonus({ promo_ate: null, viral: [em(15), em(55)] }, T)).toEqual([{ texto: '×100 · 0:15', ouro: true }]);
+    expect(selosBonus({ promo_ate: null, viral: [em(5), em(15), em(55)] }, T)).toEqual([{ texto: '×1.000 · 0:05', ouro: true }]);
     expect(selosBonus({ promo_ate: em(21), viral: [em(-3)] }, T)).toEqual([{ texto: 'Metade · 0:21', ouro: false }]);
   });
   it('o texto que sobe ao pegar', () => {
@@ -74,5 +75,6 @@ describe('selos e textos', () => {
     expect(textoPegou(1, { ganho: 0, viral: 0 })).toBe('Promoção! Tudo pela metade por 30 s');
     expect(textoPegou(2, { ganho: 0, viral: 1 })).toBe('Viralizou! ×10 por 1 min');
     expect(textoPegou(3, { ganho: 0, viral: 2 })).toBe('×100!');
+    expect(textoPegou(2, { ganho: 0, viral: 3 })).toBe('×1.000!');
   });
 });

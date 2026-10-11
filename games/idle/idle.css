@@ -405,6 +405,7 @@
   .idle .numero { font-size: 47px; white-space: nowrap; }
   .idle .taxa { font-size: 22px; }
   .idle .bonus { flex-basis: auto; }
+  .idle .selos { flex-basis: auto; justify-content: flex-start; } /* na coluna, 100% seria a altura toda */
   .idle .info { display: flex; flex-direction: column; gap: 4px; margin-top: auto; font-size: 14px; color: var(--i-mudo); }
   .idle .abrir { justify-items: start; align-content: center; padding: 0; }
   .idle .abrir p { font-size: 29px; }

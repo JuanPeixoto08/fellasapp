@@ -16,7 +16,8 @@ aparecem na tela pra quem está com o jogo aberto, somem se ninguém clicar, e t
 - Por sorte, não por horário: a cada segundo há chance 1/600 (média de um a cada ~10 min). Fica **12 s** e some.
 - **Em qualquer lugar da tela**, por cima de tudo.
 - **Dois Viralizou se multiplicam** (×10 × ×10 = ×100). A **dupla** (dois ícones de Viralizou juntos) sai em 2% dos
-  eventos; também dá ×100 se cair outro Viralizou dentro do minuto de um ativo (raríssimo). O teto é ×100.
+  eventos; também dá ×100 se cair outro Viralizou dentro do minuto de um ativo (raríssimo). **Sem teto** (pedido do Juan):
+  três ativos = ×1000, e assim por diante.
 - Caminho A: sorte com semente (id do jogador + segundo), a mesma conta na página e no banco; o banco confere.
 - Oportunidades: param de passar na cena; ficam só na Caixinha (com o "plim" e o selo contando).
 - Avisos desligado não esconde o evento (é jogo); só o texto que sobe.
@@ -40,7 +41,7 @@ aparecem na tela pra quem está com o jogo aberto, somem se ninguém clicar, e t
   - Promoção: `promo_ate = greatest(promo_ate, now() + 30 s)`;
   - Viralizou: guarda `now() + 60 s` em `viral_ate` (só os ativos ficam).
 - Conta da produção (`idle_settle`, igual a `economia.ts acumularTrechos`): em cada trecho, divide nos pontos em que o
-  ×5 da oportunidade ou algum Viralizou começa/acaba; multiplicador = (×5 se oportunidade) × 10^min(k, 2) (k =
+  ×5 da oportunidade ou algum Viralizou começa/acaba; multiplicador = (×5 se oportunidade) × 10^k (k =
   Viralizou ativos).
 - Compras com a Promoção ativa: o multiplicador de custo cai pela metade (preço, 10 e Máx); a "próxima compra pela
   metade" não é usada nem gasta enquanto a Promoção vale (desconto máximo 50%).

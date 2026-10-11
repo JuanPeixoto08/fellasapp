@@ -72,10 +72,10 @@ describe('contratos (multContratos)', () => {
 });
 
 describe('Viralizou na conta (igual a idle_settle na 0045)', () => {
-  it('×10 com um, ×100 com dois (teto, mesmo com três), ×50 com o ×5 da oportunidade', () => {
+  it('×10 por Viralizou ativo, sem teto (três = ×1000); ×50 com o ×5 da oportunidade', () => {
     expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000])).toBeCloseTo(100 + 9 * 60, 9);
     expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
-    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000, 90_000])).toBeCloseTo(100 + 999 * 60, 9);
     expect(acumular(0, 1, 0, 100_000, 60_000, TETO_SEGUNDOS, [90_000])).toBeCloseTo(1960, 9);
   });
   it('trechos: o Viralizou atravessa a troca de taxa', () => {
