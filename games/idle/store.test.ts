@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -23,6 +23,14 @@ describe('âncora no relógio do banco', () => {
   it('bônus ×5 conta só até boost_until', () => {
     const a = ancorar(base({ boost_until: '2026-10-12T12:00:05.000Z' }), 0);
     expect(valuationAgora(a, 10_000)).toBeCloseTo(100 + 2 * 10 + 2 * 4 * 5, 10);
+  });
+  it('teto do offline: 8h, ou o do ramo Tempo da árvore', () => {
+    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 8 * 3600, 6);
+    expect(valuationAgora(ancorar(base({ bonus: { arvore: [1, 41], conquistas: 0 } }), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 12 * 3600, 6);
+  });
+  it('caixinha: 3 por 4h, ou o tamanho que o ramo Oportunidades der (a validade é sempre 4h)', () => {
+    expect(caixa(base())).toEqual({ tamanho: 3, validadeS: 4 * 3600 });
+    expect(caixa(base({ bonus: { arvore: [1, 31, 32], conquistas: 0 } }))).toEqual({ tamanho: 4, validadeS: 4 * 3600 });
   });
   it('início da semana: segunda 00:00 de Brasília', () => {
     expect(inicioSemana(base({ week_start: '2026-10-12' }))).toBe(Date.parse('2026-10-12T03:00:00Z'));

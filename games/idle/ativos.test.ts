@@ -33,6 +33,10 @@ describe('ativos da Fellas Inc.', () => {
   it('resolve os ícones das 20 melhorias gerais', () => {
     for (let id = 1001; id <= 1020; id++) expect(naoVazia(ativos.geral(id)), `geral ${id}`).toBe(true);
   });
+  it('ícone de conquista ou de nó que não existe: null (a célula mostra só a moldura)', () => {
+    expect(ativos.conquista(999)).toBeNull();
+    expect(ativos.no(99)).toBeNull();
+  });
 });
 
 describe('arte da entrega 2 (contrato de formato)', () => {
