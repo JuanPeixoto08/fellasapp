@@ -2,8 +2,9 @@
 // mudança de estado; `atualizarValor` ~10x por segundo (só o número e quais botões estão liberados).
 // Texto de usuário sempre por textContent.
 import { button, el } from '../shared/hud/hud';
-import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
+import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, MelhoriaBolsa } from '../shared/types';
 import { ativos } from './ativos';
+import { criarBolsaTela } from './bolsaTela';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
@@ -12,6 +13,7 @@ import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import { iconeFechar } from './icones';
+import { escalaPc } from './escala';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
@@ -30,15 +32,23 @@ export type Modelo = {
   vendaAberta: boolean;
   /** O aviso de conquista na cena agora ("Conquista: 6-7"); null = nenhum. */
   conquistaAviso: string | null;
+  /** Estado da Bolsa (null = ainda não buscou). */
+  bolsa: BolsaEstado | null;
+  /** Gaveta Bolsa aberta (PC: no corpo da bancada; celular: tela cheia). */
+  bolsaAberta: boolean;
 };
 export type Acoes = {
   abrirCnpj(): void; comprar(tipo: 'gerador' | 'melhoria', id: number, qtd: 0 | 1 | 10): void; escolher(era: number, opcao: number): void;
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
+  bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
+  melhorar(tipo: MelhoriaBolsa, nivel: number): void;
 };
-export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
+export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
 
+/** Bolsa sem trader: só o aviso pra abrir (sem buscar nada). */
+const VAZIA: BolsaEstado = { tick: 0, vira_em_ms: 0, r: 0, aberta: false, corretor: 0, escritorio: 0, corretagem: 0.05, empresas: [], carteira: [], viraram_po: [] };
 const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidden') : n.setAttribute('hidden', ''));
 const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
@@ -74,6 +84,20 @@ export function restam(ms: number) {
 
 export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
   const app = el('div', 'app idle');
+  // PC: a base de 1280 × 720 cresce com a janela (zoom); a cena só por inteiro (escala.ts)
+  const escalar = () => {
+    const e = escalaPc(window.innerWidth, window.innerHeight);
+    const pc = e.cena > 0;
+    app.style.zoom = pc ? String(e.zoom) : '';
+    app.style.height = pc ? `${window.innerHeight / e.zoom}px` : '';
+    app.style.width = pc ? `${e.largura}px` : '';
+    app.style.marginInline = pc ? 'auto' : '';
+    app.style.setProperty('--zoom', pc ? String(e.zoom) : ''); // o que usa dvh/vh divide por ele (o zoom multiplica)
+    app.style.setProperty('--cena-w', pc ? `${(160 * e.cena) / e.zoom}px` : '');
+    app.style.setProperty('--cena-h', pc ? `${(96 * e.cena) / e.zoom}px` : '');
+  };
+  escalar();
+  window.addEventListener('resize', escalar);
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
@@ -104,12 +128,12 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   // a empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e a bancada embaixo
   const cartaoEmpresa = el('div', 'cartao-empresa');
   cartaoEmpresa.append(palco, placa, abrir);
-  // bancada: uma gaveta por coisa que acontece (por enquanto só a Caixinha; os minigames entram aqui depois)
+  // bancada: uma gaveta por coisa que acontece (Caixinha e os minigames: Bolsa; Horta, Convidados e Lives depois)
   const larga = () => window.matchMedia?.('(min-width: 1100px)').matches === true;
   const gavetaCaixa = button('', 'gaveta', () => {
+    a.bolsa('fechar');
     if (!larga()) a.caixa(true); // no PC a lista já está aberta na bancada
   });
-  gavetaCaixa.setAttribute('aria-pressed', 'true');
   const caixaIcone = el('span', 'gaveta-caixa');
   const iconeOpp = el('span', 'gaveta-icone');
   iconeOpp.style.backgroundImage = `url(${ativos.oportunidade(0)})`;
@@ -118,10 +142,26 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   gavetaCaixa.append(caixaIcone, el('span', 'gaveta-nome', 'Caixinha'), selo);
   const gavetas = el('div', 'gavetas');
   gavetas.append(gavetaCaixa);
+  // gaveta Bolsa (minigame 1): sem Grupo de trader fica apagada; tocar abre (o main busca o mercado)
+  const gavetaBolsa = button('', 'gaveta gaveta-bolsa', () => a.bolsa('abrir'));
+  const bolsaCaixa = el('span', 'gaveta-caixa');
+  const iconeBolsa = el('span', 'gaveta-icone gaveta-icone-gerador');
+  iconeBolsa.style.backgroundImage = `url(${ativos.gerador(19)})`;
+  bolsaCaixa.append(iconeBolsa);
+  gavetaBolsa.append(bolsaCaixa, el('span', 'gaveta-nome', 'Bolsa'));
+  gavetas.append(gavetaBolsa);
+  const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t) => a.negociar(e, l, q, t), melhorar: (tp, n) => a.melhorar(tp, n) });
+  // topo da Bolsa em tela cheia (só no celular, pelo CSS)
+  const bancadaTopo = el('div', 'bancada-topo');
+  const fecharBolsa = button('', 'fechar', () => a.bolsa('fechar'));
+  fecharBolsa.setAttribute('aria-label', 'Fechar a Bolsa');
+  fecharBolsa.append(iconeFechar());
+  const valorBolsa = el('span', 'chip-valor');
+  bancadaTopo.append(fecharBolsa, el('h2', undefined, 'Bolsa'), valorBolsa);
   const corpoBancada = el('div', 'gaveta-corpo');
   const bancada = el('section', 'bancada');
   bancada.setAttribute('aria-label', 'Bancada');
-  bancada.append(gavetas, corpoBancada);
+  bancada.append(bancadaTopo, gavetas, corpoBancada);
   const empresa = el('div', 'empresa');
   empresa.append(cartaoEmpresa, bancada);
 
@@ -401,7 +441,18 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(selo, m.pendentes.length > 0);
     gavetaCaixa.setAttribute('aria-label', `Caixinha: ${m.pendentes.length} ${m.pendentes.length === 1 ? 'oportunidade guardada' : 'oportunidades guardadas'}`);
     mostrar(bancada, jogando);
-    corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
+    const trader = (s?.generators[18] ?? 0) >= 1; // gerador 19 (Grupo de trader) = índice 18 aqui
+    gavetaBolsa.classList.toggle('trancada', !trader);
+    gavetaBolsa.setAttribute('aria-label', trader ? 'Bolsa' : 'Bolsa: compra 1 Grupo de trader pra abrir');
+    gavetaBolsa.setAttribute('aria-pressed', String(m.bolsaAberta));
+    gavetaCaixa.setAttribute('aria-pressed', String(!m.bolsaAberta));
+    bancada.classList.toggle('com-bolsa', m.bolsaAberta && jogando);
+    if (m.bolsaAberta && jogando && s) {
+      bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado);
+      corpoBancada.replaceChildren(bolsaTela.elemento);
+    } else {
+      corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
+    }
     mostrar(mudarVisual, jogando);
     app.classList.toggle('sem-painel', !jogando && !verLegado);
     mostrar(listaL, verLegado);
@@ -652,7 +703,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   function atualizarValor(valor: number) {
     numero.textContent = formatarValor(valor);
+    valorBolsa.textContent = formatarValor(valor);
     atualizarPrazos();
+    for (const p of bolsaTela.precos()) p.botao.disabled = p.preco > valor;
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {
@@ -670,5 +723,5 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(painel, false);
   }
 
-  return { canvas, renderizar, atualizarValor, fatal };
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal };
 }

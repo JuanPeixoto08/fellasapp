@@ -149,7 +149,9 @@ export function criarArvoreTela(comprar: (id: number) => void): ArvoreTela {
     const dy = e.clientY - arraste.y;
     if (!arraste.moveu && Math.hypot(dx, dy) <= ARRASTE_PX) return;
     arraste.moveu = true;
-    desloc = { x: arraste.dx + dx, y: arraste.dy + dy };
+    // o mouse anda em px da tela; o mundo, em px da página (que no PC pode estar ampliada pelo zoom)
+    const z = palco.offsetWidth ? palco.getBoundingClientRect().width / palco.offsetWidth || 1 : 1;
+    desloc = { x: arraste.dx + dx / z, y: arraste.dy + dy / z };
     posicionar();
   });
   const soltar = () => {

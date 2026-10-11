@@ -213,7 +213,7 @@
 
 /* modais: folha que sobe de baixo no celular; janela no meio do PC */
 .idle .modal { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(11, 10, 14, 0.72); color: var(--paper); z-index: 10; }
-.idle .folha { width: 100%; max-height: 85dvh; overflow: auto; display: grid; gap: 4px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: var(--i-painel); box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -8px 24px rgba(0, 0, 0, 0.4); }
+.idle .folha { width: 100%; max-height: calc(85dvh / var(--zoom, 1)); overflow: auto; display: grid; gap: 4px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: var(--i-painel); box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -8px 24px rgba(0, 0, 0, 0.4); }
 @media (min-width: 600px) {
   .idle .modal { align-items: center; padding: 24px; }
   .idle .folha { width: min(460px, 100%); padding: 20px; box-shadow: 0 -2px 0 0 var(--i-borda2), 0 2px 0 0 var(--i-borda2), -2px 0 0 0 var(--i-borda2), 2px 0 0 0 var(--i-borda2), 0 12px 32px rgba(0, 0, 0, 0.5); }
@@ -263,13 +263,79 @@
 .idle ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 @supports not selector(::-webkit-scrollbar) { .idle, .idle * { scrollbar-width: thin; scrollbar-color: #4A4660 transparent; } }
 
-/* PC: empresa e bancada à esquerda, painel de 500 à direita; tudo cabe numa tela de 1280 × 800 */
+/* Bolsa (minigame 1): lista + detalhe; no celular a bancada com-bolsa vira tela cheia */
+.idle .gaveta-icone-gerador { background-size: 128px 32px; }
+.idle .bancada-topo { display: none; }
+.idle .bancada.com-bolsa {
+  position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; padding: 0 12px 12px; background: #121212; box-shadow: none;
+}
+.idle .bancada.com-bolsa .bancada-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: max(8px, env(safe-area-inset-top)) 0 8px; }
+.idle .bancada.com-bolsa .bancada-topo h2 { margin: 0; font: 400 24px var(--i-pixel); }
+.idle .bancada.com-bolsa .gavetas { display: none; }
+.idle .bancada.com-bolsa .gaveta-corpo { display: block; flex: 1; min-height: 0; overflow: auto; }
+.idle .chip-valor { padding: 4px 8px; font: 400 18px var(--i-pixel); color: var(--gold); background: var(--i-painel); box-shadow: 0 0 0 2px var(--i-borda2); }
+.idle .gaveta.trancada .gaveta-icone { filter: grayscale(1) brightness(0.6); }
+.idle .gaveta.trancada { opacity: 0.55; }
+.idle .bolsa { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.idle .bolsa-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.idle .bolsa-titulo { margin: 0; font: 400 23px var(--i-pixel); }
+.idle .bolsa-po { display: grid; gap: 2px; padding: 8px 10px; background: #4A1620; color: #FFB3B3; box-shadow: 0 0 0 2px #FF6B6B; font: 400 18px var(--i-pixel); }
+.idle .bolsa-po p { margin: 0; }
+.idle .carteira { display: flex; gap: 14px; font-size: 13px; color: var(--i-mudo); }
+.idle .carteira b { font: 400 18px var(--i-pixel); color: var(--paper); }
+.idle .bolsa-melhorias { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.idle .melhoria-bolsa { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--i-linha); --c: #2A2833;
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .melhoria-bolsa strong { font: 400 17px var(--i-pixel); }
+.idle .melhoria-bolsa .btn { flex: none; min-height: 40px; font-size: 15px; white-space: normal; text-align: center; }
+.idle .bolsa-miolo { display: grid; gap: 12px; min-height: 0; }
+.idle .bolsa-lista { display: flex; flex-direction: column; gap: 6px; }
+.idle .acao { display: grid; grid-template-columns: 104px 56px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 10px; border: 0; text-align: left; color: var(--paper); background: var(--i-linha); cursor: pointer; --c: #2A2833;
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .acao.escolhida { --c: var(--i-lilas); background: var(--i-ativo); }
+.idle .acao.quebrada { opacity: 0.55; }
+.idle .acao .tk, .idle .bolsa-detalhe .tk { font: 400 20px var(--i-pixel); line-height: 1; }
+.idle .tk small { display: block; margin-top: 2px; font: 500 12px var(--font); color: var(--i-mudo); }
+.idle .acao .preco { font: 400 20px var(--i-pixel); text-align: right; }
+.idle .acao .preco small { display: block; font: 400 15px var(--i-pixel); }
+.idle .acao .tem { min-width: 76px; text-align: right; font-size: 12px; color: var(--i-mudo); }
+.idle .acao .tem b { display: block; font: 400 16px var(--i-pixel); color: var(--paper); }
+/* lista estreita (PC, ao lado do detalhe): o gráfico sai da linha e o "você tem" desce pra baixo do nome */
+.idle .bolsa-lista { container-type: inline-size; }
+@container (max-width: 380px) {
+  .idle .acao { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .idle .acao > :nth-child(2) { display: none; }
+  .idle .acao .tem { grid-column: 1 / -1; display: flex; gap: 6px; align-items: baseline; min-width: 0; text-align: left; }
+  .idle .acao .tem b { display: inline; }
+}
+.idle .sobe { color: var(--mint); } .idle .cai { color: #FF8F8F; }
+.idle .etq { display: inline-block; margin-top: 4px; padding: 1px 6px; font: 400 14px var(--i-pixel); }
+.idle .etq.risco { background: #4A1620; color: #FFB3B3; box-shadow: 0 0 0 1px #FF6B6B; }
+.idle .etq.rj { background: #2C2940; color: var(--i-lilas); }
+.idle svg.mini { width: 56px; height: 28px; display: block; }
+.idle svg.graf { width: 100%; height: 96px; flex: none; display: block; background: var(--i-fundo2); }
+.idle .barra { fill: #3B3654; } .idle .barra.sobe { fill: var(--mint); } .idle .barra.cai { fill: #FF8F8F; }
+.idle .bolsa-detalhe { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--i-painel); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .bolsa-detalhe .cab { display: flex; justify-content: space-between; align-items: baseline; }
+.idle .bolsa-detalhe .tk { font-size: 26px; }
+.idle .preco-grande b { font: 400 30px var(--i-pixel); }
+.idle .linha2 { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--i-mudo); }
+.idle .linha2 b { color: var(--paper); font-weight: 600; }
+.idle .bts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.idle .bts .rot2 { grid-column: 1 / -1; margin-bottom: -4px; font: 400 16px var(--i-pixel); color: var(--i-mudo); }
+.idle .bts .btn { flex: none; }
+.idle .bolsa-detalhe .aviso { margin: 0; font-size: 12px; color: var(--i-mudo); }
+/* celular: o detalhe sobe como cartão por cima da lista */
+.idle .bancada.com-bolsa .bolsa-detalhe { position: sticky; bottom: 0; box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -12px 30px rgba(0, 0, 0, 0.5); }
+
+/* PC: empresa e bancada à esquerda, painel de 500 à direita; montado em 1280 × 720 e ampliado com a janela (escala.ts) */
 @media (min-width: 1100px) {
   .idle { grid-template-columns: minmax(0, 1fr) 500px; grid-template-rows: 64px minmax(0, 1fr); column-gap: 32px; padding: 0 32px 32px; }
   .idle .top { grid-column: 1 / -1; padding: 0; }
   .idle .empresa { grid-column: 1; grid-row: 2; max-width: none; padding: 24px 0 0; grid-template-rows: auto minmax(0, 1fr); gap: 20px; min-height: 0; }
-  .idle .cartao-empresa { grid-template-columns: 480px minmax(0, 1fr); justify-items: stretch; gap: 24px; padding: 0; background: none; box-shadow: none; }
-  .idle .cena { width: 480px; height: 288px; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
+  .idle .cartao-empresa { grid-template-columns: var(--cena-w, 480px) minmax(0, 1fr); justify-items: stretch; gap: 24px; padding: 0; background: none; box-shadow: none; }
+  .idle .cena { width: var(--cena-w, 480px); height: var(--cena-h, 288px); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
   .idle .valor { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: flex-start; gap: 6px; text-align: left; min-width: 0; }
   .idle .numero { font-size: 47px; white-space: nowrap; }
   .idle .taxa { font-size: 22px; }
@@ -296,12 +362,30 @@
   .idle .arvore-corpo { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr); }
   .idle .arvore-lado { align-self: end; display: grid; gap: 14px; padding: 0 24px 24px 0; }
   .idle .arvore-legenda { display: flex; }
+  .idle .bancada.com-bolsa { position: static; z-index: auto; padding: 0; background: var(--i-painel); --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle .bancada.com-bolsa .bancada-topo { display: none; }
+  .idle .bancada.com-bolsa .gavetas { display: flex; }
+  .idle .bancada.com-bolsa .gaveta-corpo { padding: 10px 14px 14px; overflow: hidden; }
+  .idle .bolsa { height: 100%; }
+  .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) 300px; flex: 1; min-height: 0; }
+  .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
+  .idle .bolsa-detalhe { overflow: auto; position: static; }
+  /* Bolsa aberta: a cena sai e a bancada ganha a altura (o saldo fica em cima); fechar a gaveta traz a cena de volta */
+  .idle .empresa:has(.bancada.com-bolsa) .palco { display: none; }
+  .idle .empresa:has(.bancada.com-bolsa) .cartao-empresa { grid-template-columns: minmax(0, 1fr); }
+  .idle .empresa:has(.bancada.com-bolsa) .valor { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 16px; }
 }
 
 /* celular deitado: a tela rola inteira (a cena + o painel não cabem em 390 de altura); as abas grudam no topo */
 @media (orientation: landscape) and (max-height: 520px) and (max-width: 1099px) {
   .idle { overflow-y: auto; grid-template-rows: auto auto auto; }
   .idle .painel { overflow: visible; }
+  /* Bolsa deitada: o cartão de detalhe cobriria a lista toda; lista e detalhe lado a lado, cada um rola */
+  .idle .bancada.com-bolsa .gaveta-corpo { overflow: hidden; }
+  .idle .bolsa { height: 100%; }
+  .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
+  .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
+  .idle .bancada.com-bolsa .bolsa-detalhe { overflow: auto; position: static; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
 }
 
 /* PC estreito (1100–1279): o resumo desce pra baixo da cena, senão o dinheiro passa por cima do painel */
@@ -319,12 +403,9 @@
   .idle .arvore-cartao p { font-size: 14px; }
 }
 
-/* tela grande (1920 × 1080): cena em 4× e painel mais largo */
-@media (min-width: 1500px) and (min-height: 940px) {
-  .idle { grid-template-columns: minmax(0, 1fr) 560px; }
-  .idle .cartao-empresa { grid-template-columns: 640px minmax(0, 1fr); }
-  .idle .cena { width: 640px; height: 384px; }
-}
+/* tela grande: a página escala tudo junto (zoom em escala.ts; a cena por inteiro em --cena-w/--cena-h); as margens de
+   tela muito larga ficam da cor do fundo */
+body:has(.idle) { background: #121212; }
 
 @media (prefers-reduced-motion: reduce) {
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
