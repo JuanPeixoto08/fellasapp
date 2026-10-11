@@ -23,6 +23,16 @@ const UNSIGNED = new Set(['file', 'cloud_name', 'resource_type', 'api_key']);
 
 export const resourceType = (kind: Kind): ResourceType => (kind === 'video' ? 'video' : 'image');
 
+/** Tamanho de entrega das fotos por uso (lib/cloudinary.ts FOTO_TRANSFORMATIONS tem o mesmo; o teste compara). */
+export const FOTO_ENTREGA = {
+  post: 'c_limit,w_1600,h_1600,q_auto,f_webp,fl_awebp',
+  perfil: 'c_limit,w_512,h_512,q_auto,f_webp,fl_awebp',
+  banner: 'c_limit,w_1500,h_1500,q_auto,f_webp,fl_awebp',
+} as const;
+export type UsoFoto = keyof typeof FOTO_ENTREGA;
+export const fotoEntregaUrl = (cloud: string, publicId: string, uso: UsoFoto) =>
+  `https://res.cloudinary.com/${cloud}/image/upload/${FOTO_ENTREGA[uso]}/${publicId}`;
+
 export function randomMediaId(uuid: () => string): string {
   return `stories/${(uuid() + uuid()).replace(/-/g, '')}`;
 }

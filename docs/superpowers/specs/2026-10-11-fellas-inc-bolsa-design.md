@@ -123,7 +123,7 @@ demanda: toda chamada da Bolsa avança o mercado até o tick atual, com trava (`
 não gerarem o mesmo minuto. Se o último minuto guardado tiver mais de 1440 ticks (1 dia), gera só o último dia a partir
 do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
 
-## Banco (migração `0042_fellas_inc_bolsa.sql`)
+## Banco (migração `0043_fellas_inc_bolsa.sql`)
 
 - `idle_cat_bolsa` (catálogo: id, código, nome, gerador, repouso, vol, pesos `double precision[6]`, quebra) — lido pela página
   (select para `authenticated` com `is_member()`).
@@ -144,7 +144,7 @@ do último estado. Guarda 7 dias (10080 ticks) e apaga o resto na mesma chamada.
     `p_qtd` 1, 10 ou 0 (Máx/Tudo). Devolve o `idle_json` de sempre mais o `idle_bolsa()`.
 - RLS em tudo; internas revogadas de public/anon/authenticated; RPCs só para `authenticated`; erros `P0001` com código
   `idle_*`; não membro `42501`; `update`/`delete` sempre com `where`; idempotente; UTF-8.
-- `games/test/db.ts` e `games/dev/mockDb.ts` carregam a 0042.
+- `games/test/db.ts` e `games/dev/mockDb.ts` carregam a 0043.
 
 ## Página
 

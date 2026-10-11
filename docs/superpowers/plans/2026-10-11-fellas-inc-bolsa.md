@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Nova migração `supabase/migrations/0042_fellas_inc_bolsa.sql`; 0033–0041 nunca são editadas. Idempotente (`create table if not exists`, `create or replace`, `on conflict`), UTF-8 sem BOM (o teste `games/test/migracoesUtf8.test.ts` pega).
+- Nova migração `supabase/migrations/0043_fellas_inc_bolsa.sql`; 0033–0041 nunca são editadas. Idempotente (`create table if not exists`, `create or replace`, `on conflict`), UTF-8 sem BOM (o teste `games/test/migracoesUtf8.test.ts` pega).
 - RLS em toda tabela nova; o catálogo `idle_cat_bolsa` é lido por `authenticated` com `public.is_member()`; mercado, preços e carteira sem acesso direto (só pelas funções). Funções que mexem em dados: `security definer set search_path = public`. Internas: `revoke all ... from public, anon, authenticated`. RPCs: `revoke all ... from public, anon` + `grant execute ... to authenticated`.
 - Erros: `raise exception '<codigo>' using errcode = 'P0001'`; não membro: `raise exception 'not_member' using errcode = '42501'`. Códigos novos: `idle_bolsa_preco_mudou`, `idle_bolsa_rj`, `idle_bolsa_limite`, `idle_bolsa_fechada`, `idle_bolsa_sem_acoes`, `idle_bolsa_nivel`. Sem F$: `idle_cant_afford` (já existe).
 - Todo `update public.`/`delete from public.` com `where` (safeupdate).
@@ -37,9 +37,9 @@
 ## File Structure
 
 - Create `games/idle/bolsaMotor.ts` (+ `bolsaMotor.test.ts`): catálogo das empresas, constantes, `normal`, `escolherHumor`, `tick`, `inicial`, e a simulação usada só no teste.
-- Create `supabase/migrations/0042_fellas_inc_bolsa.sql`: tabelas, catálogo, funções puras, avançar, estado, negociar, RPCs.
+- Create `supabase/migrations/0043_fellas_inc_bolsa.sql`: tabelas, catálogo, funções puras, avançar, estado, negociar, RPCs.
 - Create `games/test/idleBolsa.test.ts`: paridade SQL × TS, avançar, negociar, RPCs.
-- Modify `games/test/db.ts`, `games/dev/mockDb.ts`: carregar a 0042.
+- Modify `games/test/db.ts`, `games/dev/mockDb.ts`: carregar a 0043.
 - Modify `games/shared/types.ts` (tipos `BolsaEstado` etc.), `games/shared/api.ts` (`idleBolsa`, `idleBolsaNegociar`), `games/shared/errors.ts` (códigos novos), `games/dev/mockIdle.ts` (as duas chamadas no `?mock`, `__trader()`).
 - Create `games/idle/bolsa.ts` (+ `bolsa.test.ts`): contas e textos da tela.
 - Create `games/idle/bolsaTela.ts` (+ `bolsaTela.test.ts`): lista + detalhe.
@@ -213,7 +213,7 @@ Expected: FAIL (módulo não existe).
 
 ```ts
 // Motor de preço da Bolsa da Fellas Inc. Um tick (1 minuto) de uma empresa é uma função pura dos sorteios (7 uniformes
-// em [0,1)): o servidor (0042 idle_bolsa_tick, com random()) e esta cópia fazem a mesma conta (games/test/idleBolsa.test.ts
+// em [0,1)): o servidor (0043 idle_bolsa_tick, com random()) e esta cópia fazem a mesma conta (games/test/idleBolsa.test.ts
 // confere). Esta cópia só serve à simulação que calibra o catálogo e aos testes; quem sorteia de verdade é o servidor.
 // Preço em segundos de produção. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-bolsa-design.md.
 
@@ -223,7 +223,7 @@ export type EmpresaBolsa = {
 };
 
 /** Pesos dos humores: 0 parada · 1 sobe devagar · 2 cai devagar · 3 sobe forte · 4 despenca · 5 maluca. Mudou aqui:
- *  mude também o insert da 0042 (o teste de paridade compara). */
+ *  mude também o insert da 0043 (o teste de paridade compara). */
 export const EMPRESAS_BOLSA: readonly EmpresaBolsa[] = [
   { id: 1, codigo: 'PSTL', nome: 'Pastel do Zé', gerador: 11, repouso: 30, vol: 0.6, pesos: [30, 30, 15, 10, 5, 10], quebra: 0.01 },
   { id: 2, codigo: 'ACAI', nome: 'Açaí Gourmet', gerador: 14, repouso: 120, vol: 0.5, pesos: [35, 30, 15, 8, 4, 8], quebra: 0.01 },
@@ -241,7 +241,7 @@ export const BOLSA = {
 } as const;
 
 /** Melhorias da Bolsa: índice = nível (0 = sem). Custo do nível n (1..5) = custo[n − 1] segundos de produção. Iguais às
- *  funções idle_bolsa_corretagem/idle_bolsa_escritorio/idle_bolsa_custo da 0042. */
+ *  funções idle_bolsa_corretagem/idle_bolsa_escritorio/idle_bolsa_custo da 0043. */
 export const MELHORIAS_BOLSA = {
   corretor: {
     nomes: ['Primo que entende de ação', 'Assessor do banco', 'Mesa de operações', 'Robô de trade', 'Insider (shh)'],
@@ -278,7 +278,7 @@ const EMPURRAO = [0, 0.004, -0.004, 0.02, -0.02];
 
 /**
  * Um minuto. u: [n1a, n1b, n2a, n2b, humor, duração, quebra]. Em recuperação judicial: preço parado no repouso; no tick
- * da volta, sai da recuperação (humor vencido). Igual a 0042 idle_bolsa_tick.
+ * da volta, sai da recuperação (humor vencido). Igual a 0043 idle_bolsa_tick.
  */
 export function tick(m: Mercado, e: EmpresaBolsa, t: number, u: readonly number[]): Mercado {
   if (m.rjAte !== null) {
@@ -336,7 +336,7 @@ export function simular(semente: number, ticks: number) {
 - [ ] **Step 4: Run and calibrate**
 
 Run: `cd games && npx vitest run idle/bolsaMotor.test.ts`
-Expected: PASS. Se um alvo da simulação falhar, ajuste **só** `vol`, `pesos` ou `quebra` da empresa que falhou (repouso e as regras ficam), rode de novo, e registre no ledger `Task 1: Ruling: <empresa> <campo> <de> → <para> — <alvo que falhou>`. Os mesmos valores vão para a 0042 na Task 2.
+Expected: PASS. Se um alvo da simulação falhar, ajuste **só** `vol`, `pesos` ou `quebra` da empresa que falhou (repouso e as regras ficam), rode de novo, e registre no ledger `Task 1: Ruling: <empresa> <campo> <de> → <para> — <alvo que falhou>`. Os mesmos valores vão para a 0043 na Task 2.
 
 - [ ] **Step 5: Commit**
 
@@ -348,10 +348,10 @@ git commit -m "Fellas Inc.: motor de preço da Bolsa e a simulação de 30 dias 
 
 ---
 
-### Task 2: Migração 0042, parte 1 — catálogo e o tick em SQL (paridade)
+### Task 2: Migração 0043, parte 1 — catálogo e o tick em SQL (paridade)
 
 **Files:**
-- Create: `supabase/migrations/0042_fellas_inc_bolsa.sql`
+- Create: `supabase/migrations/0043_fellas_inc_bolsa.sql`
 - Modify: `games/test/db.ts` (lista `MIGRATIONS`), `games/dev/mockDb.ts` (import + lista)
 - Test: `games/test/idleBolsa.test.ts`
 
@@ -438,12 +438,12 @@ describe('catálogo e tick (paridade SQL × TS)', () => {
 });
 ```
 
-Em `games/test/db.ts`, acrescente `'0042_fellas_inc_bolsa.sql',` depois de `'0041_fellas_inc_prestigio.sql',`. Em `games/dev/mockDb.ts`, acrescente `import m42 from '../../supabase/migrations/0042_fellas_inc_bolsa.sql?raw';` depois do `m41` e `m42` no fim da lista do `for (const m of [...])`.
+Em `games/test/db.ts`, acrescente `'0043_fellas_inc_bolsa.sql',` depois de `'0041_fellas_inc_prestigio.sql',`. Em `games/dev/mockDb.ts`, acrescente `import m42 from '../../supabase/migrations/0043_fellas_inc_bolsa.sql?raw';` depois do `m41` e `m42` no fim da lista do `for (const m of [...])`.
 
 Run: `cd games && npx vitest run test/idleBolsa.test.ts`
 Expected: FAIL (arquivo da migração não existe).
 
-- [ ] **Step 2: Write `supabase/migrations/0042_fellas_inc_bolsa.sql` (parte 1)**
+- [ ] **Step 2: Write `supabase/migrations/0043_fellas_inc_bolsa.sql` (parte 1)**
 
 ```sql
 -- Fellas Inc.: a Bolsa da Faria Lima (minigame 1). Spec: docs/superpowers/specs/2026-10-11-fellas-inc-bolsa-design.md.
@@ -584,16 +584,16 @@ Expected: PASS.
 
 ```bash
 cd games && npx tsc --noEmit && npx vitest run
-git add ../supabase/migrations/0042_fellas_inc_bolsa.sql test/idleBolsa.test.ts test/db.ts dev/mockDb.ts
+git add ../supabase/migrations/0043_fellas_inc_bolsa.sql test/idleBolsa.test.ts test/db.ts dev/mockDb.ts
 git commit -m "Fellas Inc.: Bolsa no banco, parte 1: catálogo das empresas e o tick em SQL (paridade com a página)"
 ```
 
 ---
 
-### Task 3: Migração 0042, parte 2 — avançar o mercado e o histórico
+### Task 3: Migração 0043, parte 2 — avançar o mercado e o histórico
 
 **Files:**
-- Modify: `supabase/migrations/0042_fellas_inc_bolsa.sql` (acrescentar no fim)
+- Modify: `supabase/migrations/0043_fellas_inc_bolsa.sql` (acrescentar no fim)
 - Test: `games/test/idleBolsa.test.ts`
 
 **Interfaces:**
@@ -740,16 +740,16 @@ Expected: PASS.
 
 ```bash
 cd games && npx vitest run
-git add ../supabase/migrations/0042_fellas_inc_bolsa.sql test/idleBolsa.test.ts
+git add ../supabase/migrations/0043_fellas_inc_bolsa.sql test/idleBolsa.test.ts
 git commit -m "Fellas Inc.: Bolsa no banco, parte 2: o mercado anda sozinho (minutos sob demanda, quebra, histórico de 7 dias)"
 ```
 
 ---
 
-### Task 4: Migração 0042, parte 3 — carteira, estado da Bolsa e negociar
+### Task 4: Migração 0043, parte 3 — carteira, estado da Bolsa e negociar
 
 **Files:**
-- Modify: `supabase/migrations/0042_fellas_inc_bolsa.sql` (acrescentar no fim)
+- Modify: `supabase/migrations/0043_fellas_inc_bolsa.sql` (acrescentar no fim)
 - Test: `games/test/idleBolsa.test.ts`
 
 **Interfaces:**
@@ -1098,16 +1098,16 @@ Expected: PASS. Se `idle_rate(s)` for 0 com 10 notebooks e 2 traders (não deve:
 
 ```bash
 cd games && npx tsc --noEmit && npx vitest run
-git add ../supabase/migrations/0042_fellas_inc_bolsa.sql test/idleBolsa.test.ts
+git add ../supabase/migrations/0043_fellas_inc_bolsa.sql test/idleBolsa.test.ts
 git commit -m "Fellas Inc.: Bolsa no banco, parte 3: carteira, estado da Bolsa e comprar/vender"
 ```
 
 ---
 
-### Task 5: Migração 0042, parte 4 — comprar as melhorias da Bolsa
+### Task 5: Migração 0043, parte 4 — comprar as melhorias da Bolsa
 
 **Files:**
-- Modify: `supabase/migrations/0042_fellas_inc_bolsa.sql` (acrescentar no fim)
+- Modify: `supabase/migrations/0043_fellas_inc_bolsa.sql` (acrescentar no fim)
 - Test: `games/test/idleBolsa.test.ts` (dentro do `describe('carteira e negociar')`)
 
 **Interfaces:**
@@ -1239,7 +1239,7 @@ Expected: PASS.
 
 ```bash
 cd games && npx tsc --noEmit && npx vitest run
-git add ../supabase/migrations/0042_fellas_inc_bolsa.sql test/idleBolsa.test.ts
+git add ../supabase/migrations/0043_fellas_inc_bolsa.sql test/idleBolsa.test.ts
 git commit -m "Fellas Inc.: Bolsa no banco, parte 4: melhorias da Bolsa (Corretor e Escritório)"
 ```
 
@@ -1337,7 +1337,7 @@ Expected: FAIL.
 `games/idle/bolsa.ts`:
 
 ```ts
-// Contas e textos da tela da Bolsa (puro). Quem decide preço, compra e venda é o banco (0042); aqui só se mostra.
+// Contas e textos da tela da Bolsa (puro). Quem decide preço, compra e venda é o banco (0043); aqui só se mostra.
 import { EMPRESAS_BOLSA, MELHORIAS_BOLSA, type EmpresaBolsa } from './bolsaMotor';
 import type { BolsaPosicao, MelhoriaBolsa } from '../shared/types';
 
@@ -1403,7 +1403,7 @@ export const avisosPo = (po: { empresa: number; qtd: number }[]): string[] =>
 `games/shared/types.ts` — acrescente no fim:
 
 ```ts
-/** Bolsa da Fellas Inc. (0042 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
+/** Bolsa da Fellas Inc. (0043 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
 export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] };
 export type BolsaPosicao = { empresa: number; qtd: number; custo: number };
 export type BolsaEstado = {
@@ -2100,4 +2100,4 @@ Corrigir num commit `Fellas Inc.: ajustes da conferência visual da Bolsa`.
 
 ## Publicação (fora do plano de tarefas)
 
-Merge local na main; o Juan roda `npx supabase db push` (0042); eu confiro pela leitura (`idle_cat_bolsa` com 8, `idle_bolsa()` e `idle_bolsa_negociar` respondendo 401 sem login, não 404) e só então `git push`.
+Merge local na main; o Juan roda `npx supabase db push` (0043); eu confiro pela leitura (`idle_cat_bolsa` com 8, `idle_bolsa()` e `idle_bolsa_negociar` respondendo 401 sem login, não 404) e só então `git push`.

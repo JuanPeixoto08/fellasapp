@@ -4,6 +4,7 @@ import {
   deleteUrl,
   isExpired,
   listUrl,
+  fotoEntregaUrl,
   randomFotoId,
   randomMediaId,
   resourceType,
@@ -11,6 +12,7 @@ import {
   TRANSFORMATIONS,
   uploadUrl,
   type Kind,
+  type UsoFoto,
   type ResourceType,
 } from './rules.ts';
 
@@ -21,6 +23,8 @@ export type Env = {
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;
   STORIES_CRON_SECRET: string;
+  /** Só a migração das fotos antigas usa (lê o Storage e troca os endereços no banco). */
+  SUPABASE_SERVICE_ROLE_KEY: string;
 };
 export type Deps = {
   fetch: typeof fetch;
@@ -175,6 +179,59 @@ async function cleanup(req: Request, env: Env, deps: Deps): Promise<Response> {
   return reply(req, 200, { deleted });
 }
 
+/** Fotos antigas por chamada da migração (cabe no tempo da função). */
+const LOTE_FOTOS = 25;
+
+/**
+ * Migração única das fotos do Storage pro Cloudinary (out/2026, o tráfego das fotos estourou o plano grátis): pega um lote
+ * de caminhos que ainda aparecem no banco (0042 fotos_pendentes), baixa cada um do Storage, sobe no Cloudinary com nome
+ * fixo (fotos/m-<sha1 do caminho>: rodar de novo sobrescreve, não duplica) e troca o endereço em todo lugar
+ * (foto_trocar). Falhou uma foto: segue com as outras e devolve a lista. Chamada pelo banco com o segredo do cron.
+ */
+async function migrarFotos(req: Request, env: Env, deps: Deps): Promise<Response> {
+  const secret = req.headers.get('x-cron-secret');
+  if (!env.STORIES_CRON_SECRET || secret !== env.STORIES_CRON_SECRET) return reply(req, 401, { error: 'segredo' });
+  const svc = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
+  const rpc = (fn: string, args: unknown) =>
+    deps.fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { ...svc, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    });
+  const lista = await rpc('fotos_pendentes', { p_limite: LOTE_FOTOS });
+  if (!lista.ok) return reply(req, 502, { error: 'listar' });
+  const pendentes = (await lista.json()) as { caminho: string; uso: UsoFoto }[];
+  let migradas = 0;
+  const falhas: string[] = [];
+  for (const { caminho, uso } of pendentes) {
+    try {
+      const caminhoUrl = caminho.split('/').map(encodeURIComponent).join('/');
+      const arq = await deps.fetch(`${env.SUPABASE_URL}/storage/v1/object/post-images/${caminhoUrl}`, { headers: svc });
+      if (!arq.ok) throw new Error('baixar');
+      const publicId = `fotos/m-${await deps.sha1Hex(caminho)}`;
+      const params = { overwrite: 'true', public_id: publicId, timestamp: String(Math.floor(deps.now().getTime() / 1000)) };
+      const signature = await deps.sha1Hex(stringToSign(params) + env.CLOUDINARY_API_SECRET);
+      const form = new FormData();
+      for (const [k, v] of Object.entries({ ...params, api_key: env.CLOUDINARY_API_KEY, signature })) form.append(k, v);
+      form.append('file', await arq.blob());
+      const up = await deps.fetch(uploadUrl(env.CLOUDINARY_CLOUD_NAME, 'photo'), { method: 'POST', body: form });
+      if (!up.ok) throw new Error('subir');
+      const troca = await rpc('foto_trocar', {
+        p_caminho: caminho,
+        p_url: fotoEntregaUrl(env.CLOUDINARY_CLOUD_NAME, publicId, uso),
+        p_uso: uso,
+      });
+      if (!troca.ok) throw new Error('trocar');
+      migradas++;
+    } catch {
+      falhas.push(caminho);
+    }
+  }
+  const total = await rpc('fotos_pendentes_total', {});
+  const restantes = total.ok ? ((await total.json()) as number) : -1;
+  return reply(req, 200, { migradas, falhas, restantes });
+}
+
 /** Rotas pelo fim do caminho (o Supabase entrega /stories-media/<rota>). */
 export async function handle(req: Request, env: Env, deps: Deps = defaults): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
@@ -182,5 +239,6 @@ export async function handle(req: Request, env: Env, deps: Deps = defaults): Pro
   if (req.method === 'POST' && pathname.endsWith('/sign')) return sign(req, env, deps);
   if (req.method === 'POST' && pathname.endsWith('/delete')) return remove(req, env, deps);
   if (req.method === 'POST' && pathname.endsWith('/cleanup')) return cleanup(req, env, deps);
+  if (req.method === 'POST' && pathname.endsWith('/migrar-fotos')) return migrarFotos(req, env, deps);
   return reply(req, 404, { error: 'não existe' });
 }

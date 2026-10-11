@@ -1,5 +1,5 @@
-import { fotoUrl, STORY_TRANSFORMATIONS, storyMediaUrl, storyOriginalUrl, storyThumbUrl } from '../lib/cloudinary';
-import { TRANSFORMATIONS } from '../supabase/functions/stories-media/rules';
+import { FOTO_TRANSFORMATIONS, fotoUrl, STORY_TRANSFORMATIONS, storyMediaUrl, storyOriginalUrl, storyThumbUrl } from '../lib/cloudinary';
+import { FOTO_ENTREGA, TRANSFORMATIONS } from '../supabase/functions/stories-media/rules';
 
 const ID = `stories/${'a'.repeat(64)}`;
 
@@ -27,5 +27,8 @@ describe('fotos no Cloudinary (posts, perfil, banner)', () => {
     expect(fotoUrl(F, 'post')).toBe(`https://res.cloudinary.com/slxposvw/image/upload/c_limit,w_1600,h_1600,q_auto,f_webp,fl_awebp/${F}`);
     expect(fotoUrl(F, 'perfil')).toBe(`https://res.cloudinary.com/slxposvw/image/upload/c_limit,w_512,h_512,q_auto,f_webp,fl_awebp/${F}`);
     expect(fotoUrl(F, 'banner')).toBe(`https://res.cloudinary.com/slxposvw/image/upload/c_limit,w_1500,h_1500,q_auto,f_webp,fl_awebp/${F}`);
+  });
+  it('a migração das antigas usa os mesmos tamanhos da página (função = app)', () => {
+    expect(FOTO_ENTREGA).toEqual(FOTO_TRANSFORMATIONS);
   });
 });
