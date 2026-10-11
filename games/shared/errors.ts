@@ -33,6 +33,7 @@ export type GameErrorCode =
   | 'idle_strategy_set'
   | 'idle_bad_choice'
   | 'idle_opp_gone'
+  | 'idle_dourado_gone' | 'idle_dourado_pego'
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
@@ -73,6 +74,8 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_strategy_set: 'Essa estratégia já foi escolhida',
   idle_bad_choice: 'Essa opção não existe',
   idle_opp_gone: 'Essa oportunidade já passou',
+  idle_dourado_gone: 'Esse já foi embora',
+  idle_dourado_pego: 'Esse você já pegou',
   idle_opp_cap: 'Chega de oportunidade por hoje',
   idle_hire_self: 'Não dá pra se contratar',
   idle_hire_twice: 'Essa pessoa já trabalha pra você',
@@ -130,6 +133,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_strategy_set',
   'idle_bad_choice',
   'idle_opp_gone',
+  'idle_dourado_gone', 'idle_dourado_pego',
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
   'idle_prestige_low', 'idle_points_low', 'idle_node_owned',

@@ -15,6 +15,8 @@ import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
+import { criarDouradoTela } from './douradoTela';
+import { promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
@@ -46,6 +48,8 @@ export type Modelo = {
   chaves: Record<ChaveSom, boolean>;
   /** Volume da música, de 0 (desligada) a 1. */
   volumeMusica: number;
+  /** Agora no relógio do servidor (ms): a Promoção valendo muda os preços. Sem = a hora do estado. */
+  agora?: number;
   /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
   novidadeNova: boolean;
 };
@@ -58,8 +62,15 @@ export type Acoes = {
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
+  pegarDourado(seg: number, lado: number): void;
 };
-export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
+export type Tela = {
+  canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void;
+  /** Eventos na tela (tipo cookie dourado). */
+  dourados: ReturnType<typeof criarDouradoTela>;
+  /** Selos do Viralizou e da Promoção com o tempo que falta. */
+  relogioBonus(s: IdleState | null, agoraMs: number): void;
+};
 
 /** Bolsa sem trader: só o aviso pra abrir (sem buscar nada). */
 const VAZIA: BolsaEstado = { tick: 0, vira_em_ms: 0, r: 0, aberta: false, corretor: 0, escritorio: 0, corretagem: 0.05, empresas: [], carteira: [], viraram_po: [] };
@@ -156,18 +167,19 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   const palco = el('div', 'palco');
   const canvas = el('canvas', 'cena');
-  const vivo = button('', 'vivo', () => undefined);
   const avisoConquista = el('div', 'conquista-aviso');
   avisoConquista.setAttribute('role', 'status');
-  palco.append(canvas, vivo, avisoConquista);
+  palco.append(canvas, avisoConquista);
 
   const placa = el('div', 'valor');
   const numero = el('div', 'numero', 'F$ 0');
   const taxaTxt = el('div', 'taxa', '');
   const bonus = el('div', 'bonus', '');
+  // Viralizou / Promoção valendo: selos com o tempo que falta (relogioBonus, a cada passo da página)
+  const selos = el('div', 'selos');
   // resumo (o PC mostra do lado da cena; o celular esconde .info pelo CSS)
   const info = el('div', 'info');
-  placa.append(numero, taxaTxt, bonus, info);
+  placa.append(numero, taxaTxt, selos, bonus, info);
 
   const abrir = el('div', 'abrir');
   abrir.append(
@@ -323,6 +335,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     return linha;
   }
 
+  // Promoção relâmpago valendo: custo pela metade; a meia-preço da Caixinha não soma (o banco faz igual)
+  let agoraTela = Date.now();
+  const custoAgora = (s: IdleState) => custoMult(catalogo, s) * (promoAtiva(s, agoraTela) ? 0.5 : 1);
+  const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
+
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
     const n = s.generators[gid - 1];
@@ -338,16 +355,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       etq.title = `Cada ${g.nome} libera +1 ação ${deEmpresa(ligada)} ${ligada.nome} na Bolsa`;
       meio.append(etq);
     }
-    const cm = custoMult(catalogo, s);
+    const cm = custoAgora(s);
     const botoes = el('div', 'compra');
-    const um = button(formatarValor(preco(g.custo, n, 1, cm) * (s.half_price ? 0.5 : 1)), 'btn', () => a.comprar('gerador', gid, 1));
+    const um = button(formatarValor(preco(g.custo, n, 1, cm) * meiaAgora(s)), 'btn', () => a.comprar('gerador', gid, 1));
     um.dataset.qtd = '1';
     const dez = button('10', 'btn', () => a.comprar('gerador', gid, 10));
     dez.dataset.qtd = '10';
     const max = button('Máx', 'btn', () => a.comprar('gerador', gid, 0));
     max.dataset.qtd = '0';
     precos.push(
-      { botao: um, preco: preco(g.custo, n, 1, cm) * (s.half_price ? 0.5 : 1) },
+      { botao: um, preco: preco(g.custo, n, 1, cm) * meiaAgora(s) },
       { botao: dez, preco: preco(g.custo, n, 10, cm) },
       { botao: max, preco: preco(g.custo, n, 1, cm), maximo: { custo: g.custo, n, cm } },
     );
@@ -477,6 +494,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   function renderizar(m: Modelo) {
     ultimo = m;
     const s = m.estado;
+    agoraTela = m.agora ?? (s ? Date.parse(s.server_now) : Date.now());
     const jogando = m.fase === 'jogando' || m.fase === 'abrindo';
     precos = [];
     prazos = [];
@@ -535,7 +553,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
           break;
         }
       }
-      const cm = custoMult(catalogo, s);
+      const cm = custoAgora(s);
       const disponiveis = catalogo.melhorias
         .filter((x) => !s.upgrades.includes(x.id) && liberada(catalogo, x, s))
         .sort((x, y) => x.preco - y.preco);
@@ -571,7 +589,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const item = el('div', 'melhoria');
         const meio = el('div', 'meio');
         meio.append(el('strong', undefined, x.nome), el('span', 'sub', x.frase));
-        const p = x.preco * cm * (s.half_price ? 0.5 : 1);
+        const p = x.preco * cm * meiaAgora(s);
         const comprar = button(formatarValor(p), 'btn', () => a.comprar('melhoria', x.id, 1));
         precos.push({ botao: comprar, preco: p });
         item.append(iconeMelhoria(x), meio, comprar);
@@ -640,17 +658,6 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));
         listaP.append(li);
       });
-    }
-
-    // oportunidade passando na cena
-    // a meia-preço que passa na cena some se você já tem uma guardada (não acumula)
-    mostrar(vivo, !!s && m.aoVivo !== null && s.opp_left > 0 && !meiaPrecoRepetida(tipoOportunidade(s.user_id, m.aoVivo), s));
-    if (s && m.aoVivo !== null) {
-      const w = m.aoVivo;
-      vivo.style.backgroundImage = `url(${ativos.oportunidade(tipoOportunidade(s.user_id, w))})`;
-      vivo.style.animationDuration = `${segundosOportunidade(s, s.bonus.arvore)}s`;
-      vivo.setAttribute('aria-label', `Pegar oportunidade: ${TEXTO_TIPO[tipoOportunidade(s.user_id, w)]}`);
-      vivo.onclick = () => a.pegar(w);
     }
 
     // estratégia
@@ -848,5 +855,12 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(painel, false);
   }
 
-  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal };
+  // eventos na tela, por cima de tudo
+  const dourados = criarDouradoTela(app, (seg, lado) => a.pegarDourado(seg, lado));
+  function relogioBonus(s: IdleState | null, agoraMs: number) {
+    const lista = s ? selosBonus(s, agoraMs) : [];
+    selos.replaceChildren(...lista.map((x) => el('span', `selo-bonus${x.ouro ? ' ouro' : ''}`, x.texto)));
+  }
+
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus };
 }

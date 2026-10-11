@@ -59,6 +59,7 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
   rpc<IdleState>('idle_buy', { p_kind: kind, p_id: id, p_qty: qty });
 export const idlePickStrategy = (era: number, opcao: number) => rpc<IdleState>('idle_pick_strategy', { p_era: era, p_opcao: opcao });
 export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportunity', { p_window: window });
+export const idleDouradoPegar = (seg: number, lado: number) => rpc<IdleState>('idle_dourado_pegar', { p_seg: seg, p_lado: lado });
 export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
 export const idlePrestige = () => rpc<IdleState>('idle_prestige');
 export const idleBuyNode = (no: number) => rpc<IdleState>('idle_buy_node', { p_no: no });

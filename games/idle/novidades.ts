@@ -4,6 +4,18 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-11-sorte',
+    titulo: 'Sorte na tela',
+    data: '2026-10-11',
+    itens: [
+      'De vez em quando aparece um evento na tela: pega antes que suma (12 s).',
+      'Investidor apressado: 20 minutos de produção na hora.',
+      'Promoção relâmpago: geradores e melhorias pela metade por 30 s.',
+      'Viralizou: produção ×10 por 1 minuto. Pegou outro no meio? ×100. E não para por aí.',
+      'As oportunidades agora ficam só na Caixinha.',
+    ],
+  },
+  {
     id: '2026-10-11-som',
     titulo: 'Som na firma',
     data: '2026-10-11',

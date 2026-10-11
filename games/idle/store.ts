@@ -22,7 +22,8 @@ export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).c
 
 export function valuationAgora(a: Ancora, clienteMs: number): number {
   const boost = a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
-  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, efeitos(a.estado).tetoS);
+  const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (teto ×100), igual ao banco
+  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, efeitos(a.estado).tetoS, virais);
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {
