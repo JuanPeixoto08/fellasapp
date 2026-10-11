@@ -6,7 +6,7 @@ import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
 import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
-import { avisosPo, proximaBusca, RECARREGA_BOLSA } from './bolsa';
+import { avisosPo, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
@@ -61,6 +61,7 @@ let conquistasConhecidas: number[] | null = null;
 // Bolsa: gaveta aberta e o último mercado buscado; um temporizador busca de novo na virada do minuto enquanto aberta
 let bolsaAberta = false;
 let bolsa: BolsaEstado | null = null;
+let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;
 
 async function carregarBolsa() {
@@ -70,6 +71,7 @@ async function carregarBolsa() {
   if (!bolsaAberta || !s || (s.generators[18] ?? 0) < 1) return; // gerador 19 = Grupo de trader
   try {
     bolsa = await api.idleBolsa();
+    bolsaBuscadaEm = Date.now();
     filaAvisos.adicionar(avisosPo(bolsa.viraram_po));
     render();
   } catch {
@@ -146,11 +148,13 @@ const tela = criarTela(document.getElementById('app')!, {
   negociar: (empresa, lado, qtd, tick) => void guard(async () => {
     const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick);
     bolsa = r.bolsa;
+    bolsaBuscadaEm = Date.now();
     aplicar(r);
   }),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);
     bolsa = r.bolsa;
+    bolsaBuscadaEm = Date.now();
     aplicar(r);
   }),
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
@@ -209,7 +213,8 @@ function render() {
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
     fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
-    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsa, bolsaAberta,
+    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
+    bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()) },
   });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
@@ -298,6 +303,7 @@ async function guard(trabalho: () => Promise<void>) {
 setInterval(() => {
   if (document.hidden || !ancora) return;
   tela.atualizarValor(valuationAgora(ancora, Date.now()));
+  if (bolsaAberta && bolsa) tela.relogioBolsa(faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()));
   if (vivoAgora(ancora.estado, agoraSrv()) !== vivoAtual) render();
   // um contrato venceu: a taxa mudou no banco, bate o ponto (uma vez por vencimento)
   const s = ancora.estado;

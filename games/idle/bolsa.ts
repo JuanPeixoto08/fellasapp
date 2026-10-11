@@ -62,5 +62,7 @@ export const avisosPo = (po: { empresa: number; qtd: number }[]): string[] =>
 
 /** Quando buscar o mercado de novo: logo depois da virada do minuto (nunca antes de 1 s). */
 export const proximaBusca = (viraEmMs: number) => Math.max(1000, viraEmMs + 300);
+/** Quanto falta pra virar o minuto agora, dado o que a busca disse e quando ela voltou (nunca negativo). */
+export const faltaVirar = (viraEmMs: number, buscadoEm: number, agora: number) => Math.max(0, viraEmMs - (agora - buscadoEm));
 /** Recusas da Bolsa que querem o mercado (e a carteira) de novo. */
 export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada', 'idle_bolsa_nivel'];

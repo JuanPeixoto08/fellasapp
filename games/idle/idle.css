@@ -298,6 +298,14 @@
 .idle .acao .preco small { display: block; font: 400 15px var(--i-pixel); }
 .idle .acao .tem { min-width: 76px; text-align: right; font-size: 12px; color: var(--i-mudo); }
 .idle .acao .tem b { display: block; font: 400 16px var(--i-pixel); color: var(--paper); }
+/* lista estreita (PC, ao lado do detalhe): o gráfico sai da linha e o "você tem" desce pra baixo do nome */
+.idle .bolsa-lista { container-type: inline-size; }
+@container (max-width: 380px) {
+  .idle .acao { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .idle .acao > :nth-child(2) { display: none; }
+  .idle .acao .tem { grid-column: 1 / -1; display: flex; gap: 6px; align-items: baseline; min-width: 0; text-align: left; }
+  .idle .acao .tem b { display: inline; }
+}
 .idle .sobe { color: var(--mint); } .idle .cai { color: #FF8F8F; }
 .idle .etq { display: inline-block; margin-top: 4px; padding: 1px 6px; font: 400 14px var(--i-pixel); }
 .idle .etq.risco { background: #4A1620; color: #FFB3B3; box-shadow: 0 0 0 1px #FF6B6B; }
@@ -319,13 +327,13 @@
 /* celular: o detalhe sobe como cartão por cima da lista */
 .idle .bancada.com-bolsa .bolsa-detalhe { position: sticky; bottom: 0; box-shadow: 0 -2px 0 0 var(--i-borda2), 0 -12px 30px rgba(0, 0, 0, 0.5); }
 
-/* PC: empresa e bancada à esquerda, painel de 500 à direita; tudo cabe numa tela de 1280 × 800 */
+/* PC: empresa e bancada à esquerda, painel de 500 à direita; montado em 1280 × 720 e ampliado com a janela (escala.ts) */
 @media (min-width: 1100px) {
   .idle { grid-template-columns: minmax(0, 1fr) 500px; grid-template-rows: 64px minmax(0, 1fr); column-gap: 32px; padding: 0 32px 32px; }
   .idle .top { grid-column: 1 / -1; padding: 0; }
   .idle .empresa { grid-column: 1; grid-row: 2; max-width: none; padding: 24px 0 0; grid-template-rows: auto minmax(0, 1fr); gap: 20px; min-height: 0; }
-  .idle .cartao-empresa { grid-template-columns: 480px minmax(0, 1fr); justify-items: stretch; gap: 24px; padding: 0; background: none; box-shadow: none; }
-  .idle .cena { width: 480px; height: 288px; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
+  .idle .cartao-empresa { grid-template-columns: var(--cena-w, 480px) minmax(0, 1fr); justify-items: stretch; gap: 24px; padding: 0; background: none; box-shadow: none; }
+  .idle .cena { width: var(--cena-w, 480px); height: var(--cena-h, 288px); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
   .idle .valor { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: flex-start; gap: 6px; text-align: left; min-width: 0; }
   .idle .numero { font-size: 47px; white-space: nowrap; }
   .idle .taxa { font-size: 22px; }
@@ -360,12 +368,22 @@
   .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) 300px; flex: 1; min-height: 0; }
   .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
   .idle .bolsa-detalhe { overflow: auto; position: static; }
+  /* Bolsa aberta: a cena sai e a bancada ganha a altura (o saldo fica em cima); fechar a gaveta traz a cena de volta */
+  .idle .empresa:has(.bancada.com-bolsa) .palco { display: none; }
+  .idle .empresa:has(.bancada.com-bolsa) .cartao-empresa { grid-template-columns: minmax(0, 1fr); }
+  .idle .empresa:has(.bancada.com-bolsa) .valor { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 16px; }
 }
 
 /* celular deitado: a tela rola inteira (a cena + o painel não cabem em 390 de altura); as abas grudam no topo */
 @media (orientation: landscape) and (max-height: 520px) and (max-width: 1099px) {
   .idle { overflow-y: auto; grid-template-rows: auto auto auto; }
   .idle .painel { overflow: visible; }
+  /* Bolsa deitada: o cartão de detalhe cobriria a lista toda; lista e detalhe lado a lado, cada um rola */
+  .idle .bancada.com-bolsa .gaveta-corpo { overflow: hidden; }
+  .idle .bolsa { height: 100%; }
+  .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
+  .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
+  .idle .bancada.com-bolsa .bolsa-detalhe { overflow: auto; position: static; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
 }
 
 /* PC estreito (1100–1279): o resumo desce pra baixo da cena, senão o dinheiro passa por cima do painel */
@@ -383,12 +401,9 @@
   .idle .arvore-cartao p { font-size: 14px; }
 }
 
-/* tela grande (1920 × 1080): cena em 4× e painel mais largo */
-@media (min-width: 1500px) and (min-height: 940px) {
-  .idle { grid-template-columns: minmax(0, 1fr) 560px; }
-  .idle .cartao-empresa { grid-template-columns: 640px minmax(0, 1fr); }
-  .idle .cena { width: 640px; height: 384px; }
-}
+/* tela grande: a página escala tudo junto (zoom em escala.ts; a cena por inteiro em --cena-w/--cena-h); as margens de
+   tela muito larga ficam da cor do fundo */
+body:has(.idle) { background: #121212; }
 
 @media (prefers-reduced-motion: reduce) {
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }

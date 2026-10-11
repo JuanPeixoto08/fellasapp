@@ -13,6 +13,7 @@ import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import { iconeFechar } from './icones';
+import { escalaPc } from './escala';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
@@ -44,7 +45,7 @@ export type Acoes = {
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
 };
-export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; fatal(texto: string): void };
+export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
 
 /** Bolsa sem trader: só o aviso pra abrir (sem buscar nada). */
 const VAZIA: BolsaEstado = { tick: 0, vira_em_ms: 0, r: 0, aberta: false, corretor: 0, escritorio: 0, corretagem: 0.05, empresas: [], carteira: [], viraram_po: [] };
@@ -83,6 +84,19 @@ export function restam(ms: number) {
 
 export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
   const app = el('div', 'app idle');
+  // PC: a base de 1280 × 720 cresce com a janela (zoom); a cena só por inteiro (escala.ts)
+  const escalar = () => {
+    const e = escalaPc(window.innerWidth, window.innerHeight);
+    const pc = e.cena > 0;
+    app.style.zoom = pc ? String(e.zoom) : '';
+    app.style.height = pc ? `${window.innerHeight / e.zoom}px` : '';
+    app.style.width = pc ? `${e.largura}px` : '';
+    app.style.marginInline = pc ? 'auto' : '';
+    app.style.setProperty('--cena-w', pc ? `${(160 * e.cena) / e.zoom}px` : '');
+    app.style.setProperty('--cena-h', pc ? `${(96 * e.cena) / e.zoom}px` : '');
+  };
+  escalar();
+  window.addEventListener('resize', escalar);
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
@@ -707,5 +721,5 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(painel, false);
   }
 
-  return { canvas, renderizar, atualizarValor, fatal };
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal };
 }

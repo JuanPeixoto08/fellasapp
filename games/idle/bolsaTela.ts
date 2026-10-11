@@ -42,9 +42,17 @@ export function criarBolsaTela(a: {
   let escolhida: number | null = null;
   let ultimo: [BolsaEstado | null, number, boolean] | null = null;
 
+  let relogioEl: HTMLElement | null = null;
+  /** "preço novo em m:ss" do detalhe aberto, chamado pela página enquanto o minuto corre. */
+  function relogio(ms: number) {
+    if (!relogioEl) return;
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    relogioEl.textContent = `preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
   function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): Precos[] {
     ultimo = [b, valuation, ocupado];
     raiz.replaceChildren();
+    relogioEl = null;
     if (!b) {
       raiz.append(el('p', 'vazio', 'Carregando a Bolsa…'));
       return [];
@@ -129,8 +137,10 @@ export function criarBolsaTela(a: {
       const cab = el('div', 'cab');
       const nome = el('span', 'tk', e.codigo);
       nome.append(el('small', undefined, e.nome));
-      const s = Math.ceil(b.vira_em_ms / 1000);
-      cab.append(nome, el('span', 'sub', `preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`));
+      relogioEl = el('span', 'sub');
+      relogioEl.setAttribute('role', 'timer'); // timer não é anunciado a cada mudança (o detalhe é aria-live)
+      relogio(b.vira_em_ms);
+      cab.append(nome, relogioEl);
       d.append(cab);
       if (m.rj_ate !== null) {
         d.append(el('p', 'sub', textoQuebra(m.rj_ate, b.tick)));
@@ -182,5 +192,5 @@ export function criarBolsaTela(a: {
     return precos.filter((x) => !x.botao.disabled || x.preco <= valuation);
   }
 
-  return { elemento: raiz, renderizar };
+  return { elemento: raiz, renderizar, relogio };
 }

@@ -42,6 +42,15 @@ describe('tela da Bolsa', () => {
     expect(linha(6).classList.contains('quebrada')).toBe(true);
     expect(linha(6).querySelector('.etq.rj')!.textContent).toBe('Quebrou · volta em 7 min');
   });
+  it('o relógio do "preço novo em" desce sem buscar de novo (e não fala a cada segundo pro leitor de tela)', () => {
+    tela.renderizar(B(), 1e9, false);
+    linha(1).click();
+    tela.relogio(9_500);
+    const r = document.querySelector('.bolsa-detalhe [role="timer"]')!;
+    expect(r.textContent).toBe('preço novo em 0:10');
+    tela.relogio(-200);
+    expect(r.textContent).toBe('preço novo em 0:00');
+  });
   it('topo: carteira e lucro em F$', () => {
     tela.renderizar(B(), 1e9, false);
     expect(document.querySelector('.carteira')!.textContent).toContain('F$ 660'); // 10 × 33 × 2
