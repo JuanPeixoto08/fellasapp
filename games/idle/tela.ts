@@ -5,7 +5,8 @@ import { button, el } from '../shared/hud/hud';
 import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { catalogo, type Melhoria } from './catalogo';
-import { falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
+import { criarArvoreTela, miniArvore } from './arvoreTela';
+import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
 import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
@@ -180,9 +181,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     const h = el('h2', undefined, texto);
     h.id = id;
     return h;
-  };
+  };  // árvore de habilidades em tela cheia (por cima de tudo, menos dos avisos)
+  const arvore = criarArvoreTela((id) => a.comprarNo(id));
 
-  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP);
+
+  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, arvore.elemento);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -287,65 +290,58 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     return box;
   }
 
-  /** Aba Legado: o card de prestígio, a árvore (raiz e 5 ramos) e a grade de conquistas (tocar mostra a frase e a data). */
+  /** Aba Legado: os pontos e o Vender, o quadro da árvore (Abrir leva pra tela cheia) e as conquistas em grade de
+   *  ícones (tocar mostra a frase e a data). */
   function legado(s: IdleState, ocupado: boolean) {
-    const card = el('div', 'prestigio');
+    const topoL = el('div', 'legado-pontos');
     const meio = el('div', 'meio');
+    const num = el('strong', 'legado-num');
+    num.append(el('span', 'estrela', '★ '), document.createTextNode(pontos(s.pontos)));
     const vezes = s.vendas === 1 ? 'vendeu 1 vez' : `vendeu ${s.vendas} vezes`;
-    meio.append(
-      el('strong', undefined, `★ ${pontos(s.pontos)} pra gastar`),
-      el('span', 'sub', `${s.pontos_vida} ganhos na vida · recorde ${formatarTaxa(s.recorde)}${s.vendas ? ` · ${vezes}` : ''}`),
-    );
-    const vender = button(
-      s.pontos_venda >= 1 ? `Vender a startup · +${pontos(s.pontos_venda)}` : 'Ainda não compensa',
-      'btn main', () => a.vender('abrir'),
-    );
+    meio.append(num, el('span', 'sub', `${s.pontos_vida} na vida · recorde ${formatarTaxa(s.recorde)}${s.vendas ? ` · ${vezes}` : ''}`));
+    const vender = button(s.pontos_venda >= 1 ? `Vender · +${s.pontos_venda} ★` : 'Ainda não compensa', 'btn', () => a.vender('abrir'));
+    if (s.pontos_venda >= 1) vender.setAttribute('aria-label', `Vender a startup e ganhar ${pontos(s.pontos_venda)}`);
     vender.disabled = s.pontos_venda < 1 || ocupado;
-    card.append(meio, vender);
+    topoL.append(meio, vender);
 
-    const arvore = el('div', 'arvore');
-    for (const r of RAMOS_ARVORE) {
-      const ramo = el('section', r.ramo === 0 ? 'ramo raiz' : 'ramo');
-      ramo.append(el('h3', 'ramo-nome', r.nome));
-      for (const n of r.nos) {
-        const sit = situacao(n, s.bonus.arvore);
-        const no = el('div', `no ${sit}`);
-        const texto = el('div', 'meio');
-        texto.append(el('strong', undefined, n.nome), el('span', 'sub', n.efeito));
-        no.append(iconeLegado(ativos.no(n.id)), texto);
-        if (sit === 'comprado') no.append(el('span', 'no-status', 'Comprado'));
-        else if (sit === 'trancado') no.append(el('span', 'no-status', falta(n)));
-        else {
-          const b = button(`Comprar · ${n.custo} ★`, 'btn compacto', () => a.comprarNo(n.id));
-          b.disabled = ocupado || s.pontos < n.custo;
-          no.append(b);
-        }
-        ramo.append(no);
-      }
-      arvore.append(ramo);
-    }
+    const comprados = s.bonus.arvore.length;
+    const podem = catalogo.arvore.filter((n) => situacaoTela(n, s.bonus.arvore, s.pontos) === 'pode').length;
+    const quadro = el('div', 'arvore-quadro');
+    const textoQ = el('div', 'meio');
+    const abrirB = button('Abrir', 'btn main arvore-abrir', () =>
+      arvore.abrir(s, ocupado, () => listaL.querySelector<HTMLElement>('.arvore-abrir')));
+    textoQ.append(
+      el('strong', undefined, 'Árvore de habilidades'),
+      el('span', 'sub', `${comprados} de ${catalogo.arvore.length} comprados${podem ? ` · ${podem} dá pra comprar agora` : ''}`),
+      abrirB,
+    );
+    quadro.append(miniArvore(s), textoQ);
 
     const celulas = grade(s);
-    const topoQ = el('h3', 'legado-titulo', `Conquistas ${s.conquistas.length}/${TOTAL_CONQUISTAS} · +${s.bonus.conquistas}% de produção`);
+    const cab = el('div', 'legado-cab');
+    cab.append(el('h3', 'legado-titulo', 'Conquistas'), el('span', 'sub', `${s.conquistas.length}/${TOTAL_CONQUISTAS} · +${s.bonus.conquistas}% de produção`));
     const grid = el('div', 'grade-conquistas');
     for (const c of celulas) {
-      const b = button('', c.ganhou ? 'conquista ganha' : 'conquista', () => {
+      const oculta = !c.ganhou && c.nome === '???';
+      const b = button(oculta ? '?' : '', `conquista${c.ganhou ? ' ganha' : ''}${oculta ? ' oculta' : ''}`, () => {
         conquistaAberta = conquistaAberta === c.conquista.id ? null : c.conquista.id;
         if (ultimo) renderizar(ultimo);
       });
+      b.setAttribute('aria-label', `${c.nome}, ${c.ganhou ? 'ganha' : 'não ganha'}`);
       b.setAttribute('aria-pressed', String(conquistaAberta === c.conquista.id));
-      b.append(iconeLegado(ativos.conquista(c.conquista.id)), el('span', 'conquista-nome', c.nome));
+      if (!oculta) b.append(iconeLegado(ativos.conquista(c.conquista.id)));
       grid.append(b);
     }
-    listaL.append(card, el('h3', 'legado-titulo', 'Árvore de habilidades'), arvore, topoQ);
+    listaL.append(topoL, quadro, cab, grid);
     const aberta = celulas.find((c: Celula) => c.conquista.id === conquistaAberta);
     if (aberta) {
       const det = el('div', 'conquista-detalhe');
-      det.append(el('strong', undefined, aberta.nome), el('span', 'sub', aberta.texto));
-      if (aberta.em) det.append(el('span', 'sub', ganhouEm(aberta.em)));
+      const texto = el('div', 'meio');
+      texto.append(el('strong', undefined, aberta.nome), el('span', 'sub', aberta.texto));
+      if (aberta.em) texto.append(el('span', 'sub', ganhouEm(aberta.em)));
+      det.append(iconeLegado(aberta.nome === '???' ? null : ativos.conquista(aberta.conquista.id)), texto);
       listaL.append(det);
     }
-    listaL.append(grid);
   }
 
   /** O miolo da caixinha: quantas ainda dá pra pegar hoje e uma linha por guardada. Serve pra folha do celular e pra
@@ -510,6 +506,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
     listaL.replaceChildren();
     if (s && verLegado) legado(s, m.ocupado);
+    // a árvore aberta acompanha o estado novo; saiu do Legado (venda, sessão caiu): fecha
+    if (arvore.aberta()) {
+      if (s && verLegado) arvore.renderizar(s, m.ocupado);
+      else arvore.fechar();
+    }
 
     listaP.replaceChildren();
     if (!m.placar) listaP.append(el('li', 'vazio', m.placarFalhou ? ERRO_GALERA : 'Carregando…'));

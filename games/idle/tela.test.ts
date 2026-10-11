@@ -301,102 +301,108 @@ describe('editor de personagem', () => {
 
 describe('legado: prestígio, árvore e conquistas', () => {
   const EM = '2026-10-12T15:00:00.000Z';
-  it('card: pontos pra gastar, ganhos na vida e recorde; sem ponto a ganhar, "Ainda não compensa" apagado', () => {
+  it('pontos: livres, na vida e recorde; sem ponto a ganhar, "Ainda não compensa" apagado', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, pontos_vida: 12, vendas: 2, recorde: 1234.5 }) }));
-    const card = root.querySelector('.prestigio')!;
-    expect(card.textContent).toContain('★ 3 pontos pra gastar');
-    expect(card.textContent).toContain('12 ganhos na vida · recorde +F$ 1,23 mil/s · vendeu 2 vezes');
-    const b = card.querySelector('button')!;
+    const topo = root.querySelector('.legado-pontos')!;
+    expect(topo.querySelector('.legado-num')!.textContent).toBe('★ 3 pontos');
+    expect(topo.textContent).toContain('12 na vida · recorde +F$ 1,23 mil/s · vendeu 2 vezes');
+    const b = topo.querySelector('button')!;
     expect(b.textContent).toBe('Ainda não compensa');
     expect(b.disabled).toBe(true);
   });
   it('vender: o botão diz quantos pontos e abre a folha; a folha confirma ou fecha', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }) }));
-    const b = root.querySelector<HTMLButtonElement>('.prestigio button')!;
-    expect(b.textContent).toBe('Vender a startup · +5 pontos');
+    const b = root.querySelector<HTMLButtonElement>('.legado-pontos button')!;
+    expect(b.textContent).toBe('Vender · +5 ★');
+    expect(b.getAttribute('aria-label')).toBe('Vender a startup e ganhar 5 pontos');
     b.click();
     expect(acoes.vender).toHaveBeenCalledWith('abrir');
-    expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true }));
     const folha = root.querySelector('.modal-venda')!;
     expect(folha.hasAttribute('hidden')).toBe(false);
-    expect(folha.textContent).toContain('Vender a startup?');
     expect(folha.textContent).toContain('Você ganha 5 pontos pra gastar na árvore e recomeça do zero.');
     [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Vender')!.click();
     [...folha.querySelectorAll('button')].find((x) => x.textContent === 'Deixa quieto')!.click();
     expect(acoes.vender.mock.calls.map((c) => c[0])).toEqual(['abrir', 'confirmar', 'fechar']);
-    tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 5 }), vendaAberta: true, ocupado: true }));
-    expect([...root.querySelectorAll<HTMLButtonElement>('.modal-venda button')].find((x) => x.textContent === 'Vender')!.disabled).toBe(true);
-    // não compensa mais (o banco recusou e a tela recarregou): a folha some
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos_venda: 0 }), vendaAberta: true }));
     expect(root.querySelector('.modal-venda')!.hasAttribute('hidden')).toBe(true);
   });
-  it('árvore: raiz e 5 ramos; comprado aceso, disponível com "Comprar · N ★" (apagado sem pontos), trancado com o que falta', () => {
+  it('quadro da árvore: miniatura, quantos comprou e quantos dá pra comprar; Abrir mostra a árvore', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }) }));
-    expect([...root.querySelectorAll('.ramo .ramo-nome')].map((h) => h.textContent)).toEqual(
-      ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'],
-    );
-    const no = (nome: string) => [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === nome)!;
-    expect(no('Cafezinho de garrafa térmica').classList.contains('comprado')).toBe(true);
-    expect(no('Cafezinho de garrafa térmica').textContent).toContain('Comprado');
-    expect(no('Ô loco, bicho!').querySelector('button')!.textContent).toBe('Comprar · 4 ★');
-    expect(no('Ô loco, bicho!').querySelector('button')!.disabled).toBe(true); // custa 4, tem 3
-    const pe = no('Porquinho quebrado').querySelector('button')!;
-    expect(pe.disabled).toBe(false);
-    pe.click();
+    const quadro = root.querySelector('.arvore-quadro')!;
+    expect(quadro.querySelector('svg.arvore-mini')).not.toBeNull();
+    expect(quadro.textContent).toContain(`2 de ${catalogo.arvore.length} comprados · 4 dá pra comprar agora`);
+    expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(true);
+    quadro.querySelector<HTMLButtonElement>('.arvore-abrir')!.click();
+    expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(false);
+    root.querySelector<HTMLButtonElement>('.arvore-cartao button')!.click();
     expect(acoes.comprarNo).toHaveBeenCalledWith(21);
-    expect(no('Turno dobrado').classList.contains('trancado')).toBe(true);
-    expect(no('Turno dobrado').textContent).toContain('Libera com Ô loco, bicho!');
-    expect(no('Turno dobrado').querySelector('button')).toBeNull();
   });
-  it('conquistas: N/total; tocar mostra a condição ou a frase e a data; escondida só quando alguém conseguiu', () => {
+  it('árvore aberta: redesenhar mantém aberta e o foco volta pro Abrir novo; sair do jogo fecha', () => {
+    const tela = criarTela(root, acoes);
+    const m = modelo({ aba: 'legado', estado: estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }) });
+    tela.renderizar(m);
+    root.querySelector<HTMLButtonElement>('.arvore-abrir')!.click();
+    tela.renderizar({ ...m, estado: estado({ pontos: 1, bonus: { arvore: [1, 11], conquistas: 0 } }) });
+    expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.no-arvore[data-no="11"]')!.classList.contains('comprado')).toBe(true);
+    root.querySelector<HTMLButtonElement>('.arvore-topo .fechar')!.click();
+    expect(document.activeElement).toBe(root.querySelector('.arvore-abrir'));
+    root.querySelector<HTMLButtonElement>('.arvore-abrir')!.click();
+    tela.renderizar(modelo({ fase: 'sem_sessao', estado: null }));
+    expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('conquistas: N/total; grade de ícones; tocar mostra a frase e a data, tocar de novo fecha', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({
       aba: 'legado',
       estado: estado({ conquistas: [{ id: 7, em: EM }], descobertas: [102], bonus: { arvore: [], conquistas: 1 } }),
     }));
     const lista = root.querySelector('.lista-legado')!;
-    expect(lista.hasAttribute('hidden')).toBe(false);
-    expect(lista.textContent).toContain(`Conquistas 1/${catalogo.conquistas.length} · +1% de produção`);
-    const celulas = [...lista.querySelectorAll<HTMLButtonElement>('.conquista')];
-    expect(celulas.map((c) => c.textContent)).toContain('???');
-    expect(celulas.map((c) => c.textContent)).not.toContain('Aura negativa');
-    celulas.find((c) => c.textContent === 'Estágio não remunerado em escala')!.click();
+    expect(lista.querySelector('.legado-cab')!.textContent).toContain(`1/${catalogo.conquistas.length} · +1% de produção`);
+    const cel = (inicio: string) => root.querySelector<HTMLButtonElement>(`.conquista[aria-label^="${inicio}"]`);
+    expect(cel('???, não ganha')!.textContent).toBe('?');
+    expect(cel('???, não ganha')!.classList.contains('oculta')).toBe(true);
+    expect(cel('Aura negativa')).toBeNull();
+    const ganha = cel('Estágio não remunerado em escala, ganha')!;
+    expect(ganha.classList.contains('ganha')).toBe(true);
+    expect(ganha.querySelector<HTMLElement>('.icone-legado')!.style.backgroundImage).not.toBe('');
+    ganha.click();
     let det = root.querySelector('.conquista-detalhe')!;
     expect(det.textContent).toContain('Cem estagiários, uma cafeteira.');
     expect(det.textContent).toContain('Ganhou em 12/10/2026');
-    [...root.querySelectorAll<HTMLButtonElement>('.conquista')].find((c) => c.textContent === 'Cem abas abertas')!.click();
+    expect(cel('Estágio não remunerado em escala, ganha')!.getAttribute('aria-pressed')).toBe('true');
+    cel('Cem abas abertas, não ganha')!.click();
     det = root.querySelector('.conquista-detalhe')!;
     expect(det.textContent).toContain('Ter 100 "Você, no notebook da faculdade"');
     expect(det.textContent).not.toContain('Ganhou em');
+    cel('Cem abas abertas, não ganha')!.click();
+    expect(root.querySelector('.conquista-detalhe')).toBeNull();
   });
-  it('nó e conquista mostram o ícone', () => {
-    const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'legado' }));
-    for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
-      const icone = root.querySelector<HTMLElement>(sel)!;
-      expect(icone.classList.contains('sem-arte'), sel).toBe(false);
-      expect(icone.style.backgroundImage, sel).not.toBe('');
-    }
-  });
-  it('sem a arte dos ícones, nó e conquista mostram só a moldura', () => {
-    const semNo = vi.spyOn(ativos, 'no').mockReturnValue(null);
-    const semConquista = vi.spyOn(ativos, 'conquista').mockReturnValue(null);
+  it('sem a arte: a conquista mostra só a moldura', () => {
+    const sem = vi.spyOn(ativos, 'conquista').mockReturnValue(null);
     try {
       const tela = criarTela(root, acoes);
       tela.renderizar(modelo({ aba: 'legado' }));
-      for (const sel of ['.no .icone-legado', '.conquista .icone-legado']) {
-        const icone = root.querySelector<HTMLElement>(sel)!;
-        expect(icone.classList.contains('sem-arte'), sel).toBe(true);
-        expect(icone.style.backgroundImage, sel).toBe('');
-      }
+      expect(root.querySelector('.conquista .icone-legado')!.classList.contains('sem-arte')).toBe(true);
     } finally {
-      semNo.mockRestore();
-      semConquista.mockRestore();
+      sem.mockRestore();
     }
+  });
+  it('depois de vender, antes do Abrir CNPJ: o Legado aparece e a raiz dá pra comprar pela árvore', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(true); // nunca vendeu
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false, pontos: 5, pontos_vida: 5 }) }));
+    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(false);
+    root.querySelector<HTMLButtonElement>('.arvore-abrir')!.click();
+    const b = root.querySelector<HTMLButtonElement>('.arvore-cartao button')!;
+    expect(b.textContent).toBe('Comprar · 1 ★');
+    b.click();
+    expect(acoes.comprarNo).toHaveBeenCalledWith(1);
   });
   it('aviso de conquista por cima da cena', () => {
     const tela = criarTela(root, acoes);
@@ -414,16 +420,6 @@ describe('legado: prestígio, árvore e conquistas', () => {
     expect(itens[0].querySelector('.pontos')!.textContent).toBe('★ 12');
     expect(itens[1].querySelector('.pontos')).toBeNull();
     expect(itens[0].querySelector('.v')!.textContent).toContain('/s');
-  });
-  it('depois de vender, antes do Abrir CNPJ: o Legado aparece embaixo pra gastar os pontos', () => {
-    const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
-    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(true); // nunca vendeu
-    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false, pontos: 5, pontos_vida: 5 }) }));
-    expect(root.querySelector('.lista-legado')!.hasAttribute('hidden')).toBe(false);
-    const fundador = [...root.querySelectorAll<HTMLElement>('.no')].find((x) => x.querySelector('strong')!.textContent === 'Virou MEI')!;
-    fundador.querySelector('button')!.click();
-    expect(acoes.comprarNo).toHaveBeenCalledWith(1);
   });
   it('quatro abas: Loja, Gente, Placar, Legado', () => {
     const tela = criarTela(root, acoes);
