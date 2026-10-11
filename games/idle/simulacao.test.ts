@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { simular } from './simulacao';
+import { catalogo } from './catalogo';
+import { K_PRESTIGIO, pontosTotais } from './economia';
+import { gastar, primeiraVenda, simular, volta } from './simulacao';
 
 const H = 3600;
 const DIA = 24 * H;
@@ -35,4 +37,36 @@ describe('ritmo da semana', () => {
     expect(m.compras1h).toBeGreaterThanOrEqual(60);
   });
   it('gerador 30 não sai numa semana jogando assim (raro de propósito)', () => expect(m.gerador30).toBeNull());
+});
+
+// Prestígio (spec da entrega 3, seção 1.4). Medido ao planejar, com K = 1 milhão: a venda vale 1 ponto já no dia 1
+// (0,7 d, era 3), 5 pontos com 2,7 d (era 4), 10 pontos com 5,5 d (11 pontos, era 5) e 15 no fim da semana.
+// Vendendo com 11 e gastando 9 na árvore (Virou MEI, Cafezinho de garrafa térmica, Porquinho quebrado, Grupo de promoção no zap, Soneca pós-almoço), a era 5
+// chega com 2,7 d (era 3,0 d) e a era 2 com 520 s (era 895 s). Se algum número sair do alvo, NÃO mexa em PARAMETROS
+// nem em K: pare e avise.
+describe('ritmo do prestígio', () => {
+  const m = simular(catalogo, 14);
+  it('K é 1 milhão (o mesmo de idle_prestige_total na 0041)', () => expect(K_PRESTIGIO).toBe(1e6));
+  it('a primeira venda que vale a pena (5 pontos) sai no dia 3 ou 4, na era 4 ou 5', () => {
+    const v = primeiraVenda(m, 5);
+    expect(v).not.toBeNull();
+    expect(v!.t).toBeGreaterThanOrEqual(2 * DIA);
+    expect(v!.t).toBeLessThan(4 * DIA);
+    expect([4, 5]).toContain(v!.era);
+  });
+  it('5 pontos não saem antes do dia 3 (a primeira venda não compensa cedo demais)', () => {
+    expect(pontosTotais(m.amostras.filter((a) => a.t < 2 * DIA).at(-1)!.taxa)).toBeLessThan(5);
+  });
+  it('a primeira semana rende uns 15 pontos', () => {
+    expect(pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa)).toBe(15);
+  });
+  it('quem gasta compra o mais barato que acelera: com 11 pontos, a raiz e o 1º de quatro ramos', () => {
+    expect(gastar(catalogo, 11)).toEqual({ arvore: [1, 11, 21, 31, 41], sobra: 2 });
+  });
+  it('depois de vender e gastar ~10 pontos, voltar à era em que estava é mais rápido que da primeira vez', () => {
+    const r = volta(catalogo, 10)!;
+    expect(r).toMatchObject({ era: 5, gastos: 9 });
+    expect(r.segunda).toBeLessThan(r.primeira);
+    expect(r.segunda / r.primeira).toBeLessThan(0.91); // 234000 / 259200 = 0,90
+  });
 });

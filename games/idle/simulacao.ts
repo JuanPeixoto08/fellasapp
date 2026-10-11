@@ -2,10 +2,18 @@
 // primeira sessão de 1h; depois abre ao meio-dia, às 17h e à meia-noite por 10 min; em cada abertura pega até 3
 // oportunidades guardadas (15 min de produção), escolhe a primeira estratégia ativa e compra, de 5 em 5 segundos,
 // sempre o que tem o melhor ganho de taxa por real.
-import { catalogo as padrao, type Catalogo } from './catalogo';
-import { acumular, custoMult, era, liberada, podeComprarGerador, preco, SOLO, taxa, taxaPorUnidade, type Estado } from './economia';
+import { catalogo as padrao, type Catalogo, type No } from './catalogo';
+import {
+  abertura, acumular, custoMult, efeitosArvore, era, liberada, podeComprarGerador, pontosTotais, preco, SEM_BONUS, SOLO, taxa,
+  taxaPorUnidade, type Bonus, type Estado,
+} from './economia';
 
-export type Marcos = { segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null };
+/** No fim de cada sessão (t em segundos de jogo): F$/s, era e as melhorias gerais que a empresa tem. */
+export type Amostra = { t: number; taxa: number; era: number; gerais: number[] };
+export type Marcos = {
+  segundaNotebook: number | null; era: Record<number, number | null>; compras1h: number; gerador30: number | null;
+  amostras: Amostra[];
+};
 
 const H = 3600;
 const DIA = 24 * H;
@@ -17,18 +25,20 @@ function sessoes(dias: number): [number, number][] {
   return s;
 }
 
-export function simular(cat: Catalogo = padrao, dias = 7): Marcos {
+/** `bonus`: os nós da árvore e as conquistas de quem já vendeu; `gerais`: as melhorias gerais que a venda manteve. */
+export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BONUS, gerais: number[] = []): Marcos {
+  const ef = efeitosArvore(cat, bonus.arvore);
+  const ini = abertura(cat, ef, gerais);
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
-  const s: Estado = { generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1], social: SOLO };
-  s.generators[0] = 1;
-  let v = 10;
+  const s: Estado = { generators: ini.generators, upgrades: ini.upgrades, strategies: [-1, -1, -1, -1], social: SOLO, bonus };
+  let v = ini.valuation;
   let relogio = 0;
-  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null };
+  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null, amostras: [] };
   let oppHoje = 0;
   let dia = 0;
 
   const avancar = (ate: number) => {
-    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null);
+    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null, ef.tetoS);
     relogio = ate;
   };
   const comprar = () => {
@@ -73,14 +83,54 @@ export function simular(cat: Catalogo = padrao, dias = 7): Marcos {
     const d = Math.floor(ini / DIA);
     if (d !== dia) { dia = d; oppHoje = 0; }
     if (ini > 0) {
-      const pegar = Math.min(3, 10 - oppHoje);
-      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900;
+      const pegar = Math.min(ef.caixinha, 10 + ef.oppExtra - oppHoje);
+      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900 * ef.oppBonus;
       oppHoje += pegar;
     }
     for (let t = ini; t < fim; t += PASSO) {
       avancar(t);
       comprar();
     }
+    const gerais = s.upgrades.filter((id) => cat.melhorias.find((m) => m.id === id)?.tipo === 'geral');
+    marcos.amostras.push({ t: fim, taxa: taxa(cat, s), era: era(cat, s.generators), gerais });
   }
   return marcos;
+}
+
+/** A primeira vez (fim de sessão) em que vender a startup rende pelo menos `minimo` pontos. */
+export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
+  return m.amostras.find((a) => pontosTotais(a.taxa) >= minimo) ?? null;
+}
+
+// o que não acelera o jogador sozinho da simulação: o ramo Gente e a validade das oportunidades (ele pega na hora)
+const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'validade'];
+
+/** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */
+export function gastar(cat: Catalogo, pontos: number, ja: readonly number[] = []): { arvore: number[]; sobra: number } {
+  const arvore = [...ja];
+  let sobra = pontos;
+  for (;;) {
+    const opcoes = cat.arvore.filter(
+      (n) => !arvore.includes(n.id) && (n.requer === null || arvore.includes(n.requer)) && !NAO_ACELERA.includes(n.tipo) && n.custo <= sobra,
+    );
+    if (!opcoes.length) return { arvore, sobra };
+    const n = opcoes.reduce((a, b) => (b.custo < a.custo || (b.custo === a.custo && b.id < a.id) ? b : a));
+    arvore.push(n.id);
+    sobra -= n.custo;
+  }
+}
+
+/** O jogador que vende: joga até a venda valer `pontos`, vende, gasta tudo na árvore (`gastar`) e recomeça (sem contar
+ *  as conquistas, que só ajudariam). Quanto tempo levou pra chegar na era em que estava da primeira vez e depois de
+ *  vender (Infinity = não chegou em `dias`). null = a venda nunca chegou a `pontos`. */
+export function volta(
+  cat: Catalogo = padrao, pontos = 10, dias = 14,
+): { era: number; primeira: number; segunda: number; arvore: number[]; gastos: number } | null {
+  const m1 = simular(cat, dias);
+  const venda = primeiraVenda(m1, pontos);
+  if (!venda || venda.era < 2) return null;
+  const ganhos = pontosTotais(venda.taxa);
+  const { arvore, sobra } = gastar(cat, ganhos);
+  const m2 = simular(cat, dias, { arvore, conquistas: 0 }, venda.gerais);
+  return { era: venda.era, primeira: m1.era[venda.era]!, segunda: m2.era[venda.era] ?? Infinity, arvore, gastos: ganhos - sobra };
 }

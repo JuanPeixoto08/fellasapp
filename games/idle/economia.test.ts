@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
-import { acumular, acumularTrechos, custoMult, era, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxa, taxaPorUnidade, type Estado } from './economia';
+import {
+  abertura, acumular, acumularTrechos, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
+} from './economia';
 
 const vazio = (): Estado => ({ generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1] });
 const com = (pares: [number, number][], extra: Partial<Estado> = {}): Estado => {
@@ -130,5 +133,60 @@ describe('acumular', () => {
   });
   it('tempo negativo não tira nada', () => {
     expect(acumular(5, 1, 1000, 0, null)).toBe(5);
+  });
+});
+
+describe('árvore de habilidades e conquistas', () => {
+  const comArvore = (s: Estado, arvore: number[], conquistas = 0): Estado => ({ ...s, bonus: { arvore, conquistas } });
+  it('sem nó: o jogo de sempre', () => {
+    expect(efeitosArvore(cat, [])).toEqual({
+      producao: 1, tetoS: 8 * 3600, caixinha: 3, validadeS: 4 * 3600, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
+      porContratado: 0.1, contratoDias: 7, empregoMult: 1, inicioValuation: 10, inicioNotebooks: 1, inicioEra1: false,
+      manterGerais: false,
+    });
+  });
+  it('nós do mesmo tipo: produção multiplica, teto e caixinha ficam o maior, +por dia soma, preço do contrato fica o menor', () => {
+    const e = efeitosArvore(cat, [1, 11, 12, 13, 14, 15, 31, 33, 35, 41, 43, 51, 55]);
+    expect(e.producao).toBeCloseTo(1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 12);
+    expect(e).toMatchObject({ tetoS: 24 * 3600, caixinha: 5, oppExtra: 3, contratoPreco: 0.5 });
+    expect(efeitosArvore(cat, [999]).producao).toBe(1); // nó que a página não conhece não faz nada
+  });
+  it('produção: nós de produção × (1 + 1% por conquista); ponto guardado não conta', () => {
+    const s = com([[1, 2]]);
+    expect(multBonus(cat, s)).toBe(1);
+    expect(taxa(cat, comArvore(s, [1, 11]))).toBeCloseTo(1 * PISO * 1.05 * 1.1, 10);
+    expect(taxa(cat, comArvore(s, [1, 11], 5))).toBeCloseTo(1 * PISO * 1.05 * 1.1 * 1.05, 10);
+    expect(taxaPorUnidade(cat, comArvore(s, [], 3), 1)).toBeCloseTo(0.5 * PISO * 1.03, 10);
+  });
+  it('Gente: Aniversariante do mês paga 15% por contratado (sem somar com a Cultura); Passe de craque dobra cada emprego, não o piso', () => {
+    const s = com([[1, 1]]);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52]), social: { contratei: 2, empregos: [] } })).toBeCloseTo(1 + 0.15 * 2 + 0.02, 12);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [1, 3] } })).toBeCloseTo(1 + 0.02 * 2 * 4, 12);
+    expect(multContratos(cat, { ...comArvore(s, [1, 51, 52, 53, 54]), social: { contratei: 0, empregos: [] } })).toBeCloseTo(1.02, 12);
+  });
+  it('preço do contrato: 30 min de produção × 1,5 por contrato ativo × o desconto da árvore', () => {
+    const s = { ...comArvore(com([[1, 2]]), [1, 51]), social: { contratei: 1, empregos: [] } };
+    expect(precoContrato(cat, s, 1)).toBeCloseTo(taxa(cat, s) * 1800 * 1.5 * 0.75, 6);
+  });
+  it('Abrir CNPJ com o Recomeço: dinheiro, notebooks, a era 1 inteira e as gerais mantidas', () => {
+    expect(abertura(cat, efeitosArvore(cat, []))).toEqual({ valuation: 10, generators: [1, ...Array(29).fill(0)], upgrades: [] });
+    const a = abertura(cat, efeitosArvore(cat, [1, 21, 22, 23, 24, 25]), [1001, 1003]);
+    expect(a.valuation).toBe(1e6);
+    expect(a.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
+    expect(a.upgrades).toEqual([1001, 1003]);
+    expect(abertura(cat, efeitosArvore(cat, [1, 21]), [1001]).upgrades).toEqual([]);
+  });
+  it('teto do offline: 8h, ou o que o ramo Tempo der', () => {
+    expect(acumular(0, 1, 0, 30 * 3600_000, null, 12 * 3600)).toBeCloseTo(12 * 3600, 6);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null, 24 * 3600)).toBeCloseTo(24 * 3600, 6);
+  });
+  it('pontos totais: floor(cbrt(F$/s ÷ 1 milhão)), sem errar nos cubos', () => {
+    for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {
+      expect(pontosTotais(r), String(r)).toBe(n);
+    }
+    for (let n = 1; n <= 1000; n++) {
+      expect(pontosTotais(n ** 3 * 1e6)).toBe(n);
+      expect(pontosTotais(n ** 3 * 1e6 * (1 - 1e-12))).toBe(n - 1);
+    }
   });
 });

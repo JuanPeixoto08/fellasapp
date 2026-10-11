@@ -16,17 +16,21 @@ export const TEXTO_TIPO: Record<0 | 1 | 2, string> = {
   2: 'Próxima compra pela metade',
 };
 
+/** Quantas a caixinha guarda e quanto tempo (s) uma guardada dura: 3 e 4h sem a árvore (ramo Oportunidades). */
+export type Caixa = { tamanho: number; validadeS: number };
+export const CAIXA_PADRAO: Caixa = { tamanho: 3, validadeS: VALIDADE_S };
+
 /**
- * Caixinha (igual a idle_opp_list): as 3 mais recentes que já apareceram, têm menos de 4h e não são de antes do
- * início da semana; só depois tira as pegas. Pegar uma não puxa outra mais velha.
+ * Caixinha (igual a idle_opp_list na 0041): as `tamanho` mais recentes que já apareceram, têm menos de `validadeS` e
+ * não são de antes do início da semana; só depois tira as pegas. Pegar uma não puxa outra mais velha.
  */
-export function pendentes(uid: string, agoraMs: number, pegas: number[], inicioSemanaMs = 0): number[] {
+export function pendentes(uid: string, agoraMs: number, pegas: number[], inicioSemanaMs = 0, caixa: Caixa = CAIXA_PADRAO): number[] {
   const ate = Math.floor(agoraMs / 1000 / JANELA_S);
-  const de = Math.floor((agoraMs / 1000 - VALIDADE_S) / JANELA_S);
+  const de = Math.floor((agoraMs / 1000 - caixa.validadeS) / JANELA_S);
   const recentes: number[] = [];
-  for (let w = ate; w >= de && recentes.length < 3; w--) {
+  for (let w = ate; w >= de && recentes.length < caixa.tamanho; w--) {
     const t = instante(uid, w);
-    if (t <= agoraMs && t >= agoraMs - VALIDADE_S * 1000 && t >= inicioSemanaMs) recentes.push(w);
+    if (t <= agoraMs && t >= agoraMs - caixa.validadeS * 1000 && t >= inicioSemanaMs) recentes.push(w);
   }
   return recentes.filter((w) => !pegas.includes(w));
 }
