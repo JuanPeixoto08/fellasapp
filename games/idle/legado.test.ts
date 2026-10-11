@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { avisos, criarFilaAvisos, detectarNovas, falta, ganhouEm, grade, pontos, RAMOS_ARVORE, situacao, textoVenda, TOTAL_CONQUISTAS } from './legado';
+import {
+  avisos, criarFilaAvisos, descricaoNo, detectarNovas, escalaArvore, falta, faltam, ganhouEm, grade, MUNDO_ARVORE, noInicial, ondeNo,
+  pontos, POSICOES_ARVORE, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela, textoVenda, TOTAL_CONQUISTAS,
+} from './legado';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
@@ -127,5 +130,74 @@ describe('árvore', () => {
     expect(falta(no(12))).toBe('Libera com Cafezinho de garrafa térmica');
     expect(falta(no(11))).toBe('Libera com Virou MEI');
     expect(falta(no(1))).toBe('');
+  });
+});
+
+const noDe = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
+
+describe('árvore em tela cheia: a copa', () => {
+  it('as 26 posições existem e cabem no mundo com folga de 26', () => {
+    const ids = Object.keys(POSICOES_ARVORE).map(Number).sort((a, b) => a - b);
+    expect(ids).toEqual(catalogo.arvore.map((n) => n.id).sort((a, b) => a - b));
+    for (const [x, y] of Object.values(POSICOES_ARVORE)) {
+      expect(x).toBeGreaterThanOrEqual(26);
+      expect(x).toBeLessThanOrEqual(MUNDO_ARVORE.largura - 26);
+      expect(y).toBeGreaterThanOrEqual(26);
+      expect(y).toBeLessThanOrEqual(MUNDO_ARVORE.altura - 26);
+    }
+  });
+  it('nenhum nó encosta no outro: centros a 64 ou mais', () => {
+    const pos = Object.values(POSICOES_ARVORE);
+    for (let i = 0; i < pos.length; i++) {
+      for (let j = i + 1; j < pos.length; j++) {
+        expect(Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])).toBeGreaterThanOrEqual(64);
+      }
+    }
+  });
+  it('a raiz embaixo de tudo e cada ramo subindo', () => {
+    const yRaiz = POSICOES_ARVORE[1][1];
+    for (const n of catalogo.arvore) if (n.id !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(yRaiz);
+    for (const n of catalogo.arvore) {
+      if (n.requer !== null && n.requer !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(POSICOES_ARVORE[n.requer][1]);
+    }
+  });
+  it('o nome de cada ramo fica 44 acima do 5º nó, dentro do mundo', () => {
+    expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente']);
+    for (const r of ROTULOS_ARVORE) {
+      const quinto = catalogo.arvore.find((n) => n.posicao === 5 && POSICOES_ARVORE[n.id][0] === r.x)!;
+      expect(r.y).toBe(POSICOES_ARVORE[quinto.id][1] - 44);
+      expect(r.y).toBeGreaterThanOrEqual(8);
+    }
+  });
+  it('escala: cabe no lado mais apertado, presa entre 0,85 e 1,4', () => {
+    expect(escalaArvore(400, 540)).toBe(1);
+    expect(escalaArvore(2000, 2000)).toBe(1.4);
+    expect(escalaArvore(300, 800)).toBe(0.85);
+    expect(escalaArvore(380, 900)).toBeCloseTo(0.95, 10);
+  });
+  it('situação na tela: comprado, dá pra comprar, falta ponto, trancado', () => {
+    expect(situacaoTela(noDe(1), [1], 0)).toBe('comprado');
+    expect(situacaoTela(noDe(11), [1], 2)).toBe('pode');
+    expect(situacaoTela(noDe(11), [1], 1)).toBe('falta');
+    expect(situacaoTela(noDe(12), [1], 99)).toBe('trancado');
+    expect(situacaoTela(noDe(1), [], 0)).toBe('falta');
+  });
+  it('nó inicial: o mais barato que dá pra comprar; senão o mais barato liberado; senão a raiz', () => {
+    expect(noInicial([], 5)).toBe(1);
+    expect(noInicial([], 0)).toBe(1);
+    expect(noInicial([1], 3)).toBe(11);
+    expect(noInicial([1, 11], 3)).toBe(21);
+    expect(noInicial([1, 11], 1)).toBe(21);
+    expect(noInicial(catalogo.arvore.map((n) => n.id), 99)).toBe(1);
+  });
+  it('textos: onde fica, quanto falta e a descrição pro leitor de tela', () => {
+    expect(ondeNo(noDe(1))).toBe('Raiz');
+    expect(ondeNo(noDe(12))).toBe('Produção · 2 de 5');
+    expect(faltam(1)).toBe('Falta 1 ★');
+    expect(faltam(5)).toBe('Faltam 5 ★');
+    expect(descricaoNo(noDe(11), 'comprado', 0)).toBe('Cafezinho de garrafa térmica, comprado');
+    expect(descricaoNo(noDe(21), 'pode', 3)).toBe('Porquinho quebrado, dá pra comprar por 2 ★');
+    expect(descricaoNo(noDe(13), 'falta', 3)).toBe('Turno dobrado, faltam 5 ★');
+    expect(descricaoNo(noDe(14), 'trancado', 3)).toBe('Tema da Vitória, trancado');
   });
 });

@@ -104,3 +104,59 @@ export function falta(no: No): string {
   const antes = catalogo.arvore.find((n) => n.id === no.requer);
   return antes ? `Libera com ${antes.nome}` : '';
 }
+
+/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó. A raiz embaixo; cada ramo sobe abrindo, como a
+ *  copa de uma árvore. Aprovado no mockup (layout-v2.html). Mudar aqui = conferir o teste de distância. */
+export const MUNDO_ARVORE = { largura: 400, altura: 540 } as const;
+export const POSICOES_ARVORE: Readonly<Record<number, readonly [number, number]>> = {
+  1: [200, 510],
+  11: [80, 450], 12: [52, 372], 13: [44, 288], 14: [48, 204], 15: [64, 122],
+  21: [134, 406], 22: [120, 324], 23: [116, 242], 24: [122, 160], 25: [136, 80],
+  31: [200, 378], 32: [200, 302], 33: [200, 222], 34: [200, 142], 35: [200, 56],
+  41: [266, 406], 42: [280, 324], 43: [284, 242], 44: [278, 160], 45: [264, 80],
+  51: [320, 450], 52: [348, 372], 53: [356, 288], 54: [352, 204], 55: [336, 122],
+};
+
+/** O nome de cada ramo, 44 unidades acima do 5º nó dele. */
+export const ROTULOS_ARVORE: readonly { nome: string; x: number; y: number }[] = RAMOS_ARVORE
+  .filter((r) => r.ramo > 0)
+  .map((r) => {
+    const [x, y] = POSICOES_ARVORE[r.nos[r.nos.length - 1].id];
+    return { nome: r.nome, x, y: y - 44 };
+  });
+
+/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,85 (abaixo disso arrasta) e 1,4. */
+export function escalaArvore(largura: number, altura: number): number {
+  const s = Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura);
+  return Math.min(1.4, Math.max(0.85, s));
+}
+
+/** A situação de um nó na tela cheia: o "disponível" se divide em dá pra comprar agora e falta ponto. */
+export type SituacaoTela = 'comprado' | 'pode' | 'falta' | 'trancado';
+export function situacaoTela(no: No, arvore: readonly number[], pontosLivres: number): SituacaoTela {
+  const s = situacao(no, arvore);
+  if (s !== 'disponivel') return s;
+  return pontosLivres >= no.custo ? 'pode' : 'falta';
+}
+
+/** O nó escolhido ao abrir a árvore: o mais barato que dá pra comprar; senão o mais barato liberado; senão a raiz.
+ *  Empate no custo: o menor id. */
+export function noInicial(arvore: readonly number[], pontosLivres: number): number {
+  const porCusto = [...catalogo.arvore].sort((a, b) => a.custo - b.custo || a.id - b.id);
+  const achar = (sit: SituacaoTela) => porCusto.find((n) => situacaoTela(n, arvore, pontosLivres) === sit);
+  return (achar('pode') ?? achar('falta') ?? catalogo.arvore.find((n) => n.ramo === 0)!).id;
+}
+
+/** "Produção · 2 de 5"; a raiz diz "Raiz". */
+export const ondeNo = (no: No): string => (no.ramo === 0 ? 'Raiz' : `${RAMOS[no.ramo]} · ${no.posicao} de 5`);
+
+/** "Falta 1 ★" / "Faltam 5 ★". */
+export const faltam = (n: number): string => (n === 1 ? 'Falta 1 ★' : `Faltam ${n} ★`);
+
+/** O rótulo do nó pro leitor de tela: "Turno dobrado, faltam 5 ★". */
+export function descricaoNo(no: No, sit: SituacaoTela, pontosLivres: number): string {
+  if (sit === 'comprado') return `${no.nome}, comprado`;
+  if (sit === 'pode') return `${no.nome}, dá pra comprar por ${no.custo} ★`;
+  if (sit === 'falta') return `${no.nome}, ${faltam(no.custo - pontosLivres).toLowerCase()}`;
+  return `${no.nome}, trancado`;
+}
