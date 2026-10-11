@@ -165,11 +165,12 @@ describe('POST /cleanup', () => {
 });
 
 describe('POST /migrar-fotos (Storage -> Cloudinary, uma vez)', () => {
+  const DONO = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
   it('leva um lote: baixa do Storage, sobe no Cloudinary com nome fixo, troca o endereço no banco e diz quantas faltam', async () => {
     const arquivo = new Response(new Blob(['jpg'], { type: 'image/jpeg' }), { status: 200 });
     const fetch = jest
       .fn()
-      .mockResolvedValueOnce(json([{ caminho: 'u1/1-0.jpg', uso: 'post' }, { caminho: 'u1/sumiu.gif', uso: 'perfil' }]))
+      .mockResolvedValueOnce(json([{ caminho: `${DONO}/1-0.jpg`, uso: 'post' }, { caminho: `${DONO}/sumiu.gif`, uso: 'perfil' }]))
       .mockResolvedValueOnce(arquivo) // baixa a 1ª
       .mockResolvedValueOnce(json({ public_id: 'ok' })) // sobe no Cloudinary
       .mockResolvedValueOnce(new Response(null, { status: 204 })) // foto_trocar
@@ -177,23 +178,23 @@ describe('POST /migrar-fotos (Storage -> Cloudinary, uma vez)', () => {
       .mockResolvedValueOnce(json(1)); // fotos_pendentes_total
     const res = await handle(post('migrar-fotos', {}, { 'x-cron-secret': 'cron' }), env, deps(fetch));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ migradas: 1, falhas: ['u1/sumiu.gif'], restantes: 1 });
+    expect(await res.json()).toEqual({ migradas: 1, falhas: [`${DONO}/sumiu.gif`], restantes: 1 });
     const [lista, baixa, sobe, troca, , total] = fetch.mock.calls;
     expect(lista[0]).toBe('https://sb.test/rest/v1/rpc/fotos_pendentes');
     expect(JSON.parse(lista[1].body)).toEqual({ p_limite: 25 });
     expect(lista[1].headers.Authorization).toBe('Bearer svc');
     expect(lista[1].headers.apikey).toBe('svc');
-    expect(baixa[0]).toBe('https://sb.test/storage/v1/object/post-images/u1/1-0.jpg');
+    expect(baixa[0]).toBe(`https://sb.test/storage/v1/object/post-images/${DONO}/1-0.jpg`);
     expect(baixa[1].headers.Authorization).toBe('Bearer svc');
     expect(sobe[0]).toBe('https://api.cloudinary.com/v1_1/cloud/image/upload');
     const form = sobe[1].body as FormData;
-    const id = `fotos/m-${await sha1Hex('u1/1-0.jpg')}`;
+    const id = `fotos/m-${await sha1Hex(`${DONO}/1-0.jpg`)}`;
     expect(form.get('public_id')).toBe(id);
     expect(form.get('api_key')).toBe('key');
     expect(form.get('signature')).toBe(await sha1Hex(`overwrite=true&public_id=${id}&timestamp=${Date.parse('2026-10-06T12:00:00Z') / 1000}secret`));
     expect(troca[0]).toBe('https://sb.test/rest/v1/rpc/foto_trocar');
     expect(JSON.parse(troca[1].body)).toEqual({
-      p_caminho: 'u1/1-0.jpg',
+      p_caminho: `${DONO}/1-0.jpg`,
       p_url: `https://res.cloudinary.com/cloud/image/upload/c_limit,w_1600,h_1600,q_auto,f_webp,fl_awebp/${id}`,
       p_uso: 'post',
     });
@@ -203,13 +204,28 @@ describe('POST /migrar-fotos (Storage -> Cloudinary, uma vez)', () => {
   it('Cloudinary recusou: entra nas falhas e o banco não troca', async () => {
     const fetch = jest
       .fn()
-      .mockResolvedValueOnce(json([{ caminho: 'u1/a.jpg', uso: 'banner' }]))
+      .mockResolvedValueOnce(json([{ caminho: `${DONO}/a.jpg`, uso: 'banner' }]))
       .mockResolvedValueOnce(new Response(new Blob(['x']), { status: 200 }))
       .mockResolvedValueOnce(json({ error: { message: 'Rate Limit' } }, 420))
       .mockResolvedValueOnce(json(1));
     const res = await handle(post('migrar-fotos', {}, { 'x-cron-secret': 'cron' }), env, deps(fetch));
-    expect(await res.json()).toEqual({ migradas: 0, falhas: ['u1/a.jpg'], restantes: 1 });
+    expect(await res.json()).toEqual({ migradas: 0, falhas: [`${DONO}/a.jpg`], restantes: 1 });
     expect(fetch.mock.calls.some((c) => String(c[0]).endsWith('/rpc/foto_trocar'))).toBe(false);
+  });
+
+  it('caminho fora do formato <usuário>/<arquivo> (ex.: ../outro-bucket) nem é baixado: vira falha', async () => {
+    const U = '11111111-2222-3333-4444-555555555555';
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(json([
+        { caminho: `${U}/../../outro/segredo.txt`, uso: 'perfil' },
+        { caminho: `../${U}/a.jpg`, uso: 'post' },
+        { caminho: `${U}/a%2F..%2Fb.jpg`, uso: 'post' },
+      ]))
+      .mockResolvedValueOnce(json(3));
+    const res = await handle(post('migrar-fotos', {}, { 'x-cron-secret': 'cron' }), env, deps(fetch));
+    expect((await res.json()).falhas).toHaveLength(3);
+    expect(fetch).toHaveBeenCalledTimes(2); // só listar e contar
   });
 
   it('segredo errado: 401 sem tocar em nada', async () => {

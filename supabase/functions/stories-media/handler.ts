@@ -180,6 +180,9 @@ async function cleanup(req: Request, env: Env, deps: Deps): Promise<Response> {
 }
 
 /** Fotos antigas por chamada da migração (cabe no tempo da função). */
+/** Caminho de foto que dá pra baixar: <id do usuário>/<arquivo>, sem "." nem ".." (a 0042 filtra igual). */
+const CAMINHO_FOTO_RE = /^[0-9a-f-]{36}\/[A-Za-z0-9._-]+$/;
+const caminhoValido = (c: string) => CAMINHO_FOTO_RE.test(c) && !/\/\.\.?$/.test(c);
 const LOTE_FOTOS = 25;
 
 /**
@@ -205,6 +208,8 @@ async function migrarFotos(req: Request, env: Env, deps: Deps): Promise<Response
   const falhas: string[] = [];
   for (const { caminho, uso } of pendentes) {
     try {
+      // o caminho é texto que o usuário grava: fora do formato, nem baixa (com a chave de serviço, seria ler outro lugar)
+      if (!caminhoValido(caminho)) throw new Error('caminho');
       const caminhoUrl = caminho.split('/').map(encodeURIComponent).join('/');
       const arq = await deps.fetch(`${env.SUPABASE_URL}/storage/v1/object/post-images/${caminhoUrl}`, { headers: svc });
       if (!arq.ok) throw new Error('baixar');

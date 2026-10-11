@@ -14,7 +14,8 @@ alter table public.fotos_migradas enable row level security;
 revoke all on public.fotos_migradas from anon, authenticated;
 
 -- os caminhos do Storage que ainda aparecem no banco, um por linha, com o uso (tamanho da entrega); endereço completo
--- (http...) já está fora do Storage
+-- (http...) já está fora do Storage. Só o formato real <id do usuário>/<arquivo>: o caminho é texto que o usuário grava,
+-- e a função baixa com a chave de serviço (um "../outro-bucket/..." não pode virar leitura de outro lugar).
 create or replace function public.fotos_pendentes(p_limite int)
 returns table (caminho text, uso text) language sql stable security definer set search_path = public as $$
   select distinct on (x.caminho) x.caminho, x.uso
@@ -25,7 +26,7 @@ returns table (caminho text, uso text) language sql stable security definer set 
       union all select pr.avatar_url, 'perfil' from public.profiles pr where pr.avatar_url is not null
       union all select pr.banner_url, 'banner' from public.profiles pr where pr.banner_url is not null
     ) x
-   where x.caminho !~ '^https?://'
+   where x.caminho ~ '^[0-9a-f-]{36}/[A-Za-z0-9._-]+$' and x.caminho !~ '/\.\.?$'
    order by x.caminho
    limit p_limite
 $$;
