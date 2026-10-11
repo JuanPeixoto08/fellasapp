@@ -29,8 +29,8 @@ export function criarAudio(fabrica: () => AudioContext = () => new AudioContext(
     motor.ligar();
     ajustarMusica();
   };
-  alvo.addEventListener('pointerdown', toque);
-  alvo.addEventListener('keydown', toque);
+  // no toque de tela o navegador só conta como gesto o fim do toque (pointerup/touchend/click); o pointerdown vale no mouse
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) alvo.addEventListener(ev, toque);
   alvo.addEventListener('visibilitychange', () => {
     motor.visivel(!alvo.hidden);
     if (!alvo.hidden) ajustarMusica();

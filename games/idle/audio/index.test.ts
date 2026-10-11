@@ -66,6 +66,16 @@ describe('som da Fellas Inc.', () => {
     expect(c.resumidos).toBe(2);
     expect(c.state).toBe('running');
   });
+  it('no celular o gesto que libera o áudio é o fim do toque (pointerup/touchend/click), não só o pointerdown', () => {
+    for (const tipo of ['pointerup', 'touchend', 'click']) {
+      const c = new ContextoFalso();
+      const doc = document.implementation.createHTMLDocument('x');
+      Object.defineProperty(doc, 'hidden', { value: false, configurable: true });
+      criarAudio(() => comoContexto(c), doc);
+      doc.dispatchEvent(new Event(tipo));
+      expect(c.state, tipo).toBe('running');
+    }
+  });
   it('momento grande abaixa a música', () => {
     const { c, audio, tocar } = montar();
     tocar();
