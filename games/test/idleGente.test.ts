@@ -22,7 +22,7 @@ type Estado = {
 };
 
 beforeEach(async () => {
-  t = await freshDb();
+  t = await freshDb({ conquistas: false });
   for (const u of [A, B, C]) await t.member(u);
   await t.member(OUT, { isMember: false });
   await t.as(A);

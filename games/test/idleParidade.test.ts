@@ -289,4 +289,20 @@ describe('paridade', () => {
       expect(db.n, String(v)).toBe(pontosTotais(v));
     }
   });
+  it('o estado devolve o bônus que a conta usa', async () => {
+    const s = estados(5)[4];
+    const bonus = { arvore: [1, 11, 12, 41], conquistas: 7 };
+    await preparar(s);
+    await arvore(bonus.arvore);
+    await conquistas(bonus.conquistas);
+    const [db] = await q<{ r: number; b: { arvore: number[]; conquistas: number } }>(
+      `select (public.idle_json(s) ->> 'rate')::double precision as r, public.idle_json(s) -> 'bonus' as b
+         from public.idle_state s where user_id = $1`,
+      [A],
+    );
+    expect(db.b).toEqual(bonus);
+    expect(rel(db.r, taxa(catalogo, { ...s, bonus }))).toBeLessThan(1e-9);
+    await arvore([]);
+    await conquistas(0);
+  });
 });

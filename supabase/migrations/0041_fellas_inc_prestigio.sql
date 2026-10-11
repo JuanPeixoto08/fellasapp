@@ -258,3 +258,391 @@ revoke all on function public.idle_opp_cap(public.idle_state) from public, anon,
 revoke all on function public.idle_hire_price(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_prestige_total(double precision) from public, anon, authenticated;
+
+-- ===== conquistas =====
+
+-- conquistas de evento: quem viu o evento ganha as do tipo (com valor até p_valor, quando a conquista pede um)
+create or replace function public.idle_ganhar(p_user uuid, p_tipo text, p_valor double precision default null)
+returns void language sql volatile set search_path = public as $$
+  insert into public.idle_conquistas (user_id, conquista_id)
+  select p_user, c.id
+    from public.idle_cat_conquista c
+   where c.tipo = p_tipo
+     and (c.valor is null or c.valor <= p_valor)
+  on conflict do nothing
+$$;
+
+-- 3h da manhã em Brasília (conquista "3h06")
+create or replace function public.idle_madrugada(ts timestamptz default now())
+returns boolean language sql stable as $$
+  select extract(hour from ts at time zone 'America/Sao_Paulo') = 3
+$$;
+
+-- confere as conquistas "de estado" de alguém e grava as novas (com a hora desta transação). Roda no idle_save, o
+-- último passo de toda função que muda o jogo, sempre depois de fechar a conta: a conquista nova só vale dali pra
+-- frente. Devolve as que ganhou agora.
+create or replace function public.idle_check_conquistas(p_user uuid)
+returns int[] language plpgsql volatile set search_path = public as $$
+declare
+  s       public.idle_state;
+  v_rate  double precision;
+  v_era   int;
+  v_novas int[];
+  n       int;
+begin
+  select * into s from public.idle_state where user_id = p_user;
+  if not found then
+    return '{}';
+  end if;
+  v_rate := public.idle_rate(s);
+  v_era := public.idle_era(s.generators);
+  n := cardinality(s.opp_recent);
+  with novas as (
+    insert into public.idle_conquistas (user_id, conquista_id)
+    select p_user, c.id
+      from public.idle_cat_conquista c
+     where case
+             when exists (select 1 from public.idle_conquistas x where x.user_id = p_user and x.conquista_id = c.id) then false
+             when c.tipo = 'gerador' then s.generators[c.alvo] >= c.valor
+             when c.tipo = 'gerador_exato' then c.valor::int = any (s.generators)
+             when c.tipo = 'taxa' then v_rate >= c.valor
+             when c.tipo = 'era' then v_era >= c.valor
+             when c.tipo = 'melhoria' then c.alvo = any (s.upgrades)
+             when c.tipo = 'melhorias' then s.upg_total >= c.valor
+             when c.tipo = 'oportunidades' then s.opp_total >= c.valor
+             when c.tipo = 'vendas' then s.prestige_count >= c.valor
+             when c.tipo = 'contratei' then s.hire_total >= c.valor
+             when c.tipo = 'contratado' then s.hired_total >= c.valor
+             -- as 3 opções de alguma era (era com opção desligada não conta)
+             when c.tipo = 'estrategia_era' then exists (
+               select 1 from public.idle_cat_est e group by e.era
+               having count(*) = count(*) filter (where e.era * 10 + e.opcao = any (s.est_usadas)))
+             -- todas as ligadas
+             when c.tipo = 'estrategia_todas' then not exists (
+               select 1 from public.idle_cat_est e where e.ativa and not (e.era * 10 + e.opcao = any (s.est_usadas)))
+             -- 3 oportunidades em menos de c.valor segundos
+             when c.tipo = 'brainrot' then n >= 3 and s.opp_recent[n] - s.opp_recent[n - 2] < make_interval(secs => c.valor)
+             -- 1º no placar (F$/s), com mais alguém com empresa aberta e ninguém com mais
+             when c.tipo = 'aura' then s.started and v_rate > 0
+               and exists (select 1 from public.idle_state o where o.started and o.user_id <> p_user)
+               and not exists (select 1 from public.idle_state o
+                                where o.started and o.user_id <> p_user and public.idle_rate(o) >= v_rate)
+             else false
+           end
+    on conflict do nothing
+    returning conquista_id
+  )
+  select coalesce(array_agg(conquista_id order by conquista_id), '{}') into v_novas from novas;
+  return v_novas;
+end;
+$$;
+
+-- gravar o estado (o da 0036 + o que é permanente e as estratégias já usadas), conferir as conquistas e guardar o
+-- recorde de F$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta. As janelas de oportunidade já
+-- pegas valem até 6h com a árvore: guarda as das últimas 10h.
+create or replace function public.idle_save(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$
+begin
+  update public.idle_state
+     set started = s.started, valuation = s.valuation, generators = s.generators, upgrades = s.upgrades,
+         strategies = s.strategies, boost_until = s.boost_until, half_price = s.half_price,
+         opp_claimed = array(select w from unnest(s.opp_claimed) w
+                              where w >= floor(extract(epoch from now()) / 600)::bigint - 60),
+         opp_day = s.opp_day, opp_count = s.opp_count,
+         settled_at = s.settled_at, updated_at = now(),
+         prestige_earned = s.prestige_earned, prestige_spent = s.prestige_spent, prestige_count = s.prestige_count,
+         upg_total = s.upg_total, opp_total = s.opp_total, hire_total = s.hire_total, hired_total = s.hired_total,
+         est_usadas = array(select distinct x from unnest(s.est_usadas || public.idle_est_codigos(s.strategies)) x order by x),
+         opp_recent = s.opp_recent
+   where user_id = s.user_id;
+  perform public.idle_check_conquistas(s.user_id);
+  -- o recorde depois das conquistas novas (o F$/s que a tela mostra já conta com elas)
+  update public.idle_state set best_rate = greatest(best_rate, s.best_rate, public.idle_rate(s)) where user_id = s.user_id;
+end;
+$$;
+
+-- o estado que toda função do jogo devolve: o da 0038 + bônus (os nós comprados e quantas conquistas), pontos livres
+-- e ganhos na vida, vendas, recorde de F$/s, quantos pontos a venda daria agora, suas conquistas, as ganhas nesta
+-- chamada (a tela avisa) e as escondidas que alguém do grupo já tem (a tela mostra "???").
+create or replace function public.idle_json(s public.idle_state)
+returns jsonb language plpgsql stable set search_path = public as $$
+declare v_rate double precision := public.idle_rate(s);
+begin
+  return jsonb_build_object(
+    'user_id', s.user_id, 'week_start', s.week_start, 'started', s.started, 'valuation', s.valuation,
+    'rate', v_rate, 'generators', to_jsonb(s.generators), 'upgrades', to_jsonb(s.upgrades),
+    'strategies', to_jsonb(s.strategies), 'era', public.idle_era(s.generators), 'boost_until', s.boost_until,
+    'half_price', s.half_price, 'opp_claimed', to_jsonb(s.opp_claimed),
+    'opp_left', greatest(0, public.idle_opp_cap(s)
+                             - case when s.opp_day = public.games_today() then s.opp_count else 0 end),
+    'server_now', now(),
+    'avatar', public.idle_avatar_json(s.user_id),
+    'equipe', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employee_id, 'cargo', c.cargo,
+                                                            'avatar', public.idle_avatar_json(c.employee_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
+                          from public.idle_contracts c
+                         where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
+    'chefes', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employer_id, 'cargo', c.cargo,
+                                                            'mult', public.idle_employee_mult(c.employer_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
+                          from public.idle_contracts c
+                         where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
+    'social', jsonb_build_object(
+      'contratei', (select count(*) from public.idle_contracts c
+                     where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()),
+      'empregos', coalesce((select jsonb_agg(public.idle_employee_mult(c.employer_id) order by c.created_at desc, c.id desc)
+                              from public.idle_contracts c
+                             where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb)),
+    'hire_price', public.idle_hire_price(s),
+    'muda_em', public.idle_next_change(s),
+    'bonus', jsonb_build_object(
+      'arvore', coalesce((select jsonb_agg(a.no_id order by a.no_id) from public.idle_arvore a where a.user_id = s.user_id), '[]'::jsonb),
+      'conquistas', (select count(*) from public.idle_conquistas c where c.user_id = s.user_id)),
+    'pontos', s.prestige_earned - s.prestige_spent,
+    'pontos_vida', s.prestige_earned,
+    'vendas', s.prestige_count,
+    'recorde', greatest(s.best_rate, v_rate),
+    'pontos_venda', case when s.started then greatest(0, public.idle_prestige_total(v_rate) - s.prestige_earned) else 0 end,
+    'conquistas', coalesce((select jsonb_agg(jsonb_build_object('id', c.conquista_id, 'em', c.ganhou_em)
+                                             order by c.ganhou_em, c.conquista_id)
+                              from public.idle_conquistas c where c.user_id = s.user_id), '[]'::jsonb),
+    'novas', coalesce((select jsonb_agg(c.conquista_id order by c.conquista_id)
+                         from public.idle_conquistas c where c.user_id = s.user_id and c.ganhou_em = now()), '[]'::jsonb),
+    'descobertas', coalesce((select jsonb_agg(d.id order by d.id)
+                               from (select distinct c.conquista_id as id
+                                       from public.idle_conquistas c
+                                       join public.idle_cat_conquista k on k.id = c.conquista_id
+                                      where k.escondida) d), '[]'::jsonb));
+end;
+$$;
+
+revoke all on function public.idle_ganhar(uuid, text, double precision) from public, anon, authenticated;
+revoke all on function public.idle_madrugada(timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_check_conquistas(uuid) from public, anon, authenticated;
+revoke all on function public.idle_save(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_json(public.idle_state) from public, anon, authenticated;
+
+-- ===== as funções que contam o que as conquistas pedem =====
+
+-- abrir o jogo (a da 0034) + "3h06"
+create or replace function public.idle_open()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare s public.idle_state;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  if public.idle_madrugada() then
+    perform public.idle_ganhar(s.user_id, 'madrugada');
+  end if;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+-- comprar (a da 0034) + conta as melhorias compradas e o "Tá saindo da jaula" (Máx com 100 ou mais)
+create or replace function public.idle_buy(p_kind text, p_id int, p_qty int default 1)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  g      public.idle_cat_gen;
+  u      public.idle_cat_upg;
+  v_era  int;
+  v_cm   double precision;
+  v_n    int;
+  v_k    int;
+  v_preco double precision;
+  v_meia boolean := false;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_era := public.idle_era(s.generators);
+  if v_era >= 2 and s.strategies[v_era - 1] < 0 then
+    raise exception 'idle_strategy_pending' using errcode = 'P0001';
+  end if;
+  v_cm := public.idle_cost_mult(s);
+
+  if p_kind = 'gerador' then
+    select * into g from public.idle_cat_gen where id = p_id;
+    if not found then
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    if p_id > 1 and s.generators[p_id - 1] < 1 then
+      raise exception 'idle_locked' using errcode = 'P0001';
+    end if;
+    v_n := s.generators[p_id];
+    if p_qty = 0 then
+      v_k := public.idle_max_qty(g.custo, v_n, s.valuation, v_cm);
+      if v_k < 1 then
+        raise exception 'idle_cant_afford' using errcode = 'P0001';
+      end if;
+    elsif p_qty in (1, 10) then
+      v_k := p_qty;
+    else
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    v_preco := public.idle_price(g.custo, v_n, v_k, v_cm);
+    if s.half_price and v_k = 1 then
+      v_preco := v_preco / 2;
+      v_meia := true;
+    end if;
+    if v_preco > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := s.valuation - v_preco;
+    s.generators[p_id] := v_n + v_k;
+    if p_qty = 0 then
+      perform public.idle_ganhar(s.user_id, 'jaula', v_k);
+    end if;
+  elsif p_kind = 'melhoria' then
+    select * into u from public.idle_cat_upg where id = p_id;
+    if not found then
+      raise exception 'idle_bad_choice' using errcode = 'P0001';
+    end if;
+    if p_id = any (s.upgrades) then
+      raise exception 'idle_owned' using errcode = 'P0001';
+    end if;
+    if not public.idle_upg_unlocked(u, s.generators) then
+      raise exception 'idle_locked' using errcode = 'P0001';
+    end if;
+    v_preco := u.preco * v_cm;
+    if s.half_price then
+      v_preco := v_preco / 2;
+      v_meia := true;
+    end if;
+    if v_preco > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := s.valuation - v_preco;
+    s.upgrades := array_append(s.upgrades, p_id);
+    s.upg_total := s.upg_total + 1;
+  else
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+
+  if v_meia then
+    s.half_price := false;
+  end if;
+  s.valuation := greatest(s.valuation, 0);
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+-- pegar oportunidade (a da 0034) + o bônus da árvore (Xepa da feira) + conta as pegas e guarda a hora das 3 últimas
+-- ("Brainrot")
+create or replace function public.idle_claim_opportunity(p_window bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_mult double precision;
+  v_rate double precision;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if p_window is null or not (p_window = any (public.idle_opp_list(s))) then
+    raise exception 'idle_opp_gone' using errcode = 'P0001';
+  end if;
+  if s.opp_day is distinct from public.games_today() then
+    s.opp_day := public.games_today();
+    s.opp_count := 0;
+  end if;
+  if s.opp_count >= public.idle_opp_cap(s) then
+    raise exception 'idle_opp_cap' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1)
+            * public.idle_arv(s.user_id, 'opp_bonus', 'mult', 1);
+  v_rate := public.idle_rate(s);
+  case public.idle_opp_kind(s.user_id, p_window)
+    when 0 then s.valuation := s.valuation + v_rate * 900 * v_mult;
+    when 1 then s.boost_until := greatest(now(), coalesce(s.boost_until, now())) + make_interval(secs => 60 * v_mult);
+    else s.half_price := true;
+  end case;
+  s.opp_claimed := array_append(s.opp_claimed, p_window);
+  s.opp_count := s.opp_count + 1;
+  s.opp_total := s.opp_total + 1;
+  s.opp_recent := array_append(s.opp_recent, now());
+  s.opp_recent := s.opp_recent[greatest(1, cardinality(s.opp_recent) - 2):];
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+-- contratar (a da 0038) + o contrato dura 10 dias com o nó Carteira assinada de quem contrata + conta os contratos
+-- dos dois lados
+create or replace function public.idle_hire(p_user uuid)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  v_me    uuid := auth.uid();
+  s       public.idle_state;
+  o       public.idle_state;
+  v_era   int;
+  v_preco double precision;
+  v_cargo text;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  if p_user = v_me then
+    raise exception 'idle_hire_self' using errcode = 'P0001';
+  end if;
+  if p_user is null or not exists (select 1 from public.profiles where id = p_user and is_member) then
+    raise exception 'idle_hire_not_open' using errcode = 'P0001';
+  end if;
+  perform public.idle_lock_all(array[v_me, p_user]);
+  select * into s from public.idle_state where user_id = v_me;
+  select * into o from public.idle_state where user_id = p_user;
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if not o.started then
+    raise exception 'idle_hire_not_open' using errcode = 'P0001';
+  end if;
+  v_era := public.idle_era(s.generators);
+  if v_era >= 2 and s.strategies[v_era - 1] < 0 then
+    raise exception 'idle_strategy_pending' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.idle_contracts c
+              where c.employer_id = v_me and c.employee_id = p_user and c.ends_at > now()) then
+    raise exception 'idle_hire_twice' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_preco := public.idle_hire_price(s);
+  if v_preco > s.valuation then
+    raise exception 'idle_cant_afford' using errcode = 'P0001';
+  end if;
+  s.valuation := greatest(s.valuation - v_preco, 0);
+  o := public.idle_settle(o); -- o contratado rende até agora com a regra antiga
+  o.hired_total := o.hired_total + 1;
+  perform public.idle_save(o);
+  select k.nome into v_cargo from public.idle_cat_cargo k order by random() limit 1;
+  insert into public.idle_contracts (employer_id, employee_id, cargo, created_at, ends_at)
+  values (v_me, p_user, coalesce(v_cargo, 'freela'), now(),
+          now() + make_interval(days => greatest(7, public.idle_arv(v_me, 'contrato_dias', 'max', 7))::int));
+  s.hire_total := s.hire_total + 1;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+revoke all on function public.idle_open() from public, anon;
+grant execute on function public.idle_open() to authenticated;
+revoke all on function public.idle_buy(text, int, int) from public, anon;
+grant execute on function public.idle_buy(text, int, int) to authenticated;
+revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
+grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
+revoke all on function public.idle_hire(uuid) from public, anon;
+grant execute on function public.idle_hire(uuid) to authenticated;

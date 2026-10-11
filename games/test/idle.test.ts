@@ -12,7 +12,7 @@ let t: TestDb;
 const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
 
 beforeEach(async () => {
-  t = await freshDb();
+  t = await freshDb({ conquistas: false });
   for (const u of [A, B]) await t.member(u);
   await t.member(OUT, { isMember: false });
   await t.as(A);

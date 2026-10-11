@@ -23,12 +23,15 @@ export const MIGRATIONS: string[] = [
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;
 
-export async function freshDb() {
+/** `conquistas: false` esvazia o catálogo das conquistas: os testes das entregas 1 e 2 conferem a conta exata, sem o
+ *  +1% de cada conquista que as ações vão ganhando. */
+export async function freshDb(opcoes: { conquistas?: boolean } = {}) {
   const db = new PGlite();
   await db.exec(SKELETON);
   for (const name of MIGRATIONS) {
     await db.exec(readFileSync(resolve(__dirname, '../../supabase/migrations', name), 'utf8'));
   }
+  if (opcoes.conquistas === false) await db.exec('delete from public.idle_cat_conquista where true');
   const t = {
     db,
     async as(uid: string | null) {
