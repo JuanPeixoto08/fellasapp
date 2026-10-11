@@ -21,7 +21,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', som: true, novidadeNova: false, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', chaves: { musica: true, efeitos: true, avisos: true }, novidadeNova: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -35,7 +35,7 @@ beforeEach(() => {
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
-    config: vi.fn<Acoes['config']>(), som: vi.fn<Acoes['som']>(),
+    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -533,18 +533,21 @@ describe('empresa, resumo e bancada', () => {
     expect(eng.querySelector('.ponto')!.hasAttribute('hidden')).toBe(true);
     expect(root.querySelector('.top .topo-visual')).toBeNull(); // o Mudar visual mudou pra dentro
   });
-  it('Configurações: Som (liga/desliga), Mudar visual e Patch notes', () => {
+  it('Configurações: Música, Efeitos sonoros e Avisos (cada um liga/desliga), Mudar visual e Patch notes', () => {
     const tela = criarTela(root, acoes);
     expect(root.querySelector('.modal-config')!.hasAttribute('hidden')).toBe(true);
-    tela.renderizar(modelo({ config: 'menu', som: true, novidadeNova: true }));
+    tela.renderizar(modelo({ config: 'menu', chaves: { musica: true, efeitos: false, avisos: true }, novidadeNova: true }));
     const modal = root.querySelector<HTMLElement>('.modal-config')!;
     expect(modal.hasAttribute('hidden')).toBe(false);
-    expect([...modal.querySelectorAll('.config-item .rotulo')].map((x) => x.textContent)).toEqual(['Som', 'Mudar visual', 'Patch notes']);
-    const som = modal.querySelector<HTMLButtonElement>('[role="switch"]')!;
-    expect(som.getAttribute('aria-checked')).toBe('true');
-    expect(som.textContent).toBe('Ligado');
-    som.click();
-    expect(acoes.som).toHaveBeenCalledWith(false);
+    expect([...modal.querySelectorAll('.config-item .rotulo')].map((x) => x.textContent)).toEqual(['Música', 'Efeitos sonoros', 'Avisos', 'Mudar visual', 'Patch notes']);
+    const chaves = [...modal.querySelectorAll<HTMLButtonElement>('[role="switch"]')];
+    expect(chaves.map((c) => [c.getAttribute('aria-label'), c.getAttribute('aria-checked'), c.textContent])).toEqual([
+      ['Música', 'true', 'Ligada'], ['Efeitos sonoros', 'false', 'Desligados'], ['Avisos', 'true', 'Ligados'],
+    ]);
+    chaves[0].click();
+    chaves[1].click();
+    chaves[2].click();
+    expect(acoes.chave.mock.calls).toEqual([['musica', false], ['efeitos', true], ['avisos', false]]);
     const item = (t: string) => [...modal.querySelectorAll<HTMLButtonElement>('button.config-item')].find((b) => b.querySelector('.rotulo')!.textContent === t)!;
     expect(item('Patch notes').querySelector('.ponto')!.hasAttribute('hidden')).toBe(false);
     item('Patch notes').click();
@@ -554,8 +557,19 @@ describe('empresa, resumo e bancada', () => {
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
     modal.querySelector<HTMLButtonElement>('.fechar')!.click();
     expect(acoes.config).toHaveBeenLastCalledWith('fechada');
-    tela.renderizar(modelo({ config: 'menu', som: false }));
-    expect(root.querySelector('.modal-config [role="switch"]')!.textContent).toBe('Desligado');
+  });
+  it('som da interface: clique em aba e em chave; comprar não clica (a compra tem o som dela); folha abrindo e fechando', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    root.querySelector<HTMLButtonElement>('.aba')!.click();
+    expect(acoes.efeito).toHaveBeenCalledWith('clique');
+    acoes.efeito.mockClear();
+    root.querySelector<HTMLButtonElement>('.gerador button[data-qtd="1"]')!.click();
+    expect(acoes.efeito).not.toHaveBeenCalled();
+    tela.renderizar(modelo({ caixaAberta: true }));
+    expect(acoes.efeito).toHaveBeenLastCalledWith('abrir');
+    tela.renderizar(modelo({ caixaAberta: false }));
+    expect(acoes.efeito).toHaveBeenLastCalledWith('fechar');
   });
   it('Patch notes: as versões da mais nova pra mais antiga, com data e linhas; Voltar volta pro menu', () => {
     const tela = criarTela(root, acoes);
