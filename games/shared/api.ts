@@ -6,11 +6,14 @@ import { linhaPlacar } from './types';
 import type {
   Action,
   BoardRow,
+  BolsaEstado,
   Fella,
   IdleBoardRow,
   IdleState,
   IdleVisual,
+  LadoBolsa,
   LinhaPlacar,
+  MelhoriaBolsa,
   PokerAction,
   PokerCards,
   PokerHistoryRow,
@@ -59,6 +62,11 @@ export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportun
 export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
 export const idlePrestige = () => rpc<IdleState>('idle_prestige');
 export const idleBuyNode = (no: number) => rpc<IdleState>('idle_buy_node', { p_no: no });
+export const idleBolsa = () => rpc<BolsaEstado>('idle_bolsa');
+export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number) =>
+  rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_negociar', { p_empresa: empresa, p_lado: lado, p_qtd: qtd, p_tick: tick });
+export const idleBolsaMelhorar = (tipo: MelhoriaBolsa, nivel: number) =>
+  rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_melhorar', { p_tipo: tipo, p_nivel: nivel });
 export const idleSetAvatar = (v: IdleVisual) =>
   rpc<IdleState>('idle_set_avatar', {
     p_pele: v.pele, p_cabelo: v.cabelo, p_cor_cabelo: v.cor_cabelo, p_roupa: v.roupa, p_cor_roupa: v.cor_roupa,

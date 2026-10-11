@@ -1,7 +1,9 @@
 // Só no dev (?mock): a Fellas Inc. contra as migrações rodando no navegador (dev/mockDb.ts). Mesmos nomes e
 // formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio, nós da
 // árvore e conquistas (uma escondida, pra aba Legado mostrar o "???"). Nunca entra no build.
-import { linhaPlacar, type IdleBoardRow, type IdleState, type IdleVisual, type LinhaPlacar } from '../shared/types';
+import {
+  linhaPlacar, type BolsaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type MelhoriaBolsa,
+} from '../shared/types';
 import { call, dono, FRIENDS, ME } from './mockDb';
 
 // visuais dos bots (ninguém real): Oliveira, Bia, Teteu
@@ -45,6 +47,11 @@ export const idleHire = (userId: string) => call<IdleState>('select public.idle_
 export const idleSetAvatar = (v: IdleVisual) => avatar(v);
 export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');
 export const idleBuyNode = (no: number) => call<IdleState>('select public.idle_buy_node($1) as v', [no]);
+export const idleBolsa = () => call<BolsaEstado>('select public.idle_bolsa() as v');
+export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number) =>
+  call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_negociar($1, $2, $3, $4) as v', [empresa, lado, qtd, tick]);
+export const idleBolsaMelhorar = (tipo: MelhoriaBolsa, nivel: number) =>
+  call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_melhorar($1, $2) as v', [tipo, nivel]);
 export const hasSession = async () => true;
 export const myId = async () => ME;
 
@@ -58,9 +65,9 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 }
 
 // console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
-// __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres
+// __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres; __trader(3) abre a Bolsa (3 traders e F$ de sobra)
 const w = window as unknown as {
-  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>;
+  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -82,4 +89,10 @@ w.__vendavel = async (foguetes = 150) => {
 w.__pontos = async (n) => {
   await dono('update public.idle_state set prestige_earned = prestige_spent + $2 where user_id = $1', [ME, n]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
+};
+w.__trader = async (n = 3) => {
+  // os traders e um pouco de cada gerador ligado às empresas (o limite de cada uma cresce com ele)
+  await dono(`update public.idle_state set generators[19] = $2, generators[18] = greatest(generators[18], 1),
+    generators[11] = greatest(generators[11], 20), generators[16] = greatest(generators[16], 5), valuation = 1e15 where user_id = $1`, [ME, n]);
+  document.dispatchEvent(new Event('visibilitychange'));
 };

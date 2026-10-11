@@ -36,6 +36,7 @@ export type GameErrorCode =
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
+  | 'idle_bolsa_preco_mudou' | 'idle_bolsa_rj' | 'idle_bolsa_limite' | 'idle_bolsa_fechada' | 'idle_bolsa_sem_acoes' | 'idle_bolsa_nivel'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -80,6 +81,12 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_prestige_low: 'Ainda não compensa vender',
   idle_points_low: 'Faltam pontos de prestígio pra esse nó',
   idle_node_owned: 'Você já tem esse nó',
+  idle_bolsa_nivel: 'Essa melhoria já mudou. Confere de novo',
+  idle_bolsa_preco_mudou: 'O preço mudou, confere de novo',
+  idle_bolsa_rj: 'Essa empresa quebrou. Volta em alguns minutos',
+  idle_bolsa_limite: 'Chegou no limite de ações dessa empresa',
+  idle_bolsa_fechada: 'Compra 1 Grupo de trader pra abrir a Bolsa',
+  idle_bolsa_sem_acoes: 'Você não tem ações dessa empresa',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -126,6 +133,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
   'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
+  'idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_fechada', 'idle_bolsa_sem_acoes', 'idle_bolsa_nivel',
 ];
 
 export function toGameError(e: unknown): GameError {

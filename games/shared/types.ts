@@ -155,3 +155,13 @@ export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
 export type IdleVisual = {
   pele: number; cabelo: number; cor_cabelo: number; roupa: number; cor_roupa: number; acessorio: number; cor_acessorio: number;
 };
+
+/** Bolsa da Fellas Inc. (0043 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
+export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] };
+export type BolsaPosicao = { empresa: number; qtd: number; custo: number };
+export type BolsaEstado = {
+  tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
+  empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[];
+};
+export type LadoBolsa = 'comprar' | 'vender';
+export type MelhoriaBolsa = 'corretor' | 'escritorio';
