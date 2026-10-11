@@ -12,6 +12,8 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
   server_now: '2026-10-12T12:00:00.000Z',
   avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
+  bonus: { arvore: [], conquistas: 0 }, pontos: 0, pontos_vida: 0, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [],
+  descobertas: [],
   ...x,
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
@@ -127,7 +129,7 @@ describe('tela da Fellas Inc.', () => {
   });
   it('placar mostra o F$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false }] }));
+    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0 }] }));
     const v = root.querySelector('.lista-placar .v')!.textContent!;
     expect(v).toContain('/s');
     expect(v).not.toContain('bi');
@@ -170,7 +172,7 @@ describe('tela da Fellas Inc.', () => {
 
 const linha = (x: Partial<IdleBoardRow> = {}): IdleBoardRow => ({
   userId: 'b', name: 'Bia', valuation: 1000, rate: 2, era: 2, strategies: [0, -1, -1, -1],
-  avatar: null, hiredCount: 0, byMe: false, mostHired: false, ...x,
+  avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0, ...x,
 });
 const ATE = '2026-10-19T00:00:00.000Z'; // 6,5 dias depois do server_now das fixtures
 

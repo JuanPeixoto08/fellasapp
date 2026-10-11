@@ -43,6 +43,16 @@ export const ready = (async () => {
 
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Roda `sql` como dono do banco (bots e atalhos do dev), na mesma fila das chamadas. */
+export function dono(sql: string, params: unknown[] = []): Promise<void> {
+  const run = queue.then(async () => {
+    const db = await ready;
+    await db.query(sql, params);
+  });
+  queue = run.catch(() => undefined);
+  return run;
+}
+
 /** Roda `sql` (que devolve uma coluna `v`) como `authenticated`, no papel de `as`. */
 export function call<T>(sql: string, params: unknown[] = [], as = ME): Promise<T> {
   const run = queue.then(async () => {

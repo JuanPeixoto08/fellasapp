@@ -1,7 +1,8 @@
 // Só no dev (?mock): a Fellas Inc. contra as migrações rodando no navegador (dev/mockDb.ts). Mesmos nomes e
-// formatos de shared/api.ts. Os bots abrem a empresa e têm personagem (dá pra contratar). Nunca entra no build.
+// formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio, nós da
+// árvore e conquistas (uma escondida, pra aba Legado mostrar o "???"). Nunca entra no build.
 import { linhaPlacar, type IdleBoardRow, type IdleState, type IdleVisual, type LinhaPlacar } from '../shared/types';
-import { call, FRIENDS, ME } from './mockDb';
+import { call, dono, FRIENDS, ME } from './mockDb';
 
 // visuais dos bots (ninguém real): Oliveira, Bia, Teteu
 const VISUAIS: IdleVisual[] = [
@@ -16,10 +17,21 @@ const avatar = (v: IdleVisual, as?: string) =>
     as,
   );
 
+// prestígio dos bots: [pontos ganhos na vida, nós da árvore, conquistas]. Oliveira já vendeu e tem a 6-7 (escondida)
+const LEGADO: [number, number[], number[]][] = [[12, [1, 11, 21, 41], [1, 31, 39, 47, 51, 101]], [3, [1], [31, 47]], [0, [], []]];
+
 const bots = (async () => {
   for (const [i, [id]] of FRIENDS.entries()) {
     await call('select public.idle_start() as v', [], id).catch(() => undefined);
     await avatar(VISUAIS[i % VISUAIS.length], id).catch(() => undefined);
+    const [ganhos, nos, conquistas] = LEGADO[i % LEGADO.length];
+    const gastos = nos.reduce((a, n) => a + (n === 1 ? 1 : 2), 0); // a raiz custa 1; o 1º de cada ramo, 2
+    await dono('update public.idle_state set prestige_earned = $2, prestige_spent = $3, prestige_count = $4 where user_id = $1',
+      [id, ganhos, gastos, ganhos ? 1 : 0]);
+    for (const n of nos) await dono('insert into public.idle_arvore (user_id, no_id) values ($1, $2) on conflict do nothing', [id, n]);
+    for (const c of conquistas) {
+      await dono('insert into public.idle_conquistas (user_id, conquista_id) values ($1, $2) on conflict do nothing', [id, c]);
+    }
   }
 })();
 
@@ -31,6 +43,8 @@ export const idlePickStrategy = (era: number, opcao: number) => call<IdleState>(
 export const idleClaim = (window: number) => call<IdleState>('select public.idle_claim_opportunity($1) as v', [window]);
 export const idleHire = (userId: string) => call<IdleState>('select public.idle_hire($1) as v', [userId]);
 export const idleSetAvatar = (v: IdleVisual) => avatar(v);
+export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');
+export const idleBuyNode = (no: number) => call<IdleState>('select public.idle_buy_node($1) as v', [no]);
 export const hasSession = async () => true;
 export const myId = async () => ME;
 
@@ -43,8 +57,11 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
   return rows.map((r) => linhaPlacar(r, names.find((n) => n.id === r.user_id)?.name ?? 'Alguém'));
 }
 
-// console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar
-const w = window as unknown as { __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void> };
+// console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
+// __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas)
+const w = window as unknown as {
+  __rico: (v: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>;
+};
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
   const db = await ready;
@@ -57,4 +74,8 @@ w.__meContrata = async () => {
   const [bot] = FRIENDS[0];
   await db.query('update public.idle_state set valuation = 1e15 where user_id = $1', [bot]);
   await call('select public.idle_hire($1) as v', [ME], bot);
+};
+w.__vendavel = async (foguetes = 150) => {
+  await dono(`update public.idle_state set generators[30] = $2, strategies = '{0,0,0,0}' where user_id = $1`, [ME, foguetes]);
+  document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
 };

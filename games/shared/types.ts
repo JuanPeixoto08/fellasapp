@@ -124,22 +124,31 @@ export type IdleState = {
    *  vencimento que muda a sua taxa (null = nenhum). */
   avatar: IdleVisual | null; equipe: IdleContratado[]; chefes: IdleChefe[];
   social: { contratei: number; empregos: number[] }; hire_price: number; muda_em: string | null;
+  /** Entrega 3 (0041): os nós da árvore que você comprou e quantas conquistas você tem (o que entra na conta), pontos de
+   *  prestígio livres e ganhos na vida, quantas vezes vendeu, o recorde de F$/s, quantos pontos vender agora daria, suas
+   *  conquistas, as ganhas nesta chamada (a tela avisa) e as escondidas que alguém do grupo já tem. */
+  bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
+  pontos_venda: number;
+  conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
 };
+export type IdleConquista = { id: number; em: string };
 export type IdleContratado = { user_id: string; cargo: string; avatar: IdleVisual | null; ate: string };
 /** mult vem de exp(sum(ln)) no banco e pode trazer ruído (3.0000000000000004): arredonde para mostrar, não compare por igualdade. */
 export type IdleChefe = { user_id: string; cargo: string; mult: number; ate: string };
 export type IdleBoardRow = {
   userId: string; name: string; valuation: number; rate: number; era: number; strategies: number[];
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
+  /** Pontos de prestígio ganhos na vida e quantas conquistas (0041). */
+  pontos: number; conquistas: number;
 };
 /** Linha de idle_board como o banco devolve. */
 export type LinhaPlacar = {
   user_id: string; valuation: number; rate: number; era: number; strategies: number[];
-  avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean;
+  avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean; pontos: number; conquistas: number;
 };
 export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
   userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
-  avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired,
+  avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired, pontos: r.pontos, conquistas: r.conquistas,
 });
 
 // Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)

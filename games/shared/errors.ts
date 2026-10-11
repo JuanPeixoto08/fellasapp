@@ -35,6 +35,7 @@ export type GameErrorCode =
   | 'idle_opp_gone'
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
+  | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -76,6 +77,9 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_hire_twice: 'Essa pessoa já trabalha pra você',
   idle_hire_not_open: 'Essa pessoa ainda não abriu a empresa',
   idle_bad_avatar: 'Esse visual não existe',
+  idle_prestige_low: 'Ainda não compensa vender',
+  idle_points_low: 'Faltam pontos de prestígio pra esse nó',
+  idle_node_owned: 'Você já tem esse nó',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -121,6 +125,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_opp_gone',
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
+  'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
 ];
 
 export function toGameError(e: unknown): GameError {

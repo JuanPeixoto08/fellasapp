@@ -8,6 +8,8 @@ const base = (x: Partial<IdleState> = {}): IdleState => ({
   upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10,
   server_now: '2026-10-12T12:00:00.000Z',
   avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
+  bonus: { arvore: [], conquistas: 0 }, pontos: 0, pontos_vida: 0, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [],
+  descobertas: [],
   ...x,
 });
 
