@@ -126,3 +126,118 @@ describe('avançar o mercado', () => {
     expect(Math.abs(Number(v) - Number(agora))).toBeLessThanOrEqual(1);
   });
 });
+
+describe('carteira e negociar', () => {
+  const A = '00000000-0000-0000-0000-00000000000a';
+  const OUT = '00000000-0000-0000-0000-0000000000ff';
+  type Bolsa = {
+    tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
+    empresas: { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] }[];
+    carteira: { empresa: number; qtd: number; custo: number }[]; viraram_po: { empresa: number; qtd: number }[];
+  };
+  type Resp = { valuation: number; bolsa: Bolsa };
+  const T = 5000;
+  const negociar = (empresa: number, lado: string, qtd: number, tick = T, agora = T) =>
+    q<{ v: Resp }>('select public.idle_bolsa_negociar_em($1, $2, $3, $4, $5, $6) as v', [A, empresa, lado, qtd, tick, agora]).then((r) => r[0].v);
+  const estado = (agora = T) => q<{ v: Bolsa }>('select public.idle_bolsa_estado($1, $2) as v', [A, agora]).then((r) => r[0].v);
+  const r = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+  const valuation = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+
+  beforeEach(async () => {
+    await t.member(A);
+    await t.member(OUT, { isMember: false });
+    await t.as(A);
+    await t.rpc('idle_start');
+    // 2 Grupos de trader, 20 Food trucks (o Pastel é ligado a eles: limite 120) e F$ de sobra; mercado no tick T, Pastel (1) a 30 s
+    // conta fechada no futuro: negociar não soma produção no meio (a diferença de F$ é só a da compra/venda)
+    await q(`update public.idle_state set generators[19] = 2, generators[11] = 20, generators[1] = 10, valuation = 1e12,
+      settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    await q('select public.idle_bolsa_avancar_ate($1)', [T]);
+  });
+
+  it('estado: aberta com trader, limite de cada empresa = 100 + o gerador ligado, corretagem 5%, preços e histórico', async () => {
+    const b = await estado();
+    expect(b.aberta).toBe(true);
+    expect(b.empresas[0].limite).toBe(120); // Pastel ↔ 20 Food trucks
+    expect(b.empresas[3].limite).toBe(102); // Cripto ↔ 2 Grupos de trader
+    expect(b.empresas[1].limite).toBe(100); // Açaí ↔ nenhum Influencer
+    expect(b).toMatchObject({ corretor: 0, escritorio: 0, corretagem: 0.05 });
+    expect(b.tick).toBe(T);
+    expect(b.r).toBeCloseTo(await r(), 9);
+    expect(b.empresas).toHaveLength(8);
+    expect(b.empresas[0]).toMatchObject({ id: 1, valor: 30, limite: 120, risco: false, rj_ate: null, historico: [30] });
+    expect(b.carteira).toEqual([]);
+  });
+  it('comprar 10: paga 10 × valor × r × 1,05 e guarda o custo em segundos', async () => {
+    const rr = await r();
+    const antes = await valuation();
+    const resp = await negociar(1, 'comprar', 10);
+    expect(antes - resp.valuation).toBeCloseTo(10 * 30 * rr * 1.05, 3);
+    expect(resp.bolsa.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05 }]);
+  });
+  it('vender: recebe qtd × valor × r sem taxa e tira o custo na proporção; Tudo (0) vende o resto', async () => {
+    await negociar(1, 'comprar', 10);
+    const rr = await r();
+    const antes = await valuation();
+    const resp = await negociar(1, 'vender', 1);
+    expect(resp.valuation - antes).toBeCloseTo(30 * rr, 3);
+    expect(resp.bolsa.carteira[0].qtd).toBe(9);
+    expect(resp.bolsa.carteira[0].custo).toBeCloseTo(9 * 30 * 1.05, 9);
+    const fim = await negociar(1, 'vender', 0);
+    expect(fim.bolsa.carteira).toEqual([]);
+  });
+  it('Máx: compra o que o F$ e o limite deixam; F$ exato passa, um centavo a menos não', async () => {
+    const rr = await r();
+    const um = 30 * rr * 1.05;
+    await q('update public.idle_state set valuation = $2 where user_id = $1', [A, um * 3]);
+    const resp = await negociar(1, 'comprar', 0);
+    expect(resp.bolsa.carteira[0].qtd).toBe(3);
+    await q('update public.idle_state set valuation = $2 where user_id = $1', [A, um - 0.01]);
+    await expect(negociar(1, 'comprar', 1)).rejects.toThrow('idle_cant_afford');
+  });
+  it('limite: 120 com 20 Food trucks no Pastel; acima disso idle_bolsa_limite', async () => {
+    await negociar(1, 'comprar', 0);
+    expect((await estado()).carteira[0].qtd).toBe(120);
+    await expect(negociar(1, 'comprar', 1)).rejects.toThrow('idle_bolsa_limite');
+  });
+  it('recusas: preço mudou, sem trader, recuperação judicial, sem ações, opção inválida', async () => {
+    await expect(negociar(1, 'comprar', 1, T - 1)).rejects.toThrow('idle_bolsa_preco_mudou');
+    await expect(negociar(1, 'vender', 1)).rejects.toThrow('idle_bolsa_sem_acoes');
+    await expect(negociar(1, 'comprar', 5)).rejects.toThrow('idle_bad_choice');
+    await expect(negociar(99, 'comprar', 1)).rejects.toThrow('idle_bad_choice');
+    await q('update public.idle_bolsa_mercado set rj_ate = $1 where empresa = 4', [T + 5]);
+    await expect(negociar(4, 'comprar', 1)).rejects.toThrow('idle_bolsa_rj');
+    await q(`update public.idle_state set generators[19] = 0 where user_id = $1`, [A]);
+    await expect(negociar(1, 'comprar', 1)).rejects.toThrow('idle_bolsa_fechada');
+  });
+  it('quebrou: as ações da geração velha viram pó uma vez e não entram em venda nem limite', async () => {
+    await negociar(4, 'comprar', 10);
+    await q('update public.idle_bolsa_mercado set geracao = geracao + 1 where empresa = 4');
+    await expect(negociar(4, 'vender', 1)).rejects.toThrow('idle_bolsa_sem_acoes');
+    const b = await estado();
+    expect(b.viraram_po).toEqual([{ empresa: 4, qtd: 10 }]);
+    expect(b.carteira).toEqual([]);
+    expect((await estado()).viraram_po).toEqual([]);
+    const resp = await negociar(4, 'comprar', 0);
+    expect(resp.bolsa.carteira[0].qtd).toBe(102); // Cripto ↔ 2 Grupos de trader
+  });
+  it('a carteira atravessa a venda da startup', async () => {
+    await negociar(1, 'comprar', 10);
+    await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    const b = await estado();
+    expect(b.aberta).toBe(false);
+    expect(b.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05 }]);
+  });
+  it('RPCs: membro chama idle_bolsa e negocia pelo relógio; não membro é recusado', async () => {
+    // o mercado foi criado no tick 5000: sem isto o relógio de verdade faria gerar 1 dia inteiro (lento no PGlite)
+    await q('update public.idle_bolsa_mercado set tick = public.idle_bolsa_agora() - 1 where true');
+    const b = await t.rpc<Bolsa>('idle_bolsa');
+    expect(b.empresas).toHaveLength(8);
+    const resp = await t.rpc<Resp>('idle_bolsa_negociar', { p_empresa: 1, p_lado: 'comprar', p_qtd: 1, p_tick: b.tick });
+    expect(resp.bolsa.carteira[0].qtd).toBe(1);
+    await t.as(OUT);
+    await expect(t.rpc('idle_bolsa')).rejects.toThrow('not_member');
+    await expect(t.asRole('authenticated', 'select public.idle_bolsa_estado($1, 1)', [A])).rejects.toThrow();
+  });
+});
