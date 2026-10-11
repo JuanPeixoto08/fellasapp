@@ -484,6 +484,13 @@ describe('empresa, resumo e bancada', () => {
     tela.renderizar(modelo());
     expect([...root.querySelectorAll('.valor .info span')].map((x) => x.textContent)).toEqual(['Era 1 · Quarto']);
   });
+  it('o selo é filho direto da gaveta (aparece no celular, em cima do ícone, e no PC, do lado do nome)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ pendentes: [3, 2] }));
+    const selo = root.querySelector('.gaveta > .selo')!;
+    expect(selo.textContent).toBe('2');
+    expect(selo.hasAttribute('hidden')).toBe(false);
+  });
   it('gaveta Caixinha no celular abre a folha; sem nada guardado o selo some', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ pendentes: [3] }));

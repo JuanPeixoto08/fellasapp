@@ -114,8 +114,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const iconeOpp = el('span', 'gaveta-icone');
   iconeOpp.style.backgroundImage = `url(${ativos.oportunidade(0)})`;
   const selo = el('span', 'selo', '0');
-  caixaIcone.append(iconeOpp, selo);
-  gavetaCaixa.append(caixaIcone, el('span', 'gaveta-nome', 'Caixinha'));
+  caixaIcone.append(iconeOpp);
+  gavetaCaixa.append(caixaIcone, el('span', 'gaveta-nome', 'Caixinha'), selo);
   const gavetas = el('div', 'gavetas');
   gavetas.append(gavetaCaixa);
   const corpoBancada = el('div', 'gaveta-corpo');

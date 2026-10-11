@@ -166,8 +166,9 @@ export function criarArvoreTela(comprar: (id: number) => void): ArvoreTela {
     e.stopPropagation();
     e.preventDefault();
   }, true);
-  tela.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
+  // no documento: o foco pode ter saído da árvore (o Comprar virou "Comprado", clicou no céu) e o Esc ainda fecha
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !aberta()) return;
     e.preventDefault();
     fechar();
   });

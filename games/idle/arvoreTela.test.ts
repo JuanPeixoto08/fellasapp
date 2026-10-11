@@ -102,6 +102,19 @@ describe('árvore em tela cheia', () => {
     expect(t.aberta()).toBe(false);
     expect(document.activeElement).toBe(volta);
   });
+  it('Esc fecha mesmo com o foco fora da árvore (o botão comprado sumiu, clicou no céu)', () => {
+    const t = abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
+    (document.activeElement as HTMLElement).blur();
+    expect(document.activeElement).toBe(document.body);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(t.aberta()).toBe(false);
+    expect(document.activeElement).toBe(volta);
+    // fechada, o Esc da página não é da árvore
+    const ouvido = vi.fn();
+    t.elemento.addEventListener('keydown', ouvido);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(t.aberta()).toBe(false);
+  });
   it('arrastar e soltar em cima de um nó não escolhe o nó', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     const palco = document.querySelector<HTMLElement>('.arvore-palco')!;

@@ -57,10 +57,10 @@
 
 /* bancada: no celular só a fileira de gavetas (a Caixinha abre a folha) */
 .idle .gavetas { display: flex; gap: 8px; }
-.idle .gaveta { display: grid; justify-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--i-mudo); cursor: pointer; font: 500 12px var(--i-pixel); }
+.idle .gaveta { position: relative; display: grid; justify-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--i-mudo); cursor: pointer; font: 500 12px var(--i-pixel); }
 .idle .gaveta-caixa { position: relative; width: 52px; height: 52px; display: grid; place-items: center; background: var(--i-painel); }
 .idle .gaveta-icone { width: 32px; height: 32px; background: no-repeat 0 0 / 128px 32px; image-rendering: pixelated; }
-.idle .selo { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 4px; display: grid; place-items: center; font: 700 12px var(--i-pixel); color: #120F22; background: var(--gold); }
+.idle .selo { position: absolute; top: -6px; right: -8px; min-width: 20px; height: 20px; padding: 0 4px; display: grid; place-items: center; font: 700 12px var(--i-pixel); color: #120F22; background: var(--gold); }
 .idle .gaveta-corpo { display: none; }
 .idle .bancada { box-shadow: none; }
 
@@ -279,8 +279,7 @@
   .idle .gaveta { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 6px; font: 600 15px var(--i-pixel); }
   .idle .gaveta[aria-pressed='true'] { color: #fff; background: var(--i-ativo); box-shadow: inset 0 -3px 0 var(--i-lilas); }
   .idle .gaveta-caixa { width: 32px; height: 32px; background: none; box-shadow: none; }
-  .idle .gaveta .selo { position: static; order: 3; }
-  .idle .gaveta-caixa .selo { display: none; }
+  .idle .gaveta .selo { position: static; }
   .idle .gaveta-corpo { display: block; flex: 1; min-height: 0; overflow: auto; padding: 4px 14px 14px; }
   .idle .painel { grid-column: 2; grid-row: 2; margin-top: 24px; max-width: none; min-height: 0; background: var(--i-painel); --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
   .idle .abas { padding: 14px 14px 8px; background: var(--i-painel); }
@@ -294,6 +293,19 @@
   .idle .arvore-corpo { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr); }
   .idle .arvore-lado { align-self: end; display: grid; gap: 14px; padding: 0 24px 24px 0; }
   .idle .arvore-legenda { display: flex; }
+}
+
+/* celular deitado: a tela rola inteira (a cena + o painel não cabem em 390 de altura); as abas grudam no topo */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1099px) {
+  .idle { overflow-y: auto; grid-template-rows: auto auto auto; }
+  .idle .painel { overflow: visible; }
+}
+
+/* PC estreito (1100–1279): o resumo desce pra baixo da cena, senão o dinheiro passa por cima do painel */
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .idle .cartao-empresa { grid-template-columns: 480px; gap: 12px; }
+  .idle .valor { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 12px; }
+  .idle .info { flex-direction: row; flex-wrap: wrap; column-gap: 12px; margin-top: 0; }
 }
 
 /* celular deitado: o cartão vai pro lado, pra copa ter altura */
