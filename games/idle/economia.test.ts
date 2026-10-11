@@ -191,7 +191,7 @@ describe('árvore de habilidades e conquistas', () => {
     expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null, 24 * 3600)).toBeCloseTo(24 * 3600, 6);
   });
   it('pontos totais: floor(cbrt(F$/s ÷ 1 milhão)), sem errar nos cubos', () => {
-    for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {
+    for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [Infinity, 0], [-Infinity, 0], [1e33, 1e9], [1e40, 1e9], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {
       expect(pontosTotais(r), String(r)).toBe(n);
     }
     for (let n = 1; n <= 1000; n++) {

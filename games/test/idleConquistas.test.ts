@@ -178,3 +178,34 @@ describe('escondidas e leitura', () => {
     expect(await q('select nome from public.idle_cat_upg where id = 283')).toEqual([{ nome: 'Filial em Portugal' }]);
   });
 });
+
+describe('conquistas da venda e da foto de segunda', () => {
+  it('Aura negativa (venda de 1 ponto) e Modo sigma (sem nunca ter contratado); quem contratou não é sigma', async () => {
+    await abrir(A, B);
+    await t.as(B);
+    await mudar(B, 'valuation = 1e9');
+    await t.rpc('idle_hire', { p_user: A }); // B já contratou; A nunca
+    await t.as(A);
+    await mudar(A, 'generators[30] = 1, strategies = \'{0,0,0,0}\'');
+    expect((await abrirJogo()).novas).not.toContain(103);
+    expect((await t.rpc<Estado>('idle_prestige')).novas).toEqual(expect.arrayContaining([51, 103, 109]));
+    await t.as(B);
+    await mudar(B, 'generators[30] = 150, strategies = \'{0,0,0,0}\'');
+    const b = await t.rpc<Estado>('idle_prestige');
+    expect(b.novas).toContain(51);
+    expect(b.novas).not.toContain(103);
+    expect(b.novas).not.toContain(109);
+  });
+  it('Pai tá on: o unicórnio da foto de segunda ganha, com a conta fechada antes (sem o +1% pra trás)', async () => {
+    await abrir(A, B);
+    await mudar(A, 'generators[2] = 5');
+    await abrirJogo();
+    await q('update public.idle_state set week_start = public.games_week_start() - 7 where true');
+    await mudar(A, 'valuation = 0, settled_at = now() - interval \'1 hour\'');
+    const [{ r }] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]);
+    await q('select public.idle_weekly_reset()');
+    expect(await q('select user_id from public.idle_conquistas where conquista_id = 110')).toEqual([{ user_id: A }]);
+    const [{ valuation }] = await q<{ valuation: number }>('select valuation from public.idle_state where user_id = $1', [A]);
+    expect(valuation / (r * 3600)).toBeCloseTo(1, 3);
+  });
+});

@@ -75,8 +75,8 @@ export function multBonus(cat: Catalogo, s: Estado): number {
 
 /** Quantos pontos de prestígio um F$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
 export function pontosTotais(r: number): number {
-  if (Number.isNaN(r) || r <= 0) return 0;
-  if (r >= MAX_PONTOS ** 3 * K_PRESTIGIO) return MAX_PONTOS; // trava em 1e9 (cabe em int no banco)
+  if (!Number.isFinite(r) || r <= 0) return 0; // NaN, Infinity e nulo não valem nada
+  if (r >= MAX_PONTOS ** 3 * K_PRESTIGIO) return MAX_PONTOS; // trava em 1e9 (cabe em int no banco), só para r finito
   let n = Math.floor(Math.cbrt(r / K_PRESTIGIO));
   while (n > 0 && n ** 3 * K_PRESTIGIO > r) n--; // sem divisão, como o banco: n³·K ≤ r
   while ((n + 1) ** 3 * K_PRESTIGIO <= r) n++;

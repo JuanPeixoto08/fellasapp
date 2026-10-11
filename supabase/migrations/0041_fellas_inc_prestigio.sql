@@ -131,8 +131,9 @@ returns int language plpgsql immutable as $$
 declare
   n int;
 begin
-  -- nulo, NaN, zero e negativo não valem nada; de 1e9 pontos pra cima trava (cabe em int), como economia.ts pontosTotais
-  if r is null or r = 'NaN'::double precision or r <= 0 then
+  -- nulo, NaN, Infinity, zero e negativo não valem nada; de 1e9 pontos pra cima (r finito) trava (cabe em int), como
+  -- economia.ts pontosTotais
+  if r is null or r = 'NaN'::double precision or r = 'Infinity'::double precision or r <= 0 then
     return 0;
   end if;
   if r >= 1e33 then
@@ -717,3 +718,208 @@ revoke all on function public.idle_buy_node(int) from public, anon;
 grant execute on function public.idle_buy_node(int) to authenticated;
 revoke all on function public.idle_start() from public, anon;
 grant execute on function public.idle_start() to authenticated;
+
+-- ===== vender a startup =====
+
+-- fecha a conta de quem o dono contratou: os contratos ativos e os já vencidos cujo trecho ainda não foi fechado (a
+-- estratégia atual do dono vale pra qualquer instante, então sem fechar antes a regra nova viraria retroativa). Trava o
+-- dono e essa equipe na ordem de user_id (idle_lock_all). Devolve a equipe travada. Igual ao que idle_pick_strategy (0038) faz.
+create or replace function public.idle_fechar_equipe(p_user uuid)
+returns uuid[] language plpgsql volatile set search_path = public as $$
+declare
+  x      public.idle_state;
+  v_team uuid[];
+begin
+  select coalesce(array_agg(distinct c.employee_id), '{}'::uuid[]) into v_team
+    from public.idle_contracts c
+    join public.idle_state es on es.user_id = c.employee_id
+   where c.employer_id = p_user and c.ends_at > es.settled_at;
+  perform public.idle_lock_all(array[p_user] || v_team);
+  for x in select es.* from public.idle_state es where es.user_id = any (v_team) loop
+    perform public.idle_save(public.idle_settle(x));
+  end loop;
+  return v_team;
+end;
+$$;
+
+-- fecha a conta do jogador e dá as conquistas de evento do tipo (a conquista só vale dali pra frente, sem o +1% pra
+-- trás). Trava só pela ordem de user_id (idle_lock_all). Não faz nada se ele já tem todas.
+create or replace function public.idle_fechar_e_ganhar(p_user uuid, p_tipo text)
+returns void language plpgsql volatile set search_path = public as $$
+declare s public.idle_state;
+begin
+  if not exists (select 1 from public.idle_cat_conquista k
+                  where k.tipo = p_tipo
+                    and not exists (select 1 from public.idle_conquistas c where c.user_id = p_user and c.conquista_id = k.id)) then
+    return;
+  end if;
+  perform public.idle_lock_all(array[p_user]);
+  select * into s from public.idle_state where user_id = p_user;
+  perform public.idle_save(public.idle_settle(s));
+  perform public.idle_ganhar(p_user, p_tipo);
+end;
+$$;
+
+-- troca a empresa por pontos: ganha a diferença entre os pontos que o F$/s de agora vale e os que você já ganhou na
+-- vida (gastos ou não; pelo menos 1, senão idle_prestige_low). Fecha a conta; quem você contratou fecha a conta antes
+-- (o que você paga a eles muda: suas estratégias zeram) e os contratos que você fez vencem agora (quem te contratou
+-- continua). Zera valuation, geradores, melhorias (as gerais ficam com o nó Leva o crachá), estratégias, boost
+-- e meia-preço e volta pro "Abrir CNPJ". Ficam pontos, nós, vendas, conquistas, personagem, contadores, o limite de
+-- oportunidades do dia e o recorde de F$/s.
+create or replace function public.idle_prestige()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  v_me    uuid := auth.uid();
+  v_rate  double precision;
+  v_total int;
+  v_ganho int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  perform public.idle_fechar_equipe(v_me); -- trava você e a equipe (na ordem de user_id) e fecha a conta deles
+  select * into s from public.idle_state where user_id = v_me;
+  if not found or not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_rate := public.idle_rate(s);
+  v_total := public.idle_prestige_total(v_rate);
+  v_ganho := v_total - s.prestige_earned;
+  if v_ganho < 1 then
+    raise exception 'idle_prestige_low' using errcode = 'P0001';
+  end if;
+  -- created_at < now(): um contrato criado neste mesmo instante não pode vencer antes de começar (check da tabela)
+  update public.idle_contracts set ends_at = now()
+   where employer_id = v_me and ends_at > now() and created_at < now();
+  if v_ganho = 1 then
+    perform public.idle_ganhar(v_me, 'aura_negativa');
+  end if;
+  if s.hire_total = 0 then
+    perform public.idle_ganhar(v_me, 'sigma');
+  end if;
+  s.best_rate := greatest(s.best_rate, v_rate);
+  s.prestige_earned := v_total;
+  s.prestige_count := s.prestige_count + 1;
+  s.started := false;
+  s.valuation := 0;
+  s.generators := array_fill(0, array[30]);
+  s.upgrades := case when public.idle_arv(v_me, 'manter_gerais', 'max', 0) > 0
+                     then array(select u from unnest(s.upgrades) u
+                                 where u in (select g.id from public.idle_cat_upg g where g.tipo = 'geral'))
+                     else '{}' end;
+  s.strategies := '{-1,-1,-1,-1}';
+  s.boost_until := null;
+  s.half_price := false;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+revoke all on function public.idle_fechar_equipe(uuid) from public, anon, authenticated;
+revoke all on function public.idle_fechar_e_ganhar(uuid, text) from public, anon, authenticated;
+revoke all on function public.idle_prestige() from public, anon;
+grant execute on function public.idle_prestige() to authenticated;
+
+-- ===== placar e foto de segunda =====
+
+-- placar (o da 0038) + pontos de prestígio ganhos na vida ("★ N") e quantas conquistas cada um tem
+create or replace function public.idle_board()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_mais uuid;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  v_mais := public.idle_most_hired(public.games_week_start());
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era, 'strategies', to_jsonb(x.strategies),
+             'avatar', public.idle_avatar_json(x.user_id), 'hired_count', x.n, 'by_me', x.by_me,
+             'most_hired', coalesce(x.user_id = v_mais, false), 'pontos', x.pontos, 'conquistas', x.nc)
+             order by x.rate desc, x.v desc, x.user_id), '[]'::jsonb)
+      from (select s.user_id, (public.idle_settle(s)).valuation as v, public.idle_rate(s) as rate,
+                   public.idle_era(s.generators) as era, s.strategies, s.prestige_earned as pontos,
+                   (select count(*) from public.idle_conquistas c where c.user_id = s.user_id)::int as nc,
+                   (select count(*) from public.idle_contracts c
+                     where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now())::int as n,
+                   exists (select 1 from public.idle_contracts c
+                            where c.employer_id = auth.uid() and c.employee_id = s.user_id
+                              and c.created_at <= now() and c.ends_at > now()) as by_me
+              from public.idle_state s
+             where s.started) x);
+end;
+$$;
+
+-- foto da semana que acabou (a da 0038) + "Pai tá on" pro unicórnio: a conta dele fecha antes (a conquista só vale
+-- dali pra frente). Nenhuma trava avulsa do campeão: ele é travado só por idle_lock_all, na ordem de user_id.
+create or replace function public.idle_weekly_reset()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_new    date := public.games_week_start();
+  v_old    date := public.games_week_start() - 7;
+  v_podium jsonb;
+  v_champ  uuid;
+  v_gravou date;
+begin
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- uma foto por vez
+  if exists (select 1 from public.idle_weeks where week_start = v_old) then
+    return;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era,
+                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc, x.user_id), '[]')
+    into v_podium
+    from (select s.user_id,
+                 (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 -- a taxa da meia-noite usa os geradores e estratégias de agora (só os contratos são os de 00:00)
+                 public.idle_rate_at(s, v_new::timestamp at time zone 'America/Sao_Paulo') as rate,
+                 public.idle_era(s.generators) as era, s.strategies
+            from public.idle_state s
+           where s.started and s.week_start < v_new
+           order by 3 desc, 2 desc, 1
+           limit 3) x;
+  if jsonb_array_length(v_podium) = 0 then
+    return; -- ninguém jogava antes desta semana: sem placa
+  end if;
+  v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
+  insert into public.idle_weeks (week_start, unicorn_id, podium, most_hired_id)
+  values (v_old, v_champ, v_podium, public.idle_most_hired(v_old))
+  on conflict (week_start) do nothing
+  returning week_start into v_gravou;
+  if v_gravou is not null then
+    update public.profiles set badges = array_remove(badges, 'weekly_unicorn') where 'weekly_unicorn' = any (badges);
+    if v_champ is not null then
+      update public.profiles set badges = array_append(badges, 'weekly_unicorn') where id = v_champ;
+      perform public.idle_fechar_e_ganhar(v_champ, 'unicornio');
+    end if;
+  end if;
+end;
+$$;
+
+revoke all on function public.idle_board() from public, anon;
+grant execute on function public.idle_board() to authenticated;
+revoke all on function public.idle_weekly_reset() from public, anon, authenticated;
+
+-- ===== o que já aconteceu antes desta migração (rodar de novo não muda nada) =====
+
+update public.idle_state set upg_total = cardinality(upgrades) where upg_total < cardinality(upgrades);
+update public.idle_state s set hire_total = x.n
+  from (select c.employer_id, count(*)::int as n from public.idle_contracts c group by c.employer_id) x
+ where x.employer_id = s.user_id and s.hire_total < x.n;
+update public.idle_state s set hired_total = x.n
+  from (select c.employee_id, count(*)::int as n from public.idle_contracts c group by c.employee_id) x
+ where x.employee_id = s.user_id and s.hired_total < x.n;
+update public.idle_state set est_usadas = public.idle_est_codigos(strategies)
+ where est_usadas = '{}' and cardinality(public.idle_est_codigos(strategies)) > 0;
+-- quem já foi unicórnio ganha o "Pai tá on" (conta fechada antes, como na foto), em ordem de user_id
+do $$
+declare v_user uuid;
+begin
+  for v_user in select distinct w.unicorn_id from public.idle_weeks w
+                 where w.unicorn_id is not null and exists (select 1 from public.idle_state st where st.user_id = w.unicorn_id)
+                 order by 1 loop
+    perform public.idle_fechar_e_ganhar(v_user, 'unicornio');
+  end loop;
+end;
+$$;

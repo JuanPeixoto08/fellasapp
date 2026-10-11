@@ -83,3 +83,48 @@ describe('Fellas Inc., entrega 2 (0038–0039)', () => {
     expect(notificacao).toContain('grant execute on function public.notifications_feed(integer) to authenticated;');
   });
 });
+
+const prestigio = ler('0041_fellas_inc_prestigio.sql');
+const prestigioSemComentarios = prestigio.split(/\r?\n/).map((l: string) => l.replace(/--.*$/, '')).join('\n');
+
+describe('Fellas Inc., entrega 3 (0040–0041)', () => {
+  it('não toca nos créditos do cassino', () => {
+    for (const proibido of ['game_wallets', 'game_ledger', 'games_move', 'weekly_champion']) expect(prestigioSemComentarios).not.toContain(proibido);
+  });
+  it('sem reset: nada apaga estado, contrato ou conquista', () => {
+    for (const proibido of ['delete from public.idle_state', 'delete from public.idle_contracts', 'delete from public.idle_conquistas', 'delete from public.idle_arvore'])
+      expect(prestigioSemComentarios).not.toContain(proibido);
+    expect(prestigioSemComentarios).not.toContain('games_week_start() and');
+  });
+  it('funções internas fechadas; as do jogo só para quem está logado', () => {
+    for (const f of [
+      'idle_est_codigos(smallint[])', 'idle_arv(uuid, text, text, double precision)', 'idle_arvore_efeitos(uuid)',
+      'idle_bonus_mult(public.idle_state)', 'idle_rate_at(public.idle_state, timestamptz)', 'idle_social_mult(public.idle_state, timestamptz)',
+      'idle_settle(public.idle_state, timestamptz)', 'idle_opp_list(public.idle_state, timestamptz)', 'idle_opp_cap(public.idle_state)',
+      'idle_hire_price(public.idle_state)',
+      'idle_prestige_total(double precision)', 'idle_ganhar(uuid, text, double precision)', 'idle_madrugada(timestamptz)',
+      'idle_check_conquistas(uuid)', 'idle_save(public.idle_state)', 'idle_json(public.idle_state)', 'idle_weekly_reset()',
+      'idle_fechar_equipe(uuid)', 'idle_fechar_e_ganhar(uuid, text)',
+    ])
+      expect(prestigio).toContain(`revoke all on function public.${f} from public, anon, authenticated;`);
+    for (const f of ['idle_open()', 'idle_start()', 'idle_buy(text, int, int)', 'idle_claim_opportunity(bigint)', 'idle_hire(uuid)', 'idle_buy_node(int)', 'idle_prestige()', 'idle_board()'])
+      expect(prestigio).toContain(`grant execute on function public.${f} to authenticated;`);
+  });
+  it('a foto de segunda não pega trava avulsa do campeão (só idle_lock_all, na ordem de user_id)', () => {
+    expect(prestigioSemComentarios).not.toMatch(/where user_id = v_champ for update/);
+  });
+  it('conquistas e árvore com RLS e leitura só para membros; sem chave estrangeira pro catálogo (que é regravado)', () => {
+    for (const t of ['idle_conquistas', 'idle_arvore']) {
+      expect(prestigio).toContain(`alter table public.${t} enable row level security;`);
+      expect(prestigio).toContain(`create policy "${t}_select_members" on public.${t} for select to authenticated using (public.is_member());`);
+    }
+    expect(prestigioSemComentarios).not.toMatch(/references public\.idle_cat_(conquista|no)/);
+  });
+  it('o catálogo novo é o gerado, com as conquistas, a árvore e a Filial em Portugal', () => {
+    const cat = ler('0040_fellas_inc_catalogo_conquistas.sql');
+    expect(cat).toContain('GERADO por games/idle/catalogo.ts');
+    expect(cat).toContain('insert into public.idle_cat_conquista');
+    expect(cat).toContain('insert into public.idle_cat_no');
+    expect(cat).toContain("(283, 'gerador', 'Filial em Portugal'");
+  });
+});
