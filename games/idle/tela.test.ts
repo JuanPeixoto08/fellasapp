@@ -73,6 +73,22 @@ describe('tela da Fellas Inc.', () => {
     expect(etqs.map((e) => e.textContent)).toEqual(['Bolsa: +1 MEME cada', 'Bolsa: +1 SIMA cada', 'Bolsa: +1 PSTL cada']); // 6, 8 e 11
     expect(etqs[2].getAttribute('title')).toBe('Cada Food truck libera +1 ação do Pastel do Zé na Bolsa');
   });
+  it('oportunidade nova: a gaveta da Caixinha pula e brilha por uns 2 s (o "plim" não fica sem nada na tela)', () => {
+    vi.useFakeTimers();
+    try {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo());
+      const gaveta = root.querySelector<HTMLElement>('.gaveta:not(.gaveta-bolsa)')!;
+      tela.chegouOportunidade();
+      expect(gaveta.classList.contains('chegou')).toBe(true);
+      tela.renderizar(modelo()); // re-render no meio não corta o pulo
+      expect(gaveta.classList.contains('chegou')).toBe(true);
+      vi.advanceTimersByTime(2200);
+      expect(gaveta.classList.contains('chegou')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('a oportunidade não passa mais na cena (fica só na Caixinha)', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aoVivo: 3 }));

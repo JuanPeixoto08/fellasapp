@@ -441,6 +441,7 @@ setInterval(() => {
   if (vivo !== null && vivo !== vivoSoou) {
     vivoSoou = vivo;
     audio.tocar('oportunidade');
+    tela.chegouOportunidade(); // a gaveta da Caixinha pula: o som não fica sem nada na tela
   }
   if (vivo !== vivoAtual) render();
   // um contrato venceu: a taxa mudou no banco, bate o ponto (uma vez por vencimento)

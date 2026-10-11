@@ -70,6 +70,8 @@ export type Tela = {
   dourados: ReturnType<typeof criarDouradoTela>;
   /** Selos do Viralizou e da Promoção com o tempo que falta. */
   relogioBonus(s: IdleState | null, agoraMs: number): void;
+  /** Oportunidade nova caiu na Caixinha: a gaveta pula e brilha (junto do "plim"). */
+  chegouOportunidade(): void;
 };
 
 /** Bolsa sem trader: só o aviso pra abrir (sem buscar nada). */
@@ -862,5 +864,14 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     selos.replaceChildren(...lista.map((x) => el('span', `selo-bonus${x.ouro ? ' ouro' : ''}`, x.texto)));
   }
 
-  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus };
+  let pulo: ReturnType<typeof setTimeout> | null = null;
+  function chegouOportunidade() {
+    gavetaCaixa.classList.remove('chegou');
+    void gavetaCaixa.offsetWidth; // recomeça a animação se já estava pulando
+    gavetaCaixa.classList.add('chegou');
+    if (pulo) clearTimeout(pulo);
+    pulo = setTimeout(() => gavetaCaixa.classList.remove('chegou'), 2000);
+  }
+
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus, chegouOportunidade };
 }

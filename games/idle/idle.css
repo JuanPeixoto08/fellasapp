@@ -53,6 +53,10 @@
 .idle .taxa { font: 400 20px var(--i-pixel); color: var(--mint); }
 .idle .bonus { flex-basis: 100%; color: var(--gold); font-size: 13px; }
 .idle .bonus:empty { display: none; }
+/* oportunidade nova na Caixinha: a gaveta pula e brilha (2 s) */
+.idle .gaveta.chegou .gaveta-caixa { animation: caixa-pula 0.5s ease-out 3; box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(242, 210, 122, 0.7); }
+.idle .gaveta.chegou .selo { animation: caixa-pula 0.5s ease-out 3; }
+@keyframes caixa-pula { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
 /* Viralizou / Promoção valendo: selos com o tempo que falta; o ×100 é dourado */
 .idle .selos { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; justify-content: center; }
 .idle .selos:empty { display: none; }
@@ -476,6 +480,7 @@ body:has(.idle) { background: #121212; }
 @media (prefers-reduced-motion: reduce) {
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
   .idle .dourado { animation: none; }
+  .idle .gaveta.chegou .gaveta-caixa, .idle .gaveta.chegou .selo { animation: none; }
   .idle .dourado-texto { animation-duration: 0.01s; animation-delay: 1.2s; }
   .idle .no-arvore.pode { animation: none; filter: drop-shadow(0 0 8px rgba(184, 162, 255, 0.65)); }
   .idle .btn:active:not(:disabled) { transform: none; }
