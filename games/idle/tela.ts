@@ -35,6 +35,9 @@ const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidd
 const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
 
+/** Oportunidade do tipo "próxima compra pela metade" (2) com uma já guardada: pegar não daria nada. */
+export const meiaPrecoRepetida = (tipo: 0 | 1 | 2, s: IdleState) => tipo === 2 && s.half_price;
+
 /** "some em 3h12" / "some em 40 min": quanto falta pra oportunidade guardada sumir. */
 export function prazo(ms: number) {
   const min = Math.ceil(ms / 60000);
@@ -365,7 +368,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     }
 
     // oportunidade passando na cena
-    mostrar(vivo, !!s && m.aoVivo !== null && s.opp_left > 0);
+    // a meia-preço que passa na cena some se você já tem uma guardada (não acumula)
+    mostrar(vivo, !!s && m.aoVivo !== null && s.opp_left > 0 && !meiaPrecoRepetida(tipoOportunidade(s.user_id, m.aoVivo), s));
     if (s && m.aoVivo !== null) {
       const w = m.aoVivo;
       vivo.style.backgroundImage = `url(${ativos.oportunidade(tipoOportunidade(s.user_id, w))})`;
@@ -423,8 +427,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const quando = el('span', 'sub prazo', '');
         texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
         prazos.push({ texto: quando, fim: instante(s.user_id, w) + VALIDADE_S * 1000 });
+        // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
+        const repetida = meiaPrecoRepetida(k, s);
+        if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
         const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
-        b.disabled = m.ocupado || s.opp_left <= 0;
+        b.disabled = m.ocupado || s.opp_left <= 0 || repetida;
         li.append(bonequinho, texto, b);
         lista.append(li);
       }
