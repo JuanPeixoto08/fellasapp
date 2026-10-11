@@ -28,14 +28,16 @@ export function grade(estado: IdleState): Celula[] {
 export const ganhouEm = (iso: string): string =>
   `Ganhou em ${new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
 
-/** "Conquista: 6-7", uma por id novo, na ordem que o banco mandou. */
+/** "Conquista: 6-7", uma por id novo, na ordem que o banco mandou. Mais de 3 de uma vez (a 1ª abertura depois de uma
+ *  atualização pode dar 15 ou 20): um aviso só, em vez de uma fila de 3 s cada. */
+export const MAX_AVISOS = 3;
 export function avisos(ids: number[]): string[] {
   const out: string[] = [];
   for (const id of ids) {
     const c = catalogo.conquistas.find((x) => x.id === id);
     if (c) out.push(`Conquista: ${c.nome}`);
   }
-  return out;
+  return out.length > MAX_AVISOS ? [`${out.length} conquistas novas! Olha no Legado.`] : out;
 }
 
 /** "1 ponto" / "5 pontos". */

@@ -145,11 +145,6 @@
 }
 .idle .no .btn { white-space: nowrap; }
 .idle .lista-legado { overflow-x: hidden; }
-  .idle .ramo.raiz { grid-column: 1 / -1; justify-self: center; width: min(100%, 320px); }
-  .idle .ramo:not(.raiz) .no { flex-direction: column; text-align: center; }
-  .idle .ramo:not(.raiz) .no .btn { width: 100%; padding: 0 6px; white-space: normal; }
-  .idle .ramo:not(.raiz) .no-status { max-width: none; text-align: center; }
-}
 .idle .grade-conquistas { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
 .idle .conquista { display: grid; justify-items: center; align-content: start; gap: 6px; min-height: 44px; padding: 8px 4px; border-radius: 8px; border: 1px solid #34323F; background: #1B1A22; color: #A8A398; font: 600 12px/1.25 var(--font); text-align: center; cursor: pointer; }
 .idle .conquista.ganha { color: var(--paper); border-color: #5B3FD9; }

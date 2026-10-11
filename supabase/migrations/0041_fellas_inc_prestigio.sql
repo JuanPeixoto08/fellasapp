@@ -20,6 +20,10 @@ alter table public.idle_state
   add column if not exists est_usadas      int[] not null default '{}',
   add column if not exists opp_recent      timestamptz[] not null default '{}';
 
+alter table public.idle_state drop constraint if exists idle_state_prestige_spent_le_earned;
+alter table public.idle_state
+  add constraint idle_state_prestige_spent_le_earned check (prestige_spent <= prestige_earned);
+
 -- sem chave estrangeira pro catálogo: a migração do catálogo apaga e regrava idle_cat_conquista
 create table if not exists public.idle_conquistas (
   user_id      uuid not null references public.profiles (id) on delete cascade,
@@ -340,7 +344,7 @@ $$;
 
 -- gravar o estado (o da 0036 + o que é permanente e as estratégias já usadas), conferir as conquistas e guardar o
 -- recorde de F$/s. Toda função que muda o jogo termina aqui, depois de fechar a conta. As janelas de oportunidade já
--- pegas valem até 6h com a árvore: guarda as das últimas 10h.
+-- pegas valem até 4h (a validade é fixa): guarda as das últimas 10h.
 create or replace function public.idle_save(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$
 begin

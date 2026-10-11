@@ -90,6 +90,14 @@ describe('fila de avisos', () => {
   });
 });
 
+describe('avisos em lote', () => {
+  it('até 3: um por conquista; mais de 3: um aviso só', () => {
+    expect(avisos([7, 101, 1])).toHaveLength(3);
+    expect(avisos([1, 2, 3, 4, 5])).toEqual(['5 conquistas novas! Olha no Legado.']);
+    expect(avisos([])).toEqual([]);
+  });
+});
+
 describe('detectarNovas (o que avisar ao recarregar)', () => {
   it('primeira carga: só as novas da chamada, não o histórico', () => {
     const e = estado({ conquistas: [{ id: 1, em: EM }, { id: 2, em: EM }], novas: [2] });

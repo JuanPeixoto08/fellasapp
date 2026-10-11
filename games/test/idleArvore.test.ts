@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { abertura, efeitosArvore } from '../idle/economia';
-import { pendentes, tipo } from '../idle/oportunidades';
+import { CAIXA_PADRAO, pendentes, tipo } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -132,15 +132,16 @@ describe('o que cada ramo faz', () => {
     expect(s.valuation).toBe(1e6);
     expect(s.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
   });
-  it('Oportunidades: caixinha de 4 (e 5), validade de 6h, +3 por dia e bônus em dobro', async () => {
+  it('Oportunidades: caixinha de 4 (e 5), +3 por dia e bônus em dobro', async () => {
     await abrir(A);
+    await q('update public.idle_state set week_start = public.games_week_start() - 7 where user_id = $1', [A]);
     const sem = await t.rpc<Estado>('idle_open');
     const agora = Date.parse(sem.server_now);
     const semana = Date.parse(sem.week_start + 'T00:00:00-03:00');
     await ter(A, [1, 31, 32, 33, 34]);
     const com = await t.rpc<Estado>('idle_open');
     expect(com.opp_left).toBe(sem.opp_left + 3);
-    const lista = pendentes(A, agora, [], semana, { tamanho: 4, validadeS: 6 * 3600 });
+    const lista = pendentes(A, agora, [], semana, { tamanho: 4, validadeS: CAIXA_PADRAO.validadeS });
     expect(lista).toHaveLength(4);
     const [{ l }] = await q<{ l: string[] }>('select public.idle_opp_list(s, $2::timestamptz) as l from public.idle_state s where user_id = $1', [A, sem.server_now]);
     expect(l.map(Number)).toEqual(lista);
