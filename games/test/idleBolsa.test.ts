@@ -70,3 +70,59 @@ describe('catálogo e tick (paridade SQL × TS)', () => {
     await expect(t.asRole('authenticated', 'select * from public.idle_bolsa_mercado')).rejects.toThrow();
   });
 });
+
+describe('avançar o mercado', () => {
+  const precos = (empresa: number) =>
+    q<{ tick: string; valor: number }>('select tick::text, valor from public.idle_bolsa_precos where empresa = $1 order by tick', [empresa]);
+  const mercado = (empresa: number) => q<Linha & { tick: string }>('select *, tick::text, humor_ate::text, rj_ate::text from public.idle_bolsa_mercado where empresa = $1', [empresa]);
+
+  it('primeira vez: cria as 8 no repouso, no tick de agora', async () => {
+    await q('select public.idle_bolsa_avancar_ate(1000)');
+    const rows = await q<{ n: number }>('select count(*)::int as n from public.idle_bolsa_mercado');
+    expect(rows[0].n).toBe(8);
+    expect(await precos(1)).toEqual([{ tick: '1000', valor: 30 }]);
+  });
+  it('gera os minutos que faltam, um preço por minuto por empresa; mesmo tick de novo não muda nada', async () => {
+    await q('select setseed(0.42)');
+    await q('select public.idle_bolsa_avancar_ate(1000)');
+    await q('select public.idle_bolsa_avancar_ate(1005)');
+    expect((await precos(3)).map((p) => p.tick)).toEqual(['1000', '1001', '1002', '1003', '1004', '1005']);
+    const antes = await mercado(3);
+    await q('select public.idle_bolsa_avancar_ate(1005)');
+    expect(await mercado(3)).toEqual(antes);
+    expect(await precos(3)).toHaveLength(6);
+  });
+  it('mais de 1 dia parado: gera só o último dia', async () => {
+    await q('select public.idle_bolsa_avancar_ate(1000)');
+    await q('select public.idle_bolsa_avancar_ate(1000 + 5000)');
+    const p = await precos(1);
+    expect(p).toHaveLength(1 + 1440);
+    expect(p[1].tick).toBe(String(1000 + 5000 - 1440 + 1));
+  });
+  it('apaga o histórico de mais de 7 dias', async () => {
+    await q('select public.idle_bolsa_avancar_ate(20000)');
+    // 20001 − 10080 = 9921: o 9920 já passou de 7 dias, o 9921 ainda não
+    await q('insert into public.idle_bolsa_precos (tick, empresa, valor) values (9920, 1, 1), (9921, 1, 1)');
+    await q('select public.idle_bolsa_avancar_ate(20001)');
+    expect((await precos(1)).map((p) => p.tick)).toEqual(['9921', '20000', '20001']);
+  });
+  it('quebra no banco: empresa na zona de risco com chance 1 quebra, fica 10 minutos parada e volta', async () => {
+    await q('select public.idle_bolsa_avancar_ate(1000)');
+    await q('update public.idle_cat_bolsa set quebra = 1 where id = 4');
+    await q('update public.idle_bolsa_mercado set valor = 1, humor = 4, humor_ate = 99999 where empresa = 4');
+    await q('select public.idle_bolsa_avancar_ate(1001)');
+    let [m] = await mercado(4);
+    expect(m.geracao).toBe(1);
+    expect(m.rj_ate).toBe('1011');
+    await q('select public.idle_bolsa_avancar_ate(1011)');
+    [m] = await mercado(4);
+    expect(m.rj_ate).toBeNull();
+    expect(m.valor).toBe(20);
+  });
+  it('avançar de verdade usa o relógio: tick = minutos desde 1970', async () => {
+    const [{ agora }] = await q<{ agora: string }>('select public.idle_bolsa_agora()::text as agora');
+    expect(Math.abs(Number(agora) - Math.floor(Date.now() / 60000))).toBeLessThanOrEqual(1);
+    const [{ v }] = await q<{ v: string }>('select public.idle_bolsa_avancar()::text as v');
+    expect(Math.abs(Number(v) - Number(agora))).toBeLessThanOrEqual(1);
+  });
+});

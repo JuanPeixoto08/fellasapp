@@ -124,3 +124,66 @@ $$;
 revoke all on function public.idle_bolsa_normal(double precision, double precision) from public, anon, authenticated;
 revoke all on function public.idle_bolsa_humor(double precision[], double precision) from public, anon, authenticated;
 revoke all on function public.idle_bolsa_tick(public.idle_bolsa_mercado, public.idle_cat_bolsa, bigint, double precision[]) from public, anon, authenticated;
+
+-- ---------- histórico (7 dias) ----------
+create table if not exists public.idle_bolsa_precos (
+  tick    bigint not null,
+  empresa int not null references public.idle_cat_bolsa (id),
+  valor   double precision not null,
+  primary key (tick, empresa)
+);
+alter table public.idle_bolsa_precos enable row level security;
+revoke all on public.idle_bolsa_precos from anon, authenticated;
+
+create or replace function public.idle_bolsa_agora()
+returns bigint language sql stable set search_path = public as $$
+  select floor(extract(epoch from now()) / 60)::bigint
+$$;
+
+-- gera os minutos que faltam até p_agora (no máximo 1 dia), com trava: duas chamadas juntas não geram o mesmo minuto
+create or replace function public.idle_bolsa_avancar_ate(p_agora bigint)
+returns void language plpgsql volatile security definer set search_path = public as $$
+declare
+  c   public.idle_cat_bolsa;
+  m   public.idle_bolsa_mercado;
+  v_t bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-bolsa'));
+  for c in select * from public.idle_cat_bolsa order by id loop
+    select * into m from public.idle_bolsa_mercado where empresa = c.id;
+    if not found then
+      insert into public.idle_bolsa_mercado (empresa, tick, valor, delta, humor, humor_ate, geracao, rj_ate)
+      values (c.id, p_agora, c.repouso, 0, 0, p_agora, 0, null);
+      insert into public.idle_bolsa_precos (tick, empresa, valor) values (p_agora, c.id, c.repouso)
+      on conflict (tick, empresa) do nothing;
+      continue;
+    end if;
+    v_t := greatest(m.tick, p_agora - 1440);
+    while v_t < p_agora loop
+      v_t := v_t + 1;
+      m := public.idle_bolsa_tick(m, c, v_t, array[random(), random(), random(), random(), random(), random(), random()]);
+      insert into public.idle_bolsa_precos (tick, empresa, valor) values (v_t, c.id, m.valor)
+      on conflict (tick, empresa) do update set valor = excluded.valor;
+    end loop;
+    update public.idle_bolsa_mercado
+       set tick = greatest(m.tick, tick), valor = m.valor, delta = m.delta, humor = m.humor, humor_ate = m.humor_ate,
+           geracao = m.geracao, rj_ate = m.rj_ate
+     where empresa = c.id;
+  end loop;
+  delete from public.idle_bolsa_precos where tick < p_agora - 10080;
+end;
+$$;
+
+create or replace function public.idle_bolsa_avancar()
+returns bigint language plpgsql volatile security definer set search_path = public as $$
+declare
+  v_agora bigint := public.idle_bolsa_agora();
+begin
+  perform public.idle_bolsa_avancar_ate(v_agora);
+  return v_agora;
+end;
+$$;
+
+revoke all on function public.idle_bolsa_agora() from public, anon, authenticated;
+revoke all on function public.idle_bolsa_avancar_ate(bigint) from public, anon, authenticated;
+revoke all on function public.idle_bolsa_avancar() from public, anon, authenticated;
