@@ -13,8 +13,10 @@ import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, prec
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
+import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { escalaPc } from './escala';
+import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
@@ -40,8 +42,8 @@ export type Modelo = {
   bolsaAberta: boolean;
   /** Folha de Configurações: fechada, o menu ou as patch notes. */
   config: TelaConfig;
-  /** Som ligado (guardado no aparelho). */
-  som: boolean;
+  /** Chaves de som e avisos (guardadas no aparelho). */
+  chaves: Record<ChaveSom, boolean>;
   /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
   novidadeNova: boolean;
 };
@@ -53,7 +55,7 @@ export type Acoes = {
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
-  config(acao: 'abrir' | TelaConfig): void; som(ligado: boolean): void;
+  config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void;
 };
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
 
@@ -108,6 +110,19 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   };
   escalar();
   window.addEventListener('resize', escalar);
+  // som da interface: navegação clica (comprar, vender e pegar têm o som do que deu certo, no main)
+  const CLIQUE = '.aba, .seg button, .gaveta, .fechar, .config-item, .chave, .acao, .voltar-config, .no-arvore, .conquista, .topo-config';
+  app.addEventListener('click', (e) => {
+    if (e.target instanceof Element && e.target.closest(CLIQUE)) a.efeito('clique');
+  });
+  // folha abrindo e fechando ("fuu" subindo e descendo); a 1ª vez só registra
+  const folhaVisivel = new WeakMap<HTMLElement, boolean>();
+  const mostrarFolha = (modal: HTMLElement, visivel: boolean) => {
+    const antes = folhaVisivel.get(modal);
+    folhaVisivel.set(modal, visivel);
+    mostrar(modal, visivel);
+    if (antes !== undefined && antes !== visivel) a.efeito(visivel ? 'abrir' : 'fechar');
+  };
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
@@ -645,7 +660,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
     // caixinha
     modalC.replaceChildren();
-    mostrar(modalC, m.caixaAberta && jogando);
+    mostrarFolha(modalC, m.caixaAberta && jogando);
     if (s && m.caixaAberta) {
       const folha = el('div', 'folha');
       const topo = el('div', 'folha-topo');
@@ -660,7 +675,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
     // editor de personagem
     modalV.replaceChildren();
-    mostrar(modalV, m.editor !== null && (m.fase === 'antes' || jogando));
+    mostrarFolha(modalV, m.editor !== null && (m.fase === 'antes' || jogando));
     if (m.editor) {
       const v = m.editor;
       const folha = el('div', 'folha');
@@ -694,7 +709,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     // vender a startup: confirmação (só com pelo menos 1 ponto a ganhar)
     modalP.replaceChildren();
     const ganho = s && m.vendaAberta && jogando ? s.pontos_venda : 0;
-    mostrar(modalP, ganho >= 1);
+    mostrarFolha(modalP, ganho >= 1);
     if (ganho >= 1) {
       const folha = el('div', 'folha');
       const topoP = el('div', 'folha-topo');
@@ -712,7 +727,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
     // configurações: menu (som, visual, patch notes) ou as patch notes
     modalCfg.replaceChildren();
-    mostrar(modalCfg, m.config !== 'fechada');
+    mostrarFolha(modalCfg, m.config !== 'fechada');
     if (m.config !== 'fechada') {
       const folha = el('div', 'folha folha-config');
       const topoCfg = el('div', 'folha-topo');
@@ -721,12 +736,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       fechar.append(iconeFechar());
       if (m.config === 'menu') {
         topoCfg.append(titulo('idle-titulo-config', 'Configurações'), fechar);
-        const som = el('div', 'config-item');
-        const chave = button(m.som ? 'Ligado' : 'Desligado', `chave${m.som ? ' ligada' : ''}`, () => a.som(!m.som));
-        chave.setAttribute('role', 'switch');
-        chave.setAttribute('aria-checked', String(m.som));
-        chave.setAttribute('aria-label', 'Som');
-        som.append(el('span', 'rotulo', 'Som'), chave);
+        const chaveSom = (qual: ChaveSom, rotulo: string, ligado: string, desligado: string) => {
+          const linha = el('div', 'config-item');
+          const on = m.chaves[qual];
+          const b = button(on ? ligado : desligado, `chave${on ? ' ligada' : ''}`, () => a.chave(qual, !on));
+          b.setAttribute('role', 'switch');
+          b.setAttribute('aria-checked', String(on));
+          b.setAttribute('aria-label', rotulo);
+          linha.append(el('span', 'rotulo', rotulo), b);
+          return linha;
+        };
         const item = (rotulo: string, sub: string, aoTocar: () => void, ponto = false) => {
           const b = button('', 'config-item', aoTocar);
           const p = el('span', 'ponto');
@@ -738,7 +757,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         };
         folha.append(
           topoCfg,
-          som,
+          chaveSom('musica', 'Música', 'Ligada', 'Desligada'),
+          chaveSom('efeitos', 'Efeitos sonoros', 'Ligados', 'Desligados'),
+          chaveSom('avisos', 'Avisos', 'Ligados', 'Desligados'),
           item('Mudar visual', 'Seu boneco nas cenas e no placar', () => { a.config('fechada'); a.editor('abrir'); }),
           item('Patch notes', 'O que entrou de novo no jogo', () => a.config('notas'), m.novidadeNova),
         );

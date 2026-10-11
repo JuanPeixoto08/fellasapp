@@ -4,6 +4,16 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-11-som',
+    titulo: 'Som na firma',
+    data: '2026-10-11',
+    itens: [
+      'Música swing que cresce junto com a empresa: cada era tem a sua.',
+      'Efeitos pra compra, venda, conquista, era nova, oportunidade e mais.',
+      'Nas Configurações: música, efeitos e avisos, cada um liga e desliga separado.',
+    ],
+  },
+  {
     id: '2026-10-11-venda-oportunidades',
     titulo: 'Venda com cota nova',
     data: '2026-10-11',

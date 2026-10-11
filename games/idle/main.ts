@@ -6,6 +6,8 @@ import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
 import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
+import { criarAudio } from './audio';
+import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { temNovidade } from './novidades';
@@ -13,7 +15,7 @@ import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
-import { gravarSom, lerSom, lerVista, marcarVista } from './preferencias';
+import { gravarChave, lerChave, lerVista, marcarVista, type ChaveSom } from './preferencias';
 import {
   agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
@@ -48,7 +50,11 @@ let ocupado = false;
 let caixaAberta = false;
 // configurações: a folha, o som e a bolinha de patch note não lida (tudo no aparelho)
 let config: TelaConfig = 'fechada';
-let som = lerSom();
+let chaves: Record<ChaveSom, boolean> = { musica: lerChave('musica'), efeitos: lerChave('efeitos'), avisos: lerChave('avisos') };
+// o som: liga no 1º toque; a música segue a era (0 = antes do Abrir CNPJ)
+const audio = criarAudio();
+audio.chaves(chaves);
+let vivoSoou: number | null = null;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
@@ -77,6 +83,7 @@ function receberBolsa(b: BolsaEstado) {
   bolsa = b;
   bolsaBuscadaEm = Date.now();
   poPendentes = [...poPendentes, ...b.viraram_po];
+  if (b.viraram_po.length) audio.tocar('po');
 }
 
 async function carregarBolsa() {
@@ -94,16 +101,27 @@ async function carregarBolsa() {
   buscandoBolsa = false;
   if (bolsaAberta && !document.hidden) timerBolsa = setTimeout(() => void carregarBolsa(), proximaBusca(bolsa?.vira_em_ms ?? 60_000));
 }
+// avisos desligados: sem o aviso de conquista e sem o som dele
 const filaAvisos = criarFilaAvisos((texto) => {
-  conquistaAviso = texto;
+  conquistaAviso = chaves.avisos ? texto : null;
+  if (texto && chaves.avisos) audio.tocar('conquista');
   render();
 });
 
 const tela = criarTela(document.getElementById('app')!, {
   abrirCnpj: () => void guard(abrirCnpj),
-  comprar: (tipo, id, qtd) => void guard(async () => aplicar(await api.idleBuy(tipo, id, qtd))),
+  comprar: (tipo, id, qtd) => void guard(async () => {
+    const antes = ancora?.estado ?? null;
+    const s = await api.idleBuy(tipo, id, qtd);
+    aplicar(s);
+    const n = quantasCompradas(antes, s, tipo, id);
+    audio.tocar(n > 1 ? 'compraMuitas' : 'compra', { quantas: n });
+  }),
   escolher: (era, opcao) => void guard(async () => aplicar(await api.idlePickStrategy(era, opcao))),
-  pegar: (w) => void guard(async () => aplicar(await api.idleClaim(w))),
+  pegar: (w) => void guard(async () => {
+    aplicar(await api.idleClaim(w));
+    audio.tocar('pegar');
+  }),
   trocarAba: (nova) => {
     aba = nova;
     if (nova === 'placar' || nova === 'gente') void carregarPlacar();
@@ -119,11 +137,14 @@ const tela = criarTela(document.getElementById('app')!, {
     }
     render();
   },
-  som: (ligado) => {
-    som = ligado;
-    gravarSom(ligado);
+  chave: (qual, ligada) => {
+    chaves = { ...chaves, [qual]: ligada };
+    gravarChave(qual, ligada);
+    audio.chaves(chaves);
+    if (qual === 'avisos' && !ligada) conquistaAviso = null; // some na hora
     render();
   },
+  efeito: (id) => audio.tocar(id),
   tentarDeNovo: () => {
     if (placar === null) void carregarPlacar();
     void guard(recarregar);
@@ -157,6 +178,7 @@ const tela = criarTela(document.getElementById('app')!, {
       vendaAberta = false; // fecha já: deu certo, a cena volta pro "antes"; deu errado, o aviso diz por quê
       void guard(async () => {
         aplicar(await api.idlePrestige());
+        audio.tocar('venda');
         aba = 'loja'; // quando reabrir a empresa, começa comprando
         bolsaAberta = false; // a empresa nova não tem trader: a Bolsa fecha
         await carregarPlacar();
@@ -166,7 +188,10 @@ const tela = criarTela(document.getElementById('app')!, {
     vendaAberta = acao === 'abrir';
     render();
   },
-  comprarNo: (id) => void guard(async () => aplicar(await api.idleBuyNode(id))),
+  comprarNo: (id) => void guard(async () => {
+    aplicar(await api.idleBuyNode(id));
+    audio.tocar('no');
+  }),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
     if (!bolsaAberta) poPendentes = [];
@@ -175,14 +200,19 @@ const tela = criarTela(document.getElementById('app')!, {
     if (bolsaAberta) void carregarBolsa();
   },
   negociar: (empresa, lado, qtd, tick) => void guard(async () => {
+    const p = bolsa?.carteira.find((x) => x.empresa === empresa);
+    const m = bolsa?.empresas.find((x) => x.id === empresa);
+    const lucro = !p || !m || m.valor >= p.custo / p.qtd;
     const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick);
     receberBolsa(r.bolsa);
     aplicar(r);
+    audio.tocar(lado === 'comprar' ? 'acaoCompra' : 'acaoVende', { lucro });
   }),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);
     receberBolsa(r.bolsa);
     aplicar(r);
+    audio.tocar('compra');
   }),
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
 // o palco recebe o kit como função (tenta de novo quando falha); o editor e as cartas esperam o mesmo kit
@@ -239,7 +269,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, som, novidadeNova,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, chaves, novidadeNova,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });
@@ -247,6 +277,7 @@ function render() {
 }
 
 function aplicar(estado: IdleState) {
+  const antes = ancora?.estado ?? null;
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
   palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO) });
@@ -255,6 +286,8 @@ function aplicar(estado: IdleState) {
   if (deveAbrirEditor(estado, fase, editorFechado, rascunho !== null)) rascunho = { ...PADRAO };
   if (fase !== 'abrindo') palco.tocar(cenaDoEstado(estado, fase));
   render();
+  for (const id of sonsDaMudanca(antes, estado)) audio.tocar(id);
+  audio.era(fase === 'antes' ? 0 : estado.era);
   // avisa as novas da chamada e as que apareceram sem estar nelas (ser contratado, "Pai tá on"); a 1ª carga não avisa o histórico
   const novas = detectarNovas(conquistasConhecidas, estado);
   conquistasConhecidas = novas.conhecidas;
@@ -275,6 +308,7 @@ async function salvarVisual(v: IdleVisual) {
 
 async function abrirCnpj() {
   const estado = await api.idleStart();
+  audio.tocar('cnpj');
   fase = 'abrindo';
   aplicar(estado);
   palco.tocar('cena-0-abrindo', {
@@ -317,6 +351,7 @@ async function guard(trabalho: () => Promise<void>) {
       filaAvisos.parar();
     }
     else {
+      audio.tocar('erro');
       aviso = err.message;
       if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
       if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
@@ -333,7 +368,12 @@ setInterval(() => {
   if (document.hidden || !ancora) return;
   tela.atualizarValor(valuationAgora(ancora, Date.now()));
   if (bolsaAberta && bolsa) tela.relogioBolsa(faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()));
-  if (vivoAgora(ancora.estado, agoraSrv()) !== vivoAtual) render();
+  const vivo = vivoAgora(ancora.estado, agoraSrv());
+  if (vivo !== null && vivo !== vivoSoou) {
+    vivoSoou = vivo;
+    audio.tocar('oportunidade');
+  }
+  if (vivo !== vivoAtual) render();
   // um contrato venceu: a taxa mudou no banco, bate o ponto (uma vez por vencimento)
   const s = ancora.estado;
   if (vencido(s, agoraSrv()) && vencimentoPedido !== s.muda_em && !ocupado) {

@@ -1,0 +1,19 @@
+/* Página de audição: escura, letra pixel nos títulos, botões no jeito do jogo (contorno de pixel, roxo quando tocando). */
+:root { color-scheme: dark; }
+body { margin: 0; background: #121212; color: #F4F1EA; font: 15px/1.45 'Golos Text', system-ui, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 24px; }
+h1, h2 { margin: 0; font-family: 'Jersey 10', monospace; font-weight: 400; }
+h1 { font-size: 34px; }
+h2 { font-size: 25px; }
+p { margin: 4px 0 0; color: #A8A398; }
+section { display: grid; gap: 10px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+button { min-height: 44px; padding: 0 12px; border: 0; border-radius: 0; background: #22202B; color: #F4F1EA; cursor: pointer;
+  font: 400 19px 'Jersey 10', monospace; --c: #34323F;
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+button:hover { --c: #B8A2FF; }
+button:focus-visible { outline: 2px solid #B8A2FF; outline-offset: 4px; }
+button.ativo { background: #5B3FD9; --c: #8C75FF; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td, th { padding: 4px 8px; text-align: left; border-bottom: 1px solid #34323F; }
+.ruim { color: #FF8F8F; }

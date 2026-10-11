@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { dataNovidade, NOVIDADES, temNovidade } from './novidades';
-import { lerSom, lerVista, marcarVista, gravarSom } from './preferencias';
+import { gravarChave, lerChave, lerVista, marcarVista } from './preferencias';
 
 describe('patch notes', () => {
   it('da mais nova pra mais antiga, ids únicos, toda versão com título e pelo menos uma linha', () => {
@@ -20,8 +20,11 @@ describe('patch notes', () => {
     expect(temNovidade(NOVIDADES[0].id)).toBe(false);
   });
   it('a nota da Bolsa explica a ligação com os geradores', () => {
-    const bolsa = NOVIDADES.find((n) => n.id === '2026-10-11-bolsa')!;
-    expect(bolsa.itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
+    expect(NOVIDADES.find((n) => n.id === '2026-10-11-bolsa')!.itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
+  });
+  it('a mais nova é o som', () => {
+    expect(NOVIDADES[0].id).toBe('2026-10-11-som');
+    expect(NOVIDADES[0].titulo).toBe('Som na firma');
   });
   it('data em pt-BR curta', () => {
     expect(dataNovidade('2026-10-11')).toBe('11/10/2026');
@@ -30,12 +33,17 @@ describe('patch notes', () => {
 
 describe('preferências no aparelho', () => {
   beforeEach(() => localStorage.clear());
-  it('som começa ligado e lembra o desligado', () => {
-    expect(lerSom()).toBe(true);
-    gravarSom(false);
-    expect(lerSom()).toBe(false);
-    gravarSom(true);
-    expect(lerSom()).toBe(true);
+  it('música, efeitos e avisos começam ligados e cada um lembra o desligado', () => {
+    for (const q of ['musica', 'efeitos', 'avisos'] as const) {
+      expect(lerChave(q)).toBe(true);
+      gravarChave(q, false);
+      expect(lerChave(q)).toBe(false);
+      gravarChave(q, true);
+      expect(lerChave(q)).toBe(true);
+    }
+    gravarChave('musica', false);
+    expect(lerChave('efeitos')).toBe(true);
+    expect(localStorage.getItem('fellas:idle-musica')).toBe('0');
   });
   it('a versão lida fica guardada', () => {
     expect(lerVista()).toBeNull();
