@@ -119,7 +119,6 @@ Ideias do Juan e da pesquisa (outubro de 2026), aprovadas. A do "Vitor" (boneco 
 | **6-7** | ter exatamente 67 unidades de algum gerador | "Seis sete. Ninguém sabe por quê." |
 | **Farmou aura** | ficar em 1º no placar (F$/s) | "+1000 de aura." |
 | **Aura negativa** | vender a startup e ganhar só 1 ponto | "Vendeu por um real e um abraço." |
-| **limaumdoc** | contratar o limaumdoc (pelo nome de usuário) | a combinar com o grupo |
 | **Tá saindo da jaula** | comprar "Máx" de um gerador e levar 100+ unidades de uma vez | "Birl! O monstro tá saindo da jaula." |
 | **Guiana Brasileira** | comprar a melhoria "Filial em Portugal" (a de 25 unidades da "Filial em Dubai", que hoje se chama "Visto de negócios" e muda de nome nesta entrega, por migração nova de catálogo) | "Fala galera! A Guiana Brasileira agora tem sede." |
 | **Fez o L** | ter 50 estagiários (o do Luis) | "L de Luis, que fique claro." |
@@ -128,7 +127,7 @@ Ideias do Juan e da pesquisa (outubro de 2026), aprovadas. A do "Vitor" (boneco 
 | **Pai tá on** | ser o unicórnio da semana | "O pai tá on." |
 | **Brainrot** | pegar 3 oportunidades em menos de 1 minuto | "Tung tung tung empreendedor." |
 
-Nomes de membros (limaumdoc) e do Luis aparecem no código público: aprovado pelo Juan (10/10).
+O nome do Luis aparece no código público: aprovado pelo Juan (10/10). A conquista do limaumdoc saiu (Juan, 11/10).
 
 ## 4. Telas (`games/idle/`)
 
