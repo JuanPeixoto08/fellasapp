@@ -8,14 +8,16 @@ import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared
 import { ativos } from './ativos';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
+import { temNovidade } from './novidades';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
+import { gravarSom, lerSom, lerVista, marcarVista } from './preferencias';
 import {
   agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
-import { criarTela, type Aba } from './tela';
+import { criarTela, type Aba, type TelaConfig } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
 
 // aba aberta há tempo recarrega sozinha quando sai versão nova (no dev o Vite já recarrega)
@@ -44,6 +46,10 @@ let placarFalhou = false;
 let aviso: string | null = null;
 let ocupado = false;
 let caixaAberta = false;
+// configurações: a folha, o som e a bolinha de patch note não lida (tudo no aparelho)
+let config: TelaConfig = 'fechada';
+let som = lerSom();
+let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
 // volta sozinho na próxima abertura da página, até o primeiro "Bora".
@@ -105,6 +111,19 @@ const tela = criarTela(document.getElementById('app')!, {
     render();
   },
   caixa: (aberta) => { caixaAberta = aberta; render(); },
+  config: (acao) => {
+    config = acao === 'abrir' ? 'menu' : acao;
+    if (config === 'notas') {
+      marcarVista();
+      novidadeNova = false;
+    }
+    render();
+  },
+  som: (ligado) => {
+    som = ligado;
+    gravarSom(ligado);
+    render();
+  },
   tentarDeNovo: () => {
     if (placar === null) void carregarPlacar();
     void guard(recarregar);
@@ -220,7 +239,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou, config, som, novidadeNova,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });

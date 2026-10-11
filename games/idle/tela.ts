@@ -12,8 +12,9 @@ import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, prec
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
-import { iconeFechar } from './icones';
+import { iconeEngrenagem, iconeFechar } from './icones';
 import { escalaPc } from './escala';
+import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
@@ -36,7 +37,14 @@ export type Modelo = {
   bolsa: BolsaEstado | null;
   /** Gaveta Bolsa aberta (PC: no corpo da bancada; celular: tela cheia). */
   bolsaAberta: boolean;
+  /** Folha de Configurações: fechada, o menu ou as patch notes. */
+  config: TelaConfig;
+  /** Som ligado (guardado no aparelho). */
+  som: boolean;
+  /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
+  novidadeNova: boolean;
 };
+export type TelaConfig = 'fechada' | 'menu' | 'notas';
 export type Acoes = {
   abrirCnpj(): void; comprar(tipo: 'gerador' | 'melhoria', id: number, qtd: 0 | 1 | 10): void; escolher(era: number, opcao: number): void;
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
@@ -44,6 +52,7 @@ export type Acoes = {
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
+  config(acao: 'abrir' | TelaConfig): void; som(ligado: boolean): void;
 };
 export type Tela = { canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void };
 
@@ -101,8 +110,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const topo = el('header', 'top');
   const voltar = el('a', undefined, '← Voltar');
   voltar.href = '/games';
-  const mudarVisual = button('Mudar visual', 'btn topo-visual', () => a.editor('abrir'));
-  topo.append(voltar, el('span', 'marca', 'Fellas Inc.'), mudarVisual);
+  // Configurações (som, visual, patch notes); a bolinha avisa patch note não lida
+  const engrenagem = button('', 'btn topo-config', () => a.config('abrir'));
+  const pontoNovo = el('span', 'ponto');
+  engrenagem.append(iconeEngrenagem(), pontoNovo);
+  topo.append(voltar, el('span', 'marca', 'Fellas Inc.'), engrenagem);
 
   const palco = el('div', 'palco');
   const canvas = el('canvas', 'cena');
@@ -210,8 +222,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const modalC = el('div', 'modal modal-caixa');
   const modalV = el('div', 'modal modal-visual');
   const modalP = el('div', 'modal modal-venda');
+  const modalCfg = el('div', 'modal modal-config');
+  modalCfg.hidden = true; // até o primeiro render
   for (const [modal, titulo] of [
     [modalE, 'idle-titulo-estrategia'], [modalC, 'idle-titulo-caixa'], [modalV, 'idle-titulo-visual'], [modalP, 'idle-titulo-venda'],
+    [modalCfg, 'idle-titulo-config'],
   ] as const) {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
@@ -225,7 +240,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const arvore = criarArvoreTela((id) => a.comprarNo(id));
 
 
-  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, arvore.elemento);
+  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -453,7 +468,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     } else {
       corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
     }
-    mostrar(mudarVisual, jogando);
+    mostrar(engrenagem, jogando || m.fase === 'antes');
+    engrenagem.setAttribute('aria-label', m.novidadeNova ? 'Configurações (tem novidade)' : 'Configurações');
+    mostrar(pontoNovo, m.novidadeNova);
     app.classList.toggle('sem-painel', !jogando && !verLegado);
     mostrar(listaL, verLegado);
 
@@ -683,6 +700,56 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       fim.append(button('Deixa quieto', 'btn', () => a.vender('fechar')), sim);
       folha.append(topoP, el('p', 'sub', textoVenda(ganho)), fim);
       modalP.append(folha);
+    }
+
+    // configurações: menu (som, visual, patch notes) ou as patch notes
+    modalCfg.replaceChildren();
+    mostrar(modalCfg, m.config !== 'fechada');
+    if (m.config !== 'fechada') {
+      const folha = el('div', 'folha folha-config');
+      const topoCfg = el('div', 'folha-topo');
+      const fechar = button('', 'fechar', () => a.config('fechada'));
+      fechar.setAttribute('aria-label', 'Fechar');
+      fechar.append(iconeFechar());
+      if (m.config === 'menu') {
+        topoCfg.append(titulo('idle-titulo-config', 'Configurações'), fechar);
+        const som = el('div', 'config-item');
+        const chave = button(m.som ? 'Ligado' : 'Desligado', `chave${m.som ? ' ligada' : ''}`, () => a.som(!m.som));
+        chave.setAttribute('role', 'switch');
+        chave.setAttribute('aria-checked', String(m.som));
+        chave.setAttribute('aria-label', 'Som');
+        som.append(el('span', 'rotulo', 'Som'), chave);
+        const item = (rotulo: string, sub: string, aoTocar: () => void, ponto = false) => {
+          const b = button('', 'config-item', aoTocar);
+          const p = el('span', 'ponto');
+          mostrar(p, ponto);
+          const texto = el('span', 'meio');
+          texto.append(el('span', 'rotulo', rotulo), el('span', 'sub', sub));
+          b.append(texto, p);
+          return b;
+        };
+        folha.append(
+          topoCfg,
+          som,
+          item('Mudar visual', 'Seu boneco nas cenas e no placar', () => { a.config('fechada'); a.editor('abrir'); }),
+          item('Patch notes', 'O que entrou de novo no jogo', () => a.config('notas'), m.novidadeNova),
+        );
+      } else {
+        const voltarCfg = button('Voltar', 'btn voltar-config', () => a.config('menu'));
+        topoCfg.append(voltarCfg, titulo('idle-titulo-config', 'Patch notes'), fechar);
+        const lista = el('div', 'notas');
+        for (const n of NOVIDADES) {
+          const nota = el('section', 'nota');
+          const cab = el('div', 'nota-cab');
+          cab.append(el('h3', undefined, n.titulo), el('span', 'sub', dataNovidade(n.data)));
+          const ul = el('ul');
+          for (const t of n.itens) ul.append(el('li', undefined, t));
+          nota.append(cab, ul);
+          lista.append(nota);
+        }
+        folha.append(topoCfg, lista);
+      }
+      modalCfg.append(folha);
     }
 
     avisoConquista.textContent = m.conquistaAviso ?? '';

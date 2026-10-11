@@ -38,7 +38,10 @@
 /* topo */
 .idle .top { padding: max(10px, env(safe-area-inset-top)) 14px 6px; }
 .idle .top .marca { font: 400 22px var(--i-pixel); letter-spacing: 0.02em; }
-.idle .top .topo-visual { flex: none; min-height: 36px; padding: 0 12px; font-size: 18px; }
+.idle .top .topo-config { position: relative; flex: none; width: 44px; padding: 0; display: grid; place-items: center; }
+/* bolinha de patch note não lida (na engrenagem e no item Patch notes) */
+.idle .ponto { flex: none; width: 10px; height: 10px; background: var(--gold); box-shadow: 0 0 0 2px var(--i-painel); }
+.idle .top .topo-config .ponto { position: absolute; top: -3px; right: -3px; box-shadow: 0 0 0 2px #121212; }
 
 /* empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e as gavetas embaixo */
 .idle .empresa { display: grid; gap: 10px; width: 100%; max-width: 560px; justify-self: center; padding: 6px 14px 0; }
@@ -223,6 +226,32 @@
 .idle .folha > .sub { margin: 0 0 8px; }
 .idle .fechar { flex: none; width: 44px; height: 44px; margin-right: -10px; display: grid; place-items: center; border: 0; border-radius: 0; background: transparent; color: var(--paper); cursor: pointer; }
 .idle .fechar:hover { background: var(--i-ativo); }
+
+/* configurações: linhas com contorno de pixel; o Som é uma chave Ligado/Desligado */
+.idle .folha-config { gap: 10px; }
+.idle .config-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 60px; padding: 10px 14px;
+  border: 0; border-radius: 0; background: var(--i-linha); color: var(--paper); text-align: left; font: inherit; --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle button.config-item { cursor: pointer; }
+.idle button.config-item:hover { --c: var(--i-lilas); background: var(--i-ativo); }
+.idle button.config-item:focus-visible, .idle .chave:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 4px; }
+.idle .config-item .meio { display: grid; gap: 2px; }
+.idle .config-item .rotulo { font: 400 22px/1.1 var(--i-pixel); }
+.idle .chave { flex: none; min-width: 112px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
+  font: 400 19px var(--i-pixel); color: var(--i-mudo); background: var(--i-fundo2); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .chave.ligada { color: #fff; background: var(--i-roxo); --c: var(--i-roxo-borda); }
+.idle .voltar-config { flex: none; min-height: 36px; padding: 0 12px; font-size: 18px; }
+.idle .folha-config .folha-topo h2 { flex: 1; }
+/* patch notes: da mais nova pra mais antiga, a mais nova com o contorno lilás */
+.idle .notas { display: grid; gap: 14px; padding-top: 4px; }
+.idle .nota { padding: 12px 14px; background: var(--i-linha); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .nota:first-child { --c: var(--i-lilas); }
+.idle .nota-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.idle .nota h3 { margin: 0; font: 400 23px/1.1 var(--i-pixel); }
+.idle .nota ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.45; }
+.idle .nota li::marker { color: var(--i-lilas); }
 .idle .arvore-topo .fechar { margin: 0; }
 .idle .escolhas { list-style: none; margin: 0; padding: 0; }
 .idle .escolha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #2A2833; }

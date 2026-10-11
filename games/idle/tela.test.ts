@@ -7,6 +7,7 @@ import { instante, sai, tipo, VALIDADE_S } from './oportunidades';
 import { ativos } from './ativos';
 import { catalogo } from './catalogo';
 import { PADRAO } from './personagem';
+import { NOVIDADES } from './novidades';
 import { criarTela, empresas, porcento, prazo, restam, type Acoes, type Modelo } from './tela';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
@@ -20,7 +21,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', som: true, novidadeNova: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -34,6 +35,7 @@ beforeEach(() => {
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
+    config: vi.fn<Acoes['config']>(), som: vi.fn<Acoes['som']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -508,11 +510,51 @@ describe('empresa, resumo e bancada', () => {
     expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
     vi.restoreAllMocks();
   });
-  it('topo: Mudar visual abre o editor', () => {
+  it('topo: a engrenagem abre as Configurações; a bolinha aparece com novidade não lida', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo());
-    root.querySelector<HTMLButtonElement>('.top .topo-visual')!.click();
+    tela.renderizar(modelo({ novidadeNova: true }));
+    const eng = root.querySelector<HTMLButtonElement>('.top .topo-config')!;
+    expect(eng.getAttribute('aria-label')).toBe('Configurações (tem novidade)');
+    expect(eng.querySelector('.ponto')!.hasAttribute('hidden')).toBe(false);
+    eng.click();
+    expect(acoes.config).toHaveBeenCalledWith('abrir');
+    tela.renderizar(modelo({ novidadeNova: false }));
+    expect(eng.getAttribute('aria-label')).toBe('Configurações');
+    expect(eng.querySelector('.ponto')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.top .topo-visual')).toBeNull(); // o Mudar visual mudou pra dentro
+  });
+  it('Configurações: Som (liga/desliga), Mudar visual e Patch notes', () => {
+    const tela = criarTela(root, acoes);
+    expect(root.querySelector('.modal-config')!.hasAttribute('hidden')).toBe(true);
+    tela.renderizar(modelo({ config: 'menu', som: true, novidadeNova: true }));
+    const modal = root.querySelector<HTMLElement>('.modal-config')!;
+    expect(modal.hasAttribute('hidden')).toBe(false);
+    expect([...modal.querySelectorAll('.config-item .rotulo')].map((x) => x.textContent)).toEqual(['Som', 'Mudar visual', 'Patch notes']);
+    const som = modal.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(som.getAttribute('aria-checked')).toBe('true');
+    expect(som.textContent).toBe('Ligado');
+    som.click();
+    expect(acoes.som).toHaveBeenCalledWith(false);
+    const item = (t: string) => [...modal.querySelectorAll<HTMLButtonElement>('button.config-item')].find((b) => b.querySelector('.rotulo')!.textContent === t)!;
+    expect(item('Patch notes').querySelector('.ponto')!.hasAttribute('hidden')).toBe(false);
+    item('Patch notes').click();
+    expect(acoes.config).toHaveBeenCalledWith('notas');
+    item('Mudar visual').click();
+    expect(acoes.config).toHaveBeenCalledWith('fechada');
     expect(acoes.editor).toHaveBeenCalledWith('abrir');
+    modal.querySelector<HTMLButtonElement>('.fechar')!.click();
+    expect(acoes.config).toHaveBeenLastCalledWith('fechada');
+    tela.renderizar(modelo({ config: 'menu', som: false }));
+    expect(root.querySelector('.modal-config [role="switch"]')!.textContent).toBe('Desligado');
+  });
+  it('Patch notes: as versões da mais nova pra mais antiga, com data e linhas; Voltar volta pro menu', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ config: 'notas' }));
+    const modal = root.querySelector<HTMLElement>('.modal-config')!;
+    expect([...modal.querySelectorAll('.nota h3')].map((x) => x.textContent)).toEqual(NOVIDADES.map((n) => n.titulo));
+    expect(modal.querySelector('.nota')!.textContent).toContain(NOVIDADES[0].itens[0]);
+    [...modal.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Voltar')!.click();
+    expect(acoes.config).toHaveBeenCalledWith('menu');
   });
   it('resumo: era, contratados e o bônus das conquistas (some o que for zero)', () => {
     const tela = criarTela(root, acoes);
