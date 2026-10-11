@@ -4,8 +4,9 @@ import './idle.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
-import type { IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
+import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
+import { avisosPo, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
@@ -22,7 +23,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -57,6 +58,25 @@ let vendaAberta = false;
 let conquistaAviso: string | null = null;
 // as conquistas que a página já conhecia (null = ainda não carregou): avisa só as que aparecem depois
 let conquistasConhecidas: number[] | null = null;
+// Bolsa: gaveta aberta e o último mercado buscado; um temporizador busca de novo na virada do minuto enquanto aberta
+let bolsaAberta = false;
+let bolsa: BolsaEstado | null = null;
+let timerBolsa: ReturnType<typeof setTimeout> | null = null;
+
+async function carregarBolsa() {
+  if (timerBolsa !== null) clearTimeout(timerBolsa);
+  timerBolsa = null;
+  const s = ancora?.estado;
+  if (!bolsaAberta || !s || (s.generators[18] ?? 0) < 1) return; // gerador 19 = Grupo de trader
+  try {
+    bolsa = await api.idleBolsa();
+    filaAvisos.adicionar(avisosPo(bolsa.viraram_po));
+    render();
+  } catch {
+    // sem rede: tenta de novo na próxima virada
+  }
+  if (bolsaAberta && !document.hidden) timerBolsa = setTimeout(() => void carregarBolsa(), proximaBusca(bolsa?.vira_em_ms ?? 60_000));
+}
 const filaAvisos = criarFilaAvisos((texto) => {
   conquistaAviso = texto;
   render();
@@ -108,6 +128,7 @@ const tela = criarTela(document.getElementById('app')!, {
       void guard(async () => {
         aplicar(await api.idlePrestige());
         aba = 'loja'; // quando reabrir a empresa, começa comprando
+        bolsaAberta = false; // a empresa nova não tem trader: a Bolsa fecha
         await carregarPlacar();
       });
       return;
@@ -116,6 +137,22 @@ const tela = criarTela(document.getElementById('app')!, {
     render();
   },
   comprarNo: (id) => void guard(async () => aplicar(await api.idleBuyNode(id))),
+  bolsa: (acao) => {
+    bolsaAberta = acao === 'abrir';
+    if (!bolsaAberta && timerBolsa !== null) clearTimeout(timerBolsa);
+    render();
+    if (bolsaAberta) void carregarBolsa();
+  },
+  negociar: (empresa, lado, qtd, tick) => void guard(async () => {
+    const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick);
+    bolsa = r.bolsa;
+    aplicar(r);
+  }),
+  melhorar: (tipo, nivel) => void guard(async () => {
+    const r = await api.idleBolsaMelhorar(tipo, nivel);
+    bolsa = r.bolsa;
+    aplicar(r);
+  }),
 }, (canvas, v, opcoes) => desenhar(canvas, v, opcoes));
 // o palco recebe o kit como função (tenta de novo quando falha); o editor e as cartas esperam o mesmo kit
 const palco = criarPalco(tela.canvas, ativos.camadas, carregarKit);
@@ -172,7 +209,7 @@ function render() {
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
     fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, editor: rascunho, placarFalhou,
-    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso,
+    pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsa, bolsaAberta,
   });
   if (ancora) tela.atualizarValor(valuationAgora(ancora, Date.now()));
 }
@@ -249,6 +286,7 @@ async function guard(trabalho: () => Promise<void>) {
       aviso = err.message;
       if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
       if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
+      if (RECARREGA_BOLSA.includes(err.code)) await carregarBolsa();
     }
   } finally {
     ocupado = false;
@@ -273,6 +311,7 @@ setInterval(() => { if (!document.hidden && (aba === 'placar' || aba === 'gente'
 // voltou pra aba: bate o ponto de novo (foto de segunda, contrato vencido)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) void prepararDesenhista();
+  if (!document.hidden && bolsaAberta) void carregarBolsa();
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
 });
 

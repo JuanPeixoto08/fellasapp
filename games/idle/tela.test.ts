@@ -20,7 +20,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -33,6 +33,7 @@ beforeEach(() => {
     trocarAba: vi.fn<Acoes['trocarAba']>(), caixa: vi.fn<Acoes['caixa']>(), tentarDeNovo: vi.fn<Acoes['tentarDeNovo']>(),
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
+    bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -465,6 +466,33 @@ describe('legado: prestígio, árvore e conquistas', () => {
 });
 
 describe('empresa, resumo e bancada', () => {
+  it('gaveta Bolsa: apagada sem Grupo de trader; com trader abre a Bolsa', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const g = root.querySelector<HTMLButtonElement>('.gaveta-bolsa')!;
+    expect(g.classList.contains('trancada')).toBe(true);
+    expect(g.getAttribute('aria-label')).toBe('Bolsa: compra 1 Grupo de trader pra abrir');
+    g.click();
+    expect(acoes.bolsa).toHaveBeenCalledWith('abrir');
+    const gens = [...Array(18).fill(1), 1, ...Array(11).fill(0)];
+    tela.renderizar(modelo({ estado: estado({ generators: gens }) }));
+    expect(root.querySelector('.gaveta-bolsa')!.classList.contains('trancada')).toBe(false);
+  });
+  it('Bolsa aberta: bancada com-bolsa, corpo mostra a Bolsa; ✕ fecha; Caixinha volta pra Caixinha', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ bolsaAberta: true, bolsa: null }));
+    const banc = root.querySelector('.bancada')!;
+    expect(banc.classList.contains('com-bolsa')).toBe(true);
+    expect(root.querySelector('.gaveta-corpo .bolsa')).not.toBeNull();
+    expect(root.querySelector('.gaveta-bolsa')!.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('.gaveta:not(.gaveta-bolsa)')!.getAttribute('aria-pressed')).toBe('false');
+    root.querySelector<HTMLButtonElement>('.bancada-topo .fechar')!.click();
+    expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+    root.querySelector<HTMLButtonElement>('.gaveta:not(.gaveta-bolsa)')!.click();
+    expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
+    vi.restoreAllMocks();
+  });
   it('topo: Mudar visual abre o editor', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());

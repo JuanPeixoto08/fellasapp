@@ -59,3 +59,8 @@ export const avisosPo = (po: { empresa: number; qtd: number }[]): string[] =>
     const de = DO.has(e.codigo) ? 'do' : 'da';
     return qtd === 1 ? `Sua 1 ação ${de} ${e.nome} virou pó.` : `Suas ${qtd} ações ${de} ${e.nome} viraram pó.`;
   });
+
+/** Quando buscar o mercado de novo: logo depois da virada do minuto (nunca antes de 1 s). */
+export const proximaBusca = (viraEmMs: number) => Math.max(1000, viraEmMs + 300);
+/** Recusas da Bolsa que querem o mercado (e a carteira) de novo. */
+export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada', 'idle_bolsa_nivel'];
