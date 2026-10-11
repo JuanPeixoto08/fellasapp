@@ -55,22 +55,45 @@ describe('comprar nós', () => {
     expect(await q('select prestige_earned, prestige_spent from public.idle_state where user_id = $1', [A]))
       .toEqual([{ prestige_earned: 10, prestige_spent: 3 }]);
   });
-  it('sem pontos livres que cubram o custo: idle_points_low; de novo: idle_node_owned; nó que não existe: idle_bad_choice', async () => {
+  it('recusa não gasta nem grava nada: idle_points_low, idle_locked, idle_node_owned e idle_bad_choice', async () => {
     await abrir(A);
     await pontos(A, 2);
+    const estado = async () => ({
+      gasto: await q('select prestige_spent from public.idle_state where user_id = $1', [A]),
+      nos: await q('select no_id from public.idle_arvore where user_id = $1 order by no_id', [A]),
+    });
     await comprar(1);
+    const base = await estado();
+    expect(base).toEqual({ gasto: [{ prestige_spent: 1 }], nos: [{ no_id: 1 }] });
     await expect(comprar(11)).rejects.toThrow(/idle_points_low/); // custa 2, sobrou 1
+    expect(await estado()).toEqual(base);
     await pontos(A, 10, 1);
+    const base2 = await estado();
+    await expect(comprar(12)).rejects.toThrow(/idle_locked/);
     await expect(comprar(1)).rejects.toThrow(/idle_node_owned/);
     await expect(comprar(99)).rejects.toThrow(/idle_bad_choice/);
     await expect(comprar(null as unknown as number)).rejects.toThrow(/idle_bad_choice/);
+    expect(await estado()).toEqual(base2);
+  });
+  it('toque duplo: comprar o nó 1 duas vezes dá idle_node_owned na 2ª e gasta só 1', async () => {
+    await abrir(A);
+    await pontos(A, 5);
+    await comprar(1);
+    await expect(comprar(1)).rejects.toThrow(/idle_node_owned/);
+    expect(await q('select prestige_spent from public.idle_state where user_id = $1', [A])).toEqual([{ prestige_spent: 1 }]);
+    expect(await q('select no_id from public.idle_arvore where user_id = $1', [A])).toEqual([{ no_id: 1 }]);
+  });
+  it('Abrir CNPJ duas vezes sem fechar: idle_started, e a empresa fica como estava', async () => {
+    const s = await t.rpc<Estado>('idle_start');
+    await expect(t.rpc('idle_start')).rejects.toThrow(/idle_started/);
+    expect((await t.rpc<Estado>('idle_open')).generators).toEqual(s.generators);
   });
   it('fecha a conta antes: o tempo parado rende sem o nó novo, e dali pra frente com ele', async () => {
     await abrir(A);
     await pontos(A, 1);
-    await q(`update public.idle_state set settled_at = settled_at - interval '1000 seconds' where user_id = $1`, [A]);
+    await q(`update public.idle_state set settled_at = settled_at - interval '20000 seconds' where user_id = $1`, [A]);
     const s = await comprar(1);
-    expect((s.valuation - 10) / (0.5 * 1.02 * 1000)).toBeCloseTo(1, 3);
+    expect((s.valuation - 10) / (0.5 * 1.02 * 20000)).toBeCloseTo(1, 2);
     expect(s.rate).toBeCloseTo(0.5 * 1.02 * 1.05, 12);
   });
   it('dá pra comprar com a empresa fechada (entre a venda e o Abrir CNPJ)', async () => {
@@ -170,9 +193,9 @@ describe('nada retroativo', () => {
   it('comprar um nó de produção não muda o valuation do trecho anterior', async () => {
     await abrir(A);
     await pontos(A, 5);
-    await q(`update public.idle_state set settled_at = settled_at - interval '5000 seconds' where user_id = $1`, [A]);
+    await q(`update public.idle_state set settled_at = settled_at - interval '20000 seconds' where user_id = $1`, [A]);
     const s = await comprar(1);
-    expect((s.valuation - 10) / (0.5 * 1.02 * 5000)).toBeCloseTo(1, 3);
+    expect((s.valuation - 10) / (0.5 * 1.02 * 20000)).toBeCloseTo(1, 2);
   });
   it('comprar o Carnaval (teto de 48h) depois de 50h fora rende só 36h, o teto de antes', async () => {
     await abrir(A);

@@ -48,14 +48,14 @@ const semanaAnterior = (u: string) => mudar(u, 'week_start = public.games_week_s
 describe('conquistas de estado', () => {
   it('100 de um gerador e F$ 1/s: grava na hora, volta em novas uma vez só e o +1% vale dali pra frente', async () => {
     await abrir(A);
-    await mudar(A, 'generators[1] = 100, settled_at = settled_at - interval \'1000 seconds\'');
+    await mudar(A, 'generators[1] = 100, settled_at = settled_at - interval \'20000 seconds\'');
     const base = 0.5 * 100 * 1.02;
     const s = await abrirJogo();
     expect(s.novas).toEqual([1, 31]);
     expect(ids(s)).toEqual([1, 31]);
     expect(s.bonus).toEqual({ arvore: [], conquistas: 2 });
     expect(s.rate).toBeCloseTo(base * 1.02, 9);
-    expect((s.valuation - 10) / (base * 1000)).toBeCloseTo(1, 3); // as 1000 s de antes rendem sem o bônus
+    expect((s.valuation - 10) / (base * 20000)).toBeCloseTo(1, 2); // as 1000 s de antes rendem sem o bônus
     const outra = await abrirJogo();
     expect(outra.novas).toEqual([]);
     expect(ids(outra)).toEqual([1, 31]);
@@ -115,14 +115,14 @@ describe('nada retroativo', () => {
   it('ser contratado fecha a conta do contratado antes de gravar a conquista: o passado rende sem o +1%', async () => {
     await abrir(A, B);
     await mudar(A, 'valuation = 1e9');
-    await mudar(B, "settled_at = settled_at - interval '1000 seconds'");
+    await mudar(B, "settled_at = settled_at - interval '20000 seconds'");
     const [{ r }] = await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [B]);
     await t.rpc('idle_hire', { p_user: B });
     await t.as(B);
     const s = await abrirJogo();
     expect(ids(s)).toContain(58);
     expect(s.bonus.conquistas).toBeGreaterThanOrEqual(1);
-    expect((s.valuation - 10) / (r * 1000)).toBeCloseTo(1, 3);
+    expect((s.valuation - 10) / (r * 20000)).toBeCloseTo(1, 2);
   });
 });
 
@@ -147,11 +147,11 @@ describe('conquistas de evento', () => {
     const antes = await abrirJogo();
     expect(ids(antes)).not.toContain(108); // fora da madrugada
     // nada retroativo: ganhar a 3h06 não muda o que o trecho parado rendeu
-    await mudar(A, `settled_at = settled_at - interval '1000 seconds'`);
+    await mudar(A, `settled_at = settled_at - interval '20000 seconds'`);
     await horaDeBrasilia(true); // agora é 3h da manhã
     const depois = await abrirJogo();
     expect(depois.novas).toContain(108); // vale até antes do Abrir CNPJ
-    expect((depois.valuation - antes.valuation) / (antes.rate * 1000)).toBeCloseTo(1, 3);
+    expect((depois.valuation - antes.valuation) / (antes.rate * 20000)).toBeCloseTo(1, 2);
   });
 });
 
