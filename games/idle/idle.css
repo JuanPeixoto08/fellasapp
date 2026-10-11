@@ -254,11 +254,14 @@
 @keyframes conquista-entra { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* barras de rolagem finas e escuras */
-.idle, .idle * { scrollbar-width: thin; scrollbar-color: #3A3846 transparent; }
-.idle ::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Chrome/Edge/Safari: as pseudo-classes do webkit (sem as setinhas); o padrão (scrollbar-width) só no Firefox, porque no
+   Chrome ele ganha das pseudo-classes e traz as setinhas de volta */
+.idle ::-webkit-scrollbar { width: 6px; height: 6px; }
 .idle ::-webkit-scrollbar-track { background: transparent; }
-.idle ::-webkit-scrollbar-thumb { background: #3A3846; border: 2px solid #121212; }
-.idle ::-webkit-scrollbar-thumb:hover { background: #4E4B5C; }
+.idle ::-webkit-scrollbar-thumb { background: #4A4660; }
+.idle ::-webkit-scrollbar-thumb:hover { background: var(--i-lilas); }
+.idle ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@supports not selector(::-webkit-scrollbar) { .idle, .idle * { scrollbar-width: thin; scrollbar-color: #4A4660 transparent; } }
 
 /* PC: empresa e bancada à esquerda, painel de 500 à direita; tudo cabe numa tela de 1280 × 800 */
 @media (min-width: 1100px) {
