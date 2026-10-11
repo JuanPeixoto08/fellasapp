@@ -646,3 +646,74 @@ revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
 grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
 revoke all on function public.idle_hire(uuid) from public, anon;
 grant execute on function public.idle_hire(uuid) to authenticated;
+
+-- ===== a árvore e o "Abrir CNPJ" =====
+
+-- comprar um nó: com pontos livres (ganhos na vida − gastos), o anterior do ramo comprado (o 1º de cada ramo pede a
+-- raiz) e sem repetir. Fecha a conta antes (o nó pode mudar a taxa, o teto e a caixinha dali pra frente). Dá pra
+-- comprar com a empresa fechada (entre a venda e o novo "Abrir CNPJ").
+create or replace function public.idle_buy_node(p_no int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  n public.idle_cat_no;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  select * into n from public.idle_cat_no where id = p_no;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.idle_arvore a where a.user_id = s.user_id and a.no_id = p_no) then
+    raise exception 'idle_node_owned' using errcode = 'P0001';
+  end if;
+  if n.requer is not null
+     and not exists (select 1 from public.idle_arvore a where a.user_id = s.user_id and a.no_id = n.requer) then
+    raise exception 'idle_locked' using errcode = 'P0001';
+  end if;
+  if s.prestige_earned - s.prestige_spent < n.custo then
+    raise exception 'idle_points_low' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s); -- o tempo até agora rende sem o nó
+  insert into public.idle_arvore (user_id, no_id) values (s.user_id, p_no);
+  s.prestige_spent := s.prestige_spent + n.custo;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+-- "Abrir CNPJ" (o da 0034) com o ramo Recomeço: F$ 10 (F$ 1 mil, F$ 1 mi), 1 notebook (10), 1 de cada gerador da
+-- era 1 (Material escolar completo). As melhorias gerais mantidas pela venda já estão no estado. Igual a economia.ts abertura.
+create or replace function public.idle_start()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  g int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if s.started then
+    raise exception 'idle_started' using errcode = 'P0001';
+  end if;
+  s.started := true;
+  s.valuation := greatest(10, public.idle_arv(s.user_id, 'inicio_valuation', 'max', 10));
+  s.generators[1] := greatest(1, public.idle_arv(s.user_id, 'inicio_notebooks', 'max', 1))::int;
+  if public.idle_arv(s.user_id, 'inicio_era1', 'max', 0) > 0 then
+    for g in select c.id from public.idle_cat_gen c where c.era = 1 loop
+      s.generators[g] := greatest(s.generators[g], 1);
+    end loop;
+  end if;
+  s.settled_at := now();
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+revoke all on function public.idle_buy_node(int) from public, anon;
+grant execute on function public.idle_buy_node(int) to authenticated;
+revoke all on function public.idle_start() from public, anon;
+grant execute on function public.idle_start() to authenticated;

@@ -127,7 +127,7 @@ describe('nada retroativo', () => {
 });
 
 describe('conquistas de evento', () => {
-  it('Tá saindo da jaula: Máx que leva 100 ou mais; 10 de uma vez ou Máx menor não', async () => {
+  it('Tá saindo da jaula: Máx que leva 100 ou mais; Máx menor (54) não', async () => {
     await abrir(A);
     await mudar(A, 'valuation = 1e6');
     await t.rpc('idle_buy', { p_kind: 'gerador', p_id: 1, p_qty: 10 });
@@ -143,9 +143,15 @@ describe('conquistas de evento', () => {
     expect(await hora('2026-10-12 07:00:00+00')).toBe(false);
     expect(await hora('2026-10-12 05:59:59+00')).toBe(false);
     await horaDeBrasilia(false);
-    expect(ids(await abrirJogo())).not.toContain(108); // fora da madrugada
+    await abrir(A);
+    const antes = await abrirJogo();
+    expect(ids(antes)).not.toContain(108); // fora da madrugada
+    // nada retroativo: ganhar a 3h06 não muda o que o trecho parado rendeu
+    await mudar(A, `settled_at = settled_at - interval '1000 seconds'`);
     await horaDeBrasilia(true); // agora é 3h da manhã
-    expect((await abrirJogo()).novas).toContain(108); // vale até antes do Abrir CNPJ
+    const depois = await abrirJogo();
+    expect(depois.novas).toContain(108); // vale até antes do Abrir CNPJ
+    expect((depois.valuation - antes.valuation) / (antes.rate * 1000)).toBeCloseTo(1, 3);
   });
 });
 
