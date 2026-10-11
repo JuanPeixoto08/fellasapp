@@ -29,8 +29,8 @@ Lives) entram depois, um por entrega, cada um com a sua spec; esta entrega só d
 - Cores de hoje do jogo: fundo `#121212`, painel `#1B1A22`, borda `#34323F`, ativo `#262431`, roxo `#5B3FD9`
   (claro `#7D64F0`, escuro `#3D27A8`), lilás `#B8A2FF`, dourado `#F2D27A`, menta no "por segundo". Viram variáveis
   CSS em `.idle` (`--idle-painel`, `--idle-borda`...), sem valor solto repetido.
-- **Fonte pixel:** Pixelify Sans (SIL OFL), carregada pelo Google Fonts no `idle/index.html`, igual à Golos hoje,
-  pesos 500/600/700. Vale nos títulos, números (dinheiro, por segundo, preços, pontos), abas, botões e rótulos dos
+- **Fonte pixel:** Jersey 10 (SIL OFL; trocada pela Pixelify em 11/10 porque os números da Pixelify confundiam 3, 8 e 9), carregada pelo Google Fonts no `idle/index.html`, igual à Golos hoje, só o peso regular (sem negrito falso);
+  tamanhos ×1,3 dos da Pixelify. Vale nos títulos, números (dinheiro, por segundo, preços, pontos), abas, botões e rótulos dos
   ramos. Texto corrido (nomes de gerador, frases, efeitos) continua na Golos.
 - **Cantos de pixel:** painéis e botões usam contorno por `box-shadow` nos 4 lados (2 px; 3 px nos nós da árvore), o
   que deixa os cantos "mordidos" como pixel art. Sem `border-radius` nesses elementos.
