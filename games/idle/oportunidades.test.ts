@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { aoVivo, instante, pendentes, semente, tipo } from './oportunidades';
+import { aoVivo, instante, pendentes, sai, semente, tipo, VALIDADE_S } from './oportunidades';
 
 const U = '00000000-0000-0000-0000-00000000000a';
 const V = '1234abcd-0000-0000-0000-000000000000';
 
 describe('oportunidades', () => {
+  it('sai da caixinha quando aparece a 3ª mais nova (ou na validade, o que vier antes)', () => {
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    expect(sai(uid, 50)).toBe(instante(uid, 53));
+    expect(sai(uid, 50, 5)).toBe(instante(uid, 55));
+    expect(sai(uid, 50, 100)).toBe(instante(uid, 50) + VALIDADE_S * 1000);
+    // e bate com pendentes: um instante antes da 53 a 50 ainda está; na 53 já saiu
+    expect(pendentes(uid, instante(uid, 53) - 1, [])).toContain(50);
+    expect(pendentes(uid, instante(uid, 53), [])).not.toContain(50);
+  });
   it('semente = 7 primeiros hex do uuid', () => {
     expect(semente(U)).toBe(0);
     expect(semente(V)).toBe(0x1234abc);
