@@ -4,6 +4,16 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-toby-fox',
+    titulo: 'Toby Fox no PPP',
+    data: '2026-10-12',
+    itens: [
+      'A Ana Mary B saiu do podcast. No lugar dela, o Toby Fox (ou o cachorro dele, ninguém confirmou).',
+      'Chapter 5 ano que vem: com ele sentado, a produção sobe 2% por hora, até +40% em 20 h. Trocar ou tirar zera, e as melhorias ficam 10% mais caras.',
+      'A conquista da Ana virou a do Toby: deixar ele 20 h sentado.',
+    ],
+  },
+  {
     id: '2026-10-12-celular',
     titulo: 'Celular arrumado',
     data: '2026-10-12',

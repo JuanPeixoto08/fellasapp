@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  ANA, CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubadaAte, destrancada, GABE, kojimaMult,
-  LUVA, manhaBrasilia, multFoodTruck, multProducao, peso, trocasAgora, type Cadeiras,
+  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubadaAte, destrancada, GABE, kojimaMult,
+  LUVA, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
 } from './convidados';
 
 const H = 3_600_000;
@@ -15,7 +15,7 @@ describe('o catálogo', () => {
   it('os 11 da spec, ids 1 a 11', () => {
     expect(CONVIDADOS.map((c) => c.nome)).toEqual([
       'Cristiano Ronaldo', 'Daniel Vorcaro', 'Gemaplys', 'Luva de Pedreiro', 'Hideo Kojima', 'Gabe Newell', 'Terry Crews',
-      'Viniccius13', 'MC V.V', 'Ana Mary B', 'VSauce',
+      'Viniccius13', 'MC V.V', 'Toby Fox', 'VSauce',
     ]);
     expect(CONVIDADOS.map((c) => c.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
@@ -46,23 +46,27 @@ describe('os efeitos', () => {
     expect(kojimaMult(1, 0, 99 * H)).toBeCloseTo(1.4, 12);
     expect(kojimaMult(0.5, 0, 12.9 * H)).toBeCloseTo(1 + 0.5 * (-0.1 + 0.25), 12);
   });
-  it('a manhã em Brasília: das 6h ao meio-dia (UTC−3)', () => {
-    expect(manhaBrasilia(Date.parse('2026-10-12T08:59:59Z'))).toBe(false); // 05:59
-    expect(manhaBrasilia(Date.parse('2026-10-12T09:00:00Z'))).toBe(true); // 06:00
-    expect(manhaBrasilia(Date.parse('2026-10-12T14:59:59Z'))).toBe(true); // 11:59
-    expect(manhaBrasilia(Date.parse('2026-10-12T15:00:00Z'))).toBe(false); // 12:00
+  it('Toby Fox: começa em 0, +2% por hora inteira, até +40% em 20 h', () => {
+    expect(tobyMult(1, 0, 0)).toBe(1);
+    expect(tobyMult(1, 0, 0.99 * H)).toBe(1);
+    expect(tobyMult(1, 0, H)).toBeCloseTo(1.02, 12);
+    expect(tobyMult(1, 0, 20 * H)).toBeCloseTo(1.4, 12);
+    expect(tobyMult(1, 0, 99 * H)).toBeCloseTo(1.4, 12);
+    expect(tobyMult(0.25, 0, 10.5 * H)).toBeCloseTo(1 + 0.25 * 0.2, 12);
   });
-  it('produção: Cristiano na frente +15%, no meio +7,5%; Luva −5%; a Ana fora da manhã −5%', () => {
-    const t = Date.parse('2026-10-12T18:00:00Z'); // 15h em Brasília
+  it('produção: Cristiano na frente +15%, no meio +7,5%; Luva −5%; Toby no meio sobe com as horas', () => {
+    const t = Date.parse('2026-10-12T18:00:00Z'); // 18 h depois de sentar
     expect(multProducao({ c: cad([CR, null, null]), ppp: 50, uid: UID }, t)).toBeCloseTo(1.15, 12);
     expect(multProducao({ c: cad([null, CR, null]), ppp: 50, uid: UID }, t)).toBeCloseTo(1.075, 12);
-    expect(multProducao({ c: cad([LUVA, ANA, null]), ppp: 50, uid: UID }, t)).toBeCloseTo(0.95 * 0.975, 12);
-    expect(multFoodTruck({ c: cad([ANA, null, null]), ppp: 1 }, t)).toBe(1);
-    expect(multFoodTruck({ c: cad([ANA, null, null]), ppp: 1 }, Date.parse('2026-10-12T12:00:00Z'))).toBe(2);
+    expect(multProducao({ c: cad([LUVA, TOBY, null]), ppp: 50, uid: UID }, t)).toBeCloseTo(0.95 * (1 + 0.5 * 0.36), 12);
+    // nenhum gerador ganha nada a mais sozinho (o Food truck da Ana acabou)
+    const s = { user_id: UID, generators: Array(30).fill(0).map((_, i) => (i === 12 ? 50 : 0)), convidados: cad([TOBY, null, null]) };
+    expect(multGerador(s, 11, t)).toBeCloseTo(multGerador(s, 1, t), 12);
   });
   it('custos e oportunidades: Gabe, Cristiano, Luva por cadeira', () => {
     expect(custoGeradores(cad([GABE, null, null]), 50)).toBeCloseTo(0.9, 12);
     expect(custoMelhorias(cad([null, CR, null]), 50)).toBeCloseTo(1.05, 12);
+    expect(custoMelhorias(cad([TOBY, CR, null]), 50)).toBeCloseTo(1.1 * 1.05, 12);
     expect([0, 1, 2].map((i) => deltaOportunidades(cad([0, 1, 2].map((j) => (j === i ? LUVA : null))), 50))).toEqual([5, 3, 2]);
     expect([0, 1, 2].map((i) => deltaOportunidades(cad([0, 1, 2].map((j) => (j === i ? GABE : null))), 50))).toEqual([-3, -2, -1]);
   });
@@ -96,5 +100,8 @@ describe('os textos', async () => {
     expect(aoVivo(KOJIMA, 1, d, UID, d + 90 * 60_000)).toBe('Agora: produção −7,9% · sobe em 30 min');
     expect(aoVivo(KOJIMA, 1, d, UID, d + 30 * H)).toBe('Agora: produção +40% (no máximo)');
     expect(aoVivo(MCVV, 1, d, UID, d + 30 * 60_000)).toBe('Próxima faixa em 1 h 30 min');
+    expect(aoVivo(10, 1, d, UID, d + 150 * 60_000)).toBe('Agora: produção +4% · sobe em 30 min');
+    expect(aoVivo(10, 0.5, d, UID, d + 25 * H)).toBe('Agora: produção +20% (no máximo)');
+    expect(efeitosTexto(10, 1)).toEqual(['Produção sobe +2% por hora sentado, até +40%', 'Melhorias 10% mais caras; trocar ou tirar zera']);
   });
 });

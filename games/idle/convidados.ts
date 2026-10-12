@@ -16,12 +16,12 @@ export const CONVIDADOS: readonly Convidado[] = [
   { id: 7, nome: 'Terry Crews', bordao: 'POWER! O peitoral dele tem CNPJ próprio.', bonus: 'Plantas amadurecem 30% mais rápido', defeito: 'E vivem 20% menos' },
   { id: 8, nome: 'Viniccius13', bordao: 'Já fez uma réplica do estúdio no Minecraft. Ficou melhor.', bonus: 'Cruzamento da Horta 2×', defeito: 'Sementes 50% mais caras' },
   { id: 9, nome: 'MC V.V', bordao: 'Lançou o BONDA. O YouTube derrubou o BONDA.', bonus: 'A cada 2 h uma faixa: evento dourado garantido', defeito: '25% de chance de derrubada: produção −10% por 30 min' },
-  { id: 10, nome: 'Ana Mary B', bordao: 'Maquiagem básica pro dia a dia.', bonus: 'Food truck rende 2× das 6h ao meio-dia', defeito: 'O resto do dia, produção −5%' },
+  { id: 10, nome: 'Toby Fox', bordao: 'Mandou o cachorro no lugar dele. Ninguém percebeu a diferença.', bonus: 'Produção sobe +2% por hora sentado, até +40%', defeito: 'Melhorias 10% mais caras; trocar ou tirar zera' },
   { id: 11, nome: 'VSauce', bordao: 'Hey, VSauce, Michael aqui. Ou não?', bonus: 'A Bolsa mostra pra onde cada ação tende', defeito: 'Produção −5%' },
 ];
 export const convidado = (id: number): Convidado => CONVIDADOS.find((c) => c.id === id)!;
 
-export const CR = 1, VORCARO = 2, GEMAPLYS = 3, LUVA = 4, KOJIMA = 5, GABE = 6, TERRY = 7, VINI = 8, MCVV = 9, ANA = 10, VSAUCE = 11;
+export const CR = 1, VORCARO = 2, GEMAPLYS = 3, LUVA = 4, KOJIMA = 5, GABE = 6, TERRY = 7, VINI = 8, MCVV = 9, TOBY = 10, VSAUCE = 11;
 
 /** Força de cada cadeira (frente, meio, canto) e quantos PPP Podcasts (gerador 13) abrem cada uma. */
 export const PESOS = [1, 0.5, 0.25] as const;
@@ -65,10 +65,10 @@ export function kojimaMult(p: number, desdeMs: number, tMs: number): number {
   return 1 + p * (-0.1 + (0.5 * Math.min(24, h)) / 24);
 }
 
-/** 06:00 ≤ hora < 12:00 em Brasília (UTC−3, sem horário de verão). */
-export function manhaBrasilia(tMs: number): boolean {
-  const h = Math.floor((((tMs / 1000 - 10800) % 86400) + 86400) % 86400 / 3600);
-  return h >= 6 && h < 12;
+/** Toby Fox ("Chapter 5 ano que vem"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
+export function tobyMult(p: number, desdeMs: number, tMs: number): number {
+  const h = Math.max(0, Math.floor((tMs - desdeMs) / H));
+  return 1 + p * 0.02 * Math.min(20, h);
 }
 
 /** MC V.V: uma faixa a cada 2 h / peso; a derrubada dura 30 min. */
@@ -96,24 +96,19 @@ export function derrubadaAte(uid: string, p: number, desdeMs: number, tMs: numbe
 }
 
 type Ctx = { c: Cadeiras; ppp: number; uid: string };
-/** Multiplicador da produção toda em t (sem a Ana da manhã, que vai só no Food truck). */
+/** Multiplicador da produção toda em t. */
 export function multProducao({ c, ppp, uid }: Ctx, tMs: number): number {
   let m = (1 + 0.15 * peso(c, ppp, CR)) * (1 - 0.05 * peso(c, ppp, LUVA)) * (1 - 0.05 * peso(c, ppp, VSAUCE));
   const pk = peso(c, ppp, KOJIMA);
   if (pk) m *= kojimaMult(pk, sentadoDesde(c, KOJIMA)!, tMs);
-  const pa = peso(c, ppp, ANA);
-  if (pa && !manhaBrasilia(tMs)) m *= 1 - 0.05 * pa;
+  const pt = peso(c, ppp, TOBY);
+  if (pt) m *= tobyMult(pt, sentadoDesde(c, TOBY)!, tMs);
   const pm = peso(c, ppp, MCVV);
   if (pm && derrubadaAte(uid, pm, sentadoDesde(c, MCVV)!, tMs) !== null) m *= 1 - 0.1 * pm;
   return m;
 }
-/** O Food truck (gerador 11) com a Ana de manhã. */
-export function multFoodTruck({ c, ppp }: Omit<Ctx, 'uid'>, tMs: number): number {
-  const pa = peso(c, ppp, ANA);
-  return pa && manhaBrasilia(tMs) ? 1 + pa : 1;
-}
 export const custoGeradores = (c: Cadeiras, ppp: number) => 1 - 0.1 * peso(c, ppp, GABE);
-export const custoMelhorias = (c: Cadeiras, ppp: number) => 1 + 0.1 * peso(c, ppp, CR);
+export const custoMelhorias = (c: Cadeiras, ppp: number) => (1 + 0.1 * peso(c, ppp, CR)) * (1 + 0.1 * peso(c, ppp, TOBY));
 export const deltaOportunidades = (c: Cadeiras, ppp: number) => Math.ceil(5 * peso(c, ppp, LUVA)) - Math.ceil(3 * peso(c, ppp, GABE));
 
 // ---------- eventos na tela: Gemaplys (mais eventos, menos tempo) e as faixas do MC V.V ----------
@@ -171,7 +166,7 @@ function efeitosCru(id: number, p: number): [string, string] {
     case TERRY: return [`plantas novas amadurecem ${pct(0.3 * p)} mais rápido`, `e vivem ${pct(0.2 * p)} menos`];
     case VINI: return [`cruzamento da Horta ${vz(1 + p)}`, `sementes ${pct(0.5 * p)} mais caras`];
     case MCVV: return [`uma faixa a cada ${faixaS(p) / 3600} h: evento dourado garantido`, `25% de derrubada: produção −${pct(0.1 * p)} por 30 min`];
-    case ANA: return [`Food truck rende ${vz(1 + p)} das 6h ao meio-dia`, `o resto do dia, produção −${pct(0.05 * p)}`];
+    case TOBY: return [`produção sobe +${pct(0.02 * p)} por hora sentado, até +${pct(0.4 * p)}`, `melhorias ${pct(0.1 * p)} mais caras; trocar ou tirar zera`];
     case VSAUCE: return ['a Bolsa mostra pra onde cada ação tende', `produção −${pct(0.05 * p)}`];
     default: return ['', ''];
   }
@@ -196,16 +191,21 @@ export function aoVivo(id: number, p: number, desdeMs: number, uid: string, agor
     const k = Math.floor((agoraMs - desdeMs) / passo) + 1;
     return `Próxima faixa em ${hm(desdeMs + k * passo - agoraMs)}`;
   }
-  if (id === ANA) return manhaBrasilia(agoraMs) ? 'Cozinhando (até o meio-dia)' : 'Se maquiando (volta às 6h)';
+  if (id === TOBY) {
+    const m = tobyMult(p, desdeMs, agoraMs) - 1;
+    const h = Math.floor((agoraMs - desdeMs) / 3_600_000);
+    return `Agora: produção +${pct(m)}${h < 20 ? ` · sobe em ${hm(desdeMs + (h + 1) * 3_600_000 - agoraMs)}` : ' (no máximo)'}`;
+  }
   return null;
 }
 
 /** O que os convidados fazem com a produção de uma unidade do gerador `gid` agora (pra mostrar na Loja). */
 export function multGerador(s: ComCadeiras, gid: number, tMs: number): number {
   const { c, ppp } = ctx(s);
-  return multProducao({ c, ppp, uid: s.user_id }, tMs) * (gid === 11 ? multFoodTruck({ c, ppp }, tMs) : 1);
+  void gid; // nenhum convidado mexe num gerador só (desde que a Ana saiu)
+  return multProducao({ c, ppp, uid: s.user_id }, tMs);
 }
-/** Custo dos geradores e das melhorias com os convidados agora (Gabe e Cristiano). */
+/** Custo dos geradores e das melhorias com os convidados agora (Gabe; Cristiano e Toby). */
 export const custosConv = (s: ComCadeiras) => {
   const { c, ppp } = ctx(s);
   return { geradores: custoGeradores(c, ppp), melhorias: custoMelhorias(c, ppp) };
@@ -223,7 +223,7 @@ export const VISUAL_CONVIDADO: Record<number, IdleVisual> = {
   7: { pele: 0, cabelo: 1, cor_cabelo: 0, roupa: 1, cor_roupa: 1, acessorio: 0, cor_acessorio: 0 },
   8: { pele: 4, cabelo: 0, cor_cabelo: 0, roupa: 1, cor_roupa: 3, acessorio: 2, cor_acessorio: 1 },
   9: { pele: 2, cabelo: 1, cor_cabelo: 0, roupa: 0, cor_roupa: 3, acessorio: 4, cor_acessorio: 0 },
-  10: { pele: 5, cabelo: 4, cor_cabelo: 0, roupa: 1, cor_roupa: 9, acessorio: 0, cor_acessorio: 0 },
+  10: { pele: 5, cabelo: 0, cor_cabelo: 1, roupa: 0, cor_roupa: 0, acessorio: 0, cor_acessorio: 0 },
   11: { pele: 4, cabelo: 1, cor_cabelo: 1, roupa: 1, cor_roupa: 0, acessorio: 3, cor_acessorio: 0 },
 };
 /** O convidado da cadeira da frente na cena (id da vaga → visual), se a cadeira está aberta. */

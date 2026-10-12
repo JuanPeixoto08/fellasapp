@@ -2,7 +2,7 @@
 // falso): cada teste para o tempo e anda quando precisa.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { derrubada, kojimaMult, manhaBrasilia } from '../idle/convidados';
+import { derrubada, kojimaMult, tobyMult } from '../idle/convidados';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -91,6 +91,17 @@ describe('sentar, tirar e as trocas', () => {
     await sentar(2, 6);
     expect(await conquistas()).toEqual(expect.arrayContaining([73, 74, 76, 79]));
   });
+  it('conquista do Toby Fox: 20 h sentado sem trocar', async () => {
+    await sentar(0, 10);
+    andar(19 * H);
+    await abrir();
+    expect(await conquistas()).not.toContain(81);
+    andar(H + 1000);
+    await abrir();
+    expect(await conquistas()).toContain(81);
+    const [{ nome }] = await q<{ nome: string }>('select nome from public.idle_cat_conv where id = 10');
+    expect(nome).toBe('Toby Fox');
+  });
   it('vender a startup não mexe nas cadeiras', async () => {
     await sentar(0, 1);
     await q(`update public.idle_state set prestige_earned = 0 where user_id = $1`, [A]);
@@ -142,12 +153,7 @@ describe('os efeitos', () => {
     expect(v / esperado).toBeCloseTo(1, 6);
     expect(v).toBeGreaterThan(base * 0.9 * 7 * 3600);
   });
-  it('paridade com convidados.ts: manhã, derrubada', async () => {
-    for (const h of [0, 8, 9, 14, 15, 23]) {
-      const ts = Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`);
-      const [{ m }] = await q<{ m: boolean }>('select public.idle_conv_manha(to_timestamp($1)) as m', [ts / 1000]);
-      expect(m).toBe(manhaBrasilia(ts));
-    }
+  it('paridade com convidados.ts: derrubada', async () => {
     const desde = 1_791_000_000;
     for (let k = 1; k <= 40; k++) {
       const [{ d }] = await q<{ d: boolean }>(
@@ -155,12 +161,35 @@ describe('os efeitos', () => {
       expect(d).toBe(derrubada(A, desde, k));
     }
   });
-  it('Ana: de manhã o Food truck rende o dobro; à tarde a produção cai 5%', async () => {
+  it('Toby Fox: +2% por hora sentado até +40%; a conta de 5 h de uma vez soma os degraus; melhorias 10% mais caras', async () => {
+    const precoMelhoria = async () => {
+      await q(`update public.idle_state set valuation = 1e12, upgrades = '{}', settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+      const s = await t.rpc<Estado>('idle_buy', { p_kind: 'melhoria', p_id: 11, p_qty: 1 });
+      await q(`update public.idle_state set upgrades = '{}', settled_at = now() where user_id = $1`, [A]);
+      return 1e12 - s.valuation;
+    };
+    const semToby = await precoMelhoria();
     await sentar(0, 10);
-    const r = async (iso: string) => (await q<{ r: number }>('select public.idle_rate_at(s, $2::timestamptz) as r from public.idle_state s where user_id = $1', [A, iso]))[0].r;
-    const manha = await r('2026-10-14T12:00:00Z');
-    const tarde = await r('2026-10-14T18:00:00Z');
-    expect(manha).toBeGreaterThan(tarde / 0.95);
+    expect(await precoMelhoria()).toBeCloseTo(semToby * 1.1, 3);
+    const [{ desde }] = await q<{ desde: string }>('select conv_desde[1]::text as desde from public.idle_state where user_id = $1', [A]);
+    const d = Date.parse(desde);
+    const r = async (ms: number) => (await q<{ r: number }>('select public.idle_rate_at(s, to_timestamp($2)) as r from public.idle_state s where user_id = $1', [A, ms / 1000]))[0].r;
+    const base = await r(d);
+    expect((await r(d + 10 * H + 1000)) / base).toBeCloseTo(tobyMult(1, d, d + 10 * H + 1000), 9);
+    expect((await r(d + 30 * H)) / base).toBeCloseTo(1.4, 9);
+    await q(`update public.idle_state set settled_at = now(), valuation = 0 where user_id = $1`, [A]);
+    andar(5 * H);
+    const [{ v }] = await q<{ v: number }>(`select (public.idle_settle(s, now())).valuation as v from public.idle_state s where user_id = $1`, [A]);
+    const ini = agora - 5 * H;
+    let esperado = 0;
+    for (let k = 0; k < 5; k++) {
+      // de hora em hora contando de quando sentou: o pedaço [ini, fim] com o multiplicador de cada degrau
+      const a = ini + k * H, b = a + H;
+      for (const [x, y] of [[a, Math.min(b, d + Math.ceil((a - d) / H + 1e-9) * H)], [Math.min(b, d + Math.ceil((a - d) / H + 1e-9) * H), b]]) {
+        if (y > x) esperado += base * tobyMult(1, d, x) * ((y - x) / 1000);
+      }
+    }
+    expect(v / esperado).toBeCloseTo(1, 6);
   });
 });
 
