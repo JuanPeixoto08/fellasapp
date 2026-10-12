@@ -238,6 +238,15 @@ describe('desafio da semana', () => {
        select (n).prestige_earned - e0 as ganhou, (n).prestige_spent - g0 as gasto from x`, [A]);
     expect(r[0]).toEqual({ ganhou: 0, gasto: -3 });
   });
+  it('legado salvo: prestige_spent fica negativo (pontos do desafio) e os pontos sobem 3', async () => {
+    await q(`update public.idle_cat_place_desafio set premio = 'legado', premio_valor = 3 where id = 9001`);
+    const e = (await q<{ e: number }>('select prestige_earned as e from public.idle_state where user_id = $1', [A]))[0].e;
+    await q(`select public.idle_save(public.idle_place_desafio(s, 3, 'teste', 9)) from public.idle_state s where user_id = $1`, [A]);
+    const r = await q<{ gasto: number; pontos: number }>(
+      `select s.prestige_spent as gasto, (public.idle_json(s) ->> 'pontos')::double precision as pontos
+         from public.idle_state s where user_id = $1`, [A]);
+    expect(r[0]).toEqual({ gasto: -3, pontos: e + 3 });
+  });
   it('o idle_lugar mostra o desafio e se já foi feito', async () => {
     expect((await lugar(3)).desafio).toMatchObject({ id: 9001, feito: false });
   });
@@ -248,6 +257,20 @@ describe('semana e presença', () => {
     await q(`update public.idle_state set visto_em = null where user_id = $1`, [A]);
     await mapa();
     expect((await q<{ v: string | null }>('select visto_em as v from public.idle_state where user_id = $1', [A]))[0].v).not.toBeNull();
+  });
+  it('trava feita por outra pessoa ou pelo cron não marca visto_em de quem foi travado', async () => {
+    const visto = async () => (await q<{ v: string | null }>('select visto_em as v from public.idle_state where user_id = $1', [A]))[0].v;
+    await q(`update public.idle_state set visto_em = null where user_id = $1`, [A]);
+    await t.as(null); // cron: auth.uid() nulo
+    await q(`select public.idle_fechar_e_ganhar($1, 'mapa_dono')`, [A]);
+    await q(`select public.idle_lock_all(array[$1::uuid])`, [A]);
+    expect(await visto()).toBeNull();
+    await t.as(B); // B travando A (contratar, equipe)
+    await q(`select public.idle_lock_all(array[$1::uuid, $2::uuid])`, [A, B]);
+    expect(await visto()).toBeNull();
+    await t.as(A);
+    await mapa();
+    expect(await visto()).not.toBeNull();
   });
   it('a foto de segunda guarda o dono de cada lugar uma vez e dá "Dono do pedaço"', async () => {
     await outros();

@@ -373,6 +373,10 @@ returns public.idle_cat_place_desafio language sql stable set search_path = publ
    limit 1
 $$;
 
+-- prestige_spent negativo = pontos ganhos em desafio (o prêmio legado). Fica a trava de não gastar mais do que ganhou
+-- (idle_state_prestige_spent_le_earned); sai só a de não ficar abaixo de zero (a da 0041).
+alter table public.idle_state drop constraint if exists idle_state_prestige_spent_check;
+
 -- paga o prêmio do desafio da semana se é desse tipo, o valor alcança e ainda não foi feito. Não salva: quem chama salva.
 create or replace function public.idle_place_desafio(s public.idle_state, p_lugar int, p_tipo text, p_valor double precision)
 returns public.idle_state language plpgsql volatile set search_path = public as $$
@@ -541,7 +545,8 @@ begin
   returning * into s;
   perform public.idle_horta_avancar(s); -- a horta anda até agora antes de qualquer conta
   perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0057)
-  update public.idle_state set visto_em = now() where user_id = p_user; -- o s devolvido fica com o visto_em antigo
+  -- só quando é a própria pessoa (travada por outro ou pelo cron não conta); o s devolvido fica com o visto_em antigo
+  update public.idle_state set visto_em = now() where user_id = p_user and p_user = auth.uid();
   return s;
 end;
 $$;
