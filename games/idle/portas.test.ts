@@ -58,4 +58,12 @@ describe('o resumo das portas', () => {
     expect(portaMapa(estado({ era: 3 }), m(1)).st).toBe('1 lugar aberto');
     expect(portaMapa(estado({ era: 3 }), m(2)).st).toBe('2 lugares abertos');
   });
+  it('Mapa do rolê: quem vendeu a startup (era 1) e tem lugar aberto não vê a porta trancada', () => {
+    const m = (abertos: number): MapaEstado => ({ mapa: null, mult: 1, lugares: [3, 4, 7].map((id, i) => ({ id, aberto: i < abertos })) as MapaEstado['lugares'] });
+    expect(portaMapa(estado({ era: 1 }), m(1))).toEqual({ st: '1 lugar aberto', badge: null, trancada: false });
+    expect(portaMapa(estado({ era: 1 }), m(0))).toEqual({ st: 'Abre na era 2', badge: null, trancada: true });
+    // sem o mapa buscado ainda: o estado diz quantos (idle_json, mapa_abertos)
+    expect(portaMapa(estado({ era: 1, mapa_abertos: 2 }), null)).toEqual({ st: '2 lugares abertos', badge: null, trancada: false });
+    expect(portaMapa(estado({ era: 1, mapa_abertos: 0 }), null)).toEqual({ st: 'Abre na era 2', badge: null, trancada: true });
+  });
 });

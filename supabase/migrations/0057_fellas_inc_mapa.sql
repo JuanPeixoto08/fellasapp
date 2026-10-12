@@ -311,6 +311,7 @@ returns double precision language sql stable set search_path = public as $$
 $$;
 
 -- o estado que toda função devolve (o da 0051) + o multiplicador do Mapa do rolê (a página multiplica o "cada" e a caixinha)
+-- e quantos lugares a pessoa tem abertos (a porta do Mapa não fica trancada pra quem vendeu a startup e tem lugar)
 create or replace function public.idle_json(s public.idle_state)
 returns jsonb language plpgsql stable set search_path = public as $$
 declare v_rate double precision := public.idle_rate(s);
@@ -360,6 +361,7 @@ begin
     'novas', coalesce((select jsonb_agg(c.conquista_id order by c.conquista_id)
                          from public.idle_conquistas c where c.user_id = s.user_id and c.ganhou_em = now()), '[]'::jsonb),
     'mapa_mult', public.idle_place_mult(s),
+    'mapa_abertos', (select count(*) from public.idle_place_state st where st.user_id = s.user_id),
     'descobertas', coalesce((select jsonb_agg(d.id order by d.id)
                                from (select distinct c.conquista_id as id
                                        from public.idle_conquistas c

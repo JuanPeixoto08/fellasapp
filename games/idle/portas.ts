@@ -47,10 +47,12 @@ export function portaConvidados(s: IdleState, agoraMs: number): ResumoPorta {
   };
 }
 
-/** Mapa do rolê: quantos lugares abertos (sem selo: saber do desafio da semana custaria buscar cada lugar). */
+/** Mapa do rolê: quantos lugares abertos (sem selo: saber do desafio da semana custaria buscar cada lugar). Lugar aberto
+ *  fica aberto depois de vender a startup: com algum, a porta não tranca nem na era 1. Sem o mapa buscado, o número vem
+ *  do estado (mapa_abertos). */
 export function portaMapa(s: IdleState, m: MapaEstado | null): ResumoPorta {
-  if (s.era < 2) return { st: 'Abre na era 2', badge: null, trancada: true };
-  if (!m) return { st: 'Os lugares do rolê', badge: null, trancada: false };
-  const n = m.lugares.filter((l) => l.aberto).length;
+  const n = m ? m.lugares.filter((l) => l.aberto).length : s.mapa_abertos;
+  if (s.era < 2 && !n) return { st: 'Abre na era 2', badge: null, trancada: true };
+  if (n === undefined) return { st: 'Os lugares do rolê', badge: null, trancada: false };
   return { st: n === 0 ? 'Nenhum lugar aberto' : n === 1 ? '1 lugar aberto' : `${n} lugares abertos`, badge: null, trancada: false };
 }

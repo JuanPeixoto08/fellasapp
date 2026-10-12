@@ -358,6 +358,7 @@ describe('a produção na tela conta o Mapa do rolê', () => {
     const s = await t.rpc<IdleState>('idle_open');
     const mult = (await q<{ m: number }>('select public.idle_place_mult(s) as m from public.idle_state s where user_id = $1', [A]))[0].m;
     expect(s.mapa_mult).toBeCloseTo(mult, 12);
+    expect(s.mapa_abertos).toBe(3);
     expect(mult).toBeGreaterThan(1);
     const soma = porUnidade(s).reduce((a, x, i) => a + x * s.generators[i], 0);
     expect(Math.abs(soma - s.rate) / s.rate).toBeLessThan(1e-9);

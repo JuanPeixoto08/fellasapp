@@ -125,6 +125,8 @@ export type IdleState = {
   horta_bonus?: BonusHorta;
   /** Mapa do rolê (0057): o multiplicador dos lugares (marcos e estratégias) que já está na taxa; a página multiplica o "cada". */
   mapa_mult?: number;
+  /** Mapa do rolê (0057): quantos lugares a pessoa tem abertos (continuam abertos depois de vender a startup). */
+  mapa_abertos?: number;
   /** Convidados (0051): as 3 cadeiras (id ou null), desde quando, as trocas guardadas e a âncora da recarga, os PPP
    *  Podcasts e o fim da derrubada do MC V.V valendo agora. */
   convidados?: IdleConvidados;
