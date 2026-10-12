@@ -68,6 +68,15 @@ describe('sentar, tirar e as trocas', () => {
     await sentar(1, 1);
     await expect(sentar(2, 2)).rejects.toThrow(/idle_conv_trancada/);
   });
+  it('São a mesma pessoa? fecha a conta antes (o F$ não volta pro de antes)', async () => {
+    await sentar(0, 3);
+    andar(3_600_000);
+    const s = await sentar(1, 9);
+    const [{ v }] = await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]);
+    expect(s.valuation).toBeCloseTo(v, 3);
+    const [{ t: st }] = await q<{ t: string }>('select settled_at::text as t from public.idle_state where user_id = $1', [A]);
+    expect(Date.parse(st)).toBeGreaterThan(agora - 5000);
+  });
   it('Gemaplys e MC V.V: não muda nada, a escondida sai', async () => {
     await sentar(0, 3);
     const s = await sentar(1, 9);
@@ -248,6 +257,17 @@ describe('Bolsa: Vorcaro e VSauce', () => {
     const depois = (await negociar(1, 'vender', 0, 2)).valuation;
     expect(depois).toBeCloseTo(antes, 6);
     expect(await conquistas()).toContain(77);
+  });
+  it('tirar e sentar o Cristiano entre comprar e vender não dá F$ (a Bolsa usa a produção sem os convidados)', async () => {
+    await sentar(0, 1);
+    await tirar(0);
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    const antes = await valuation();
+    await negociar(1, 'comprar', 10);
+    await sentar(0, 1); // produção ×1,15
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    const depois = (await negociar(1, 'vender', 0)).valuation;
+    expect(depois).toBeLessThan(antes); // só perdeu a corretagem
   });
   it('o humor de cada empresa só vem com o VSauce sentado', async () => {
     expect((await estado()).empresas[0].humor ?? null).toBeNull();

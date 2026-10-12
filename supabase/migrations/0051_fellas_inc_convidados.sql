@@ -26,7 +26,9 @@ alter table public.idle_state
   add column if not exists conv_desde      timestamptz[] not null default '{null,null,null}',
   add column if not exists conv_trocas     int not null default 3,
   add column if not exists conv_trocas_t   timestamptz,
-  add column if not exists conv_vistos     int[] not null default '{}';
+  add column if not exists conv_vistos     int[] not null default '{}',
+  -- um lote do Vorcaro virou pó: a conquista sai na próxima conta fechada (idle_check_conquistas), não na hora
+  add column if not exists conv_fgc        boolean not null default false;
 
 -- ===== contas =====
 -- peso do convidado c: o da cadeira em que ele está, se ela está aberta pelos PPP Podcasts (0 = não está valendo)
@@ -178,6 +180,17 @@ begin
 end;
 $$;
 
+-- a produção sem os convidados: a Bolsa negocia por ela (senão tirar e sentar alguém entre comprar e vender daria F$ de graça)
+create or replace function public.idle_rate_bolsa(s public.idle_state)
+returns double precision language plpgsql stable set search_path = public as $$
+declare
+  x public.idle_state := s;
+begin
+  x.conv_cadeira := '{null,null,null}';
+  return public.idle_rate_at(x, now());
+end;
+$$;
+
 -- os efeitos agora (a página mostra e usa nos preços)
 create or replace function public.idle_conv_json(s public.idle_state)
 returns jsonb language sql stable set search_path = public as $$
@@ -225,6 +238,8 @@ begin
   -- Gemaplys e MC V.V são a mesma pessoa: não muda nada, mas a conquista escondida sai (sem exceção: o rollback a apagaria)
   if (p_convidado = 3 and 9 = any (s.conv_cadeira[1:v_i - 1] || s.conv_cadeira[v_i + 1:3]))
      or (p_convidado = 9 and 3 = any (s.conv_cadeira[1:v_i - 1] || s.conv_cadeira[v_i + 1:3])) then
+    s := public.idle_settle(s); -- fecha a conta antes: a conquista nova só vale dali pra frente
+    perform public.idle_save(s);
     perform public.idle_ganhar(v_me, 'conv_mesma');
     return public.idle_json(s) || jsonb_build_object('mesma_pessoa', true);
   end if;
@@ -294,6 +309,19 @@ revoke all on function public.idle_conv_sentar(int, int) from public, anon;
 grant execute on function public.idle_conv_sentar(int, int) to authenticated;
 revoke all on function public.idle_conv_tirar(int) from public, anon;
 grant execute on function public.idle_conv_tirar(int) to authenticated;
+
+-- as contas internas não são chamadas de fora
+revoke all on function public.idle_conv_peso(public.idle_state, int) from public, anon, authenticated;
+revoke all on function public.idle_conv_desde(public.idle_state, int) from public, anon, authenticated;
+revoke all on function public.idle_conv_trocas(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_manha(timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_derrubada_ate(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_prod(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_food(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_mudancas(public.idle_state, timestamptz, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_derrubadas(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_conv_json(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_rate_bolsa(public.idle_state) from public, anon, authenticated;
 
 
 -- produção em t (a da 0048) × os convidados (e o Food truck com a Ana de manhã)
@@ -676,6 +704,7 @@ begin
                                                        where d.user_id = p_user and d.especie not in (1, 2)) >= c.valor
              -- convidados (0051)
              when c.tipo = 'conv_vistos' then cardinality(s.conv_vistos) >= c.valor
+             when c.tipo = 'conv_fgc' then s.conv_fgc
              when c.tipo = 'conv_kojima' then public.idle_conv_peso(s, 5) > 0 and public.idle_conv_desde(s, 5) <= now() - interval '24 hours'
              when c.tipo = 'conv_derrubada' then public.idle_conv_derrubadas(s, now()) >= c.valor
              when c.tipo = 'conv_ana' then public.idle_conv_peso(s, 10) > 0
@@ -855,13 +884,15 @@ begin
   if found and k.geracao = m.geracao then
     v_tem := k.qtd;
     v_custo := k.custo;
+  elsif found and k.alavanca > 1 and k.qtd > 0 then
+    perform public.idle_ganhar(p_user, 'conv_fgc'); -- o lote antigo virou pó (a conta já fechou acima)
   end if;
   select coalesce(sum(x.qtd), 0) into v_total from public.idle_bolsa_carteira x
    where x.user_id = p_user and x.empresa = p_empresa and x.geracao = m.geracao;
   select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
     from public.idle_bolsa_nivel n where n.user_id = p_user;
   v_fee := 1 + public.idle_bolsa_corretagem(v_corr);
-  v_r := public.idle_rate(s);
+  v_r := public.idle_rate_bolsa(s); -- sem os convidados (ver idle_rate_bolsa)
   v_preco := m.valor * v_r;
 
   if p_lado = 'comprar' then
@@ -920,6 +951,7 @@ end;
 $$;
 revoke all on function public.idle_bolsa_negociar(int, text, int, bigint, double precision) from public, anon;
 grant execute on function public.idle_bolsa_negociar(int, text, int, bigint, double precision) to authenticated;
+revoke all on function public.idle_conv_faixa(public.idle_state, bigint) from public, anon, authenticated;
 
 
 -- o que a Bolsa mostra (a da 0043) + os lotes do Vorcaro (e a conquista se virou pó) + o humor pro VSauce
@@ -950,13 +982,13 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('empresa', empresa, 'qtd', qtd) order by empresa) filter (where qtd > 0), '[]'::jsonb),
          coalesce(bool_or(alavanca > 1 and qtd > 0), false)
     into v_po, v_fgc from po;
-  if v_fgc then
-    perform public.idle_ganhar(p_user, 'conv_fgc'); -- lote do Vorcaro virou pó
+  if v_fgc then -- lote do Vorcaro virou pó: a conquista sai na próxima conta fechada (aqui pode não ter trava)
+    update public.idle_state set conv_fgc = true where user_id = p_user;
   end if;
   return jsonb_build_object(
     'tick', p_agora,
     'vira_em_ms', greatest(0, (p_agora + 1) * 60000 - floor(extract(epoch from now()) * 1000)::bigint),
-    'r', case when s.user_id is null then 0 else public.idle_rate(s) end,
+    'r', case when s.user_id is null then 0 else public.idle_rate_bolsa(s) end, -- sem os convidados (ver idle_rate_bolsa)
     'aberta', v_tr >= 1 and coalesce(s.started, false),
     'corretor', v_corr,
     'escritorio', v_esc,
