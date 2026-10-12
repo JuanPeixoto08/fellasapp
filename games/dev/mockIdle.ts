@@ -2,7 +2,7 @@
 // formatos de shared/api.ts. Os bots abrem a empresa, têm personagem (dá pra contratar), pontos de prestígio, nós da
 // árvore e conquistas (uma escondida, pra aba Legado mostrar o "???"). Nunca entra no build.
 import {
-  linhaPlacar, type BolsaEstado, type HortaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type MelhoriaBolsa,
+  linhaPlacar, type BolsaEstado, type Fella, type HortaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type LugarEstado, type MapaEstado, type MelhoriaBolsa,
 } from '../shared/types';
 import { call, dono, FRIENDS, ME } from './mockDb';
 
@@ -49,6 +49,18 @@ export const idleHorta = () => call<HortaEstado>('select public.idle_horta() as 
 export const idleHortaPlantar = (canteiro: number, especie: number) => call<ComHorta>('select public.idle_horta_plantar($1, $2) as v', [canteiro, especie]);
 export const idleHortaColher = (canteiro: number) => call<ComHorta>('select public.idle_horta_colher($1) as v', [canteiro]);
 export const idleHortaArrancar = (canteiro: number) => call<ComHorta>('select public.idle_horta_arrancar($1) as v', [canteiro]);
+export const idleMapa = () => call<MapaEstado>('select public.idle_mapa() as v');
+export const idleLugar = (lugar: number) => call<LugarEstado>('select public.idle_lugar($1) as v', [lugar]);
+export const idleLugarAbrir = (lugar: number) => call<IdleState & { mapa: MapaEstado }>('select public.idle_place_abrir($1) as v', [lugar]);
+export const idleLugarNivel = (lugar: number) =>
+  call<IdleState & { lugar: LugarEstado; marcos_novos: number[] }>('select public.idle_place_nivel($1) as v', [lugar]);
+export const idleLugarAcao = (fn: string, args: Record<string, unknown>) => {
+  if (!/^idle_(tee|cup|din)_[a-z_]+$/.test(fn)) throw new Error(`ação de lugar desconhecida: ${fn}`);
+  const valores = Object.values(args);
+  return call<IdleState & { lugar: LugarEstado }>(`select public.${fn}(${valores.map((_, i) => `$${i + 1}`).join(', ')}) as v`, valores);
+};
+export const fellas = (ids: string[]) =>
+  call<Fella[]>(`select coalesce(json_agg(json_build_object('id', id, 'name', coalesce(display_name, username), 'avatarUrl', null)), '[]'::json) as v from public.profiles where id = any($1::uuid[])`, [ids]);
 export const idleHire = (userId: string) => call<IdleState>('select public.idle_hire($1) as v', [userId]);
 export const idleSetAvatar = (v: IdleVisual) => avatar(v);
 export const idlePrestige = () => call<IdleState>('select public.idle_prestige() as v');

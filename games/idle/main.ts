@@ -4,13 +4,14 @@ import './idle.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
-import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
+import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, LugarEstado, MapaEstado } from '../shared/types';
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
+import { MARCOS } from './mapa';
 import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
 import { temNovidade } from './novidades';
 import { aoVivo, instante, pendentes } from './oportunidades';
@@ -29,7 +30,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'idleMapa' | 'idleLugar' | 'idleLugarAbrir' | 'idleLugarNivel' | 'idleLugarAcao' | 'fellas' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -119,6 +120,55 @@ async function carregarHorta() {
     // sem rede: tenta de novo no próximo ciclo
   }
 }
+// Mapa do rolê: tela cheia aberta, o último mapa e (dentro dele) o lugar aberto; busca de novo a cada 60 s (o lugar anda sozinho)
+let mapaAberto = false;
+let mapa: MapaEstado | null = null;
+let lugarAberto: number | null = null;
+let lugar: LugarEstado | null = null;
+let nomesLugar = new Map<string, string>(); // user_id -> nome de quem aparece no pódio e na semana
+let timerMapa: ReturnType<typeof setInterval> | null = null;
+const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked'];
+async function carregarMapa() {
+  if (!mapaAberto) return;
+  try {
+    if (lugarAberto === null) {
+      mapa = await api.idleMapa();
+    } else {
+      const id = lugarAberto;
+      const l = await api.idleLugar(id);
+      if (!mapaAberto || lugarAberto !== id) return; // saiu do lugar enquanto buscava
+      lugar = l;
+      await carregarNomesLugar(l);
+    }
+    render();
+  } catch {
+    // sem rede: tenta de novo no próximo ciclo
+  }
+}
+/** Busca o nome de quem aparece no pódio, na semana e como dono do lugar (só os que ainda faltam). */
+async function carregarNomesLugar(l: LugarEstado) {
+  const ids = new Set([...l.podio.map((p) => p.user_id), ...l.semana.map((p) => p.user_id), ...(l.dono ? [l.dono.user_id] : [])]);
+  const faltam = [...ids].filter((id) => !nomesLugar.has(id));
+  if (!faltam.length) return;
+  try {
+    const quem = await api.fellas(faltam);
+    nomesLugar = new Map([...nomesLugar, ...quem.map((f) => [f.id, f.name] as [string, string])]);
+  } catch {
+    // sem nome: a tela mostra "Alguém"
+  }
+}
+function fecharMapa() {
+  mapaAberto = false;
+  lugarAberto = null;
+  lugar = null;
+  if (timerMapa) clearInterval(timerMapa);
+  timerMapa = null;
+}
+/** "Marco: +2% de produção" (vários marcos de uma vez somam). */
+const avisoMarcos = (ids: number[]): string | null => {
+  const total = ids.reduce((t, id) => t + (MARCOS.find((m) => m.id === id)?.bonus ?? 0), 0);
+  return ids.length ? `Marco: +${Math.round(total * 100)}% de produção` : null;
+};
 let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;
 let buscandoBolsa = false;
@@ -269,6 +319,7 @@ const tela = criarTela(document.getElementById('app')!, {
   convidados: (acao) => {
     convidadosAberto = acao === 'abrir';
     if (convidadosAberto) {
+      fecharMapa();
       if (hortaAberta) {
         hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
         if (timerHorta) clearInterval(timerHorta);
@@ -299,7 +350,10 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   horta: (acao) => {
     hortaAberta = acao === 'abrir';
-    if (hortaAberta) convidadosAberto = false;
+    if (hortaAberta) {
+      convidadosAberto = false;
+      fecharMapa();
+    }
     if (hortaAberta && bolsaAberta) {
       bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
       poPendentes = [];
@@ -330,7 +384,10 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
-    if (bolsaAberta) convidadosAberto = false;
+    if (bolsaAberta) {
+      convidadosAberto = false;
+      fecharMapa();
+    }
     if (bolsaAberta && hortaAberta) {
       hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
       if (timerHorta) clearInterval(timerHorta);
@@ -349,6 +406,58 @@ const tela = criarTela(document.getElementById('app')!, {
     receberBolsa(r.bolsa);
     aplicar(r);
     audio.tocar(lado === 'comprar' ? 'acaoCompra' : 'acaoVende', { lucro });
+  }),
+  mapa: (acao) => {
+    if (acao === 'fechar') {
+      fecharMapa();
+      render();
+      return;
+    }
+    mapaAberto = true;
+    convidadosAberto = false;
+    if (hortaAberta) {
+      hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
+      if (timerHorta) clearInterval(timerHorta);
+      timerHorta = null;
+    }
+    if (bolsaAberta) {
+      bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
+      poPendentes = [];
+      if (timerBolsa !== null) clearTimeout(timerBolsa);
+    }
+    if (timerMapa) clearInterval(timerMapa);
+    timerMapa = setInterval(() => { if (!document.hidden) void carregarMapa(); }, 60_000);
+    render();
+    void carregarMapa();
+  },
+  lugar: (id) => {
+    lugarAberto = id;
+    lugar = null; // o estado do lugar anterior não vale pro novo
+    render();
+    void carregarMapa();
+  },
+  abrirLugar: (id) => void guard(async () => {
+    const r = await api.idleLugarAbrir(id);
+    mapa = r.mapa;
+    aplicar(r);
+    audio.tocar('no');
+  }),
+  subirNivel: (id) => void guard(async () => {
+    const r = await api.idleLugarNivel(id);
+    lugar = r.lugar;
+    aplicar(r);
+    audio.tocar('compra');
+    const marco = avisoMarcos(r.marcos_novos);
+    if (marco) {
+      aviso = marco;
+      audio.tocar('conquista');
+    }
+  }),
+  lugarAcao: (fn, args) => void guard(async () => {
+    const r = await api.idleLugarAcao(fn, args);
+    lugar = r.lugar;
+    aplicar(r);
+    audio.tocar('compra');
   }),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);
@@ -430,7 +539,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova, hortaAberta, horta, convidadosAberto,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova, hortaAberta, horta, convidadosAberto, mapaAberto, mapa, lugarAberto, lugar, nomesLugar,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });
@@ -459,6 +568,7 @@ function aplicar(estado: IdleState) {
 
 async function recarregar() {
   aplicar(await api.idleOpen());
+  if (mapaAberto) void carregarMapa();
   if (hortaAberta) void carregarHorta(); // virada da horta (planta madura, morta ou brotada): a gaveta acompanha
 }
 
@@ -519,6 +629,7 @@ async function guard(trabalho: () => Promise<void>) {
       if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
       if (RECARREGA_BOLSA.includes(err.code)) await carregarBolsa();
       if (RECARREGA_HORTA.includes(err.code)) await carregarHorta();
+      if (RECARREGA_MAPA.includes(err.code)) await carregarMapa();
     }
   } finally {
     ocupado = false;
@@ -575,6 +686,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) void prepararDesenhista();
   if (!document.hidden && bolsaAberta) void carregarBolsa();
   if (!document.hidden && hortaAberta) void carregarHorta();
+  if (!document.hidden && mapaAberto) void carregarMapa();
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
 });
 

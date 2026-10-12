@@ -35,6 +35,7 @@ export type GameErrorCode =
   | 'idle_opp_gone'
   | 'idle_dourado_gone' | 'idle_dourado_pego'
   | 'idle_horta_ocupado' | 'idle_horta_vazio' | 'idle_horta_trancado' | 'idle_horta_semente' | 'idle_horta_verde'
+  | 'idle_lugar_aberto' | 'idle_lugar_fechado' | 'idle_lugar_nome' | 'idle_lugar_moeda' | 'idle_lugar_nivel_max'
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
@@ -82,6 +83,11 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_horta_trancado: 'Esse canteiro ainda tá trancado',
   idle_horta_semente: 'Você ainda não descobriu essa semente',
   idle_horta_verde: 'Ainda não tá madura',
+  idle_lugar_aberto: 'Esse lugar já é seu',
+  idle_lugar_fechado: 'Abre esse lugar primeiro',
+  idle_lugar_nome: 'O nome precisa ter de 1 a 30 letras',
+  idle_lugar_moeda: 'Não dá pra pagar isso ainda',
+  idle_lugar_nivel_max: 'Esse lugar já tá no nível máximo',
   idle_opp_cap: 'Chega de oportunidade por hoje',
   idle_hire_self: 'Não dá pra se contratar',
   idle_hire_twice: 'Essa pessoa já trabalha pra você',
@@ -141,6 +147,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_opp_gone',
   'idle_dourado_gone', 'idle_dourado_pego',
   'idle_horta_ocupado', 'idle_horta_vazio', 'idle_horta_trancado', 'idle_horta_semente', 'idle_horta_verde',
+  'idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max',
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
   'idle_prestige_low', 'idle_points_low', 'idle_node_owned',

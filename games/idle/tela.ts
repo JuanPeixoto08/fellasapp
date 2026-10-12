@@ -2,7 +2,7 @@
 // mudança de estado; `atualizarValor` ~10x por segundo (só o número e quais botões estão liberados).
 // Texto de usuário sempre por textContent.
 import { button, el } from '../shared/hud/hud';
-import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, MelhoriaBolsa } from '../shared/types';
+import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, LugarEstado, MapaEstado, MelhoriaBolsa } from '../shared/types';
 import { ativos } from './ativos';
 import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
@@ -59,6 +59,14 @@ export type Modelo = {
   horta: HortaEstado | null;
   /** Convidados (minigame 3): gaveta aberta (o estado vem no IdleState). */
   convidadosAberto: boolean;
+  /** Mapa do rolê: tela cheia aberta e o último mapa buscado (null = ainda não buscou). */
+  mapaAberto: boolean;
+  mapa: MapaEstado | null;
+  /** Lugar aberto dentro do mapa (null = o mapa) e o último estado dele. */
+  lugarAberto: number | null;
+  lugar: LugarEstado | null;
+  /** Nomes (user_id -> nome) de quem aparece no pódio e na semana do lugar aberto. */
+  nomesLugar: Map<string, string>;
   /** Agora no relógio do servidor (ms): a Promoção valendo muda os preços. Sem = a hora do estado. */
   agora?: number;
   /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
@@ -74,6 +82,11 @@ export type Acoes = {
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote?: number): void;
   convidados(acao: 'abrir' | 'fechar'): void; sentar(cadeira: number, convidado: number): void; tirar(cadeira: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
+  mapa(acao: 'abrir' | 'fechar'): void; // abre/fecha a tela cheia do mapa (fecha Bolsa/Horta/Convidados)
+  lugar(id: number | null): void; // entra num lugar aberto (null = volta pro mapa)
+  abrirLugar(id: number): void; // compra (idle_place_abrir)
+  subirNivel(id: number): void; // idle_place_nivel
+  lugarAcao(fn: string, args: Record<string, unknown>): void; // mecânica de lugar (partes 2 a 4)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
   pegarDourado(seg: number, lado: number): void;
 };

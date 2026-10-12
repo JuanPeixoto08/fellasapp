@@ -14,6 +14,8 @@ import type {
   IdleVisual,
   LadoBolsa,
   LinhaPlacar,
+  LugarEstado,
+  MapaEstado,
   MelhoriaBolsa,
   PokerAction,
   PokerCards,
@@ -66,6 +68,15 @@ export const idleHorta = () => rpc<HortaEstado>('idle_horta');
 export const idleHortaPlantar = (canteiro: number, especie: number) => rpc<ComHorta>('idle_horta_plantar', { p_canteiro: canteiro, p_especie: especie });
 export const idleHortaColher = (canteiro: number) => rpc<ComHorta>('idle_horta_colher', { p_canteiro: canteiro });
 export const idleHortaArrancar = (canteiro: number) => rpc<ComHorta>('idle_horta_arrancar', { p_canteiro: canteiro });
+export const idleMapa = () => rpc<MapaEstado>('idle_mapa');
+export const idleLugar = (lugar: number) => rpc<LugarEstado>('idle_lugar', { p_lugar: lugar });
+export const idleLugarAbrir = (lugar: number) => rpc<IdleState & { mapa: MapaEstado }>('idle_place_abrir', { p_lugar: lugar });
+export const idleLugarNivel = (lugar: number) => rpc<IdleState & { lugar: LugarEstado; marcos_novos: number[] }>('idle_place_nivel', { p_lugar: lugar });
+/** Ação de uma mecânica de lugar (partes 2 a 4): só funções idle_tee_*, idle_cup_* e idle_din_*. */
+export const idleLugarAcao = (fn: string, args: Record<string, unknown>) => {
+  if (!/^idle_(tee|cup|din)_[a-z_]+$/.test(fn)) throw new Error(`ação de lugar desconhecida: ${fn}`);
+  return rpc<IdleState & { lugar: LugarEstado }>(fn, args);
+};
 export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
 export const idlePrestige = () => rpc<IdleState>('idle_prestige');
 export const idleBuyNode = (no: number) => rpc<IdleState>('idle_buy_node', { p_no: no });

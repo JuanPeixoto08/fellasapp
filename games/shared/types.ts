@@ -182,3 +182,25 @@ export type BolsaEstado = {
 };
 export type LadoBolsa = 'comprar' | 'vender';
 export type MelhoriaBolsa = 'corretor' | 'escritorio';
+
+// Mapa do rolê (idle_mapa, idle_lugar): os lugares que a pessoa abre e sobe de nível.
+export type PinoMapa = {
+  id: number; faixa: 'barato' | 'medio' | 'caro'; lote: number; lancado: boolean; horas: number; era: number;
+  moeda: string | null; numero: 'pct' | 'nota' | 'estrelas' | null; preco: number;
+  nome: string | null; frase: string | null; icone: string | null; x: number | null; y: number | null;
+  aberto: boolean; nivel: number | null; moeda_qtd: number | null; fas: number | null;
+  dono: { user_id: string; avatar: IdleVisual | null } | null;
+};
+export type MapaEstado = { mapa: string | null; lugares: PinoMapa[]; mult: number };
+export type ProducaoLugar = { id: number; user_id: string; nome: string; partes: number[]; numero: number; criado_em: string; avatar: IdleVisual | null };
+export type NotaCaderninho = { tipo: string; a: number; b: number; rotulo: number };
+export type LugarEstado = {
+  id: number; moeda_nome: string | null; numero: 'pct' | 'nota' | 'estrelas' | null; lancado: boolean;
+  nome: string | null; frase: string | null; icone: string | null;
+  aberto: boolean; nivel: number | null; moeda: number | null; fas: number | null; volume: number | null; lendario: boolean | null;
+  marcos: number[]; preco_nivel: number | null;
+  desafio: { id: number; texto: string; premio: 'horas' | 'legado' | 'investidor'; premio_valor: number; feito: boolean } | null;
+  podio: ProducaoLugar[]; semana: { user_id: string; numero: number; avatar: IdleVisual | null }[];
+  dono: { user_id: string; numero: number; avatar: IdleVisual | null } | null;
+  caderninho: NotaCaderninho[]; mecanica: unknown; server_now: string;
+};
