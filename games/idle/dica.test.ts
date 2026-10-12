@@ -171,7 +171,7 @@ describe('caixinhas do Mapa do rolê', () => {
     expect(dicaMarco(marco(31), lugar())).toBe('+2% de produção na empresa. Nível 5 (você está no 3).');
     expect(dicaMarco(marco(31), lugar({ marcos: [31] }))).toBe('+2% de produção na empresa. Nível 5. Já ganhou.');
     expect(dicaMarco(marco(36), lugar())).toBe('+3% de produção na empresa. Um resultado lendário neste lugar.');
-    expect(dicaMarco(marco(37), lugar())).toBe('+3% de produção na empresa. 10.000 fãs (você tem 10).');
+    expect(dicaMarco(marco(37), lugar())).toBe('+3% de produção na empresa. 100.000 fãs (você tem 10).');
     expect(dicaMarco(marco(38), lugar())).toBe('+2% de produção na empresa. 50 coleções (você fez 2).');
   });
   it('dica do nível: de quanto pra quanto, o preço na moeda do lugar e o que libera', () => {

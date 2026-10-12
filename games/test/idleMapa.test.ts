@@ -151,7 +151,7 @@ describe('nível e marcos', () => {
   it('marcos de fãs, volume e lendário', async () => {
     await empresa(2);
     await abrir(3);
-    await q('update public.idle_place_state set fas = 10000, volume = 50, lendario = true where user_id = $1 and lugar = 3', [A]);
+    await q('update public.idle_place_state set fas = 100000, volume = 50, lendario = true where user_id = $1 and lugar = 3', [A]);
     expect(await q<{ m: number[] }>('select public.idle_place_marcos($1, 3) as m', [A])).toEqual([{ m: [36, 37, 38] }]);
     expect(await q<{ m: number[] }>('select public.idle_place_marcos($1, 3) as m', [A])).toEqual([{ m: [] }]);
   });
@@ -373,7 +373,7 @@ describe('marcos depois de fechar a conta (idle_lugar e idle_mapa)', () => {
     await empresa(2);
     await abrir(3);
     await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '1 hour' where user_id = $1`, [A]);
-    await q('update public.idle_place_state set fas = 10000 where user_id = $1 and lugar = 3', [A]);
+    await q('update public.idle_place_state set fas = 100000 where user_id = $1 and lugar = 3', [A]);
   }
   const valor = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
   it('idle_lugar devolve marcos_novos; a hora que passou rende com a taxa de antes, a de agora sobe 3%', async () => {
@@ -399,7 +399,7 @@ describe('marcos depois de fechar a conta (idle_lugar e idle_mapa)', () => {
   it('subir de nível com fãs e volume já passados dá os três marcos de uma vez', async () => {
     await empresa(2);
     await abrir(3);
-    await q('update public.idle_place_state set nivel = 4, moeda = 1e9, fas = 10000, volume = 50 where user_id = $1 and lugar = 3', [A]);
+    await q('update public.idle_place_state set nivel = 4, moeda = 1e9, fas = 100000, volume = 50 where user_id = $1 and lugar = 3', [A]);
     const antes = await taxa();
     expect((await nivel(3)).marcos_novos).toEqual([31, 37, 38]);
     expect(await taxa()).toBeCloseTo(antes * (1 + 0.02 + 0.03 + 0.02), 6);

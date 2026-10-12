@@ -10,10 +10,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CORES, custoLote, ESTILOS, fasExcesso, liberado, notas, PECAS, pecasLote, pecaTema, pctProcura, podeFiar, precoPeca,
-  precoRelatorio, procura, producaoMs, publico, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte, type Lancamento,
+  CORES, custoLote, ESTILOS, fasExcesso, fasNota, liberado, notas, PECAS, pecasLote, pecaTema, pctProcura, podeFiar, precoPeca,
+  precoRelatorio, procura, producaoMs, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte, type Lancamento,
 } from './camisetaria';
-import { custoNivel, LUGARES, NIVEL_MAX } from './mapa';
+import { custoNivel, LUGARES, MARCOS, NIVEL_MAX } from './mapa';
 
 const H = 3600_000;
 const DIA = 24 * H;
@@ -34,6 +34,8 @@ type Resultado = {
   nivelEm: Map<number, number>; notas: { dia: number; media: number }[]; nivelFinal: number;
   /** maior % de procura até o dia 49, maior intervalo entre dois lançamentos (h), quantos lotes fiados */
   pctMax: number; maiorIntervaloH: number; fiados: number; fas: number;
+  /** dia do primeiro lote fiado (null = nunca) e os fãs depois de cada visita */
+  primeiroFiado: number | null; fasNoDia: { dia: number; fas: number }[];
 };
 
 /** mulberry32: aleatório com semente. */
@@ -58,10 +60,12 @@ function semanaDe(t: number): string {
 const ids = (lista: readonly { id: number }[], tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel: number): number[] =>
   lista.filter((x) => liberado(tipo, x.id, nivel)).map((x) => x.id);
 
-function simular(estrategia: Estrategia, semente: number): Resultado {
+function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISETARIA.moedaInicial): Resultado {
   const sorte = aleatorio(semente);
   const escolhe = <T,>(xs: readonly T[]): T => xs[Math.floor(sorte() * xs.length)];
-  let cupom = CAMISETARIA.moedaInicial;
+  let cupom = cupomInicial;
+  let primeiroFiado: number | null = null;
+  const fasNoDia: { dia: number; fas: number }[] = [];
   let ultimoFiado: number | null = null;
   let fiados = 0;
   let pctMax = 0;
@@ -97,7 +101,7 @@ function simular(estrategia: Estrategia, semente: number): Resultado {
       c.revelada = true;
       combo.set(`${c.l.tema}-${c.l.estilo}`, rotulo(c.l.tema, c.l.estilo));
       pecaSabida.set(`${c.l.peca}-${c.l.tema}`, pecaTema(c.l.peca, c.l.tema));
-      if (c.media >= 7) fas += Math.round(publico(c.l.nivel) * 0.1 * (c.media - 6));
+      fas += fasNota(c.media, c.l.nivel);
     }
     if (t >= c.fim) ativa = null;
   }
@@ -164,6 +168,7 @@ function simular(estrategia: Estrategia, semente: number): Resultado {
       if (!podeFiar(true, cupom, custoLote(peca, nivel, 0), ultimoFiado, t)) return;
       [lote, fiado, ultimoFiado] = [0, true, t];
       fiados += 1;
+      primeiroFiado ??= (t - INICIO) / DIA;
     }
     const l: Lancamento = {
       id: proximoId++, tema, estilo, peca, cor, foco, lote, nivel, fas, tendencia: tend, ultimas: historico.slice(0, 3),
@@ -203,10 +208,11 @@ function simular(estrategia: Estrategia, semente: number): Resultado {
       subir(t, dia);
       if (estrategia === 'caderninho') relatorio();
       if (!ativa) lancar(t);
+      fasNoDia.push({ dia: (t - INICIO) / DIA, fas });
     }
   }
   maiorIntervalo = Math.max(maiorIntervalo, (INICIO + DIAS * DIA - ultimoLancamento) / H);
-  return { nivelEm, notas: notasDia, nivelFinal: nivel, pctMax, maiorIntervaloH: maiorIntervalo, fiados, fas };
+  return { nivelEm, notas: notasDia, nivelFinal: nivel, pctMax, maiorIntervaloH: maiorIntervalo, fiados, fas, primeiroFiado, fasNoDia };
 }
 
 const media = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
@@ -257,5 +263,25 @@ describe('balanceamento da camisetaria (simulação)', () => {
 
   it('com caderninho: nota média 8 ou mais depois de 14 dias', () => {
     expect(media(caderninho.map((r) => mediaEntre(r, 14, 49)))).toBeGreaterThanOrEqual(8);
+  });
+  // Pessoa quebrada: começa sem cupom (ou queimou tudo numa série ruim). O fornecedor fia o lote pequeno e ela volta a jogar.
+  it('quem fica sem cupom recebe lote fiado, volta a lançar e depois sobe de nível', () => {
+    for (const s of SEMENTES.slice(0, 8)) {
+      const r = simular('chute', s, 0);
+      expect(r.fiados).toBeGreaterThan(0);
+      expect(r.primeiroFiado).toBeCloseTo(VISITAS[0] / 24, 9); // fiou já na primeira visita
+      expect(r.notas.length).toBeGreaterThan(40); // continuou lançando (1 por dia)
+      expect(r.maiorIntervaloH).toBeLessThanOrEqual(48);
+      expect(r.nivelEm.get(2)).toBeGreaterThan(r.primeiroFiado!);
+    }
+  });
+
+  // Marco de fãs da camisetaria (id 37): calibrado para a mediana do caderninho chegar por volta do dia 28.
+  it('com caderninho: o marco de fãs chega por volta do dia 28 (mediana entre 25 e 31)', () => {
+    const limiar = MARCOS.find((m) => m.id === 37)!.valor!;
+    const dias = caderninho.map((r) => r.fasNoDia.find((f) => f.fas >= limiar)?.dia ?? Infinity).sort((a, b) => a - b);
+    const mediana = (dias[7] + dias[8]) / 2;
+    expect(mediana).toBeGreaterThanOrEqual(25);
+    expect(mediana).toBeLessThanOrEqual(31);
   });
 });

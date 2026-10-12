@@ -167,6 +167,11 @@ export function procura(l: Lancamento, ns: readonly number[]): number {
   return publico(l.nivel) * (media / 10) ** 2 * (1 + Math.min(Math.sqrt(l.fas) / 30, FAS_TETO)) * PECAS[l.peca - 1].mult;
 }
 
+/** Fãs que a coleção traz pela nota ao ser revelada: com média 7 ou mais, 10% do público do nível por ponto acima de 6. */
+export function fasNota(media: number, nivel: number): number {
+  return media >= 7 ? Math.round(publico(nivel) * 0.1 * (media - 6)) : 0;
+}
+
 /** Fãs que a procura que sobrou (depois de esgotar) traz no fim da venda: metade da sobra, até 20% do público do nível. */
 export function fasExcesso(procuraTotal: number, estoque: number, nivel: number): number {
   return Math.min(0.5 * Math.max(0, procuraTotal - estoque), publico(nivel) * 0.2);

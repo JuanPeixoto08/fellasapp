@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CORES, CRESCE, custoLote, distanciaFoco, FAS_TETO, fasExcesso, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
+  CORES, CRESCE, custoLote, distanciaFoco, FAS_TETO, fasExcesso, fasNota, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
   pecaTema, pesoVenda, precoPeca, precoRelatorio, procura, producaoMs, publico, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte,
   type Lancamento,
 } from './camisetaria';
@@ -145,6 +145,12 @@ describe('lote, procura e preço', () => {
     // √8100/30 = 3 (no teto); √1e10/30 passaria de 3000 e fica em 3
     expect(procura(base({ fas: 8100, nivel: 1, peca: 1 }), [10, 10, 10, 10])).toBeCloseTo(PUBLICO_BASE * 4, 9);
     expect(procura(base({ fas: 1e10, nivel: 1, peca: 1 }), [10, 10, 10, 10])).toBeCloseTo(PUBLICO_BASE * 4, 9);
+  });
+  it('fãs pela nota: nada abaixo de 7; 10% do público do nível por ponto acima de 6, arredondado', () => {
+    expect(fasNota(6.75, 1)).toBe(0);
+    expect(fasNota(7, 1)).toBe(Math.round(PUBLICO_BASE * 0.1));
+    expect(fasNota(9.5, 1)).toBe(Math.round(PUBLICO_BASE * 0.1 * 3.5));
+    expect(fasNota(10, 5)).toBe(Math.round(publico(5) * 0.4));
   });
   it('fãs do excesso: metade da sobra, até 20% do público do nível', () => {
     expect(fasExcesso(30, 36, 1)).toBe(0);
