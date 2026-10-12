@@ -12,7 +12,7 @@ import { portaBolsa, portaConvidados, portaHorta, type ResumoPorta } from './por
 import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
-import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
+import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
 import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
@@ -43,7 +43,7 @@ export type Modelo = {
   /** Folha "Vender a startup?" aberta. */
   vendaAberta: boolean;
   /** O aviso de conquista na cena agora ("Conquista: 6-7"); null = nenhum. */
-  conquistaAviso: string | null;
+  conquistaAviso: AvisoConquista | null;
   /** Estado da Bolsa (null = ainda não buscou). */
   bolsa: BolsaEstado | null;
   /** Gaveta Bolsa aberta (PC: no corpo da bancada; celular: tela cheia). */
@@ -184,9 +184,32 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   const palco = el('div', 'palco');
   const canvas = el('canvas', 'cena');
-  const avisoConquista = el('div', 'conquista-aviso');
-  avisoConquista.setAttribute('role', 'status');
-  palco.append(canvas, avisoConquista);
+  palco.append(canvas);
+  // aviso de conquista: no topo da tela inteira (não mais no meio da cena); tocar abre a conquista no Legado
+  const avisoConquista = button('', 'conquista-aviso', () => verConquista());
+  avisoConquista.setAttribute('aria-live', 'polite');
+  avisoConquista.setAttribute('hidden', '');
+  let avisoMostrado: AvisoConquista | null = null;
+  /** A conquista que o aviso mandou ver: pisca na grade (e no celular já abre o detalhe). */
+  let destaque: number | null = null;
+  /** PC com mouse: a conquista mostra a caixinha ao passar o mouse; celular: tocar abre o detalhe embaixo. */
+  const temMouse = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  function verConquista() {
+    if (!avisoMostrado) return;
+    destaque = avisoMostrado.id;
+    if (destaque !== null && !temMouse()) conquistaAberta = destaque;
+    a.trocarAba('legado');
+  }
+  function desenharAviso(av: AvisoConquista | null) {
+    if (av === avisoMostrado) return;
+    avisoMostrado = av;
+    mostrar(avisoConquista, av !== null);
+    if (!av) return;
+    const meio = el('span', 'meio');
+    meio.append(el('span', 'rot', av.id === null ? 'Conquistas' : 'Conquista desbloqueada · +1% de produção'), el('strong', undefined, av.nome), el('span', 'frase', av.frase));
+    avisoConquista.replaceChildren(iconeLegado(av.id === null ? null : ativos.conquista(av.id)), meio, el('span', 'ver', 'Ver →'), el('i', 'barra'));
+    avisoConquista.setAttribute('aria-label', `${av.id === null ? '' : 'Conquista desbloqueada: '}${av.nome}. ${av.frase} Abrir no Legado`);
+  }
 
   const placa = el('div', 'valor');
   const numero = el('div', 'numero', 'F$ 0');
@@ -343,7 +366,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const arvore = criarArvoreTela((id) => a.comprarNo(id));
 
 
-  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento, telaCheia);
+  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento, telaCheia, avisoConquista);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -497,10 +520,14 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     const grid = el('div', 'grade-conquistas');
     for (const c of celulas) {
       const oculta = !c.ganhou && c.nome === '???';
-      const b = button(oculta ? '?' : '', `conquista${c.ganhou ? ' ganha' : ''}${oculta ? ' oculta' : ''}`, () => {
+      const b = button(oculta ? '?' : '', `conquista${c.ganhou ? ' ganha' : ''}${oculta ? ' oculta' : ''}${destaque === c.conquista.id ? ' destaque' : ''}`, () => {
+        destaque = null;
+        if (temMouse()) return; // no PC quem mostra é a caixinha (mouse/foco)
         conquistaAberta = conquistaAberta === c.conquista.id ? null : c.conquista.id;
         if (ultimo) renderizar(ultimo);
       });
+      dicas.ligar(b, `conquista-${c.conquista.id}`, () => dicaConquista(c));
+      if (destaque === c.conquista.id) queueMicrotask(() => b.scrollIntoView?.({ block: 'center', behavior: 'smooth' }));
       b.setAttribute('aria-label', `${c.nome}, ${c.ganhou ? 'ganha' : 'não ganha'}`);
       b.setAttribute('aria-pressed', String(conquistaAberta === c.conquista.id));
       if (!oculta) b.append(iconeLegado(ativos.conquista(c.conquista.id)));
@@ -511,7 +538,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     if (aberta) {
       const det = el('div', 'conquista-detalhe');
       const texto = el('div', 'meio');
-      texto.append(el('strong', undefined, aberta.nome), el('span', 'sub', aberta.texto));
+      texto.append(el('strong', undefined, aberta.nome), el('span', aberta.ganhou ? 'frase' : 'sub', aberta.texto));
+      if (aberta.feito) texto.append(el('span', 'feito', `✓ Feito: ${aberta.feito}`));
       if (aberta.em) texto.append(el('span', 'sub', ganhouEm(aberta.em)));
       det.append(iconeLegado(aberta.nome === '???' ? null : ativos.conquista(aberta.conquista.id)), texto);
       listaL.append(det);
@@ -920,8 +948,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       if (naBarra && barraVolume.isConnected) barraVolume.focus();
     }
 
-    avisoConquista.textContent = m.conquistaAviso ?? '';
-    mostrar(avisoConquista, m.conquistaAviso !== null);
+    desenharAviso(m.conquistaAviso);
 
     noticeTxt.textContent = m.aviso ?? '';
     mostrar(notice, !!m.aviso);

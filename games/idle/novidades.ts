@@ -4,6 +4,17 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-conquistas',
+    titulo: 'Conquistas sem filtro',
+    data: '2026-10-12',
+    itens: [
+      'As conquistas ganharam textos novos. Ninguém pediu, ninguém vai gostar.',
+      'O aviso de conquista agora aparece grandão no topo da tela. Toca nele pra ver no Legado.',
+      'No PC, passar o mouse numa conquista mostra o que ela é, o que precisou fazer e quando você ganhou.',
+      'A conquista do Toby Fox estava com o texto da Ana. Arrumado.',
+    ],
+  },
+  {
     id: '2026-10-12-toby-fox',
     titulo: 'Toby Fox no PPP',
     data: '2026-10-12',

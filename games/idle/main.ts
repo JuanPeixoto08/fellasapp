@@ -11,7 +11,7 @@ import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
-import { avisos, criarFilaAvisos, detectarNovas } from './legado';
+import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
 import { temNovidade } from './novidades';
 import { aoVivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
@@ -95,9 +95,9 @@ let editorFechado = false;
 let desenhar: Desenhar = () => undefined;
 // o vencimento de contrato que já pediu um "bater o ponto" (pede uma vez por vencimento)
 let vencimentoPedido: string | null = null;
-// folha "Vender a startup?" aberta; aviso de conquista na cena (um de cada vez, 3 s cada)
+// folha "Vender a startup?" aberta; aviso de conquista no topo (um de cada vez, 5 s cada)
 let vendaAberta = false;
-let conquistaAviso: string | null = null;
+let conquistaAviso: AvisoConquista | null = null;
 // as conquistas que a página já conhecia (null = ainda não carregou): avisa só as que aparecem depois
 let conquistasConhecidas: number[] | null = null;
 // Bolsa: gaveta aberta e o último mercado buscado; um temporizador busca de novo na virada do minuto enquanto aberta
@@ -148,9 +148,9 @@ async function carregarBolsa() {
   if (bolsaAberta && !document.hidden) timerBolsa = setTimeout(() => void carregarBolsa(), proximaBusca(bolsa?.vira_em_ms ?? 60_000));
 }
 // avisos desligados: sem o aviso de conquista e sem o som dele
-const filaAvisos = criarFilaAvisos((texto) => {
-  conquistaAviso = chaves.avisos ? texto : null;
-  if (texto && chaves.avisos) audio.tocar('conquista');
+const filaAvisos = criarFilaAvisos<AvisoConquista>((aviso) => {
+  conquistaAviso = chaves.avisos ? aviso : null;
+  if (aviso && chaves.avisos) audio.tocar('conquista');
   render();
 });
 

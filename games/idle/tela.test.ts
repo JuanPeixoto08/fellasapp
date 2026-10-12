@@ -27,6 +27,8 @@ const modelo = (x: Partial<Modelo> = {}): Modelo => ({
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
 let root: HTMLElement;
 beforeEach(() => {
+  // por padrão, sem mouse (celular): tocar na conquista abre o detalhe; o teste do PC troca isso
+  window.matchMedia = ((q: string) => ({ matches: false, media: q }) as MediaQueryList) as typeof window.matchMedia;
   document.body.innerHTML = '<div id="app"></div>';
   root = document.getElementById('app')!;
   acoes = {
@@ -518,7 +520,8 @@ describe('legado: prestígio, árvore e conquistas', () => {
     expect(ganha.querySelector<HTMLElement>('.icone-legado')!.style.backgroundImage).not.toBe('');
     ganha.click();
     let det = root.querySelector('.conquista-detalhe')!;
-    expect(det.textContent).toContain('Cem estagiários, uma cafeteira.');
+    expect(det.textContent).toContain('A princesa Isabel ficaria decepcionada.');
+    expect(det.textContent).toContain('✓ Feito: Ter 100 "Estagiário"'); // o que precisou continua aparecendo
     expect(det.textContent).toContain('Ganhou em 12/10/2026');
     expect(cel('Estágio não remunerado em escala, ganha')!.getAttribute('aria-pressed')).toBe('true');
     cel('Cem abas abertas, não ganha')!.click();
@@ -527,6 +530,23 @@ describe('legado: prestígio, árvore e conquistas', () => {
     expect(det.textContent).not.toContain('Ganhou em');
     cel('Cem abas abertas, não ganha')!.click();
     expect(root.querySelector('.conquista-detalhe')).toBeNull();
+  });
+  it('no PC (mouse): passar o mouse ou o foco mostra a caixinha da conquista; clicar não abre nada embaixo', () => {
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation((q: string) => ({ matches: q.includes('hover'), media: q } as MediaQueryList));
+    try {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ aba: 'legado', estado: estado({ conquistas: [{ id: 7, em: EM }], bonus: { arvore: [], conquistas: 1 } }) }));
+      const ganha = root.querySelector<HTMLButtonElement>('.conquista[aria-label^="Estágio não remunerado em escala"]')!;
+      ganha.click();
+      expect(root.querySelector('.conquista-detalhe')).toBeNull();
+      ganha.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      const dica = root.querySelector('#idle-dica')!;
+      expect(dica.hasAttribute('hidden')).toBe(false);
+      expect(dica.textContent).toContain('Estágio não remunerado em escala');
+      expect(dica.textContent).toContain('✓ Feito: Ter 100 "Estagiário"');
+    } finally {
+      mm.mockRestore();
+    }
   });
   it('sem a arte: a conquista mostra só a moldura', () => {
     const sem = vi.spyOn(ativos, 'conquista').mockReturnValue(null);
@@ -550,14 +570,34 @@ describe('legado: prestígio, árvore e conquistas', () => {
     b.click();
     expect(acoes.comprarNo).toHaveBeenCalledWith(1);
   });
-  it('aviso de conquista por cima da cena', () => {
+  it('aviso de conquista no topo da tela (fora da cena): ícone, nome e frase; tocar abre a conquista no Legado', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ conquistaAviso: 'Conquista: 6-7' }));
-    const aviso = root.querySelector('.palco .conquista-aviso')!;
-    expect(aviso.hasAttribute('hidden')).toBe(false);
-    expect(aviso.textContent).toBe('Conquista: 6-7');
     tela.renderizar(modelo());
-    expect(root.querySelector('.palco .conquista-aviso')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.conquista-aviso')!.hasAttribute('hidden')).toBe(true); // sem aviso, sem caixa vazia
+    tela.renderizar(modelo({ conquistaAviso: { id: 101, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.' } }));
+    expect(root.querySelector('.palco .conquista-aviso')).toBeNull();
+    const aviso = root.querySelector<HTMLButtonElement>('.conquista-aviso')!;
+    expect(aviso.hasAttribute('hidden')).toBe(false);
+    expect(aviso.textContent).toContain('Conquista desbloqueada');
+    expect(aviso.textContent).toContain('6-7');
+    expect(aviso.textContent).toContain('Seis sete. Ninguém sabe por quê.');
+    expect(aviso.querySelector<HTMLElement>('.icone-legado')!.style.backgroundImage).not.toBe('');
+    aviso.click();
+    expect(acoes.trocarAba).toHaveBeenCalledWith('legado');
+    tela.renderizar(modelo({ aba: 'legado', estado: estado({ conquistas: [{ id: 101, em: EM }], descobertas: [101] }) }));
+    expect(root.querySelector('.conquista[aria-label^="6-7"]')!.classList.contains('destaque')).toBe(true);
+    expect(root.querySelector('.conquista-detalhe')!.textContent).toContain('6-7'); // celular: já abre o detalhe
+    tela.renderizar(modelo());
+    expect(root.querySelector('.conquista-aviso')!.hasAttribute('hidden')).toBe(true);
+  });
+  it('aviso de várias de uma vez: sem ícone, leva pro Legado', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ conquistaAviso: { id: null, nome: '5 conquistas novas!', frase: 'Olha no Legado.' } }));
+    const aviso = root.querySelector<HTMLButtonElement>('.conquista-aviso')!;
+    expect(aviso.textContent).toContain('5 conquistas novas!');
+    expect(aviso.querySelector('.icone-legado')!.classList.contains('sem-arte')).toBe(true);
+    aviso.click();
+    expect(acoes.trocarAba).toHaveBeenCalledWith('legado');
   });
   it('placar: ★ N (ganhos na vida) ao lado do F$/s de quem tem', () => {
     const tela = criarTela(root, acoes);

@@ -26,7 +26,7 @@ import m49 from '../../supabase/migrations/0049_fellas_inc_oportunidades_sorte.s
 import m50 from '../../supabase/migrations/0050_fellas_inc_catalogo_convidados.sql?raw';
 import m51 from '../../supabase/migrations/0051_fellas_inc_convidados.sql?raw';
 import m52 from '../../supabase/migrations/0052_fellas_inc_toby_fox.sql?raw';
-import m53 from '../../supabase/migrations/0053_fellas_inc_catalogo_toby.sql?raw';
+import m53 from '../../supabase/migrations/0053_fellas_inc_catalogo_conquistas.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 

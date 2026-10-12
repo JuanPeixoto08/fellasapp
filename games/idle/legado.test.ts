@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import {
-  avisos, criarFilaAvisos, descricaoNo, detectarNovas, escalaArvore, falta, faltam, ganhouEm, grade, MUNDO_ARVORE, noInicial, ondeNo,
+  avisos, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaArvore, falta, faltam, ganhouEm, grade, MUNDO_ARVORE, noInicial, ondeNo,
   pontos, POSICOES_ARVORE, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela, textoVenda, TOTAL_CONQUISTAS,
 } from './legado';
 
@@ -27,8 +27,27 @@ describe('grade de conquistas', () => {
   });
   it('ganha: a frase e a data; escondida que você tem aparece com o nome', () => {
     const g = grade(estado({ conquistas: [{ id: 7, em: EM }, { id: 101, em: EM }], descobertas: [101] }));
-    expect(g.find((c) => c.conquista.id === 7)).toMatchObject({ ganhou: true, texto: 'Cem estagiários, uma cafeteira.', em: EM });
+    expect(g.find((c) => c.conquista.id === 7)).toMatchObject({
+      ganhou: true, texto: 'Cem estagiários pagos em "experiência". A princesa Isabel ficaria decepcionada.', feito: 'Ter 100 "Estagiário"', em: EM,
+    });
     expect(g.find((c) => c.conquista.id === 101)).toMatchObject({ ganhou: true, nome: '6-7', texto: 'Seis sete. Ninguém sabe por quê.' });
+  });
+  it('bloqueada não tem "feito"; a caixinha (PC) diz o que é: frase, o que precisou e a data; ou o que falta', () => {
+    const g = grade(estado({ conquistas: [{ id: 7, em: '2026-10-13T02:30:00.000Z' }], descobertas: [102] }));
+    expect(g.find((c) => c.conquista.id === 1)!.feito).toBeNull();
+    expect(dicaConquista(g.find((c) => c.conquista.id === 7)!)).toEqual({
+      titulo: 'Estágio não remunerado em escala',
+      linhas: [
+        { texto: 'Cem estagiários pagos em "experiência". A princesa Isabel ficaria decepcionada.' },
+        { texto: '✓ Feito: Ter 100 "Estagiário"', tom: 'bom' },
+        { texto: 'Ganhou em 12/10/2026 · +1% de produção', tom: 'fraco' },
+      ],
+    });
+    expect(dicaConquista(g.find((c) => c.conquista.id === 1)!)).toEqual({
+      titulo: 'Cem abas abertas',
+      linhas: [{ texto: 'Ter 100 "Você, no notebook da faculdade"' }, { texto: 'Vale +1% de produção', tom: 'fraco' }],
+    });
+    expect(dicaConquista(g.find((c) => c.conquista.id === 102)!)).toEqual({ titulo: '???', linhas: [{ texto: 'Alguém do grupo conseguiu', tom: 'fraco' }] });
   });
   it('escondida que alguém do grupo tem e você não: ???; que ninguém tem: não aparece', () => {
     const g = grade(estado({ descobertas: [102] }));
@@ -45,7 +64,10 @@ describe('grade de conquistas', () => {
 
 describe('textos', () => {
   it('aviso por conquista nova; id desconhecido some', () => {
-    expect(avisos([101, 999, 1])).toEqual(['Conquista: 6-7', 'Conquista: Cem abas abertas']);
+    expect(avisos([101, 999, 1])).toEqual([
+      { id: 101, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.' },
+      { id: 1, nome: 'Cem abas abertas', frase: 'Cem abas, zero vagas aplicadas. Seu pai já desistiu de você em silêncio.' },
+    ]);
   });
   it('venda e pontos no singular e no plural', () => {
     expect(pontos(1)).toBe('1 ponto');
@@ -60,20 +82,20 @@ describe('textos', () => {
 
 describe('fila de avisos', () => {
   afterEach(() => vi.useRealTimers());
-  it('um de cada vez, 3 s cada, e depois some', () => {
+  it('um de cada vez, 5 s cada, e depois some', () => {
     vi.useFakeTimers();
     const vistos: (string | null)[] = [];
-    const fila = criarFilaAvisos((t) => vistos.push(t));
+    const fila = criarFilaAvisos<string>((t) => vistos.push(t));
     fila.adicionar(['Conquista: 6-7', 'Conquista: Exit']);
     expect(vistos).toEqual(['Conquista: 6-7']);
     fila.adicionar(['Conquista: Black Friday']);
-    vi.advanceTimersByTime(2999);
+    vi.advanceTimersByTime(4999);
     expect(vistos).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(vistos.at(-1)).toBe('Conquista: Exit');
-    vi.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(5000);
     expect(vistos.at(-1)).toBe('Conquista: Black Friday');
-    vi.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(5000);
     expect(vistos.at(-1)).toBeNull();
     fila.adicionar([]);
     expect(vistos.at(-1)).toBeNull();
@@ -81,7 +103,7 @@ describe('fila de avisos', () => {
   it('parar limpa o que está na tela, a fila e os timers', () => {
     vi.useFakeTimers();
     const vistos: (string | null)[] = [];
-    const fila = criarFilaAvisos((t) => vistos.push(t));
+    const fila = criarFilaAvisos<string>((t) => vistos.push(t));
     fila.adicionar(['A', 'B']);
     fila.parar();
     expect(vistos).toEqual(['A', null]);
@@ -96,7 +118,7 @@ describe('fila de avisos', () => {
 describe('avisos em lote', () => {
   it('até 3: um por conquista; mais de 3: um aviso só', () => {
     expect(avisos([7, 101, 1])).toHaveLength(3);
-    expect(avisos([1, 2, 3, 4, 5])).toEqual(['5 conquistas novas! Olha no Legado.']);
+    expect(avisos([1, 2, 3, 4, 5])).toEqual([{ id: null, nome: '5 conquistas novas!', frase: 'Olha no Legado.' }]);
     expect(avisos([])).toEqual([]);
   });
 });

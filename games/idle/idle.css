@@ -317,8 +317,34 @@
 .idle .editor-fim { display: flex; gap: 12px; justify-content: flex-end; padding-top: 12px; }
 
 /* aviso de conquista: por cima da cena, 3 s (main.ts) */
-.idle .conquista-aviso { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; max-width: calc(100% - 24px); padding: 8px 14px; background: #3A2A66; color: #DDD2FF; font: 400 18px var(--i-pixel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; animation: conquista-entra 0.25s ease-out; box-shadow: 0 -2px 0 0 var(--i-lilas), 0 2px 0 0 var(--i-lilas), -2px 0 0 0 var(--i-lilas), 2px 0 0 0 var(--i-lilas); }
-@keyframes conquista-entra { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* aviso de conquista: no topo da tela inteira, por cima de tudo (até dos minigames); a barrinha conta os 5 s; tocar abre no Legado */
+.idle .conquista-aviso { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; z-index: 30; transform: translateX(-50%); width: min(540px, calc(100vw - 20px));
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 0 16px; align-items: center; padding: 14px 20px 16px 14px; border: 0; border-radius: 0;
+  text-align: left; color: var(--paper); background: #231B3D; cursor: pointer; overflow: hidden; animation: conquista-entra 0.3s ease-out;
+  box-shadow: 0 -3px 0 0 var(--gold), 0 3px 0 0 var(--gold), -3px 0 0 0 var(--gold), 3px 0 0 0 var(--gold), 0 20px 50px rgba(0, 0, 0, 0.6); }
+.idle .conquista-aviso:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 6px; }
+.idle .conquista-aviso .icone-legado { width: 64px; height: 64px; background-color: #14121A; background-size: 52px 52px; background-position: center; }
+.idle .conquista-aviso .meio { display: grid; gap: 4px; min-width: 0; }
+.idle .conquista-aviso .rot { font: 400 18px var(--i-pixel); line-height: 1; color: var(--gold); text-transform: uppercase; letter-spacing: 0.04em; }
+.idle .conquista-aviso strong { font: 400 32px var(--i-pixel); line-height: 1; }
+.idle .conquista-aviso .frase { font-size: 14px; line-height: 1.3; color: #CFC8E8; }
+.idle .conquista-aviso .ver { align-self: end; font: 400 17px var(--i-pixel); color: var(--i-lilas); white-space: nowrap; }
+.idle .conquista-aviso .barra { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: var(--gold); transform-origin: left; animation: conquista-tempo 5s linear forwards; }
+@keyframes conquista-entra { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes conquista-tempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (max-width: 600px) {
+  .idle .conquista-aviso { grid-template-columns: 48px minmax(0, 1fr); gap: 0 12px; padding: 10px 12px 12px; }
+  .idle .conquista-aviso .icone-legado { width: 48px; height: 48px; background-size: 40px 40px; }
+  .idle .conquista-aviso strong { font-size: 24px; }
+  .idle .conquista-aviso .rot { font-size: 15px; }
+  .idle .conquista-aviso .ver { display: none; }
+}
+/* detalhe da conquista (celular): a frase e o que precisou, mesmo depois de ganhar */
+.idle .conquista-detalhe .frase { font-style: italic; font-size: 14px; color: var(--paper); }
+.idle .conquista-detalhe .feito { font-size: 13px; color: var(--mint); }
+/* a conquista que o aviso mandou ver pisca na grade */
+.idle .conquista.destaque { animation: conquista-pisca 0.6s steps(2) 4; }
+@keyframes conquista-pisca { 50% { box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(242, 210, 122, 0.8); } }
 
 /* barras de rolagem finas e escuras */
 /* Chrome/Edge/Safari: as pseudo-classes do webkit (sem as setinhas); o padrão (scrollbar-width) só no Firefox, porque no
@@ -957,4 +983,7 @@ body:has(.idle) { background: #121212; }
   .idle .minigame-topo h2[data-curto]::before { content: attr(data-curto); font-size: 24px; }
   .idle .minigame-corpo .bolsa-melhorias { grid-template-columns: minmax(0, 1fr); }
   .idle .minigame-corpo .bolsa-detalhe { scroll-margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle .conquista-aviso .barra, .idle .conquista.destaque { animation: none; }
 }

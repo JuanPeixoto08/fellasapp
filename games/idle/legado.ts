@@ -2,10 +2,12 @@
 // o que sai daqui. Quem comprou ou ganhou o quê é o banco que decide; aqui só se decide o que cada quadradinho mostra.
 import type { IdleState } from '../shared/types';
 import { catalogo, type Conquista, type No } from './catalogo';
+import type { Dica } from './dica';
 import { RAMOS } from './nomes';
 
-/** Um quadradinho da grade. `texto` = a frase (ganhou), a condição (bloqueada) ou "Alguém do grupo conseguiu". */
-export type Celula = { conquista: Conquista; ganhou: boolean; nome: string; texto: string; em: string | null };
+/** Um quadradinho da grade. `texto` = a frase (ganhou), a condição (bloqueada) ou "Alguém do grupo conseguiu".
+ *  `feito` = o que precisou pra ganhar (só nas ganhas: continua aparecendo depois de feita). */
+export type Celula = { conquista: Conquista; ganhou: boolean; nome: string; texto: string; feito: string | null; em: string | null };
 
 export const TOTAL_CONQUISTAS = catalogo.conquistas.length;
 
@@ -17,9 +19,9 @@ export function grade(estado: IdleState): Celula[] {
   const out: Celula[] = [];
   for (const c of catalogo.conquistas) {
     const em = minhas.get(c.id) ?? null;
-    if (em) out.push({ conquista: c, ganhou: true, nome: c.nome, texto: c.frase, em });
-    else if (!c.escondida) out.push({ conquista: c, ganhou: false, nome: c.nome, texto: c.condicao, em: null });
-    else if (descobertas.has(c.id)) out.push({ conquista: c, ganhou: false, nome: '???', texto: 'Alguém do grupo conseguiu', em: null });
+    if (em) out.push({ conquista: c, ganhou: true, nome: c.nome, texto: c.frase, feito: c.condicao, em });
+    else if (!c.escondida) out.push({ conquista: c, ganhou: false, nome: c.nome, texto: c.condicao, feito: null, em: null });
+    else if (descobertas.has(c.id)) out.push({ conquista: c, ganhou: false, nome: '???', texto: 'Alguém do grupo conseguiu', feito: null, em: null });
   }
   return out;
 }
@@ -28,16 +30,30 @@ export function grade(estado: IdleState): Celula[] {
 export const ganhouEm = (iso: string): string =>
   `Ganhou em ${new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
 
-/** "Conquista: 6-7", uma por id novo, na ordem que o banco mandou. Mais de 3 de uma vez (a 1ª abertura depois de uma
- *  atualização pode dar 15 ou 20): um aviso só, em vez de uma fila de 3 s cada. */
+/** A caixinha de informação da conquista (mouse no PC): a frase, o que precisou e a data; ou o que falta. */
+export function dicaConquista(c: Celula): Dica {
+  if (c.ganhou) {
+    return {
+      titulo: c.nome,
+      linhas: [{ texto: c.texto }, { texto: `✓ Feito: ${c.feito}`, tom: 'bom' }, { texto: `${ganhouEm(c.em!)} · +1% de produção`, tom: 'fraco' }],
+    };
+  }
+  if (c.nome === '???') return { titulo: '???', linhas: [{ texto: c.texto, tom: 'fraco' }] };
+  return { titulo: c.nome, linhas: [{ texto: c.texto }, { texto: 'Vale +1% de produção', tom: 'fraco' }] };
+}
+
+/** Um aviso de conquista (id null = o aviso de várias de uma vez). */
+export type AvisoConquista = { id: number | null; nome: string; frase: string };
+/** Um aviso por id novo, na ordem que o banco mandou. Mais de 3 de uma vez (a 1ª abertura depois de uma atualização
+ *  pode dar 15 ou 20): um aviso só, em vez de uma fila de 5 s cada. */
 export const MAX_AVISOS = 3;
-export function avisos(ids: number[]): string[] {
-  const out: string[] = [];
+export function avisos(ids: number[]): AvisoConquista[] {
+  const out: AvisoConquista[] = [];
   for (const id of ids) {
     const c = catalogo.conquistas.find((x) => x.id === id);
-    if (c) out.push(`Conquista: ${c.nome}`);
+    if (c) out.push({ id: c.id, nome: c.nome, frase: c.frase });
   }
-  return out.length > MAX_AVISOS ? [`${out.length} conquistas novas! Olha no Legado.`] : out;
+  return out.length > MAX_AVISOS ? [{ id: null, nome: `${out.length} conquistas novas!`, frase: 'Olha no Legado.' }] : out;
 }
 
 /** "1 ponto" / "5 pontos". */
@@ -61,8 +77,8 @@ export function detectarNovas(conhecidas: readonly number[] | null, estado: Idle
 }
 
 /** Fila dos avisos de conquista: um de cada vez, `ms` cada. `mostrar(null)` = nenhum na tela. `parar` limpa tudo. */
-export function criarFilaAvisos(mostrar: (texto: string | null) => void, ms = 3000) {
-  const fila: string[] = [];
+export function criarFilaAvisos<T>(mostrar: (aviso: T | null) => void, ms = 5000) {
+  const fila: T[] = [];
   let ativo = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const proximo = () => {
@@ -73,8 +89,8 @@ export function criarFilaAvisos(mostrar: (texto: string | null) => void, ms = 30
     if (t !== undefined) timer = setTimeout(proximo, ms);
   };
   return {
-    adicionar(textos: string[]) {
-      fila.push(...textos);
+    adicionar(itens: T[]) {
+      fila.push(...itens);
       if (!ativo && fila.length) proximo();
     },
     parar() {
