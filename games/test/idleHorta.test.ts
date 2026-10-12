@@ -125,6 +125,9 @@ describe('o tempo passa sozinho', () => {
     await q(`update public.idle_state set horta_passo = floor(extract(epoch from now()) / 300)::bigint - 3, horta_visto = now() - interval '20 minutes' where user_id = $1`, [A]);
     const h = await horta();
     expect(h.plantas).toMatchObject([{ canteiro: 7, especie: 8, origem: 'morango' }]);
+    // a escondida só entra depois da conta fechada (o +1% dela não vale pro tempo de antes)
+    expect(await conquistas()).not.toContain(112);
+    await t.rpc('idle_open');
     expect(await conquistas()).toContain(112);
     expect((await q<{ n: number }>('select horta_morreu as n from public.idle_state where user_id = $1', [A]))[0].n).toBe(1);
   });

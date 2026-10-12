@@ -68,7 +68,9 @@ alter table public.idle_state
   add column if not exists horta_passo   bigint,
   add column if not exists horta_plantou int not null default 0,
   add column if not exists horta_colheu  int not null default 0,
-  add column if not exists horta_morreu  int not null default 0;
+  add column if not exists horta_morreu  int not null default 0,
+  -- Morangos que brotaram (a conquista escondida sai em idle_check_conquistas, depois da conta fechada)
+  add column if not exists horta_morangos int not null default 0;
 
 -- ===== contas =====
 -- lado da grade pelos Food trucks (gerador 11): 0, 2, 3, 4, 5, 6
@@ -164,6 +166,7 @@ declare
   v_esp    int;
   k        public.idle_cat_horta;
   v_morreu int := 0;
+  v_morangos int := 0;
 begin
   -- mortes naturais desde a última vez (conquista "Planta de plástico era melhor")
   if s.horta_visto is not null then
@@ -252,14 +255,14 @@ begin
           a_nat := a_nat || true;
           ocup[c + 1] := true;
           if v_esp = 8 then
-            perform public.idle_ganhar(s.user_id, 'horta_morango');
+            v_morangos := v_morangos + 1; -- a conquista não sai aqui: a conta ainda não fechou
           end if;
         end if;
       end loop;
     end loop;
   end if;
   update public.idle_state
-     set horta_passo = v_agora, horta_visto = now(), horta_morreu = horta_morreu + v_morreu
+     set horta_passo = v_agora, horta_visto = now(), horta_morreu = horta_morreu + v_morreu, horta_morangos = horta_morangos + v_morangos
    where user_id = s.user_id;
   -- o histórico que a conta já passou (e mais de 1 dia de idade) sai
   delete from public.idle_horta_plantas p
@@ -868,6 +871,7 @@ begin
              when c.tipo = 'horta_plantou' then s.horta_plantou >= c.valor
              when c.tipo = 'horta_colheu' then s.horta_colheu >= c.valor
              when c.tipo = 'horta_morreu' then s.horta_morreu >= c.valor
+             when c.tipo = 'horta_morango' then s.horta_morangos >= 1
              when c.tipo = 'horta_colecao' then 2 + (select count(*) from public.idle_horta_descobertas d
                                                        where d.user_id = p_user and d.especie not in (1, 2)) >= c.valor
              else false

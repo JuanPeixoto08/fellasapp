@@ -265,7 +265,11 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   horta: (acao) => {
     hortaAberta = acao === 'abrir';
-    if (hortaAberta) bolsaAberta = false;
+    if (hortaAberta && bolsaAberta) {
+      bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
+      poPendentes = [];
+      if (timerBolsa !== null) clearTimeout(timerBolsa);
+    }
     if (timerHorta) clearInterval(timerHorta);
     timerHorta = hortaAberta ? setInterval(() => { if (!document.hidden) void carregarHorta(); }, 120_000) : null;
     render();
@@ -291,7 +295,11 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
-    if (bolsaAberta) hortaAberta = false;
+    if (bolsaAberta && hortaAberta) {
+      hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
+      if (timerHorta) clearInterval(timerHorta);
+      timerHorta = null;
+    }
     if (!bolsaAberta) poPendentes = [];
     if (!bolsaAberta && timerBolsa !== null) clearTimeout(timerBolsa);
     render();
@@ -415,6 +423,7 @@ function aplicar(estado: IdleState) {
 
 async function recarregar() {
   aplicar(await api.idleOpen());
+  if (hortaAberta) void carregarHorta(); // virada da horta (planta madura, morta ou brotada): a gaveta acompanha
 }
 
 async function salvarVisual(v: IdleVisual) {

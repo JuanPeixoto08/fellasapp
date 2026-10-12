@@ -493,6 +493,7 @@
   .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
   .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
   .idle .bancada.com-bolsa .bolsa-detalhe { overflow: auto; position: static; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle .bancada.com-horta .gaveta-corpo { overflow: auto; } /* a horta rola (a Bolsa tem lista e detalhe lado a lado) */
 }
 
 /* PC estreito (1100–1279): o resumo desce pra baixo da cena, senão o dinheiro passa por cima do painel */
