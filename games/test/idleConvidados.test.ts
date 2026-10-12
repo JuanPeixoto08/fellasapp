@@ -208,3 +208,50 @@ describe('eventos na tela', () => {
     await expect(t.rpc('idle_dourado_pegar', { p_seg: seg, p_lado: 0 })).rejects.toThrow(/idle_dourado_gone/);
   });
 });
+
+describe('Bolsa: Vorcaro e VSauce', () => {
+  type Pos = { empresa: number; qtd: number; custo: number; alavanca: number };
+  type Bolsa = { carteira: Pos[]; empresas: { id: number; humor?: number | null }[] };
+  const T = 5000;
+  const negociar = (empresa: number, lado: string, qtd: number, lote = 1) =>
+    q<{ v: { valuation: number; bolsa: Bolsa } }>('select public.idle_bolsa_negociar_em($1, $2, $3, $4, $5, $5, $6) as v', [A, empresa, lado, qtd, T, lote]).then((r) => r[0].v);
+  const estado = () => q<{ v: Bolsa }>('select public.idle_bolsa_estado($1, $2) as v', [A, T]).then((r) => r[0].v);
+  const valuation = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+  const preco = (v: number) => q('update public.idle_bolsa_mercado set valor = $1 where empresa = 1', [v]);
+
+  beforeEach(async () => {
+    await q('delete from public.idle_cat_conquista where id <> 77'); // só a do FGC: as outras mudariam a taxa no meio
+    await q(`update public.idle_state set generators[19] = 2, generators[11] = 20, valuation = 1e12 where user_id = $1`, [A]);
+    await q('select public.idle_bolsa_avancar_ate($1)', [T]);
+  });
+
+  it('com o Vorcaro na frente o lote é 2×: o ganho conta em dobro; separado das ações normais', async () => {
+    await sentar(0, 2);
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    let b = (await negociar(1, 'comprar', 10)).bolsa;
+    expect(b.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 315, alavanca: 2 }]);
+    await tirar(0);
+    b = (await negociar(1, 'comprar', 10)).bolsa;
+    expect(b.carteira.map((p) => [p.alavanca, p.qtd])).toEqual([[1, 10], [2, 10]]);
+    await preco(45);
+    const r = await taxa();
+    const antes = await valuation();
+    const depois = (await negociar(1, 'vender', 0, 2)).valuation;
+    expect(depois - antes).toBeCloseTo(10 * (31.5 + 2 * (45 - 31.5)) * r, 2);
+  });
+  it('a perda também dobra; caiu pela metade = pó (recebe 0) e sai "O FGC não cobre"', async () => {
+    await sentar(0, 2);
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    await negociar(1, 'comprar', 10);
+    await preco(10);
+    const antes = await valuation();
+    const depois = (await negociar(1, 'vender', 0, 2)).valuation;
+    expect(depois).toBeCloseTo(antes, 6);
+    expect(await conquistas()).toContain(77);
+  });
+  it('o humor de cada empresa só vem com o VSauce sentado', async () => {
+    expect((await estado()).empresas[0].humor ?? null).toBeNull();
+    await sentar(1, 11);
+    expect(typeof (await estado()).empresas[0].humor).toBe('number');
+  });
+});

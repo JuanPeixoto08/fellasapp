@@ -173,7 +173,7 @@ describe('carteira e negociar', () => {
     const antes = await valuation();
     const resp = await negociar(1, 'comprar', 10);
     expect(antes - resp.valuation).toBeCloseTo(10 * 30 * rr * 1.05, 3);
-    expect(resp.bolsa.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05 }]);
+    expect(resp.bolsa.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05, alavanca: 1 }]);
   });
   it('vender: recebe qtd × valor × r sem taxa e tira o custo na proporção; Tudo (0) vende o resto', async () => {
     await negociar(1, 'comprar', 10);
@@ -227,7 +227,7 @@ describe('carteira e negociar', () => {
     await t.rpc('idle_prestige');
     const b = await estado();
     expect(b.aberta).toBe(false);
-    expect(b.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05 }]);
+    expect(b.carteira).toEqual([{ empresa: 1, qtd: 10, custo: 10 * 30 * 1.05, alavanca: 1 }]);
   });
   it('RPCs: membro chama idle_bolsa e negocia pelo relógio; não membro é recusado', async () => {
     // o mercado foi criado no tick 5000: sem isto o relógio de verdade faria gerar 1 dia inteiro (lento no PGlite)
