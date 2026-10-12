@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CORES, custoLote, distanciaFoco, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
+  CORES, CRESCE, custoLote, distanciaFoco, FAS_TETO, fasExcesso, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
   pecaTema, pesoVenda, precoPeca, precoRelatorio, procura, producaoMs, publico, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte,
   type Lancamento,
 } from './camisetaria';
@@ -127,23 +127,46 @@ describe('lote, procura e preço', () => {
     expect(pecasLote(1, 0)).toBe(12);
     expect(pecasLote(1, 1)).toBe(36);
     expect(pecasLote(1, 2)).toBe(84);
-    expect(pecasLote(5, 1)).toBe(Math.round(12 * 1.55 ** 4) * 3);
-    expect(publico(1)).toBe(75);
-    expect(publico(3)).toBeCloseTo(75 * 1.55 ** 2, 9);
+    expect(pecasLote(5, 1)).toBe(Math.round(12 * CRESCE ** 4) * 3);
+    expect(publico(1)).toBe(PUBLICO_BASE);
+    expect(publico(3)).toBeCloseTo(PUBLICO_BASE * CRESCE ** 2, 9);
+  });
+  it('as constantes da Task 2 (o banco copia em idle_tee_const)', () => {
+    expect([PUBLICO_BASE, CRESCE, PRECO_MULT, FAS_TETO]).toEqual([75, 1.35, 6.5, 3]);
   });
   it('procura e pctProcura', () => {
     const l = base({ fas: 900, nivel: 1, peca: 1 });
-    expect(procura(l, [10, 10, 10, 10])).toBeCloseTo(75 * 1 * 2 * 1, 9);
-    expect(procura(l, [5, 5, 5, 5])).toBeCloseTo(75 * 0.25 * 2, 9);
-    expect(pctProcura(l, [10, 10, 10, 10])).toBeCloseTo((150 / 36) * 100, 9);
+    // 900 fãs: √900/30 = 1 -> bônus 2
+    expect(procura(l, [10, 10, 10, 10])).toBeCloseTo(PUBLICO_BASE * 1 * 2 * 1, 9);
+    expect(procura(l, [5, 5, 5, 5])).toBeCloseTo(PUBLICO_BASE * 0.25 * 2, 9);
+    expect(pctProcura(l, [10, 10, 10, 10])).toBeCloseTo(((PUBLICO_BASE * 2) / 36) * 100, 9);
+  });
+  it('o bônus de fãs para em 4× (√fãs/30 até 3)', () => {
+    // √8100/30 = 3 (no teto); √1e10/30 passaria de 3000 e fica em 3
+    expect(procura(base({ fas: 8100, nivel: 1, peca: 1 }), [10, 10, 10, 10])).toBeCloseTo(PUBLICO_BASE * 4, 9);
+    expect(procura(base({ fas: 1e10, nivel: 1, peca: 1 }), [10, 10, 10, 10])).toBeCloseTo(PUBLICO_BASE * 4, 9);
+  });
+  it('fãs do excesso: metade da sobra, até 20% do público do nível', () => {
+    expect(fasExcesso(30, 36, 1)).toBe(0);
+    expect(fasExcesso(40, 36, 1)).toBeCloseTo(2, 9);
+    expect(fasExcesso(1000, 36, 1)).toBeCloseTo(PUBLICO_BASE * 0.2, 9);
+    expect(fasExcesso(1e9, 36, 3)).toBeCloseTo(publico(3) * 0.2, 9);
+  });
+  it('o fornecedor fia o lote pequeno uma vez a cada 24 h, só sem coleção e sem cupom', () => {
+    const t = Date.UTC(2026, 9, 12, 12);
+    expect(podeFiar(true, 10, 24, null, t)).toBe(true);
+    expect(podeFiar(false, 10, 24, null, t)).toBe(false);
+    expect(podeFiar(true, 24, 24, null, t)).toBe(false);
+    expect(podeFiar(true, 10, 24, t - 24 * H + 1, t)).toBe(false);
+    expect(podeFiar(true, 10, 24, t - 24 * H, t)).toBe(true);
   });
   it('custo, preço, produção, relatório', () => {
     expect(custoLote(1, 1, 1)).toBe(3 * 36);
-    expect(precoPeca(1)).toBeCloseTo(7.5, 9);
+    expect(precoPeca(1)).toBeCloseTo(3 * PRECO_MULT, 9);
     expect([producaoMs(0), producaoMs(1), producaoMs(2)]).toEqual([H, 2 * H, 4 * H]);
     expect(VENDA_MS).toBe(12 * H);
     expect(precoRelatorio(1)).toBe(50);
-    expect(precoRelatorio(3)).toBeCloseTo(50 * 1.55 ** 2, 9);
+    expect(precoRelatorio(3)).toBeCloseTo(50 * CRESCE ** 2, 9);
   });
 });
 

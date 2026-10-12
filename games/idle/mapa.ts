@@ -6,7 +6,8 @@ export type TipoMarco = 'nivel' | 'lendario' | 'fas' | 'volume';
 export type Marco = { id: number; lugar: number; tipo: TipoMarco; valor: number | null; bonus: number };
 export type Lugar = {
   id: number; apelido: string; faixa: Faixa; horas: number; era: number; lote: number;
-  custoBase: number; moeda: string | null; /** como o número do pódio aparece */ numero: 'pct' | 'nota' | 'estrelas' | null;
+  custoBase: number; moeda: string | null; /** moeda com que o lugar abre (camisetaria: 1 lote médio de camiseta) */ moedaInicial: number;
+  /** como o número do pódio aparece */ numero: 'pct' | 'nota' | 'estrelas' | null;
 };
 
 /** Último lote lançado. Lugar com lote maior ainda não existe para a pessoa. */
@@ -14,15 +15,15 @@ export const LOTE_ATUAL = 1;
 export const NIVEL_MAX = 25;
 
 export const LUGARES: readonly Lugar[] = [
-  { id: 1, apelido: 'o samba', faixa: 'barato', horas: 2, era: 2, lote: 2, custoBase: 100, moeda: null, numero: null },
-  { id: 2, apelido: 'o casarão', faixa: 'barato', horas: 2, era: 2, lote: 2, custoBase: 100, moeda: null, numero: null },
-  { id: 3, apelido: 'a camisetaria', faixa: 'barato', horas: 2, era: 2, lote: 1, custoBase: 100, moeda: 'cupom', numero: 'pct' },
-  { id: 4, apelido: 'o copão', faixa: 'medio', horas: 6, era: 3, lote: 1, custoBase: 150, moeda: 'ficha', numero: 'nota' },
-  { id: 5, apelido: 'a loja 24h', faixa: 'medio', horas: 6, era: 3, lote: 2, custoBase: 150, moeda: null, numero: null },
-  { id: 6, apelido: 'a sinuca', faixa: 'medio', horas: 6, era: 3, lote: 3, custoBase: 150, moeda: null, numero: null },
-  { id: 7, apelido: 'o jantar', faixa: 'caro', horas: 16, era: 4, lote: 1, custoBase: 250, moeda: 'gorjeta', numero: 'estrelas' },
-  { id: 8, apelido: 'a massa-mãe', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, numero: null },
-  { id: 9, apelido: 'o corredor', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, numero: null },
+  { id: 1, apelido: 'o samba', faixa: 'barato', horas: 2, era: 2, lote: 2, custoBase: 100, moeda: null, moedaInicial: 0, numero: null },
+  { id: 2, apelido: 'o casarão', faixa: 'barato', horas: 2, era: 2, lote: 2, custoBase: 100, moeda: null, moedaInicial: 0, numero: null },
+  { id: 3, apelido: 'a camisetaria', faixa: 'barato', horas: 2, era: 2, lote: 1, custoBase: 100, moeda: 'cupom', moedaInicial: 108, numero: 'pct' },
+  { id: 4, apelido: 'o copão', faixa: 'medio', horas: 6, era: 3, lote: 1, custoBase: 150, moeda: 'ficha', moedaInicial: 0, numero: 'nota' },
+  { id: 5, apelido: 'a loja 24h', faixa: 'medio', horas: 6, era: 3, lote: 2, custoBase: 150, moeda: null, moedaInicial: 0, numero: null },
+  { id: 6, apelido: 'a sinuca', faixa: 'medio', horas: 6, era: 3, lote: 3, custoBase: 150, moeda: null, moedaInicial: 0, numero: null },
+  { id: 7, apelido: 'o jantar', faixa: 'caro', horas: 16, era: 4, lote: 1, custoBase: 250, moeda: 'gorjeta', moedaInicial: 0, numero: 'estrelas' },
+  { id: 8, apelido: 'a massa-mãe', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, moedaInicial: 0, numero: null },
+  { id: 9, apelido: 'o corredor', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, moedaInicial: 0, numero: null },
 ];
 
 const BONUS = [0.02, 0.02, 0.03, 0.03, 0.04, 0.03, 0.03, 0.02];

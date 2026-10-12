@@ -11,10 +11,12 @@ export type Cor = { id: number; nome: string; hex: string; forte: boolean; nivel
 export type Influencer = { id: number; nome: string; gosto: string };
 export type Rotulo = 0 | 1 | 2 | 3 | 4; // péssima, ruim, ok, boa, ótima
 
-/** Ajustados na Task 2 (equilíbrio). */
+/** Ajustados na Task 2 (camisetariaSim.test.ts, 16 sementes): 75 de público mantém a % de procura abaixo de 1000% (teto
+ *  75 × 4 / 36 = 833%); o lote crescendo 1,35 por nível contra 1,55 do preço do nível acelera o começo e segura o fim
+ *  (nível 10 no dia ~7, nível 25 no dia ~40); o preço a 6,5× o custo paga os ~9.200 cupons até o nível 10 em uma semana. */
 export const PUBLICO_BASE = 75;
-export const CRESCE = 1.55;
-export const PRECO_MULT = 2.5;
+export const CRESCE = 1.35;
+export const PRECO_MULT = 6.5;
 
 const TODAS: readonly Vibe[] = ['zoeira', 'raiz', 'fofo', 'sombrio', 'retro', 'esporte', 'nerd', 'praia', 'chique', 'bruto', 'urbano', 'grana'];
 
@@ -156,10 +158,18 @@ export function publico(nivel: number): number {
   return PUBLICO_BASE * CRESCE ** (nivel - 1);
 }
 
+/** Teto do bônus de fãs na procura (√fãs/30 para de crescer aqui: no máximo 4× o público). */
+export const FAS_TETO = 3;
+
 /** Quantas peças a freguesia quer: público × (média/10)² × bônus de fãs × a pegada da peça. */
 export function procura(l: Lancamento, ns: readonly number[]): number {
   const media = ns.reduce((a, b) => a + b, 0) / 4;
-  return publico(l.nivel) * (media / 10) ** 2 * (1 + Math.sqrt(l.fas) / 30) * PECAS[l.peca - 1].mult;
+  return publico(l.nivel) * (media / 10) ** 2 * (1 + Math.min(Math.sqrt(l.fas) / 30, FAS_TETO)) * PECAS[l.peca - 1].mult;
+}
+
+/** Fãs que a procura que sobrou (depois de esgotar) traz no fim da venda: metade da sobra, até 20% do público do nível. */
+export function fasExcesso(procuraTotal: number, estoque: number, nivel: number): number {
+  return Math.min(0.5 * Math.max(0, procuraTotal - estoque), publico(nivel) * 0.2);
 }
 
 /** A procura em % do lote médio (100% = vende o lote médio inteiro). */
@@ -173,6 +183,13 @@ export function custoLote(peca: number, nivel: number, lote: 0 | 1 | 2): number 
 
 export function precoPeca(peca: number): number {
   return PECAS[peca - 1].custo * PRECO_MULT;
+}
+
+/** "O fornecedor fia": sem coleção rodando e sem cupom para o lote pequeno da peça escolhida, o lote pequeno sai de graça,
+ *  no máximo uma vez a cada 24 h (ultimoFiadoMs null = nunca fiou). Assim ninguém fica travado sem cupom. */
+export function podeFiar(semColecaoAtiva: boolean, moeda: number, custoPequeno: number, ultimoFiadoMs: number | null, agoraMs: number): boolean {
+  if (!semColecaoAtiva || moeda >= custoPequeno) return false;
+  return ultimoFiadoMs === null || agoraMs - ultimoFiadoMs >= 24 * 3600_000;
 }
 
 export function producaoMs(lote: 0 | 1 | 2): number {
@@ -227,7 +244,7 @@ export function nomeSugerido(tema: number, estilo: number, n: number): string {
   return [...semSufixo].length <= 30 ? semSufixo : nome;
 }
 
-/** Preço do relatório dos influencers no nível dado: 50 × 1,55^(nível−1). */
+/** Preço do relatório dos influencers no nível dado: 50 × CRESCE^(nível−1). */
 export function precoRelatorio(nivel: number): number {
   return 50 * CRESCE ** (nivel - 1);
 }
