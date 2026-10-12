@@ -137,7 +137,7 @@ export function notas(l: Lancamento): [number, number, number, number] {
     l.tema === l.tendencia ? 1 : 0,
     (l.estilo === 5 || l.estilo === 10 || CORES[l.cor - 1].forte) ? 1 : 0,
     l.tema === 3 ? 2 : -1,
-    -1 + (rot === 4 && dist <= 1 ? 1 : 0),
+    rot === 4 && dist <= 1 ? 1 : -1,
   ];
   return gosto.map((g, k) => {
     const sorte10 = ((l.id * 7919 + (k + 1) * 104729) % 11) - 5;

@@ -95,13 +95,14 @@ describe('notas', () => {
     expect(b).toEqual([10, 9, 8, 8]);
   });
 
-  it('@luisviton ganha +1 só com combinação ótima e foco <= 1', () => {
+  it('@luisviton: +1 só com combinação ótima e foco <= 1, senão -1', () => {
     // Caveira(15)+Gótico(14) = ótima; Moletom(6) gosta de caveira (+10); id 1 -> sorte do luisviton (i=4) = -3.
-    // base10 = 90+10-3*dist. Com foco = ideal [4,4,2]: dist 0 -> 100; luisviton: 100 + 0 (-1+1) - 3 = 97 -> 10.
-    // Com dist 1 (foco [5,3,2]): 97 -> 97+0-3 = 94 ->  floor(99/10)=9. Com dist 2 ([6,2,2]): base 94, luis -1: 94-10-3 = 81 -> 8.
+    // foco [4,4,2] (dist 0): base10 = 90+10 = 100; gosto +1: 100+10-3 = 107 -> 10.
+    // foco [5,3,2] (dist 1): base10 = 97; gosto +1: 97+10-3 = 104 -> 10 (com gosto 0 daria 94 -> 9: distingue).
+    // foco [6,2,2] (dist 2): base10 = 94; gosto -1: 94-10-3 = 81 -> 8.
     const o = base({ id: 1, tema: 15, estilo: 14, peca: 6, cor: 1, ultimas: [], tendencia: 9 });
     expect(notas({ ...o, foco: [4, 4, 2] })[3]).toBe(10);
-    expect(notas({ ...o, foco: [5, 3, 2] })[3]).toBe(9);
+    expect(notas({ ...o, foco: [5, 3, 2] })[3]).toBe(10);
     expect(notas({ ...o, foco: [6, 2, 2] })[3]).toBe(8);
   });
 
@@ -157,6 +158,7 @@ describe('venda no tempo', () => {
     expect(pesoVenda(sexta18 + 8 * H, sexta18 + 24 * H)).toBe(16 * H); // sáb 2h até sáb 18h: peso 1
     expect(pesoVenda(sexta18 + 24 * H, sexta18 + 32 * H)).toBe(16 * H); // sáb 18h até dom 2h
     expect(pesoVenda(sexta18 + 32 * H, sexta18 + 33 * H)).toBe(H);
+    expect(pesoVenda(sexta18 + 31 * H, sexta18 + 33 * H)).toBe(3 * H); // dom 1h-3h: 1h de show (peso 2) + 1h normal
   });
   it('vendidoAte: 0 no início, total no fim, proporcional no meio, preso nos extremos', () => {
     expect(vendidoAte(100, segunda10, segunda10)).toBe(0);
