@@ -51,7 +51,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
   const refazer = () => ultimo && renderizar(...ultimo);
   const escolher = (i: number) => {
     recado = null;
-    escolhendo = escolhendo === i ? null : i;
+    escolhendo = i;
     marcado = null;
     refazer();
   };
@@ -67,10 +67,19 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
     const c: Cadeiras = s.convidados ?? SEM;
     const tr = trocasAgora(c, agoraMs);
     const algum = c.cadeira.some((id, i) => id && destrancada(i, ppp));
+    if (escolhendo === null || !destrancada(escolhendo, ppp)) {
+      const vazia = [0, 1, 2].find((i) => destrancada(i, ppp) && !c.cadeira[i]);
+      escolhendo = vazia ?? 0;
+    }
 
+    // as trocas: o número, quando volta a próxima e uma fichinha por troca
     const topo = el('div', 'conv-topo');
-    topo.append(el('h3', 'conv-titulo', 'PPP Podcast'),
-      el('span', 'conv-trocas', `Trocas: ${tr.trocas}/${MAX_TROCAS}${tr.proximaMs ? ` · próxima em ${tempo(tr.proximaMs - agoraMs)}` : ''}`));
+    const txt = el('div', 'conv-trocas-txt');
+    txt.append(el('span', 'conv-trocas', `Trocas: ${tr.trocas}/${MAX_TROCAS}${tr.proximaMs ? ` · próxima em ${tempo(tr.proximaMs - agoraMs)}` : ''}`));
+    const fichas = el('div', 'conv-fichas');
+    fichas.setAttribute('aria-hidden', 'true');
+    for (let k = 0; k < MAX_TROCAS; k++) fichas.append(el('i', k < tr.trocas ? 'ficha' : 'ficha gasta'));
+    topo.append(txt, fichas);
 
     // ----- o estúdio -----
     const estudio = el('div', `estudio${algum ? ' no-ar' : ''}`);
@@ -110,13 +119,18 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
 
     // ----- os cartões das cadeiras -----
     const cartoes = el('div', 'conv-estudio');
-    for (let i = 0; i < 3; i++) {
+    for (const i of [1, 0, 2]) {
       const aberta = destrancada(i, ppp);
       const id = c.cadeira[i];
       const cad = el('div', `conv-cadeira${i === 0 ? ' frente' : ''}${aberta ? '' : ' trancada'}${escolhendo === i ? ' escolhendo' : ''}`);
       cad.append(el('span', 'conv-rotulo', `${cap(NOME_CADEIRA[i])} · ${pct(PESOS[i])}`));
       if (!aberta) {
         cad.append(el('span', 'sub', `Abre com ${ABRE_COM[i]} PPP Podcasts${id ? ` (${convidado(id).nome} esperando)` : ''}`));
+        if (id) {
+          const tirar = button('Tirar', 'btn compacto', () => a.tirar(i));
+          tirar.disabled = ocupado;
+          cad.append(tirar);
+        }
       } else if (id) {
         const desde = c.desde[i] ? Date.parse(c.desde[i]!) : agoraMs;
         const viva = aoVivo(id, PESOS[i], desde, s.user_id, agoraMs);
@@ -141,16 +155,20 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
       cartoes.append(cad);
     }
 
-    raiz.append(topo, ...(recado ? [el('p', 'conv-recado', recado)] : []), estudio, cartoes);
+    const esq = el('div', 'conv-esq');
+    esq.append(...(recado ? [el('p', 'conv-recado', recado)] : []), estudio, cartoes);
+    const dir = el('div', 'conv-dir');
+    dir.append(topo);
+    raiz.append(esq, dir);
 
     // ----- a seleção de convidado -----
-    if (escolhendo !== null && destrancada(escolhendo, ppp)) {
+    if (destrancada(escolhendo, ppp)) {
       const ch = escolhendo;
       const livres = CONVIDADOS.filter((cv) => !c.cadeira.includes(cv.id));
       const foco = marcado ?? livres[0]?.id ?? CONVIDADOS[0].id;
       const sel = el('div', 'conv-escolha');
       const cab = el('div', 'conv-lista-cab');
-      cab.append(el('strong', undefined, `Quem senta na cadeira ${DA_CADEIRA[ch]}?`), button('Cancelar', 'btn compacto', () => { escolhendo = null; refazer(); }));
+      cab.append(el('strong', undefined, `Quem senta na cadeira ${DA_CADEIRA[ch]}?`));
       sel.append(cab);
       if (tr.trocas < 1) sel.append(el('p', 'sub', `Sem trocas agora. A próxima volta em ${tempo((tr.proximaMs ?? agoraMs) - agoraMs)}.`));
       const grade = el('div', 'conv-grade');
@@ -176,13 +194,13 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
       let acao: HTMLElement;
       if (onde >= 0) acao = el('span', 'conv-ja', onde === ch ? 'Já está nesta cadeira' : `Na cadeira ${DA_CADEIRA[onde]}`);
       else {
-        const bt = button('Sentar', 'btn main', () => { escolhendo = null; marcado = null; a.sentar(ch, foco); });
+        const bt = button(`Sentar ${['na frente', 'no meio', 'no canto'][ch]}`, 'btn main', () => { marcado = null; escolhendo = null; a.sentar(ch, foco); });
         bt.disabled = ocupado || tr.trocas < 1;
         acao = bt;
       }
       det.append(peca('conv-retrato', ativos.convidado(foco), 0, 0), meio, acao);
       sel.append(det);
-      raiz.append(sel);
+      dir.append(sel);
     }
   }
 

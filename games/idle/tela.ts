@@ -8,6 +8,7 @@ import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
 import { criarHortaTela } from './hortaTela';
 import { criarConvidadosTela } from './convidadosTela';
+import { portaBolsa, portaConvidados, portaHorta, type ResumoPorta } from './portas';
 import { custosConv, multGerador, peso, SEM_CADEIRAS, VINI, VORCARO } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
@@ -211,65 +212,71 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   // a empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e a bancada embaixo
   const cartaoEmpresa = el('div', 'cartao-empresa');
   cartaoEmpresa.append(palco, placa, abrir);
-  // bancada: uma gaveta por coisa que acontece (Caixinha e os minigames: Bolsa; Horta, Convidados e Lives depois)
-  const larga = () => window.matchMedia?.('(min-width: 1100px)').matches === true;
-  const gavetaCaixa = button('', 'gaveta', () => {
-    a.bolsa('fechar');
-    a.horta('fechar');
-    a.convidados('fechar');
-    if (!larga()) a.caixa(true); // no PC a lista já está aberta na bancada
-  });
-  const caixaIcone = el('span', 'gaveta-caixa');
-  const iconeOpp = el('span', 'gaveta-icone');
-  iconeOpp.style.backgroundImage = `url(${ativos.oportunidade(0)})`;
+  // bancada: as portas dos minigames (cada um abre em tela cheia) e a Caixinha das oportunidades guardadas
+  const portas = el('div', 'portas');
+  type Porta = { botao: HTMLButtonElement; st: HTMLElement; badge: HTMLElement };
+  function porta(cls: string, nome: string, icone: string | null, abrirPorta: (() => void) | null): Porta {
+    const botao = button('', `porta ${cls}`, () => abrirPorta?.());
+    const ic = el('span', `porta-icone${icone && !icone.includes('mapa') ? ' quadros' : ''}`);
+    if (icone) ic.style.backgroundImage = `url(${icone})`;
+    const st = el('span', 'porta-st');
+    const badge = el('span', 'porta-badge');
+    mostrar(badge, false);
+    botao.append(ic, el('strong', 'porta-nome', nome), st, el('span', 'porta-abrir', abrirPorta ? 'Abrir →' : 'Em breve'), badge);
+    if (!abrirPorta) {
+      botao.disabled = true;
+      botao.classList.add('em-breve');
+      st.textContent = nome === 'Lives' ? 'Chega na Live na Twitch' : 'Os lugares do rolê';
+    }
+    portas.append(botao);
+    return { botao, st, badge };
+  }
+  const pBolsa = porta('gaveta-bolsa', 'Bolsa', ativos.gerador(19), () => a.bolsa('abrir'));
+  const pHorta = porta('gaveta-horta', 'Horta', ativos.gerador(11), () => a.horta('abrir'));
+  const pConv = porta('gaveta-convidados', 'Convidados', ativos.gerador(13), () => a.convidados('abrir'));
+  porta('porta-lives', 'Lives', ativos.gerador(6), null);
+  porta('porta-mapa', 'Mapa do rolê', ativos.mapa(), null);
+  const gavetaBolsa = pBolsa.botao;
+  const gavetaHorta = pHorta.botao;
+  const gavetaConv = pConv.botao;
+  // a Caixinha: o cabeçalho (quantas tem e quantas ainda dá pra pegar hoje) e as guardadas lado a lado
+  const gavetaCaixa = el('div', 'bancada-caixa-cab');
   const selo = el('span', 'selo', '0');
-  caixaIcone.append(iconeOpp);
-  gavetaCaixa.append(caixaIcone, el('span', 'gaveta-nome', 'Caixinha'), selo);
-  const gavetas = el('div', 'gavetas');
-  gavetas.append(gavetaCaixa);
-  // gaveta Bolsa (minigame 1): sem Grupo de trader fica apagada; tocar abre (o main busca o mercado)
-  const gavetaBolsa = button('', 'gaveta gaveta-bolsa', () => a.bolsa('abrir'));
-  const bolsaCaixa = el('span', 'gaveta-caixa');
-  const iconeBolsa = el('span', 'gaveta-icone gaveta-icone-gerador');
-  iconeBolsa.style.backgroundImage = `url(${ativos.gerador(19)})`;
-  bolsaCaixa.append(iconeBolsa);
-  gavetaBolsa.append(bolsaCaixa, el('span', 'gaveta-nome', 'Bolsa'));
-  gavetas.append(gavetaBolsa);
-  // gaveta Horta (minigame 2): sem Food truck fica apagada; tocar abre (o main busca a horta)
-  const gavetaHorta = button('', 'gaveta gaveta-horta', () => a.horta('abrir'));
-  const hortaCaixa = el('span', 'gaveta-caixa');
-  const iconeHorta = el('span', 'gaveta-icone gaveta-icone-gerador');
-  iconeHorta.style.backgroundImage = `url(${ativos.gerador(11)})`;
-  hortaCaixa.append(iconeHorta);
-  gavetaHorta.append(hortaCaixa, el('span', 'gaveta-nome', 'Horta'));
-  gavetas.append(gavetaHorta);
-  // gaveta Convidados (minigame 3): sem PPP Podcast fica apagada; o estado já vem com o jogo (nada pra buscar)
-  const gavetaConv = button('', 'gaveta gaveta-convidados', () => a.convidados('abrir'));
-  const convCaixa = el('span', 'gaveta-caixa');
-  const iconeConv = el('span', 'gaveta-icone gaveta-icone-gerador');
-  iconeConv.style.backgroundImage = `url(${ativos.gerador(13)})`;
-  convCaixa.append(iconeConv);
-  gavetaConv.append(convCaixa, el('span', 'gaveta-nome', 'Convidados'));
-  gavetas.append(gavetaConv);
+  const caixaSub = el('span', 'sub');
+  const caixaTitulo = el('strong', undefined, 'Caixinha');
+  caixaTitulo.append(selo);
+  gavetaCaixa.append(caixaTitulo, caixaSub);
+  const corpoCaixa = el('div', 'bancada-caixa-itens');
+  const caixinha = el('section', 'bancada-caixa');
+  caixinha.setAttribute('aria-label', 'Caixinha');
+  caixinha.append(gavetaCaixa, corpoCaixa);
   const hortaTela = criarHortaTela({ plantar: (c, e) => a.plantar(c, e), colher: (c) => a.colher(c), arrancar: (c) => a.arrancar(c) });
   const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t, lote) => a.negociar(e, l, q, t, lote), melhorar: (tp, n) => a.melhorar(tp, n) });
-  // topo da Bolsa em tela cheia (só no celular, pelo CSS)
-  const bancadaTopo = el('div', 'bancada-topo');
+  // o minigame aberto, em tela cheia (como a árvore): Voltar, o ícone, o nome e o F$
   let gavetaAberta: 'bolsa' | 'horta' | 'convidados' | null = null;
-  const fecharBolsa = button('', 'fechar', () => (gavetaAberta === 'horta' ? a.horta('fechar') : gavetaAberta === 'convidados' ? a.convidados('fechar') : a.bolsa('fechar')));
-  fecharBolsa.setAttribute('aria-label', 'Fechar a Bolsa');
-  fecharBolsa.append(iconeFechar());
-  const valorBolsa = el('span', 'chip-valor');
+  const fecharMinigame = () => (gavetaAberta === 'horta' ? a.horta('fechar') : gavetaAberta === 'convidados' ? a.convidados('fechar') : a.bolsa('fechar'));
+  const telaCheia = el('div', 'minigame-tela');
+  telaCheia.setAttribute('role', 'dialog');
+  telaCheia.setAttribute('aria-modal', 'true');
+  telaCheia.setAttribute('aria-labelledby', 'idle-titulo-minigame');
+  telaCheia.setAttribute('hidden', '');
+  const bancadaTopo = el('div', 'minigame-topo');
+  const fecharBolsa = button('← Voltar', 'btn voltar-minigame', fecharMinigame);
+  const iconeMinigame = el('span', 'porta-icone quadros');
   const tituloGaveta = el('h2', undefined, 'Bolsa');
-  bancadaTopo.append(fecharBolsa, tituloGaveta, valorBolsa);
-  const corpoBancada = el('div', 'gaveta-corpo');
+  tituloGaveta.id = 'idle-titulo-minigame';
+  const valorBolsa = el('span', 'chip-valor');
+  bancadaTopo.append(fecharBolsa, iconeMinigame, tituloGaveta, el('span', 'espaco'), valorBolsa);
+  const corpoBancada = el('div', 'minigame-corpo');
+  telaCheia.append(bancadaTopo, corpoBancada);
+  telaCheia.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMinigame(); });
   // a Bolsa e a Horta continuam no corpo entre um desenho e outro: tirar e pôr de volta zeraria a rolagem delas
   const noCorpo = (n: HTMLElement) => {
     if (corpoBancada.childNodes.length !== 1 || corpoBancada.firstChild !== n) corpoBancada.replaceChildren(n);
   };
   const bancada = el('section', 'bancada');
   bancada.setAttribute('aria-label', 'Bancada');
-  bancada.append(bancadaTopo, gavetas, corpoBancada);
+  bancada.append(portas, caixinha);
   const empresa = el('div', 'empresa');
   empresa.append(cartaoEmpresa, bancada);
 
@@ -336,7 +343,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const arvore = criarArvoreTela((id) => a.comprarNo(id));
 
 
-  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento);
+  app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento, telaCheia);
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
@@ -564,31 +571,39 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(listaP, jogando && m.aba === 'placar');
     // Legado: na aba, ou embaixo do "Abrir CNPJ" de quem já vendeu (dá pra gastar os pontos antes de reabrir)
     const verLegado = !!s && ((jogando && m.aba === 'legado') || (m.fase === 'antes' && s.pontos_vida > 0));
-    // bancada: a gaveta Caixinha com quantas tem; no PC o corpo mostra a lista
+    // bancada: as portas (com o resumo de cada minigame) e a Caixinha com as guardadas
     selo.textContent = String(m.pendentes.length);
     mostrar(selo, m.pendentes.length > 0);
     gavetaCaixa.setAttribute('aria-label', `Caixinha: ${m.pendentes.length} ${m.pendentes.length === 1 ? 'oportunidade guardada' : 'oportunidades guardadas'}`);
+    caixaSub.textContent = s ? (s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}` : 'Já pegou todas de hoje') : '';
     mostrar(bancada, jogando);
     const trader = (s?.generators[18] ?? 0) >= 1; // gerador 19 (Grupo de trader) = índice 18 aqui
-    gavetaBolsa.classList.toggle('trancada', !trader);
-    gavetaBolsa.setAttribute('aria-label', trader ? 'Bolsa' : 'Bolsa: compra 1 Grupo de trader pra abrir');
-    gavetaBolsa.setAttribute('aria-pressed', String(m.bolsaAberta));
     const foodTruck = (s?.generators[10] ?? 0) >= 1; // gerador 11 (Food truck)
-    gavetaHorta.classList.toggle('trancada', !foodTruck);
-    gavetaHorta.setAttribute('aria-label', foodTruck ? 'Horta' : 'Horta: compra 1 Food truck pra abrir');
-    gavetaHorta.setAttribute('aria-pressed', String(m.hortaAberta));
-    const ppp = (s?.generators[12] ?? 0) >= 1; // gerador 13 (PPP Podcast)
-    gavetaConv.classList.toggle('trancada', !ppp);
-    gavetaConv.setAttribute('aria-label', ppp ? 'Convidados' : 'Convidados: compra 1 PPP Podcast pra abrir');
-    gavetaConv.setAttribute('aria-pressed', String(m.convidadosAberto));
-    gavetaCaixa.setAttribute('aria-pressed', String(!m.bolsaAberta && !m.hortaAberta && !m.convidadosAberto));
+    if (s) {
+      const resumos: [Porta, ResumoPorta, string][] = [
+        [pBolsa, portaBolsa(s, m.bolsa), 'Bolsa'],
+        [pHorta, portaHorta(s, m.horta, agoraTela), 'Horta'],
+        [pConv, portaConvidados(s, agoraTela), 'Convidados'],
+      ];
+      for (const [p, r, nome] of resumos) {
+        p.st.textContent = r.st;
+        p.badge.textContent = r.badge ?? '';
+        mostrar(p.badge, r.badge !== null);
+        p.botao.classList.toggle('trancada', r.trancada);
+        p.botao.setAttribute('aria-label', `${nome}: ${r.st}${r.badge ? ` (${r.badge})` : ''}`);
+      }
+    }
     gavetaAberta = !jogando ? null : m.convidadosAberto ? 'convidados' : m.hortaAberta ? 'horta' : m.bolsaAberta ? 'bolsa' : null;
-    bancada.classList.toggle('com-gaveta', gavetaAberta !== null);
-    bancada.classList.toggle('com-bolsa', gavetaAberta === 'bolsa');
-    bancada.classList.toggle('com-horta', gavetaAberta === 'horta');
-    bancada.classList.toggle('com-convidados', gavetaAberta === 'convidados');
-    tituloGaveta.textContent = gavetaAberta === 'horta' ? 'Horta' : gavetaAberta === 'convidados' ? 'Convidados' : 'Bolsa';
-    fecharBolsa.setAttribute('aria-label', gavetaAberta === 'horta' ? 'Fechar a Horta' : gavetaAberta === 'convidados' ? 'Fechar os Convidados' : 'Fechar a Bolsa');
+    const abriuAgora = gavetaAberta !== null && telaCheia.hasAttribute('hidden');
+    mostrar(telaCheia, gavetaAberta !== null);
+    telaCheia.dataset.minigame = gavetaAberta ?? '';
+    app.classList.toggle('com-minigame', gavetaAberta !== null);
+    const NOMES_MINI = { bolsa: ['Bolsa', 19], horta: ['Horta do Food truck', 11], convidados: ['Convidados no PPP Podcast', 13] } as const;
+    if (gavetaAberta) {
+      const [titulo, gid] = NOMES_MINI[gavetaAberta];
+      tituloGaveta.textContent = titulo;
+      iconeMinigame.style.backgroundImage = `url(${ativos.gerador(gid)})`;
+    }
     if (gavetaAberta === 'convidados' && s) {
       convidadosTela.renderizar(s, m.ocupado, agoraTela);
       noCorpo(convidadosTela.elemento);
@@ -598,12 +613,12 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const taxaSemente = s.rate * (1 + 0.5 * peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VINI));
       hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela);
       noCorpo(hortaTela.elemento);
-    } else if (m.bolsaAberta && jogando && s) {
+    } else if (gavetaAberta === 'bolsa' && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
       noCorpo(bolsaTela.elemento);
-    } else {
-      corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
-    }
+    } else corpoBancada.replaceChildren();
+    if (abriuAgora) fecharBolsa.focus({ preventScroll: true });
+    corpoCaixa.replaceChildren(...(s && jogando ? itensCaixinha(s, m).slice(1) : []));
     mostrar(engrenagem, jogando || m.fase === 'antes');
     engrenagem.setAttribute('aria-label', m.novidadeNova ? 'Configurações (tem novidade)' : 'Configurações');
     mostrar(pontoNovo, m.novidadeNova);
@@ -942,11 +957,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   let pulo: ReturnType<typeof setTimeout> | null = null;
   function chegouOportunidade() {
-    gavetaCaixa.classList.remove('chegou');
-    void gavetaCaixa.offsetWidth; // recomeça a animação se já estava pulando
-    gavetaCaixa.classList.add('chegou');
+    caixinha.classList.remove('chegou');
+    void caixinha.offsetWidth; // recomeça a animação se já estava pulando
+    caixinha.classList.add('chegou');
     if (pulo) clearTimeout(pulo);
-    pulo = setTimeout(() => gavetaCaixa.classList.remove('chegou'), 2000);
+    pulo = setTimeout(() => caixinha.classList.remove('chegou'), 2000);
   }
 
   return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus, chegouOportunidade,

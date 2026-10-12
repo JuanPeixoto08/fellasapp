@@ -72,7 +72,7 @@ describe('tela da Fellas Inc.', () => {
       criarTela(root, acoes);
       const app = root.querySelector<HTMLElement>('.app')!;
       expect(Number(app.style.getPropertyValue('--zoom'))).toBeCloseTo(4 / 3);
-      expect(app.style.getPropertyValue('--cena-w')).toBe('480px'); // 4× = 640 na tela
+      expect(app.style.getPropertyValue('--cena-w')).toBe('600px'); // 5× = 800 na tela
       Object.assign(window, { innerWidth: 390, innerHeight: 760 });
       window.dispatchEvent(new Event('resize'));
       expect(app.style.getPropertyValue('--zoom')).toBe('');
@@ -97,42 +97,51 @@ describe('tela da Fellas Inc.', () => {
     expect(etqs.map((e) => e.textContent)).toEqual(['Bolsa: +1 MEME cada', 'Bolsa: +1 SIMA cada', 'Bolsa: +1 PSTL cada']); // 6, 8 e 11
     expect(etqs[2].getAttribute('title')).toBe('Cada Food truck libera +1 ação do Pastel do Zé na Bolsa');
   });
-  it('oportunidade nova: a gaveta da Caixinha pula e brilha por uns 2 s (o "plim" não fica sem nada na tela)', () => {
+  it('oportunidade nova: a Caixinha da bancada pula e brilha por uns 2 s (o "plim" não fica sem nada na tela)', () => {
     vi.useFakeTimers();
     try {
       const tela = criarTela(root, acoes);
       tela.renderizar(modelo());
-      const gaveta = root.querySelector<HTMLElement>('.gaveta:not(.gaveta-bolsa)')!;
+      const caixa = root.querySelector<HTMLElement>('.bancada-caixa')!;
       tela.chegouOportunidade();
-      expect(gaveta.classList.contains('chegou')).toBe(true);
+      expect(caixa.classList.contains('chegou')).toBe(true);
       tela.renderizar(modelo()); // re-render no meio não corta o pulo
-      expect(gaveta.classList.contains('chegou')).toBe(true);
+      expect(caixa.classList.contains('chegou')).toBe(true);
       vi.advanceTimersByTime(2200);
-      expect(gaveta.classList.contains('chegou')).toBe(false);
+      expect(caixa.classList.contains('chegou')).toBe(false);
     } finally {
       vi.useRealTimers();
     }
   });
-  it('gaveta Horta: apagada sem Food truck; aberta mostra a horta em tela cheia (com-gaveta); Caixinha fecha', () => {
+  it('porta Horta: apagada sem Food truck; aberta mostra a horta em tela cheia; Voltar fecha', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());
-    const gaveta = root.querySelector<HTMLButtonElement>('.gaveta-horta')!;
-    expect(gaveta.classList.contains('trancada')).toBe(true);
-    gaveta.click();
+    const porta = root.querySelector<HTMLButtonElement>('.gaveta-horta')!;
+    expect(porta.classList.contains('trancada')).toBe(true);
+    expect(porta.textContent).toContain('Compra 1 Food truck pra abrir');
+    porta.click();
     expect(acoes.horta).toHaveBeenCalledWith('abrir');
     const comFT = estado({ generators: [1, ...Array(9).fill(0), 3, ...Array(19).fill(0)] });
     const horta = { lado: 2, food_trucks: 3, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: comFT.server_now };
     tela.renderizar(modelo({ estado: comFT, hortaAberta: true, horta }));
-    expect(gaveta.classList.contains('trancada')).toBe(false);
-    const banc = root.querySelector('.bancada')!;
-    expect(banc.classList.contains('com-gaveta')).toBe(true);
-    expect(banc.classList.contains('com-bolsa')).toBe(false);
-    expect(root.querySelector('.gaveta-corpo .horta-grade')).not.toBeNull();
-    expect(root.querySelector('.bancada-topo h2')!.textContent).toBe('Horta');
-    root.querySelector<HTMLButtonElement>('.bancada-topo .fechar')!.click();
+    expect(porta.classList.contains('trancada')).toBe(false);
+    expect(porta.textContent).toContain('2 × 2');
+    expect(porta.textContent).toContain('4 vazios');
+    const cheia = root.querySelector<HTMLElement>('.minigame-tela')!;
+    expect(cheia.hasAttribute('hidden')).toBe(false);
+    expect(cheia.querySelector('.minigame-corpo .horta-grade')).not.toBeNull();
+    expect(cheia.querySelector('h2')!.textContent).toBe('Horta do Food truck');
+    [...cheia.querySelectorAll('button')].find((x) => x.textContent === '← Voltar')!.click();
     expect(acoes.horta).toHaveBeenLastCalledWith('fechar');
-    root.querySelector<HTMLButtonElement>('.gaveta:not(.gaveta-bolsa):not(.gaveta-horta)')!.click();
-    expect(acoes.horta).toHaveBeenLastCalledWith('fechar');
+    tela.renderizar(modelo({ estado: comFT, horta }));
+    expect(cheia.hasAttribute('hidden')).toBe(true);
+  });
+  it('as portas: Bolsa, Horta, Convidados, Lives e Mapa do rolê (os dois últimos em breve)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const portas = [...root.querySelectorAll<HTMLButtonElement>('.portas .porta')];
+    expect(portas.map((p) => p.querySelector('.porta-nome')!.textContent)).toEqual(['Bolsa', 'Horta', 'Convidados', 'Lives', 'Mapa do rolê']);
+    expect(portas.slice(3).every((p) => p.disabled && p.textContent!.includes('Em breve'))).toBe(true);
   });
   it('os descontos da horta entram nos preços da Loja', () => {
     const tela = criarTela(root, acoes);
@@ -206,11 +215,11 @@ describe('tela da Fellas Inc.', () => {
     [...modal.querySelectorAll('button')].find((b) => b.textContent === 'Escolher' && !b.disabled)!.click();
     expect(acoes.escolher).toHaveBeenCalledWith(3, 0);
   });
-  it('aviso aparece; a gaveta Caixinha mostra quantas tem', () => {
+  it('aviso aparece; a Caixinha da bancada mostra quantas tem', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aviso: 'Valuation não cobre essa compra', pendentes: [3, 2] }));
     expect(root.querySelector('.notice')!.textContent).toContain('Valuation não cobre essa compra');
-    expect(root.querySelector('.gaveta .selo')!.textContent).toBe('2');
+    expect(root.querySelector('.bancada-caixa .selo')!.textContent).toBe('2');
     expect(root.querySelector('.caixinha')).toBeNull();
   });
   it('caixinha: com uma meia-preço guardada, outra meia-preço fica apagada com o aviso; os outros tipos não', () => {
@@ -602,38 +611,35 @@ describe('legado: prestígio, árvore e conquistas', () => {
 });
 
 describe('empresa, resumo e bancada', () => {
-  it('gaveta Bolsa: apagada sem Grupo de trader; com trader abre a Bolsa', () => {
+  it('porta Bolsa: apagada sem Grupo de trader; com trader abre a Bolsa', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());
     const g = root.querySelector<HTMLButtonElement>('.gaveta-bolsa')!;
     expect(g.classList.contains('trancada')).toBe(true);
-    expect(g.getAttribute('aria-label')).toBe('Bolsa: compra 1 Grupo de trader pra abrir');
+    expect(g.getAttribute('aria-label')).toBe('Bolsa: Compra 1 Grupo de trader pra abrir');
     g.click();
     expect(acoes.bolsa).toHaveBeenCalledWith('abrir');
     const gens = [...Array(18).fill(1), 1, ...Array(11).fill(0)];
     tela.renderizar(modelo({ estado: estado({ generators: gens }) }));
     expect(root.querySelector('.gaveta-bolsa')!.classList.contains('trancada')).toBe(false);
   });
-  it('Bolsa aberta: bancada com-bolsa, corpo mostra a Bolsa; ✕ fecha; Caixinha volta pra Caixinha', () => {
+  it('Bolsa aberta: em tela cheia com a Bolsa no corpo; Voltar e Esc fecham', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ bolsaAberta: true, bolsa: null }));
-    const banc = root.querySelector('.bancada')!;
-    expect(banc.classList.contains('com-bolsa')).toBe(true);
-    expect(root.querySelector('.gaveta-corpo .bolsa')).not.toBeNull();
-    expect(root.querySelector('.gaveta-bolsa')!.getAttribute('aria-pressed')).toBe('true');
-    expect(root.querySelector('.gaveta:not(.gaveta-bolsa)')!.getAttribute('aria-pressed')).toBe('false');
-    root.querySelector<HTMLButtonElement>('.bancada-topo .fechar')!.click();
+    const cheia = root.querySelector<HTMLElement>('.minigame-tela')!;
+    expect(cheia.hasAttribute('hidden')).toBe(false);
+    expect(cheia.querySelector('.minigame-corpo .bolsa')).not.toBeNull();
+    expect(cheia.querySelector('h2')!.textContent).toBe('Bolsa');
+    [...cheia.querySelectorAll('button')].find((x) => x.textContent === '← Voltar')!.click();
     expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
-    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
-    root.querySelector<HTMLButtonElement>('.gaveta:not(.gaveta-bolsa)')!.click();
-    expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
-    vi.restoreAllMocks();
+    cheia.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(acoes.bolsa).toHaveBeenCalledTimes(2);
   });
-  it('Bolsa ou Horta aberta: redesenhar a página não tira a gaveta do lugar (sair e voltar zera a rolagem)', () => {
+  it('Bolsa ou Horta aberta: redesenhar a página não tira o minigame do lugar (sair e voltar zera a rolagem)', () => {
     const tela = criarTela(root, acoes);
     for (const aberta of [{ bolsaAberta: true }, { hortaAberta: true }]) {
       tela.renderizar(modelo(aberta));
-      const corpo = root.querySelector('.gaveta-corpo')!;
+      const corpo = root.querySelector('.minigame-corpo')!;
       const obs = new MutationObserver(() => {});
       obs.observe(corpo, { childList: true });
       tela.renderizar(modelo(aberta));
@@ -726,34 +732,16 @@ describe('empresa, resumo e bancada', () => {
     tela.renderizar(modelo());
     expect([...root.querySelectorAll('.valor .info span')].map((x) => x.textContent)).toEqual(['Era 1 · Quarto']);
   });
-  it('o selo é filho direto da gaveta (aparece no celular, em cima do ícone, e no PC, do lado do nome)', () => {
-    const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ pendentes: [3, 2] }));
-    const selo = root.querySelector('.gaveta > .selo')!;
-    expect(selo.textContent).toBe('2');
-    expect(selo.hasAttribute('hidden')).toBe(false);
-  });
-  it('gaveta Caixinha no celular abre a folha; sem nada guardado o selo some', () => {
+  it('a Caixinha da bancada: o selo some sem nada guardado e o aviso aparece no lugar da lista', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ pendentes: [3] }));
-    root.querySelector<HTMLButtonElement>('.gaveta')!.click();
-    expect(acoes.caixa).toHaveBeenCalledWith(true);
+    expect(root.querySelector('.bancada-caixa .selo')!.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.bancada-caixa-cab')!.textContent).toContain('Hoje ainda dá pra pegar 10');
     tela.renderizar(modelo({ pendentes: [] }));
-    expect(root.querySelector('.gaveta .selo')!.hasAttribute('hidden')).toBe(true);
-    expect(root.querySelector('.gaveta-corpo')!.textContent).toContain('Nada guardado agora. Volta mais tarde.');
+    expect(root.querySelector('.bancada-caixa .selo')!.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.bancada-caixa-itens')!.textContent).toContain('Nada guardado agora. Volta mais tarde.');
   });
-  it('no PC a gaveta não abre a folha (a lista já está na bancada)', () => {
-    const larga = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
-    try {
-      const tela = criarTela(root, acoes);
-      tela.renderizar(modelo({ pendentes: [3] }));
-      root.querySelector<HTMLButtonElement>('.gaveta')!.click();
-      expect(acoes.caixa).not.toHaveBeenCalled();
-    } finally {
-      larga.mockRestore();
-    }
-  });
-  it('a gaveta aberta lista as guardadas com Pegar, com as mesmas regras da folha', () => {
+  it('a Caixinha da bancada lista as guardadas com Pegar, com as mesmas regras da folha', () => {
     const uid = '00000000-0000-0000-0000-00000000000a';
     const janela = (k: 0 | 1 | 2) => { let w = 50; while (tipo(uid, w) !== k) w++; return w; };
     const meia = janela(2);
@@ -766,7 +754,7 @@ describe('empresa, resumo e bancada', () => {
     o1.querySelector('button')!.click();
     expect(acoes.pegar).toHaveBeenCalledWith(outra);
     tela.renderizar(modelo({ pendentes: [outra], estado: estado({ user_id: uid, opp_left: 0 }) }));
-    expect(root.querySelector('.gaveta-corpo')!.textContent).toContain('Já pegou todas de hoje. Amanhã tem mais.');
+    expect(root.querySelector('.bancada-caixa-cab')!.textContent).toContain('Já pegou todas de hoje');
     expect(root.querySelector<HTMLButtonElement>('.bancada .escolha button')!.disabled).toBe(true);
     tela.renderizar(modelo({ pendentes: [outra], estado: estado({ user_id: uid }), ocupado: true }));
     expect(root.querySelector<HTMLButtonElement>('.bancada .escolha button')!.disabled).toBe(true);

@@ -581,3 +581,115 @@ body:has(.idle) { background: #121212; }
   .idle .no-arvore.pode { animation: none; filter: drop-shadow(0 0 8px rgba(184, 162, 255, 0.65)); }
   .idle .btn:active:not(:disabled) { transform: none; }
 }
+
+/* ===== tela inicial nova (mockups de 12/10): a bancada vira as portas dos minigames, que abrem em tela cheia, e a
+   Caixinha com as guardadas ===== */
+.idle .bancada { display: grid; gap: 12px; padding: 0; background: none; box-shadow: none; }
+.idle .portas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.idle .porta { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: auto 1fr auto; gap: 4px 8px; align-items: center;
+  min-height: 104px; padding: 10px 10px 8px; text-align: left; color: var(--paper); background: var(--i-painel); border: 0; border-radius: 0; cursor: pointer; --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -4px 0 0 #14121A; }
+.idle .porta:hover:not(:disabled) { --c: var(--i-lilas); }
+.idle .porta:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 4px; }
+.idle .porta-icone { width: 40px; height: 40px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .porta-icone.quadros { background-size: 400% 100%; } /* sprite do gerador: 4 quadros, mostra o 1º */
+.idle .porta-nome { font: 400 20px var(--i-pixel); line-height: 1; }
+.idle .porta-st { grid-column: 1 / -1; align-self: start; font-size: 12px; line-height: 1.3; color: var(--i-mudo); }
+.idle .porta-abrir { grid-column: 1 / -1; justify-self: end; font: 400 16px var(--i-pixel); color: var(--i-lilas); }
+.idle .porta-badge { position: absolute; top: -9px; right: -6px; padding: 1px 6px; font: 400 14px var(--i-pixel); color: #1A1408; background: var(--gold); box-shadow: 0 0 0 2px #14121A; }
+.idle .porta.trancada { opacity: 0.6; }
+.idle .porta.em-breve { opacity: 0.5; cursor: default; }
+.idle .porta.em-breve .porta-abrir { color: var(--i-mudo); }
+.idle .bancada-caixa { display: grid; gap: 8px; }
+.idle .bancada-caixa-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.idle .bancada-caixa-cab strong { display: flex; align-items: center; gap: 8px; font: 400 22px var(--i-pixel); }
+.idle .bancada-caixa .selo { position: static; }
+.idle .bancada-caixa .escolhas { display: grid; gap: 8px; }
+.idle .bancada-caixa .escolha { gap: 10px; padding: 8px 10px; border: 0; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .bancada-caixa .escolha .boneco { width: 36px; height: 36px; }
+.idle .bancada-caixa .vazio { margin: 0; padding: 10px; background: var(--i-painel); }
+.idle .bancada-caixa.chegou .caixinha-cab strong, .idle .bancada-caixa.chegou .selo { animation: caixa-pula 0.5s ease-out 3; }
+
+/* o minigame em tela cheia: Voltar, ícone, nome e o F$ em cima; o minigame embaixo */
+.idle .minigame-tela { position: fixed; inset: 0; z-index: 9; display: grid; grid-template-rows: auto minmax(0, 1fr); color: var(--paper); background: #121118; }
+.idle .minigame-topo { display: flex; align-items: center; gap: 12px; padding: max(8px, env(safe-area-inset-top)) 14px 8px; background: var(--i-fundo2); box-shadow: 0 2px 0 0 var(--i-borda); }
+.idle .minigame-topo h2 { margin: 0; font: 400 24px var(--i-pixel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .minigame-topo .porta-icone { flex: none; width: 32px; height: 32px; }
+.idle .minigame-topo .espaco { flex: 1; }
+.idle .voltar-minigame { flex: none; height: 36px; padding: 0 12px; font-size: 20px; }
+.idle .minigame-corpo { min-height: 0; overflow: auto; padding: 12px 14px max(14px, env(safe-area-inset-bottom)); }
+
+/* o estúdio do PPP em pixel art: cada peça na posição da arte (160 × 80) vezes a escala --e */
+.idle .convidados { --e: 2; display: grid; gap: 14px; }
+.idle .conv-esq, .idle .conv-dir { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.idle .estudio { position: relative; width: calc(160px * var(--e)); height: calc(80px * var(--e)); justify-self: center; box-shadow: 0 0 0 2px #14121A, 0 0 0 4px var(--i-borda2); }
+.idle .estudio > * { position: absolute; left: calc(var(--x) * var(--e) * 1px); top: calc(var(--y) * var(--e) * 1px); background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .estudio-fundo, .idle .estudio-frente, .idle .estudio-aovivo { width: calc(160px * var(--e)); height: calc(80px * var(--e)); }
+.idle .estudio-aovivo { display: none; }
+.idle .estudio.no-ar .estudio-aovivo { display: block; animation: ao-vivo 1.6s steps(1) infinite; }
+@keyframes ao-vivo { 0%, 70% { opacity: 1; } 71%, 100% { opacity: 0.55; } }
+.idle .estudio-retrato { width: calc(32px * var(--e)); height: calc(32px * var(--e)); }
+.idle .estudio-retrato.trancada { filter: grayscale(0.7) brightness(0.6); }
+.idle .estudio-retrato.frente { animation: respira 2.4s steps(2) infinite; }
+@keyframes respira { 50% { transform: translateY(calc(var(--e) * 1px)); } }
+.idle .estudio-cadeado { width: calc(16px * var(--e)); height: calc(16px * var(--e)); }
+.idle .estudio-eq { display: flex; align-items: flex-end; gap: calc(1px * var(--e)); height: calc(10px * var(--e)); background: none; }
+.idle .estudio-eq i { width: calc(2px * var(--e)); height: 30%; background: var(--mint); animation: eq 0.9s steps(4) infinite; }
+.idle .estudio-eq i:nth-child(2) { animation-delay: -0.3s; }
+.idle .estudio-eq i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes eq { 0% { height: 25%; } 25% { height: 90%; } 50% { height: 45%; } 75% { height: 70%; } }
+.idle .estudio-placa { width: calc(48px * var(--e)); height: calc(10px * var(--e)); display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  font: 400 calc(5px * var(--e)) var(--i-pixel); color: var(--paper); white-space: nowrap; overflow: hidden; }
+.idle .estudio-placa.frente { color: var(--gold); }
+.idle .estudio-lugar { width: calc(32px * var(--e)); height: calc(32px * var(--e)); padding: 0; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+.idle .estudio-lugar:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
+.idle .estudio-lugar:disabled { cursor: default; }
+.idle .conv-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .conv-trocas { font: 400 20px var(--i-pixel); color: var(--paper); }
+.idle .conv-fichas { display: flex; gap: 8px; }
+.idle .conv-fichas .ficha { width: 22px; height: 22px; background: var(--i-roxo); box-shadow: inset 0 -4px 0 0 var(--i-roxo-e), 0 0 0 2px #14121A; }
+.idle .conv-fichas .ficha.gasta { background: var(--i-painel2); box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .conv-estudio { grid-template-columns: minmax(0, 1fr); }
+.idle .conv-cadeira { display: grid; align-content: start; justify-items: start; gap: 4px; padding: 10px 12px 12px; text-align: left; }
+.idle .conv-cadeira .bts-conv { justify-content: flex-start; margin-top: 4px; }
+.idle .conv-escolha { display: grid; gap: 8px; }
+.idle .conv-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.idle .conv-tile { position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border: 0; border-radius: 0; color: var(--paper); background: var(--i-painel2); cursor: pointer; --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .conv-tile:hover { --c: var(--i-borda2); }
+.idle .conv-tile.marcado { --c: var(--i-lilas); background: #2B2540; }
+.idle .conv-tile.sentado { opacity: 0.55; }
+.idle .conv-tile:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+.idle .conv-tile > .conv-tile-retrato { width: 64px; height: 64px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .conv-tile-nome { max-width: 100%; font: 400 15px var(--i-pixel); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .conv-tile-onde { position: absolute; top: 4px; right: 4px; padding: 0 4px; font: 400 13px var(--i-pixel); color: var(--gold); background: #14121A; }
+.idle .conv-detalhe { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px; align-items: start; }
+.idle .conv-detalhe > .conv-retrato { width: 96px; height: 96px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .conv-detalhe .meio { display: grid; gap: 3px; }
+.idle .conv-detalhe .bordao { font-style: italic; }
+.idle .conv-detalhe > .btn, .idle .conv-detalhe > .conv-ja { grid-column: 1 / -1; justify-self: end; }
+@media (prefers-reduced-motion: reduce) {
+  .idle .estudio-eq i, .idle .estudio-retrato.frente, .idle .estudio.no-ar .estudio-aovivo, .idle .bancada-caixa.chegou .caixinha-cab strong, .idle .bancada-caixa.chegou .selo { animation: none; }
+}
+
+@media (min-width: 1100px) {
+  .idle { grid-template-columns: minmax(0, 1fr) 440px; grid-template-rows: 56px minmax(0, 1fr); column-gap: 22px; padding: 0 20px 18px; }
+  .idle .empresa { padding-top: 14px; grid-template-rows: auto auto auto; gap: 14px; }
+  .idle .cartao-empresa { gap: 16px; }
+  .idle .painel { margin-top: 14px; }
+  .idle .bancada { display: grid; background: none; box-shadow: none; }
+  .idle .portas { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .idle .bancada-caixa { grid-template-columns: 112px minmax(0, 1fr); align-items: stretch; }
+  .idle .bancada-caixa-cab { flex-direction: column; justify-content: center; align-items: flex-start; padding: 8px 12px; background: var(--i-painel2); }
+  .idle .bancada-caixa .escolhas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .idle .bancada-caixa .escolha .escolha-texto strong { font-size: 13px; }
+  .idle .minigame-topo { padding: 10px 20px; }
+  .idle .minigame-topo h2 { font-size: 32px; }
+  .idle .minigame-topo .porta-icone { width: 40px; height: 40px; }
+  .idle .minigame-corpo { padding: 16px 20px 18px; }
+  .idle .convidados { --e: 5; grid-template-columns: 800px minmax(0, 1fr); gap: 22px; }
+  .idle .conv-estudio { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .idle .estudio-placa { font-size: 26px; }
+}

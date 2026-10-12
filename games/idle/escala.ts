@@ -17,6 +17,6 @@ export type Escala = {
 export function escalaPc(largura: number, altura: number): Escala {
   if (largura < 1100) return { zoom: 1, cena: 0, largura };
   const zoom = Math.min(MAX_ZOOM, Math.max(1, Math.min(largura / BASE_LARGURA, altura / BASE_ALTURA)));
-  const cena = Math.max(3, Math.floor(3 * zoom + 1e-9));
+  const cena = Math.max(4, Math.floor(4 * zoom + 1e-9)); // 4× na base (640 × 384): a tela inicial tem espaço desde que os minigames saíram
   return { zoom, cena, largura: Math.min(largura / zoom, (altura / zoom) * PROPORCAO_MAX) };
 }

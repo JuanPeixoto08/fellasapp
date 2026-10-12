@@ -13,6 +13,7 @@ const conquistas = pegar(import.meta.glob('./assets/conquistas/*.png', { eager: 
 const arvore = pegar(import.meta.glob('./assets/arvore/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const pessoas = pegar(import.meta.glob('./assets/pessoas/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const convidados = pegar(import.meta.glob('./assets/convidados/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
+const portas = pegar(import.meta.glob('./assets/portas/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const vagas = Object.fromEntries(
   Object.entries(import.meta.glob('./assets/cenas/*-vagas.json', { eager: true, import: 'default' }) as Record<string, Vagas>)
     .map(([arq, v]) => [nomeDe(arq).replace(/-vagas$/, ''), v]),
@@ -36,6 +37,8 @@ export const ativos = {
   geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
   /** Peças do estúdio do PPP Podcast (fundo, frente, aovivo, cadeira, cadeado). */
   estudio: (nome: 'fundo' | 'frente' | 'aovivo' | 'cadeira' | 'cadeado'): string | null => convidados[`estudio-${nome}`] ?? null,
+  /** Ícone 32x32 da porta do Mapa do rolê (genérico: nada dos lugares de verdade). */
+  mapa: (): string | null => portas.mapa ?? null,
   /** Retrato 32x32 do convidado do PPP Podcast (1 a 11). */
   convidado: (id: number): string | null => convidados[`convidado-${String(id).padStart(2, '0')}`] ?? null,
   /** Ícone 16x16 da conquista (null = a arte ainda não chegou). */

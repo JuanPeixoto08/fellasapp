@@ -46,23 +46,23 @@ describe('o estúdio', () => {
   });
   it('chamar convidado abre a seleção em grade; o destaque mostra o efeito naquela cadeira e o Sentar', () => {
     tela.renderizar(estado(), false, AGORA);
-    botao('Chamar convidado', document.querySelectorAll('.conv-cadeira')[1]).click();
+    botao('Chamar convidado', document.querySelectorAll('.conv-cadeira')[0]).click(); // os cartões vão meio, frente, canto
     const tiles = [...document.querySelectorAll<HTMLButtonElement>('.conv-tile')];
     expect(tiles).toHaveLength(11);
     expect(document.querySelector('.conv-detalhe')!.textContent).toContain('Produção +7,5%'); // Cristiano no meio
     tiles[5].click(); // Gabe
-    botao('Sentar', document.querySelector('.conv-detalhe')!).click();
+    botao('Sentar no meio', document.querySelector('.conv-detalhe')!).click();
     expect(sentar).toHaveBeenCalledWith(1, 6);
   });
   it('convidado sentado: efeitos, Trocar e Tirar; na seleção ele aparece marcado com a cadeira', () => {
     tela.renderizar(estado({ convidados: { cadeira: [1, null, null], desde: ['2026-10-14T17:00:00Z', null, null], trocas: 2, trocas_t: '2026-10-14T17:01:00Z', ppp: 30, derrubada_ate: null } }), false, AGORA);
-    const frente = document.querySelector('.conv-cadeira')!;
+    const frente = document.querySelectorAll('.conv-cadeira')[1]; // meio, frente, canto
     expect(frente.textContent).toContain('Cristiano Ronaldo');
     expect(frente.textContent).toContain('Melhorias 10% mais caras');
     expect(document.querySelector('.conv-trocas')!.textContent).toBe('Trocas: 2/3 · próxima em 1 min');
     botao('Tirar', frente).click();
     expect(tirar).toHaveBeenCalledWith(0);
-    botao('Chamar convidado', document.querySelectorAll('.conv-cadeira')[1]).click();
+    botao('Chamar convidado', document.querySelectorAll('.conv-cadeira')[0]).click();
     const cr = document.querySelector('.conv-tile[data-convidado="1"]')!;
     expect(cr.classList.contains('sentado')).toBe(true);
     expect(cr.textContent).toContain('Frente');
