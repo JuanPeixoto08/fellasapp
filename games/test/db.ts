@@ -29,6 +29,16 @@ export const MIGRATIONS: string[] = [
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;
 
+/** A próxima quarta às 15h de Brasília (18h UTC), pelo menos 1 dia à frente. Os testes de oportunidade param o relógio
+ *  nela (o now() do PGlite segue o Date falso do vitest): perto da virada da semana (segunda 0h) ou do dia ainda não tem
+ *  oportunidades guardadas, e o teste falhava conforme a hora em que rodava. */
+export function quartaATarde(agora = Date.now()): Date {
+  const d = new Date(agora + 86_400_000);
+  d.setUTCHours(18, 0, 0, 0);
+  while (d.getUTCDay() !== 3) d.setUTCDate(d.getUTCDate() + 1);
+  return d;
+}
+
 /** `conquistas: false` esvazia o catálogo das conquistas: os testes das entregas 1 e 2 conferem a conta exata, sem o
  *  +1% de cada conquista que as ações vão ganhando. */
 export async function freshDb(opcoes: { conquistas?: boolean } = {}) {

@@ -2,12 +2,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { abertura, efeitosArvore, pontosTotais } from '../idle/economia';
 import { pendentes } from '../idle/oportunidades';
-import { freshDb, type TestDb } from './db';
+import { freshDb, quartaATarde, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
 const B = '00000000-0000-0000-0000-00000000000b';
@@ -102,6 +102,7 @@ describe('pontos de prestígio', () => {
 });
 
 describe('vender a startup', () => {
+  afterEach(() => vi.useRealTimers());
   it('zera a empresa e volta pro Abrir CNPJ; ficam pontos, nós, vendas, conquistas, personagem e o recorde; a cota do dia recomeça', async () => {
     await abrir(A);
     await t.rpc('idle_set_avatar', {
@@ -140,6 +141,8 @@ describe('vender a startup', () => {
     expect(r.rate).toBeCloseTo(0.5 * 1.02 * 1.05 * 1.1 * (1 + 0.01 * r.bonus.conquistas), 10); // os nós continuam valendo
   });
   it('a cota do dia recomeça, mas a oportunidade já pega não paga de novo', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // numa quarta à tarde (ver quartaATarde): sempre tem 2 guardadas
+    vi.setSystemTime(quartaATarde());
     await abrir(A);
     await enriquecer(A);
     const s0 = await t.rpc<Estado>('idle_open');
