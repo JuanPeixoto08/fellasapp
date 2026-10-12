@@ -4,6 +4,16 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-celular',
+    titulo: 'Celular arrumado',
+    data: '2026-10-12',
+    itens: [
+      'No celular a tela rola inteira de novo: a empresa, as portas dos minigames, a Caixinha e a Loja embaixo (as abas grudam no topo).',
+      'As portas dos minigames viraram uma fileira só, do jeito que cabe na mão.',
+      'Segurar o dedo não abre mais a caixinha de informação por cima das coisas. No PC ela continua no mouse.',
+    ],
+  },
+  {
     id: '2026-10-12-telas-cheias',
     titulo: 'Bolsa e Horta de cara nova',
     data: '2026-10-12',

@@ -130,6 +130,8 @@ export function criarBolsaTela(a: {
       const li = button('', `acao${escolhida === m.id ? ' escolhida' : ''}${m.rj_ate !== null ? ' quebrada' : ''}`, () => {
         escolhida = m.id;
         if (ultimo) renderizar(...ultimo);
+        // no celular o detalhe fica embaixo da lista: leva até ele
+        if (window.innerWidth < 1100) raiz.querySelector('.bolsa-detalhe')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
       });
       li.dataset.empresa = String(m.id);
       li.setAttribute('aria-pressed', String(escolhida === m.id));

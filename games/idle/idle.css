@@ -922,3 +922,39 @@ body:has(.idle) { background: #121212; }
   .idle .minigame-corpo .acao { grid-template-columns: 32px minmax(0, 1fr) 48px auto minmax(36px, auto); gap: 8px; padding: 6px 8px; }
   .idle .minigame-corpo svg.mini { width: 48px; }
 }
+
+/* ===== celular (de pé ou deitado): a tela rola inteira (empresa, portas, Caixinha e a Loja embaixo; as abas grudam no
+   topo). As portas viram uma fileira de 5 (ícone + nome; o resumo fica pra dentro do minigame) e a Caixinha fica enxuta. ===== */
+@media (max-width: 1099px) {
+  .idle { overflow-y: auto; overscroll-behavior-y: contain; grid-template-rows: auto auto auto; align-content: start; }
+  .idle { grid-template-rows: auto auto max-content; }
+  .idle .painel { overflow: visible; min-height: auto; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .idle .empresa { gap: 12px; }
+  .idle .portas { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding-top: 6px; }
+  .idle .porta { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; justify-items: center; align-content: start; gap: 4px; padding: 8px 2px 6px; text-align: center; }
+  .idle .porta-icone { width: 32px; height: 32px; grid-row: auto; }
+  .idle .porta-nome { font-size: 15px; line-height: 1; align-self: start; overflow-wrap: anywhere; }
+  .idle .porta-st { display: none; }
+  .idle .porta-badge { top: -8px; right: auto; left: 50%; transform: translateX(-50%); padding: 0 4px; font-size: 12px; white-space: nowrap; }
+  .idle .bancada-caixa { gap: 6px; }
+  .idle .bancada-caixa .escolhas { gap: 6px; }
+  .idle .bancada-caixa .escolha { gap: 8px; padding: 6px 8px; }
+  .idle .bancada-caixa .escolha .boneco { width: 32px; height: 32px; }
+  .idle .bancada-caixa .escolha .escolha-texto strong { font-size: 13.5px; line-height: 1.2; }
+  .idle .bancada-caixa .escolha .escolha-texto .sub { font-size: 12px; }
+  .idle .bancada-caixa .btn.compacto { min-height: 36px; height: 36px; padding: 0 12px; font-size: 18px; }
+}
+/* Convidados no celular: a cadeira da frente primeiro, cartões baixos e o botão do tamanho do texto */
+@media (max-width: 1099px) {
+  .idle .conv-estudio { gap: 8px; }
+  .idle .conv-cadeira { padding: 8px 10px 10px; }
+  .idle .conv-cadeira.frente { order: -1; }
+  .idle .conv-cadeira > .btn { width: auto; justify-self: start; }
+}
+/* topo do minigame no celular: o nome curto (o nome inteiro continua pro leitor de tela) */
+@media (max-width: 1099px) {
+  .idle .minigame-topo h2[data-curto] { font-size: 0; }
+  .idle .minigame-topo h2[data-curto]::before { content: attr(data-curto); font-size: 24px; }
+  .idle .minigame-corpo .bolsa-melhorias { grid-template-columns: minmax(0, 1fr); }
+  .idle .minigame-corpo .bolsa-detalhe { scroll-margin-top: 8px; }
+}

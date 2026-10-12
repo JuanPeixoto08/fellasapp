@@ -1,11 +1,10 @@
-// A caixinha de informação na tela: mouse por cima (PC), segurar o dedo (celular) ou foco pelo teclado. Uma caixinha só,
+// A caixinha de informação na tela: mouse por cima (PC) ou foco pelo teclado; no celular não tem (pedido do Juan: o dedo
+// é pra comprar e rolar, não pra abrir caixinha por cima das coisas). Uma caixinha só,
 // presa ao item pela chave: quando a tela refaz a lista, ela passa pra linha nova com os números novos (conferir()).
 import { el } from '../shared/hud/hud';
 import type { Dica } from './dica';
 
 const ESPERA_MOUSE = 120;
-const SEGURAR = 450;
-const ARRASTE = 10; // px: mais que isso é rolagem, não segurar
 const MARGEM = 8;
 
 export function criarDicas(app: HTMLElement) {
@@ -19,7 +18,6 @@ export function criarDicas(app: HTMLElement) {
   let aberta: string | null = null;
   let ancora: HTMLElement | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let engolirClique = false;
   let ultimoToque = 0;
 
   const limpar = () => {
@@ -50,7 +48,7 @@ export function criarDicas(app: HTMLElement) {
     posicionar(l.alvo);
   }
 
-  /** Do lado do item (direita; sem espaço, esquerda; no celular, em cima ou embaixo), sem sair da tela. O app pode estar
+  /** Do lado do item (direita; sem espaço, esquerda; senão em cima ou embaixo), sem sair da tela. O app pode estar
    *  com zoom (PC): as medidas da tela são divididas por ele. */
   function posicionar(alvo: HTMLElement) {
     const zoom = Number(app.style.zoom) || 1;
@@ -71,13 +69,7 @@ export function criarDicas(app: HTMLElement) {
     caixa.style.top = `${Math.max(MARGEM, Math.min(y, alt - h - MARGEM))}px`;
   }
 
-  // segurar abre e o toque de soltar não vale como clique (não compra); tocar em qualquer outro lugar fecha
-  window.addEventListener('click', (e) => {
-    if (!engolirClique) return;
-    engolirClique = false;
-    e.preventDefault();
-    e.stopPropagation();
-  }, true);
+  // um toque (celular) em qualquer lugar fecha a que estiver aberta (a do teclado, por exemplo)
   document.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse') ultimoToque = Date.now();
     if (aberta && e.pointerType !== 'mouse' && !(ancora?.contains(e.target as Node))) esconder();
@@ -89,7 +81,6 @@ export function criarDicas(app: HTMLElement) {
 
   function ligar(alvo: HTMLElement, chave: string, conteudo: () => Dica | null) {
     ligados.set(chave, { alvo, conteudo });
-    let inicio: [number, number] | null = null;
     alvo.addEventListener('pointerenter', (e) => {
       if (e.pointerType !== 'mouse') return;
       limpar();
@@ -99,33 +90,6 @@ export function criarDicas(app: HTMLElement) {
       if (e.pointerType !== 'mouse') return;
       if (aberta === chave) esconder();
       else limpar();
-    });
-    alvo.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse') return;
-      inicio = [e.clientX, e.clientY];
-      limpar();
-      timer = setTimeout(() => {
-        engolirClique = true;
-        mostrar(chave);
-      }, SEGURAR);
-    });
-    alvo.addEventListener('pointermove', (e) => {
-      if (!inicio || e.pointerType === 'mouse') return;
-      if (Math.hypot(e.clientX - inicio[0], e.clientY - inicio[1]) > ARRASTE) {
-        inicio = null;
-        if (aberta !== chave) limpar();
-      }
-    });
-    const soltar = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse') return;
-      inicio = null;
-      if (aberta !== chave) limpar();
-    };
-    alvo.addEventListener('pointerup', soltar);
-    alvo.addEventListener('pointercancel', soltar);
-    // segurar no celular abre o menu do navegador (copiar, salvar imagem): aqui não
-    alvo.addEventListener('contextmenu', (e) => {
-      if (Date.now() - ultimoToque < 1500) e.preventDefault();
     });
     // teclado: o foco que veio do Tab (não de um toque/clique) mostra
     alvo.addEventListener('focusin', () => {

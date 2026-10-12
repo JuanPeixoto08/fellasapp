@@ -602,6 +602,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     if (gavetaAberta) {
       const [titulo, gid] = NOMES_MINI[gavetaAberta];
       tituloGaveta.textContent = titulo;
+      tituloGaveta.dataset.curto = { bolsa: 'Bolsa', horta: 'Horta', convidados: 'Convidados' }[gavetaAberta];
       iconeMinigame.style.backgroundImage = `url(${ativos.gerador(gid)})`;
     }
     if (gavetaAberta === 'convidados' && s) {

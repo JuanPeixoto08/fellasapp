@@ -111,6 +111,20 @@ describe('tela da Bolsa', () => {
     tela.renderizar(B(), 1e9, true);
     expect(tela.precos()).toEqual([]);
   });
+  it('no celular, tocar numa empresa leva até o detalhe (que fica embaixo da lista); no PC não', () => {
+    const rolar = vi.fn();
+    (Element.prototype as unknown as { scrollIntoView: unknown }).scrollIntoView = rolar;
+    const largura = window.innerWidth;
+    tela.renderizar(B(), 1e9, false);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+    linha(6).click();
+    expect(rolar).not.toHaveBeenCalled();
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    linha(1).click();
+    expect(rolar).toHaveBeenCalledTimes(1);
+    expect(rolar.mock.contexts[0]).toBe(document.querySelector('.bolsa-detalhe'));
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: largura });
+  });
   it('escolher outra empresa põe os botões novos do detalhe na lista do F$', () => {
     tela.renderizar(B(), 1e9, false);
     expect(tela.precos()).toHaveLength(5);

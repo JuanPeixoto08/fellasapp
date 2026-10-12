@@ -10,8 +10,8 @@ Rede social fechada da FellasInc (Expo RN iOS/Android + web PWA, Supabase). Text
 
 ## Fellas Inc. (games/idle)
 - **Caixinha de informação:** toda coisa nova com número ou efeito (gerador, melhoria, bônus, convidado, planta, item
-  de minigame) ganha caixinha (`dica.ts` monta o texto, `dicaTela.ts` mostra: mouse no PC, segurar o dedo no celular,
-  foco no teclado). Ela diz o que a coisa faz **agora**, em números da pessoa. A spec de cada entrega diz onde entra
+  de minigame) ganha caixinha (`dica.ts` monta o texto, `dicaTela.ts` mostra: mouse no PC e
+  foco no teclado; no celular não tem, a pedido do Juan). Ela diz o que a coisa faz **agora**, em números da pessoa. A spec de cada entrega diz onde entra
   caixinha e onde não; não entra onde o próprio item já mostra tudo (ex.: o cartão da Horta).
 - Toda entrega nova ganha uma entrada no começo de `novidades.ts` (patch notes).
 

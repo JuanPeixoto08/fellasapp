@@ -37,30 +37,19 @@ describe('caixinha de informação', () => {
     expect(aberta()).toBe(false);
     expect(alvo.hasAttribute('aria-describedby')).toBe(false);
   });
-  it('dedo: tocar rápido não abre (e o toque vale); segurar abre e engole o toque', () => {
+  it('dedo: no celular não tem caixinha (nem tocando, nem segurando) e o toque sempre vale', () => {
     const clique = vi.fn();
     alvo.addEventListener('click', clique);
     ponteiro('pointerdown', alvo, 'touch');
     vi.advanceTimersByTime(100);
     ponteiro('pointerup', alvo, 'touch');
     alvo.click();
-    expect(aberta()).toBe(false);
-    expect(clique).toHaveBeenCalledTimes(1);
-
     ponteiro('pointerdown', alvo, 'touch');
-    vi.advanceTimersByTime(500);
-    expect(aberta()).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(aberta()).toBe(false);
     ponteiro('pointerup', alvo, 'touch');
     alvo.click();
-    expect(clique).toHaveBeenCalledTimes(1); // o toque de segurar não compra
-    expect(aberta()).toBe(true); // fica aberta pra ler
-    ponteiro('pointerdown', document.body, 'touch'); // tocar em outro lugar fecha
-    expect(aberta()).toBe(false);
-  });
-  it('dedo arrastando (rolando a lista) não abre', () => {
-    ponteiro('pointerdown', alvo, 'touch', 10, 10);
-    ponteiro('pointermove', alvo, 'touch', 10, 40);
-    vi.advanceTimersByTime(600);
+    expect(clique).toHaveBeenCalledTimes(2);
     expect(aberta()).toBe(false);
   });
   it('a tela refez a linha: a caixinha aberta passa pra linha nova com o conteúdo novo; sem ela, fecha', () => {
