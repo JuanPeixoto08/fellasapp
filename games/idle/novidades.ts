@@ -4,6 +4,16 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-dicas',
+    titulo: 'Caixinhas de informação',
+    data: '2026-10-12',
+    itens: [
+      'Passa o mouse (ou segura o dedo) num gerador: mostra quanto cada um rende, quanto todos rendem e que fatia da sua produção é dele.',
+      'Nas melhorias: o que ela faz de verdade, quanto soma agora e o preço em tempo de produção.',
+      'No F$/s do topo: de onde vem sua produção, multiplicador por multiplicador. Nos contratos: quanto cada parte dá.',
+    ],
+  },
+  {
     id: '2026-10-11-horta',
     titulo: 'Horta do Food truck',
     data: '2026-10-11',

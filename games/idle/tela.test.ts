@@ -42,6 +42,28 @@ beforeEach(() => {
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
 
 describe('tela da Fellas Inc.', () => {
+  it('caixinha de informação: mouse no gerador mostra quanto ele rende; segue a linha quando a tela refaz', () => {
+    vi.useFakeTimers();
+    try {
+      const tela = criarTela(root, acoes);
+      const s = estado({ generators: [12, ...Array(29).fill(0)], rate: 6 });
+      tela.renderizar(modelo({ estado: s }));
+      const linha = () => root.querySelector<HTMLElement>('.lista-geradores .gerador')!;
+      linha().dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+      vi.advanceTimersByTime(200);
+      const dica = root.querySelector<HTMLElement>('.dica')!;
+      expect(dica.hasAttribute('hidden')).toBe(false);
+      expect(dica.querySelector('strong')!.textContent).toBe(catalogo.geradores[0].nome);
+      expect(dica.textContent).toContain('Os 12 rendem');
+      tela.renderizar(modelo({ estado: estado({ generators: [13, ...Array(29).fill(0)], rate: 6.5 }) }));
+      expect(dica.hasAttribute('hidden')).toBe(false);
+      expect(dica.textContent).toContain('Os 13 rendem');
+      tela.renderizar(modelo({ estado: s, aba: 'placar' }));
+      expect(dica.hasAttribute('hidden')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('PC grande: a página ganha zoom e o --zoom (o que usa dvh divide por ele); celular fica sem', () => {
     const [w, h] = [window.innerWidth, window.innerHeight];
     try {

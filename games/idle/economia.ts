@@ -110,6 +110,11 @@ export function estrategiasAtivas(cat: Catalogo, s: Estado): Estrategia[] {
  * Aniversariante do mês); emprego = ×2 com o nó Passe de craque.
  */
 export function multContratos(cat: Catalogo, s: Estado): number {
+  return partesContratos(cat, s).mult;
+}
+
+/** As partes de multContratos (a caixinha dos contratos mostra cada uma): já com o efeito da estratégia. */
+export function partesContratos(cat: Catalogo, s: Estado): { contratei: number; empregos: number; efeito: number; mult: number } {
   const est = estrategiasAtivas(cat, s);
   const soc = s.social ?? SOLO;
   const ef = efeitosDe(cat, s);
@@ -117,7 +122,7 @@ export function multContratos(cat: Catalogo, s: Estado): number {
   const por = Math.max(pors.length ? Math.max(...pors) : POR_CONTRATADO, ef.porContratado);
   const efeito = est.reduce((a, e) => a * (e.sociais.contratoEfeitoMult ?? 1), 1);
   const empregos = soc.empregos.length ? soc.empregos.reduce((a, m) => a + POR_EMPREGO * m * ef.empregoMult, 0) : POR_EMPREGO;
-  return 1 + efeito * (por * soc.contratei + empregos);
+  return { contratei: efeito * por * soc.contratei, empregos: efeito * empregos, efeito, mult: 1 + efeito * (por * soc.contratei + empregos) };
 }
 
 const porId = new WeakMap<Catalogo, Map<number, Melhoria>>();

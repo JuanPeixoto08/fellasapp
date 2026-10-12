@@ -17,6 +17,8 @@ import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
+import { dicaContratos, dicaGerador, dicaMelhoria, dicaProducao } from './dica';
+import { criarDicas } from './dicaTela';
 import { promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
@@ -181,12 +183,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const placa = el('div', 'valor');
   const numero = el('div', 'numero', 'F$ 0');
   const taxaTxt = el('div', 'taxa', '');
+  taxaTxt.tabIndex = 0;
   const bonus = el('div', 'bonus', '');
   // Viralizou / Promoção valendo: selos com o tempo que falta (relogioBonus, a cada passo da página)
   const selos = el('div', 'selos');
   // resumo (o PC mostra do lado da cena; o celular esconde .info pelo CSS)
   const info = el('div', 'info');
   placa.append(numero, taxaTxt, selos, bonus, info);
+  // caixinhas de informação (dica.ts): o F$/s do topo, os geradores, as melhorias e os contratos
+  const dicas = criarDicas(app);
+  dicas.ligar(taxaTxt, 'producao', () => (ultimo?.estado ? dicaProducao(ultimo.estado, agoraTela) : null));
 
   const abrir = el('div', 'abrir');
   abrir.append(
@@ -396,6 +402,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     );
     botoes.append(um, dez, max);
     linha.append(sprite, meio, botoes);
+    dicas.ligar(linha, `g${gid}`, () => dicaGerador(s, gid, preco(g.custo, n, 1, cm) * meiaAgora(s)));
     return linha;
   }
 
@@ -620,6 +627,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
           const meio = el('div', 'meio');
           meio.append(el('strong', undefined, x.nome), el('span', 'sub', x.frase));
           item.append(iconeMelhoria(x), meio);
+          dicas.ligar(item, `m${x.id}`, () => dicaMelhoria(s, x, null));
           listaM.append(item);
         }
       }
@@ -632,6 +640,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const comprar = button(formatarValor(p), 'btn', () => a.comprar('melhoria', x.id, 1));
         precos.push({ botao: comprar, preco: p });
         item.append(iconeMelhoria(x), meio, comprar);
+        dicas.ligar(item, `m${x.id}`, () => dicaMelhoria(s, x, p));
         listaM.append(item);
       }
     }
@@ -649,6 +658,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
           ? `Você trabalha pra ${s.chefes.map((c) => `${nome(c.user_id)} (${c.cargo}, ${restam(Date.parse(c.ate) - agora)})`).join(', ')}.`
           : 'Ninguém te contratou: você ganha o piso de freela.'),
       );
+      texto.tabIndex = 0;
+      dicas.ligar(texto, 'contratos', () => dicaContratos(s));
       topoC.append(boneco(s.avatar, 'Seu personagem'), texto, button('Mudar visual', 'btn', () => a.editor('abrir')));
       listaC.append(topoC);
       if (!m.placar) listaC.append(el('p', 'vazio', m.placarFalhou ? ERRO_GALERA : 'Carregando…'));
@@ -865,6 +876,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     mostrar(entrar, true);
     mostrar(deNovo, false);
     mostrar(overlay, m.fase === 'sem_sessao');
+    dicas.conferir(); // a caixinha aberta segue a linha refeita (números novos) ou fecha
   }
 
   function atualizarPrazos() {

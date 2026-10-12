@@ -515,6 +515,20 @@
    tela muito larga ficam da cor do fundo */
 body:has(.idle) { background: #121212; }
 
+/* caixinha de informação (dica.ts / dicaTela.ts): mouse por cima no PC, segurar o dedo no celular */
+.idle .dica { position: fixed; z-index: 60; width: max-content; max-width: min(320px, calc(100vw - 16px)); padding: 10px 12px 11px;
+  background: var(--i-painel2); color: var(--paper); pointer-events: none;
+  box-shadow: 0 -2px 0 0 var(--i-borda2), 0 2px 0 0 var(--i-borda2), -2px 0 0 0 var(--i-borda2), 2px 0 0 0 var(--i-borda2), 0 10px 24px rgba(0, 0, 0, 0.5); }
+.idle .dica strong { display: block; margin-bottom: 4px; font: 400 21px/1.05 var(--i-pixel); color: var(--gold); }
+.idle .dica ul { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.idle .dica li { font-size: 14px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.idle .dica li.bom { color: var(--mint); }
+.idle .dica li.ruim { color: #FF9B8F; }
+.idle .dica li.fraco { color: var(--i-mudo); }
+/* segurar o dedo abre a caixinha: sem seleção de texto nem o menu do navegador por cima */
+.idle .gerador, .idle .melhoria, .idle .taxa, .idle .contratos-topo .meio { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.idle .taxa:focus-visible, .idle .contratos-topo .meio:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+
 @media (prefers-reduced-motion: reduce) {
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
   .idle .dourado { animation: none; }
