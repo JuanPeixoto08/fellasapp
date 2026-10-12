@@ -160,7 +160,10 @@ export type TipoConquista =
   | 'aura_negativa' | 'sigma' | 'jaula' | 'madrugada' | 'unicornio'
   // horta (0048): de estado (contadores e coleção) e de evento (plantou/colheu/descobriu/brotou)
   | 'horta_plantou' | 'horta_colheu' | 'horta_morreu' | 'horta_colecao'
-  | 'horta_pix' | 'horta_mandioca' | 'horta_coentro' | 'horta_inhame' | 'horta_abacate' | 'horta_morango';
+  | 'horta_pix' | 'horta_mandioca' | 'horta_coentro' | 'horta_inhame' | 'horta_abacate' | 'horta_morango'
+  // convidados (0051): de estado (vistos, Kojima, derrubada, Ana) e de evento (sentou, mesa, CR, FGC, HL3, mesma pessoa, dia de oportunidades)
+  | 'conv_sentou' | 'conv_mesa' | 'conv_vistos' | 'conv_cr' | 'conv_fgc' | 'conv_kojima' | 'conv_hl3' | 'conv_derrubada'
+  | 'conv_ana' | 'opp_dia' | 'conv_mesma';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -248,6 +251,17 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 70, tipo: 'horta_morreu', valor: 10, nome: 'Planta de plástico era melhor', frase: 'Pelo menos ela não julga.', condicao: 'Deixar 10 plantas morrerem de velhas' },
   { id: 71, tipo: 'horta_colecao', valor: 8, nome: 'Temos que plantar', frase: 'Ash Ketchum da roça.', condicao: 'Descobrir as 8 plantas da horta' },
   { id: 72, tipo: 'gerador', alvo: 11, valor: 200, nome: 'Fazendinha do Facebook', frase: 'Convida os amigos pra regar.', condicao: 'Ter 200 "Food truck" (horta 6 × 6)' },
+  // convidados do PPP Podcast (0051)
+  { id: 73, tipo: 'conv_sentou', nome: 'Tá gravando?', frase: 'Episódio 1: 40 minutos arrumando o microfone.', condicao: 'Sentar o primeiro convidado' },
+  { id: 74, tipo: 'conv_mesa', nome: 'Mesacast', frase: 'Três convidados, um microfone funcionando e zero pauta.', condicao: 'Ter as 3 cadeiras ocupadas' },
+  { id: 75, tipo: 'conv_vistos', valor: 11, nome: 'Todo mundo já sentou aqui', frase: 'Até o Kojima chegou no horário.', condicao: 'Sentar os 11 convidados ao menos uma vez' },
+  { id: 76, tipo: 'conv_cr', nome: 'Água!', frase: 'Afastou duas Coca-Colas e a marca perdeu 4 bilhões. Respeita.', condicao: 'Sentar o Cristiano Ronaldo na cadeira da frente' },
+  { id: 77, tipo: 'conv_fgc', nome: 'O FGC não cobre', frase: 'Rendia 140% do CDI. Rendia.', condicao: 'Ter uma ação do Vorcaro virando pó' },
+  { id: 78, tipo: 'conv_kojima', nome: 'Que geometria', frase: 'Ficou 24 h no estúdio e entregou uma encomenda.', condicao: 'Deixar o Kojima 24 h sentado' },
+  { id: 79, tipo: 'conv_hl3', nome: 'Half-Life 3 confirmado', frase: 'Ele finalmente contou até 3.', condicao: 'Sentar o Gabe Newell na 3ª cadeira' },
+  { id: 80, tipo: 'conv_derrubada', valor: 1, nome: 'Sample não liberado', frase: 'Lost media brasileira.', condicao: 'Ter uma faixa do MC V.V derrubada por copyright' },
+  { id: 81, tipo: 'conv_ana', nome: 'Cozinheira matutina', frase: 'Acordou às 5h, fez a maquiagem básica e saiu 11h50.', condicao: 'Estar com a Ana Mary B sentada às 6h' },
+  { id: 82, tipo: 'opp_dia', valor: 15, nome: 'Receba!', frase: 'Obrigado meu Deus, obrigado meu pai.', condicao: 'Pegar 15 oportunidades num dia' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -259,6 +273,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 110, escondida: true, tipo: 'unicornio', nome: 'Pai tá on', frase: 'O pai tá on.', condicao: 'Ser o unicórnio da semana' },
   { id: 111, escondida: true, tipo: 'brainrot', valor: 60, nome: 'Brainrot', frase: 'Tung tung tung empreendedor.', condicao: 'Pegar 3 oportunidades em menos de 1 minuto' },
   { id: 112, escondida: true, tipo: 'horta_morango', nome: 'Ele tem pescoço sim', frase: 'Você viu com seus próprios olhos.', condicao: 'Ver um Morango com Pescoço brotar' },
+  { id: 113, escondida: true, tipo: 'conv_mesma', nome: 'São a mesma pessoa?', frase: 'Nunca foram vistos juntos.', condicao: 'Tentar sentar o Gemaplys e o MC V.V juntos' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
