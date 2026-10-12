@@ -207,13 +207,14 @@ describe('tela da Fellas Inc.', () => {
     comprar1.click();
     expect(acoes.comprar).toHaveBeenCalledWith('gerador', 1, 1);
   });
-  it('era nova sem estratégia: cartões, os desligados avisam o porquê', () => {
+  it('era nova sem estratégia: cartões, todos ligados (Marca forte pelos lugares)', () => {
     const tela = criarTela(root, acoes);
     const g = [...Array(13).fill(1), ...Array(17).fill(0)];
     tela.renderizar(modelo({ estado: estado({ era: 3, generators: g, strategies: [0, -1, -1, -1] }) }));
     const modal = root.querySelector('.modal-estrategia')!;
     expect(modal.hasAttribute('hidden')).toBe(false);
-    expect(modal.textContent).toContain('Chega com o Mapa do rolê');
+    expect(modal.textContent).toContain('+5% de produção por lugar aberto no Mapa do rolê');
+    expect(modal.querySelectorAll('.escolha.off')).toHaveLength(0);
     [...modal.querySelectorAll('button')].find((b) => b.textContent === 'Escolher' && !b.disabled)!.click();
     expect(acoes.escolher).toHaveBeenCalledWith(3, 0);
   });

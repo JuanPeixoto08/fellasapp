@@ -27,12 +27,14 @@ describe('catálogo', () => {
     expect(m.find((x) => x.id === 305)).toMatchObject({ gerador: 30, nivel: 5, requer: 100 });
   });
 
-  it('12 estratégias; só as que dependem de propriedades vêm desligadas', () => {
+  it('12 estratégias; todas ligadas (Marca forte e Monopólio dependem dos lugares)', () => {
     const e = catalogo.estrategias;
     expect(e).toHaveLength(12);
-    expect(e.filter((x) => !x.ativa).map((x) => x.nome)).toEqual(['Marca forte', 'Monopólio']);
+    expect(e.filter((x) => !x.ativa)).toEqual([]);
+    expect(e.find((x) => x.nome === 'Marca forte')).toMatchObject({ requer: 'lugares', sociais: { porLugar: 0.05 } });
+    expect(e.find((x) => x.nome === 'Monopólio')).toMatchObject({ requer: 'lugares', sociais: { marcosMult: 2 } });
     expect(e.find((x) => x.nome === 'Queimar caixa')).toMatchObject({ custoMult: 1.25, prodMult: 1.6, genMult: 1 });
-    expect(e.find((x) => x.nome === 'Networking')).toMatchObject({ ativa: true, sociais: { contratoEfeitoMult: 2, propriedadeEfeitoMult: 2 } });
+    expect(e.find((x) => x.nome === 'Networking')).toMatchObject({ ativa: true, sociais: { contratoEfeitoMult: 2 } });
     expect(e.find((x) => x.nome === 'Cultura de startup')).toMatchObject({ ativa: true, sociais: { porContratado: 0.15, empregadoMult: 3 } });
     expect(e.find((x) => x.nome === 'Abrir capital')).toMatchObject({ prodMult: 1.3, sociais: { contratoCustoMult: 2 } });
   });
@@ -44,9 +46,9 @@ describe('catálogo', () => {
     expect(catalogo.cargos).toContain('CEO de nada');
   });
 
-  it('conquistas: 82 visíveis e 12 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
+  it('conquistas: 86 visíveis e 12 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
     const c = catalogo.conquistas;
-    expect(c.filter((x) => !x.escondida)).toHaveLength(82);
+    expect(c.filter((x) => !x.escondida)).toHaveLength(86);
     expect(c.filter((x) => x.escondida)).toHaveLength(12);
     expect(new Set(c.map((x) => x.id)).size).toBe(c.length);
     for (let g = 1; g <= 30; g++) expect(c.find((x) => x.id === g)).toMatchObject({ tipo: 'gerador', alvo: g, valor: 100, escondida: false });

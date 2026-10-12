@@ -36,7 +36,7 @@ export type Melhoria =
       fonte: number; alvo: number; porUnidade: number; requerFonte: number; requerAlvo: number;
     };
 export type Estrategia = {
-  era: number; opcao: number; nome: string; frase: string; ativa: boolean; requer: 'contratos' | 'propriedades' | null;
+  era: number; opcao: number; nome: string; frase: string; ativa: boolean; requer: 'contratos' | 'lugares' | null;
   genDe: number | null; genAte: number | null; genMult: number; prodMult: number; custoMult: number;
   oppBonusMult: number; oppExtra: number; oppSegundos: number; porGeradorDistinto: number;
   sociais: Record<string, number>;

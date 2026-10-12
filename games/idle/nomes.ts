@@ -107,7 +107,7 @@ export const SINERGIAS: readonly { nome: string; fonte: number; alvo: number; po
 
 export type EstrategiaTexto = {
   era: number; opcao: number; nome: string; frase: string;
-  ativa?: boolean; requer?: 'contratos' | 'propriedades';
+  ativa?: boolean; requer?: 'contratos' | 'lugares';
   genDe?: number; genAte?: number; genMult?: number; prodMult?: number; custoMult?: number;
   oppBonusMult?: number; oppExtra?: number; oppSegundos?: number; porGeradorDistinto?: number;
   sociais?: Record<string, number>;
@@ -117,12 +117,12 @@ export type EstrategiaTexto = {
 export const ESTRATEGIAS: readonly EstrategiaTexto[] = [
   { era: 2, opcao: 0, nome: 'Bootstrapping', frase: 'Cresce com o que tem: os geradores do 1 ao 12 rendem 50% a mais.', genDe: 1, genAte: 12, genMult: 1.5 },
   { era: 2, opcao: 1, nome: 'Queimar caixa', frase: 'Tudo custa 25% a mais, mas a produção sobe 60%.', custoMult: 1.25, prodMult: 1.6 },
-  { era: 2, opcao: 2, nome: 'Networking', frase: 'Contratos e propriedades valem o dobro.', requer: 'contratos', sociais: { contratoEfeitoMult: 2, propriedadeEfeitoMult: 2 } },
+  { era: 2, opcao: 2, nome: 'Networking', frase: 'Contratos valem o dobro.', requer: 'contratos', sociais: { contratoEfeitoMult: 2 } },
   { era: 3, opcao: 0, nome: 'Viralizar', frase: 'Oportunidades rendem o dobro e o limite do dia sobe 3.', oppBonusMult: 2, oppExtra: 3 },
   { era: 3, opcao: 1, nome: 'Foco no produto', frase: 'Os geradores do 13 ao 18 rendem o dobro.', genDe: 13, genAte: 18, genMult: 2 },
-  { era: 3, opcao: 2, nome: 'Marca forte', frase: '+5% de produção por propriedade sua.', ativa: false, requer: 'propriedades', sociais: { porPropriedade: 0.05 } },
+  { era: 3, opcao: 2, nome: 'Marca forte', frase: '+5% de produção por lugar aberto no Mapa do rolê.', requer: 'lugares', sociais: { porLugar: 0.05 } },
   { era: 4, opcao: 0, nome: 'Abrir capital', frase: 'Produção +30%, mas contratar custa o dobro.', prodMult: 1.3, sociais: { contratoCustoMult: 2 } },
-  { era: 4, opcao: 1, nome: 'Monopólio', frase: 'Suas propriedades rendem o dobro; tomar custa 50% a mais pra você.', ativa: false, requer: 'propriedades', sociais: { propriedadeBeneficioMult: 2, tomarCustoMult: 1.5 } },
+  { era: 4, opcao: 1, nome: 'Monopólio', frase: 'Os marcos dos seus lugares valem o dobro.', requer: 'lugares', sociais: { marcosMult: 2 } },
   { era: 4, opcao: 2, nome: 'Cultura de startup', frase: '+15% por contratado, e seus contratados ganham o triplo.', requer: 'contratos', sociais: { porContratado: 0.15, empregadoMult: 3 } },
   { era: 5, opcao: 0, nome: 'Expansão global', frase: 'Os geradores do 25 ao 30 rendem o dobro.', genDe: 25, genAte: 30, genMult: 2 },
   { era: 5, opcao: 1, nome: 'Holding', frase: '+3% de produção por gerador diferente que você tem.', porGeradorDistinto: 0.03 },
@@ -165,7 +165,9 @@ export type TipoConquista =
   | 'conv_sentou' | 'conv_mesa' | 'conv_vistos' | 'conv_cr' | 'conv_fgc' | 'conv_kojima' | 'conv_hl3' | 'conv_derrubada'
   | 'conv_toby' | 'opp_dia' | 'conv_mesma'
   // Fez o L: F$ 13 bi na mão e `valor` do gerador `alvo` (os estagiários) ao mesmo tempo
-  | 'fez_o_l';
+  | 'fez_o_l'
+  // Mapa do rolê: lugares abertos (estado) e dono/pódio da semana (evento)
+  | 'mapa_abriu' | 'mapa_dono' | 'mapa_podio';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -264,6 +266,10 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 80, tipo: 'conv_derrubada', valor: 1, nome: 'Sample não liberado', frase: 'Lost media brasileira.', condicao: 'Ter uma faixa do MC V.V derrubada por copyright' },
   { id: 81, tipo: 'conv_toby', nome: 'Já já sai o Chapter 5', frase: 'Ficou 20 horas esperando. O Toby também.', condicao: 'Deixar o Toby Fox 20 h sentado sem trocar' },
   { id: 82, tipo: 'opp_dia', valor: 15, nome: 'Receba!', frase: 'Obrigado meu Deus, obrigado meu pai.', condicao: 'Pegar 15 oportunidades num dia' },
+  { id: 83, tipo: 'mapa_abriu', valor: 1, nome: 'Rolê marcado', frase: 'Saiu de casa. Pelo jogo, mas saiu.', condicao: 'Abrir o primeiro lugar do Mapa do rolê' },
+  { id: 84, tipo: 'mapa_abriu', valor: 3, nome: 'Conhece a cidade', frase: 'Três lugares e nenhum convite pro aniversário.', condicao: 'Abrir 3 lugares do Mapa do rolê' },
+  { id: 85, tipo: 'mapa_dono', nome: 'Dono do pedaço', frase: 'Uma semana mandando no pedaço. Ninguém respeitou.', condicao: 'Ser o 1º da semana em algum lugar' },
+  { id: 86, tipo: 'mapa_podio', nome: 'Tá no pódio', frase: 'Foto na parede. Ninguém olha, mas tá lá.', condicao: 'Entrar no pódio de algum lugar' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
