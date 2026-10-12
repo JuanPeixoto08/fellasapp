@@ -173,11 +173,23 @@ describe('estratégia por era', () => {
 
 const claim = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window: w });
 
+/** Numa quarta à tarde (ver quartaATarde), o primeiro instante em que as 3 guardadas são dos 3 tipos: o tipo é sorteado
+ *  por janela (0049), então os testes que pegam um de cada param o relógio aí. */
+function quartaComOsTresTipos(): Date {
+  const ini = quartaATarde().getTime();
+  for (let m = 0; m < 6 * 60; m += 5) {
+    const agora = ini + m * 60_000;
+    const l = pendentes(A, agora, []);
+    if (l.length === 3 && new Set(l.map((w) => tipo(A, w))).size === 3) return new Date(agora);
+  }
+  throw new Error('nenhum instante com os 3 tipos guardados');
+}
+
 describe('oportunidades no banco', () => {
-  // relógio parado numa quarta à tarde (ver quartaATarde): sempre tem 3 guardadas e o dia inteiro de cota
+  // relógio parado numa quarta à tarde, com os 3 tipos guardados: o dia inteiro de cota e um de cada
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(quartaATarde());
+    vi.setSystemTime(quartaComOsTresTipos());
     await t.rpc('idle_start');
   });
   afterEach(() => vi.useRealTimers());
