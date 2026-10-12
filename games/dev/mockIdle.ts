@@ -228,6 +228,26 @@ wc.__faixaAgora = async () => {
     b.addEventListener('click', () => void f());
     painel.append(b);
   }
+  // Mapa do rolê: era 4 (1 de cada gerador até a era 4) e F$ de sobra pra abrir os lugares; moeda pra subir de nível
+  const mapa: [string, () => Promise<void>][] = [
+    ['Mapa: era 4 + F$', async () => {
+      await dono(`update public.idle_state s set valuation = 1e15, generators = (
+          select array_agg(case when exists (select 1 from public.idle_cat_gen c where c.id = x.i and c.era <= 4) then greatest(x.g, 1) else x.g end order by x.i)
+            from unnest(s.generators) with ordinality x(g, i)) where user_id = $1`, [ME]);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }],
+    ['Lugares +1.000 moeda', async () => {
+      await dono('update public.idle_place_state set moeda = moeda + 1000 where user_id = $1', [ME]);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }],
+  ];
+  for (const [nome, f] of mapa) {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#8A6A12;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void f());
+    painel.append(b);
+  }
   // fechado por padrão (um botãozinho no canto), pra não cobrir a Caixinha; abre e fecha no clique
   const t = document.createElement('button');
   t.style.cssText = 'padding:6px 8px;background:#333;color:#ddd;border:0;cursor:pointer';

@@ -987,3 +987,172 @@ body:has(.idle) { background: #121212; }
 @media (prefers-reduced-motion: reduce) {
   .idle .conquista-aviso .barra, .idle .conquista.destaque { animation: none; }
 }
+
+/* ===== Mapa do rolê (moldura): o mapa noturno 160 × 96 em escala inteira (o JS mede: mapaTela.ts) com os 9 pinos por cima;
+   dentro de um lugar, o cabeçalho e o miolo da mecânica à esquerda e a faixa (pódio, semana, desafio, marcos e
+   caderninho) à direita. PC: tudo cabe sem rolar. Celular: o mapa pequeno com a lista embaixo; a tela rola inteira. ===== */
+.idle .so-leitor { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.idle .mapa-tela { display: grid; gap: 12px; align-content: start; }
+.idle .mapa-palco { display: grid; place-items: center; min-width: 0; }
+.idle .mapa-quadro { position: relative; width: 320px; height: 192px; box-shadow: 0 0 0 2px var(--i-fundo2), 0 0 0 4px var(--i-borda2); }
+.idle .mapa-img, .idle .mapa-generico { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; user-select: none; }
+/* sem a arte do banco (?mock, ou antes do carregar.sql): noite em cima, mar embaixo, em faixas de pixel e umas estrelas */
+.idle .mapa-generico {
+  background:
+    linear-gradient(to bottom, var(--i-fundo2) 0 22%, var(--i-linha) 22% 40%, var(--i-painel) 40% 56%, var(--i-ativo) 56% 70%,
+      color-mix(in srgb, var(--i-roxo-e) 45%, var(--i-fundo2)) 70% 72%, color-mix(in srgb, var(--i-roxo-e) 30%, var(--i-fundo2)) 72% 86%,
+      color-mix(in srgb, var(--i-roxo-e) 18%, var(--i-fundo2)) 86% 100%);
+}
+.idle .mapa-generico::before { content: ''; position: absolute; inset: 0 0 58% 0;
+  background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--paper) 60%, transparent) 1px, transparent 1.5px) 7px 5px / 61px 37px,
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--paper) 30%, transparent) 1px, transparent 1.5px) 31px 19px / 89px 43px; }
+.idle .mapa-carregando { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: 400 20px var(--i-pixel); }
+.idle .pino { position: absolute; z-index: 1; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 4px 5px;
+  border: 0; border-radius: 0; color: var(--paper); background: color-mix(in srgb, var(--i-fundo2) 86%, transparent); cursor: pointer; --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 0 var(--i-fundo2); }
+.idle .pino:hover:not(:disabled) { --c: var(--i-lilas); z-index: 2; }
+.idle .pino:focus-visible, .idle .lugar-linha:focus-visible, .idle .marco:focus-visible, .idle .desafio-corpo:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+.idle .pino:disabled { cursor: default; }
+.idle .pino-icone { width: 32px; height: 32px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .pino-nome { display: none; max-width: 150px; font: 400 18px var(--i-pixel); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .pino-selo { display: flex; align-items: center; gap: 3px; font: 400 13px var(--i-pixel); line-height: 1; white-space: nowrap; color: var(--gold); font-variant-numeric: tabular-nums; }
+.idle .pino-cadeado { flex: none; width: 10px; height: 10px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .pino.aberto { --c: var(--i-roxo-borda); background: color-mix(in srgb, var(--i-roxo-e) 70%, var(--i-fundo2)); }
+.idle .pino.aberto .pino-selo { color: #fff; }
+.idle .pino.fechado:disabled .pino-icone { filter: brightness(0.7); }
+.idle .pino.fechado:disabled .pino-selo { color: color-mix(in srgb, var(--gold) 60%, var(--i-mudo)); }
+.idle .pino.breve { --c: var(--i-borda); background: color-mix(in srgb, var(--i-fundo2) 80%, transparent); }
+.idle .pino.breve .pino-icone { filter: grayscale(1) brightness(0.55); }
+.idle .pino.breve .pino-selo, .idle .pino.breve .pino-nome { color: var(--i-mudo); }
+.idle .pino-era { display: none; }
+.idle .pino .pino-dono { position: absolute; top: -12px; right: -12px; width: 18px; height: 26px; }
+.idle .mapa-rodape { display: grid; gap: 8px; }
+.idle .mapa-resumo { margin: 0; font-size: 13px; line-height: 1.35; color: var(--i-mudo); }
+.idle .mapa-resumo b { margin-right: 2px; font: 400 20px var(--i-pixel); color: var(--mint); }
+.idle .mapa-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--i-mudo); }
+.idle .mapa-legenda span { display: flex; align-items: center; gap: 6px; }
+.idle .mapa-legenda i { display: inline-block; width: 12px; height: 12px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .mapa-legenda i.aberto { background: color-mix(in srgb, var(--i-roxo-e) 70%, var(--i-fundo2)); box-shadow: inset 0 0 0 2px var(--i-roxo-borda); }
+.idle .mapa-legenda i.breve { opacity: 0.5; box-shadow: inset 0 0 0 2px var(--i-borda); }
+/* a lista (celular): alvos grandes com o nome inteiro, o estado do lado */
+.idle .mapa-lista { display: grid; gap: 8px; margin: 0; padding: 2px; list-style: none; }
+.idle .lugar-linha { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px;
+  border: 0; border-radius: 0; text-align: left; color: var(--paper); background: var(--i-painel); cursor: pointer; --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .lugar-linha.aberto { --c: var(--i-roxo-borda); }
+.idle .lugar-linha:disabled { cursor: default; }
+.idle .lugar-linha.breve { opacity: 0.5; }
+.idle .lugar-linha .meio { display: grid; gap: 2px; min-width: 0; }
+.idle .lugar-linha strong { font: 400 20px var(--i-pixel); line-height: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .lugar-linha .sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .lugar-linha-fim { display: grid; justify-items: end; gap: 2px; font: 400 18px var(--i-pixel); color: var(--gold); white-space: nowrap; }
+.idle .lugar-linha-fim:has(.pino-cadeado) { grid-template-columns: auto auto; align-items: center; column-gap: 4px; }
+.idle .lugar-linha-fim .pino-cadeado { width: 14px; height: 14px; }
+.idle .lugar-linha-fim .pino-era { display: block; grid-column: 1 / -1; font-size: 14px; color: var(--i-mudo); }
+.idle .lugar-linha.aberto .lugar-linha-fim { color: var(--i-lilas); }
+.idle .lugar-linha.breve .lugar-linha-fim { color: var(--i-mudo); }
+
+/* o lugar */
+.idle .lugar-tela { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.idle .lugar-carregando, .idle .lugar-fechado { display: grid; justify-items: center; gap: 12px; padding: 40px 12px; }
+.idle .lugar-carregando { margin: 0; font: 400 22px var(--i-pixel); }
+.idle .lugar-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 14px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .lugar-ident { flex: 1 1 200px; min-width: 0; }
+.idle .lugar-frase { margin: 0; font-size: 14px; line-height: 1.35; color: var(--i-mudo); }
+.idle .lugar-numeros { display: flex; gap: 18px; }
+.idle .lugar-num { display: grid; gap: 1px; font-size: 12px; color: var(--i-mudo); }
+.idle .lugar-num b { font: 400 26px var(--i-pixel); line-height: 1; color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .lugar-num.moeda b { color: var(--gold); }
+.idle .subir-nivel { flex: none; width: auto; min-width: 150px; display: grid; justify-items: center; align-content: center; gap: 1px; padding: 4px 16px; line-height: 1; }
+.idle .subir-nivel .preco-nivel { font-size: 16px; color: var(--i-lilas); }
+.idle .lugar-corpo { min-width: 0; min-height: 0; }
+.idle .lugar-corpo > .vazio { display: grid; place-items: center; min-height: 160px; margin: 0; padding: 16px; font: 400 20px var(--i-pixel); background: var(--i-fundo2);
+  box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .lugar-faixa { display: grid; gap: 10px; align-content: start; min-width: 0; min-height: 0; }
+.idle .lugar-bloco { display: grid; gap: 6px; align-content: start; min-height: 0; padding: 9px 12px 10px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .lugar-bloco > .rot2 { margin: 0; font: 400 18px var(--i-pixel); line-height: 1; color: var(--i-mudo); }
+.idle .lugar-bloco .sub { margin: 0; }
+.idle .lugar-tela .pos { font: 400 18px var(--i-pixel); line-height: 1; color: var(--i-mudo); }
+.idle .lugar-tela li:first-child > .pos { color: var(--gold); }
+.idle .quem { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--i-mudo); }
+.idle .quem .mini-boneco { width: 18px; height: 26px; }
+.idle .quem .nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .podio-lista, .idle .semana-lista { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.idle .podio-pos { display: grid; grid-template-columns: 20px 44px minmax(0, 1fr); align-items: center; gap: 10px; }
+.idle .podio-foto { width: 44px; height: 44px; image-rendering: pixelated; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .podio-pos.vaga .podio-foto { box-shadow: inset 0 0 0 2px var(--i-linha); }
+.idle .podio-pos .meio { display: grid; gap: 2px; min-width: 0; }
+.idle .podio-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.idle .podio-nome { min-width: 0; font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .podio-numero, .idle .semana-numero { flex: none; font: 400 20px var(--i-pixel); line-height: 1; color: var(--mint); font-variant-numeric: tabular-nums; }
+.idle .semana-lista li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.idle .dono-pedaco { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; padding: 4px 8px; font: 400 17px var(--i-pixel); color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, var(--i-painel)); }
+.idle .dono-pedaco .mini-boneco { width: 18px; height: 26px; }
+.idle .desafio-corpo { display: grid; gap: 4px; }
+.idle .desafio-texto { margin: 0; font-size: 14px; line-height: 1.3; }
+.idle .desafio-premio { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font: 400 17px var(--i-pixel); color: var(--gold); }
+.idle .desafio-feito { flex: none; font-weight: 400; color: var(--mint); }
+.idle .desafio-corpo.feito .desafio-texto { color: var(--i-mudo); }
+.idle .marcos { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.idle .marco { display: grid; place-items: center; align-content: center; gap: 2px; aspect-ratio: 1; font: 400 12px var(--i-pixel); line-height: 1; color: var(--i-mudo);
+  background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .marco b { font: 400 15px var(--i-pixel); color: var(--paper); }
+.idle .marco.ganho { color: var(--gold); background: color-mix(in srgb, var(--gold) 16%, var(--i-painel)); box-shadow: inset 0 0 0 2px var(--gold); }
+.idle .marco.ganho b { color: var(--gold); }
+.idle .caderninho { overflow: auto; }
+
+@media (min-width: 1100px) {
+  /* o mapa ocupa a altura (o JS escolhe a maior escala inteira que cabe), a lista sai; o bônus e a legenda numa linha só */
+  .idle .minigame-corpo .mapa-tela { --mapa-lista: 260px; height: 100%; grid-template-columns: auto minmax(var(--mapa-lista), 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 12px 16px; }
+  .idle .mapa-palco { grid-column: 1; grid-row: 1; min-height: 0; height: 100%; }
+  .idle .mapa-lista { grid-column: 2; grid-row: 1; grid-auto-rows: minmax(52px, 1fr); align-content: stretch; min-height: 0; overflow: auto; }
+  .idle .mapa-lista .lugar-linha { height: 100%; }
+  .idle .mapa-rodape { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+  .idle .pino { gap: 4px; padding: 6px 8px 7px; }
+  .idle .pino .pino-icone { width: 64px; height: 64px; }
+  .idle .pino-nome { display: block; }
+  .idle .pino-selo { gap: 5px; font-size: 18px; }
+  .idle .pino-cadeado { width: 16px; height: 16px; }
+  .idle .pino-era { display: block; font: 400 15px var(--i-pixel); line-height: 1; color: var(--i-mudo); }
+  .idle .pino .pino-dono { top: -18px; right: -16px; width: 27px; height: 39px; }
+  /* o lugar: cabeçalho e miolo à esquerda, a faixa à direita na altura toda */
+  .idle .minigame-corpo .lugar-tela { height: 100%; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr); gap: 14px 20px; }
+  .idle .lugar-cab { grid-column: 1; grid-row: 1; flex-wrap: nowrap; }
+  .idle .lugar-corpo { grid-column: 1; grid-row: 2; overflow: auto; }
+  .idle .lugar-corpo > .vazio { height: 100%; }
+  .idle .lugar-faixa { grid-column: 2; grid-row: 1 / span 2; grid-template-rows: auto auto auto auto minmax(0, 1fr); align-content: stretch; }
+  .idle .lugar-tela > .lugar-carregando, .idle .lugar-tela > .lugar-fechado { grid-column: 1 / -1; grid-row: 1 / -1; align-content: center; }
+  /* a faixa enxuta: cabe em 720 de altura com pódio, semana, dono, desafio e marcos cheios e ainda sobra pro caderninho */
+  .idle .lugar-faixa { gap: 8px; }
+  .idle .lugar-bloco { gap: 5px; padding: 7px 12px 8px; }
+  .idle .podio-lista { gap: 4px; }
+  .idle .podio-pos .meio { gap: 0; }
+  .idle .podio-pos { grid-template-columns: 20px 40px minmax(0, 1fr); }
+  .idle .podio-foto { width: 40px; height: 40px; }
+  .idle .semana-lista { gap: 2px; }
+  .idle .dono-pedaco { padding: 2px 8px; }
+}
+
+/* tema do lugar (temasLugar.ts): as cores do ícone de cada lugar trocam poucos tokens dentro da tela dele (topo, fundo,
+   blocos, destaques e o botão principal) e o destaque do pino no mapa. Lugar sem tema fica com os tokens de sempre. */
+.idle .minigame-tela[data-tema], .idle .lugar-tela[data-tema] {
+  --i-fundo2: var(--lugar-fundo); --i-linha: var(--lugar-fundo); --i-painel: var(--lugar-superficie);
+  --i-painel2: color-mix(in srgb, var(--lugar-superficie) 80%, var(--lugar-borda));
+  --i-borda: var(--lugar-borda); --i-borda2: color-mix(in srgb, var(--lugar-borda) 70%, var(--lugar-texto));
+  --i-mudo: color-mix(in srgb, var(--lugar-texto) 62%, var(--lugar-superficie)); --i-lilas: var(--lugar-acento2);
+  --i-roxo: var(--lugar-acento); --i-roxo-borda: color-mix(in srgb, var(--lugar-acento) 55%, var(--lugar-texto));
+  --i-roxo-c: color-mix(in srgb, var(--lugar-acento) 70%, var(--lugar-texto)); --i-roxo-e: color-mix(in srgb, var(--lugar-acento) 60%, var(--lugar-fundo));
+  --gold: var(--lugar-acento); --mint: var(--lugar-acento2); --paper: var(--lugar-texto);
+}
+.idle .minigame-tela[data-tema] { background: var(--lugar-fundo); }
+.idle .lugar-tela[data-tema] .btn.main { color: var(--lugar-fundo); }
+.idle .lugar-tela[data-tema] .subir-nivel .preco-nivel { color: color-mix(in srgb, var(--lugar-fundo) 80%, var(--lugar-acento)); }
+.idle .pino[data-tema] { --c: color-mix(in srgb, var(--lugar-borda) 55%, var(--lugar-acento)); }
+.idle .pino[data-tema].aberto { --c: var(--lugar-acento); background: color-mix(in srgb, var(--lugar-acento) 22%, var(--lugar-fundo)); }
+.idle .pino[data-tema].aberto .pino-selo { color: var(--lugar-acento); }
+.idle .pino[data-tema]:hover:not(:disabled) { --c: var(--lugar-texto); }
+.idle .lugar-linha[data-tema].aberto { --c: var(--lugar-acento); }
+.idle .lugar-linha[data-tema].aberto .lugar-linha-fim { color: var(--lugar-acento); }

@@ -1,6 +1,6 @@
 // O resumo de cada porta da bancada (a tela inicial): uma linha do que está acontecendo no minigame e um selo quando
 // tem algo pra fazer. Puro: a tela só escreve o que sai daqui.
-import type { BolsaEstado, HortaEstado, IdleState } from '../shared/types';
+import type { BolsaEstado, HortaEstado, IdleState, MapaEstado } from '../shared/types';
 import { empresa, variacao } from './bolsa';
 import { destrancada, MAX_TROCAS, trocasAgora } from './convidados';
 import { daPlanta, fase, madura, resumoBonus } from './horta';
@@ -45,4 +45,12 @@ export function portaConvidados(s: IdleState, agoraMs: number): ResumoPorta {
     badge: sentados < abertas && tr > 0 ? (sentados === 0 ? 'Estúdio vazio' : 'Cadeira vazia') : null,
     trancada: false,
   };
+}
+
+/** Mapa do rolê: quantos lugares abertos (sem selo: saber do desafio da semana custaria buscar cada lugar). */
+export function portaMapa(s: IdleState, m: MapaEstado | null): ResumoPorta {
+  if (s.era < 2) return { st: 'Abre na era 2', badge: null, trancada: true };
+  if (!m) return { st: 'Os lugares do rolê', badge: null, trancada: false };
+  const n = m.lugares.filter((l) => l.aberto).length;
+  return { st: n === 0 ? 'Nenhum lugar aberto' : n === 1 ? '1 lugar aberto' : `${n} lugares abertos`, badge: null, trancada: false };
 }

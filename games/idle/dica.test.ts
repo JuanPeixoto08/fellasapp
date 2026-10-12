@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
-import { dicaContratos, dicaGerador, dicaMelhoria, dicaProducao, tempoDeProducao } from './dica';
+import { dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaPino, dicaProducao, tempoDeProducao } from './dica';
+import { MARCOS } from './mapa';
+import type { LugarEstado } from '../shared/types';
 import { fatores, multContratos, taxa } from './economia';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
@@ -142,5 +144,39 @@ describe('caixinha dos contratos', () => {
   it('trabalhando pra outras empresas', () => {
     const t = textos(dicaContratos(estado({ social: { contratei: 0, empregos: [1, 1] } })));
     expect(t).toContain('Trabalha em 2 empresas: +4%');
+  });
+});
+
+describe('caixinhas do Mapa do rolê', () => {
+  it('dica do pino fechado: preço, horas e o que falta', () => {
+    const p = { id: 3, faixa: 'barato', lote: 1, lancado: true, horas: 2, era: 2, moeda: 'cupom', numero: 'pct', preco: 12_300_000,
+      nome: null, frase: null, icone: null, x: null, y: null, aberto: false, nivel: null, moeda_qtd: null, fas: null, dono: null } as const;
+    expect(dicaPino(p, 20_000_000, 2)).toBe('Abre por F$ 12,3 mi (2 h da sua produção).');
+    expect(dicaPino(p, 1_000_000, 1)).toContain('Precisa da era 2.');
+    expect(dicaPino(p, 1_000_000, 2)).toContain('Falta F$ 11,3 mi.');
+  });
+  it('dica do desafio por prêmio', () => {
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'horas', premio_valor: 2, feito: false })).toBe('Prêmio: 2 h da sua produção em F$.');
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'legado', premio_valor: 3, feito: true })).toBe('Prêmio: 3 pontos do Legado. Já fez esta semana.');
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'investidor', premio_valor: 1, feito: false })).toBe('Prêmio: um Investidor na hora (20 min de produção).');
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'legado', premio_valor: 1, feito: false })).toBe('Prêmio: 1 ponto do Legado.');
+  });
+  const lugar = (x: Partial<LugarEstado> = {}): LugarEstado => ({
+    id: 3, moeda_nome: 'cupom', numero: 'pct', lancado: true, nome: null, frase: null, icone: null,
+    aberto: true, nivel: 3, moeda: 50, fas: 10, volume: 2, lendario: false, marcos: [], preco_nivel: 240,
+    desafio: null, podio: [], semana: [], dono: null, caderninho: [], mecanica: null, server_now: '2026-10-12T12:00:00Z', ...x,
+  });
+  const marco = (id: number) => MARCOS.find((m) => m.id === id)!;
+  it('dica do marco: bônus, o que precisa e onde a pessoa está; ganho diz que já ganhou', () => {
+    expect(dicaMarco(marco(31), lugar())).toBe('+2% de produção na empresa. Nível 5 (você está no 3).');
+    expect(dicaMarco(marco(31), lugar({ marcos: [31] }))).toBe('+2% de produção na empresa. Nível 5. Já ganhou.');
+    expect(dicaMarco(marco(36), lugar())).toBe('+3% de produção na empresa. Um resultado lendário neste lugar.');
+    expect(dicaMarco(marco(37), lugar())).toBe('+3% de produção na empresa. 10.000 fãs (você tem 10).');
+    expect(dicaMarco(marco(38), lugar())).toBe('+2% de produção na empresa. 50 coleções (você fez 2).');
+  });
+  it('dica do nível: de quanto pra quanto, o preço na moeda do lugar e o que libera', () => {
+    expect(dicaNivel(lugar({ nivel: 4 }), ['Tema praia', 'Peça regata'])).toBe('Nível 4 → 5 por 240 cupons. Rende mais e libera: Tema praia, Peça regata.');
+    expect(dicaNivel(lugar({ nivel: 4 }), [])).toBe('Nível 4 → 5 por 240 cupons. Rende mais.');
+    expect(dicaNivel(lugar({ nivel: 25, preco_nivel: null }), [])).toBe('Nível 25: o máximo.');
   });
 });

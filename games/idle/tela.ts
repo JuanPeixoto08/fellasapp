@@ -8,7 +8,11 @@ import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
 import { criarHortaTela } from './hortaTela';
 import { criarConvidadosTela } from './convidadosTela';
-import { portaBolsa, portaConvidados, portaHorta, type ResumoPorta } from './portas';
+import { portaBolsa, portaConvidados, portaHorta, portaMapa, type ResumoPorta } from './portas';
+import { criarMapaTela, nomeLugar } from './mapaTela';
+import { criarLugarTela } from './lugarTela';
+import type { Dicas } from './mecanicas';
+import { aplicarTema } from './temasLugar';
 import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
@@ -238,6 +242,13 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const dicas = criarDicas(app);
   const convidadosTela = criarConvidadosTela({ sentar: (c, id) => a.sentar(c, id), tirar: (c) => a.tirar(c) }, dicas.ligar);
   dicas.ligar(taxaTxt, 'producao', () => (ultimo?.estado ? dicaProducao(ultimo.estado, agoraTela) : null));
+  // Mapa do rolê: caixinhas de uma frase (título em cima, o texto de dica.ts embaixo)
+  const dicasMapa: Dicas = {
+    ligar: (alvo, chave, titulo, texto) => dicas.ligar(alvo, `mapa-${chave}`, () => {
+      const t = texto();
+      return t === null ? null : { titulo, linhas: [{ texto: t }] };
+    }),
+  };
 
   const abrir = el('div', 'abrir');
   abrir.append(
@@ -271,7 +282,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const pHorta = porta('gaveta-horta', 'Horta', ativos.gerador(11), () => a.horta('abrir'));
   const pConv = porta('gaveta-convidados', 'Convidados', ativos.gerador(13), () => a.convidados('abrir'));
   porta('porta-lives', 'Lives', ativos.gerador(6), null);
-  porta('porta-mapa', 'Mapa do rolê', ativos.mapa(), null);
+  const pMapa = porta('porta-mapa', 'Mapa do rolê', ativos.mapa(), () => a.mapa('abrir'));
   const gavetaBolsa = pBolsa.botao;
   const gavetaHorta = pHorta.botao;
   const gavetaConv = pConv.botao;
@@ -288,9 +299,13 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   caixinha.append(gavetaCaixa, corpoCaixa);
   const hortaTela = criarHortaTela({ plantar: (c, e) => a.plantar(c, e), colher: (c) => a.colher(c), arrancar: (c) => a.arrancar(c) });
   const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t, lote) => a.negociar(e, l, q, t, lote), melhorar: (tp, n) => a.melhorar(tp, n) });
+  const mapaTela = criarMapaTela({ entrar: (id) => a.lugar(id), abrir: (id) => a.abrirLugar(id) }, dicasMapa, (v) => boneco(v, null));
+  const lugarTela = criarLugarTela({ voltar: () => a.lugar(null), nivel: (id) => a.subirNivel(id), acao: (fn, args) => a.lugarAcao(fn, args) }, dicasMapa, (v) => boneco(v, null));
   // o minigame aberto, em tela cheia (como a árvore): Voltar, o ícone, o nome e o F$
-  let gavetaAberta: 'bolsa' | 'horta' | 'convidados' | null = null;
-  const fecharMinigame = () => (gavetaAberta === 'horta' ? a.horta('fechar') : gavetaAberta === 'convidados' ? a.convidados('fechar') : a.bolsa('fechar'));
+  let gavetaAberta: 'bolsa' | 'horta' | 'convidados' | 'mapa' | null = null;
+  // no Mapa do rolê, dentro de um lugar o Voltar volta pro mapa (não fecha a tela cheia)
+  const fecharMinigame = () => (gavetaAberta === 'mapa' ? (ultimo?.lugarAberto != null ? a.lugar(null) : a.mapa('fechar'))
+    : gavetaAberta === 'horta' ? a.horta('fechar') : gavetaAberta === 'convidados' ? a.convidados('fechar') : a.bolsa('fechar'));
   const telaCheia = el('div', 'minigame-tela');
   telaCheia.setAttribute('role', 'dialog');
   telaCheia.setAttribute('aria-modal', 'true');
@@ -625,6 +640,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         [pBolsa, portaBolsa(s, m.bolsa), 'Bolsa'],
         [pHorta, portaHorta(s, m.horta, agoraTela), 'Horta'],
         [pConv, portaConvidados(s, agoraTela), 'Convidados'],
+        [pMapa, portaMapa(s, m.mapa), 'Mapa do rolê'],
       ];
       for (const [p, r, nome] of resumos) {
         p.st.textContent = r.st;
@@ -634,19 +650,41 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         p.botao.setAttribute('aria-label', `${nome}: ${r.st}${r.badge ? ` (${r.badge})` : ''}`);
       }
     }
-    gavetaAberta = !jogando ? null : m.convidadosAberto ? 'convidados' : m.hortaAberta ? 'horta' : m.bolsaAberta ? 'bolsa' : null;
+    gavetaAberta = !jogando ? null : m.mapaAberto ? 'mapa' : m.convidadosAberto ? 'convidados' : m.hortaAberta ? 'horta' : m.bolsaAberta ? 'bolsa' : null;
     const abriuAgora = gavetaAberta !== null && telaCheia.hasAttribute('hidden');
     mostrar(telaCheia, gavetaAberta !== null);
     telaCheia.dataset.minigame = gavetaAberta ?? '';
     app.classList.toggle('com-minigame', gavetaAberta !== null);
-    const NOMES_MINI = { bolsa: ['Bolsa', 19], horta: ['Horta do Food truck', 11], convidados: ['Convidados no PPP Podcast', 13] } as const;
+    const NOMES_MINI = {
+      bolsa: ['Bolsa', ativos.gerador(19)], horta: ['Horta do Food truck', ativos.gerador(11)], convidados: ['Convidados no PPP Podcast', ativos.gerador(13)],
+      mapa: ['Mapa do rolê', ativos.mapa()],
+    } as const;
+    const noLugar = gavetaAberta === 'mapa' && m.lugarAberto !== null;
+    telaCheia.dataset.lugar = noLugar ? String(m.lugarAberto) : '';
+    aplicarTema(telaCheia, noLugar ? m.lugarAberto : null); // dentro de um lugar, o topo e o fundo com as cores dele
     if (gavetaAberta) {
-      const [titulo, gid] = NOMES_MINI[gavetaAberta];
+      let [titulo, icone]: [string, string | null] = [...NOMES_MINI[gavetaAberta]];
+      if (noLugar) {
+        // dentro de um lugar: o nome e o ícone dele (do lugar buscado ou, carregando, do pino do mapa)
+        const pino = m.mapa?.lugares.find((p) => p.id === m.lugarAberto);
+        const id = m.lugarAberto as number;
+        titulo = nomeLugar(m.lugar ?? pino ?? { id, nome: null });
+        icone = m.lugar?.icone ?? pino?.icone ?? ativos.mapa();
+      }
       tituloGaveta.textContent = titulo;
-      tituloGaveta.dataset.curto = { bolsa: 'Bolsa', horta: 'Horta', convidados: 'Convidados' }[gavetaAberta];
-      iconeMinigame.style.backgroundImage = `url(${ativos.gerador(gid)})`;
+      tituloGaveta.dataset.curto = noLugar ? titulo : { bolsa: 'Bolsa', horta: 'Horta', convidados: 'Convidados', mapa: 'Mapa do rolê' }[gavetaAberta];
+      iconeMinigame.style.backgroundImage = icone ? `url(${icone})` : '';
+      iconeMinigame.classList.toggle('quadros', gavetaAberta !== 'mapa'); // sprite de gerador (4 quadros); o do mapa é um quadro só
     }
-    if (gavetaAberta === 'convidados' && s) {
+    if (gavetaAberta === 'mapa' && s) {
+      if (noLugar) {
+        lugarTela.renderizar(m.lugar, m.ocupado, agoraTela, m.nomesLugar);
+        noCorpo(lugarTela.elemento);
+      } else {
+        mapaTela.renderizar(m.mapa, s.valuation, s.era, m.ocupado);
+        noCorpo(mapaTela.elemento);
+      }
+    } else if (gavetaAberta === 'convidados' && s) {
       convidadosTela.renderizar(s, m.ocupado, agoraTela);
       noCorpo(convidadosTela.elemento);
     } else if (gavetaAberta === 'horta' && s) {
@@ -667,7 +705,10 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
       noCorpo(bolsaTela.elemento);
     } else corpoBancada.replaceChildren();
-    if (abriuAgora) fecharBolsa.focus({ preventScroll: true });
+    if (abriuAgora) {
+      dicas.esconder(); // a caixinha de um item da tela de trás (o mouse estava em cima) não fica por cima do minigame
+      fecharBolsa.focus({ preventScroll: true });
+    }
     corpoCaixa.replaceChildren(...(s && jogando ? itensCaixinha(s, m).slice(1) : []));
     mostrar(engrenagem, jogando || m.fase === 'antes');
     engrenagem.setAttribute('aria-label', m.novidadeNova ? 'Configurações (tem novidade)' : 'Configurações');
@@ -981,7 +1022,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     numero.textContent = formatarValor(valor);
     valorBolsa.textContent = formatarValor(valor);
     atualizarPrazos();
-    for (const p of [...bolsaTela.precos(), ...hortaTela.precos()]) p.botao.disabled = p.preco > valor;
+    mapaTela.valor(valor);
+    for (const p of [...bolsaTela.precos(), ...hortaTela.precos(), ...mapaTela.precos()]) p.botao.disabled = p.preco > valor;
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {

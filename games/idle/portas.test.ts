@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BolsaEstado, HortaEstado, IdleState } from '../shared/types';
-import { portaBolsa, portaConvidados, portaHorta } from './portas';
+import type { BolsaEstado, HortaEstado, IdleState, MapaEstado } from '../shared/types';
+import { portaBolsa, portaConvidados, portaHorta, portaMapa } from './portas';
 
 const AGORA = Date.parse('2026-10-14T18:00:00.000Z');
 const gens = (pares: Record<number, number>) => { const g = Array(30).fill(0); for (const [k, v] of Object.entries(pares)) g[Number(k) - 1] = v; return g; };
@@ -49,5 +49,13 @@ describe('o resumo das portas', () => {
     const c = { cadeira: [1, null, null], desde: ['2026-10-14T17:00:00Z', null, null], trocas: 3, trocas_t: null, ppp: 30, derrubada_ate: null };
     const r = portaConvidados(estado({ generators: gens({ 13: 30 }), convidados: c }), AGORA);
     expect(r).toEqual({ st: '1 sentado · trocas 3/3', badge: 'Cadeira vazia', trancada: false });
+  });
+  it('Mapa: era antes da 2 diz quando abre; sem estado, o convite; depois, quantos lugares abertos', () => {
+    expect(portaMapa(estado({ era: 1 }), null)).toEqual({ st: 'Abre na era 2', badge: null, trancada: true });
+    expect(portaMapa(estado({ era: 2 }), null)).toEqual({ st: 'Os lugares do rolê', badge: null, trancada: false });
+    const m = (abertos: number): MapaEstado => ({ mapa: null, mult: 1, lugares: [3, 4, 7].map((id, i) => ({ id, aberto: i < abertos })) as MapaEstado['lugares'] });
+    expect(portaMapa(estado({ era: 3 }), m(0)).st).toBe('Nenhum lugar aberto');
+    expect(portaMapa(estado({ era: 3 }), m(1)).st).toBe('1 lugar aberto');
+    expect(portaMapa(estado({ era: 3 }), m(2)).st).toBe('2 lugares abertos');
   });
 });

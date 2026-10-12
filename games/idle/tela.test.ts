@@ -139,12 +139,39 @@ describe('tela da Fellas Inc.', () => {
     tela.renderizar(modelo({ estado: comFT, horta }));
     expect(cheia.hasAttribute('hidden')).toBe(true);
   });
-  it('as portas: Bolsa, Horta, Convidados, Lives e Mapa do rolê (os dois últimos em breve)', () => {
+  it('as portas: Bolsa, Horta, Convidados, Lives (em breve) e Mapa do rolê', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo());
     const portas = [...root.querySelectorAll<HTMLButtonElement>('.portas .porta')];
     expect(portas.map((p) => p.querySelector('.porta-nome')!.textContent)).toEqual(['Bolsa', 'Horta', 'Convidados', 'Lives', 'Mapa do rolê']);
-    expect(portas.slice(3).every((p) => p.disabled && p.textContent!.includes('Em breve'))).toBe(true);
+    expect(portas[3].disabled && portas[3].textContent!.includes('Em breve')).toBe(true);
+    expect(portas[4].disabled).toBe(false);
+    expect(portas[4].querySelector('.porta-st')!.textContent).toBe('Abre na era 2');
+    portas[4].click();
+    expect(acoes.mapa).toHaveBeenCalledWith('abrir');
+  });
+  it('Mapa do rolê em tela cheia: o mapa; dentro de um lugar o título vira o nome dele e o Voltar volta pro mapa', () => {
+    const tela = criarTela(root, acoes);
+    const pino = { id: 3, faixa: 'barato', lote: 1, lancado: true, horas: 2, era: 2, moeda: 'cupom', numero: 'pct', preco: 100, nome: null, frase: null,
+      icone: null, x: null, y: null, aberto: true, nivel: 2, moeda_qtd: 0, fas: 0, dono: null } as const;
+    const mapa = { mapa: null, mult: 1, lugares: [pino] };
+    tela.renderizar(modelo({ estado: estado({ era: 2 }), mapaAberto: true, mapa }));
+    const cheia = root.querySelector<HTMLElement>('.minigame-tela')!;
+    expect(cheia.hasAttribute('hidden')).toBe(false);
+    expect(cheia.querySelector('h2')!.textContent).toBe('Mapa do rolê');
+    expect(cheia.querySelectorAll('.minigame-corpo .pino')).toHaveLength(1);
+    expect(root.querySelector('.porta-mapa .porta-st')!.textContent).toBe('1 lugar aberto');
+    cheia.querySelector<HTMLButtonElement>('.pino')!.click();
+    expect(acoes.lugar).toHaveBeenCalledWith(3);
+    const voltar = () => [...cheia.querySelectorAll('button')].find((x) => x.textContent === '← Voltar')!;
+    voltar().click();
+    expect(acoes.mapa).toHaveBeenLastCalledWith('fechar');
+    tela.renderizar(modelo({ estado: estado({ era: 2 }), mapaAberto: true, mapa, lugarAberto: 3, lugar: null }));
+    expect(cheia.querySelector('h2')!.textContent).toBe('Lugar 3');
+    expect(cheia.querySelector('.minigame-corpo')!.textContent).toContain('Carregando');
+    voltar().click();
+    expect(acoes.lugar).toHaveBeenLastCalledWith(null);
+    expect(acoes.mapa).toHaveBeenCalledTimes(1);
   });
   it('os descontos da horta entram nos preços da Loja', () => {
     const tela = criarTela(root, acoes);

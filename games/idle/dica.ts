@@ -1,7 +1,8 @@
 // Caixinhas de informação (estilo Cookie Clicker): o que cada coisa da Fellas Inc. está fazendo agora, em números.
 // Só conta da página (puro); quem mostra é dicaTela.ts. Regra: coisa nova com número ou efeito ganha caixinha
 // (ver CLAUDE.md, "Fellas Inc.").
-import type { IdleState } from '../shared/types';
+import type { IdleState, LugarEstado, PinoMapa } from '../shared/types';
+import type { Marco } from './mapa';
 import { catalogo, type Melhoria } from './catalogo';
 import { estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
@@ -138,4 +139,48 @@ export function dicaContratos(s: IdleState): Dica {
   if (p.efeito !== 1) linhas.push({ texto: `Estratégia: contratos valem ${vezes(p.efeito)}`, tom: 'fraco' });
   linhas.push({ texto: `Total: +${pct(p.mult - 1)} de produção` });
   return { titulo: 'Contratos', linhas };
+}
+
+// ===== Mapa do rolê: caixinhas em uma frase (pino fechado, marcos, desafio e o botão de nível) =====
+
+/** O nome dos fãs e do volume de cada lugar com mecânica (spec 3.3), no plural. */
+export const TERMOS_LUGAR: Record<number, { fas: string; volume: string }> = {
+  3: { fas: 'fãs', volume: 'coleções' },
+  4: { fas: 'de galera', volume: 'copões' },
+  7: { fas: 'de reputação', volume: 'casais formados' },
+};
+const inteiro = (n: number) => Math.floor(n).toLocaleString('pt-BR');
+/** "cupom" → "cupons", "ficha" → "fichas" (sem moeda: "moedas"). */
+export const plural = (palavra: string | null) => (!palavra ? 'moedas' : palavra.endsWith('m') ? `${palavra.slice(0, -1)}ns` : `${palavra}s`);
+
+export function dicaPino(p: PinoMapa, valuation: number, era: number): string {
+  let t = `Abre por ${formatarValor(p.preco)} (${num(p.horas)} h da sua produção).`;
+  if (era < p.era) t += ` Precisa da era ${p.era}.`;
+  if (valuation < p.preco) t += ` Falta ${formatarValor(p.preco - valuation)}.`;
+  return t;
+}
+
+export function dicaMarco(m: Marco, l: LugarEstado): string {
+  const base = `+${pct(m.bonus)} de produção na empresa.`;
+  if (m.tipo === 'lendario') return `${base} Um resultado lendário neste lugar.${l.marcos.includes(m.id) ? ' Já ganhou.' : ''}`;
+  const termos = TERMOS_LUGAR[m.lugar] ?? { fas: 'fãs', volume: 'feitos' };
+  const valor = m.valor ?? 0;
+  const [meta, ondeEsta] = m.tipo === 'nivel' ? [`Nível ${valor}`, `você está no ${l.nivel ?? 0}`]
+    : m.tipo === 'fas' ? [`${inteiro(valor)} ${termos.fas}`, `você tem ${inteiro(l.fas ?? 0)}`]
+      : [`${inteiro(valor)} ${termos.volume}`, `você fez ${inteiro(l.volume ?? 0)}`];
+  return l.marcos.includes(m.id) ? `${base} ${meta}. Já ganhou.` : `${base} ${meta} (${ondeEsta}).`;
+}
+
+export function dicaDesafio(d: NonNullable<LugarEstado['desafio']>): string {
+  const premio = d.premio === 'horas' ? `${num(d.premio_valor)} h da sua produção em F$`
+    : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado`
+      : 'um Investidor na hora (20 min de produção)';
+  return `Prêmio: ${premio}.${d.feito ? ' Já fez esta semana.' : ''}`;
+}
+
+export function dicaNivel(l: LugarEstado, libera: string[]): string {
+  const n = l.nivel ?? 1;
+  if (l.preco_nivel === null) return `Nível ${n}: o máximo.`;
+  const rende = libera.length ? `Rende mais e libera: ${libera.join(', ')}.` : 'Rende mais.';
+  return `Nível ${n} → ${n + 1} por ${inteiro(Math.ceil(l.preco_nivel))} ${plural(l.moeda_nome)}. ${rende}`;
 }

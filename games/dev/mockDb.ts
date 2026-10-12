@@ -45,6 +45,10 @@ export const ready = (async () => {
   const db = new PGlite();
   await db.exec(SKELETON);
   for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m56, m57]) await db.exec(m);
+  // lugares de mentira pro ?mock não ficar vazio (os de verdade só no banco, carregados fora do repositório)
+  await db.exec(`insert into public.idle_places (id, nome, frase, x, y)
+    select g, 'Lugar ' || g, 'Um lugar de mentira pro ?mock.', 30 + ((g - 1) % 3) * 50, 18 + ((g - 1) / 3) * 30
+      from generate_series(1, 9) g on conflict (id) do nothing`);
   await db.query(`insert into public.profiles (id, username, display_name) values ($1, 'eu', 'Você')`, [ME]);
   for (const [id, name, balance] of FRIENDS) {
     await db.query(`insert into public.profiles (id, username, display_name) values ($1, lower($2), $2)`, [id, name]);
