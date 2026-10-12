@@ -132,7 +132,9 @@ async function carregarMapa() {
   if (!mapaAberto) return;
   try {
     if (lugarAberto === null) {
-      mapa = await api.idleMapa();
+      const m = await api.idleMapa();
+      if (!mapaAberto || lugarAberto !== null) return; // fechou o mapa ou entrou num lugar enquanto buscava
+      mapa = m;
     } else {
       const id = lugarAberto;
       const l = await api.idleLugar(id);
@@ -438,13 +440,16 @@ const tela = criarTela(document.getElementById('app')!, {
   },
   abrirLugar: (id) => void guard(async () => {
     const r = await api.idleLugarAbrir(id);
-    mapa = r.mapa;
+    if (mapaAberto && lugarAberto === null) mapa = r.mapa; // só se o mapa ainda é o que está na tela
     aplicar(r);
     audio.tocar('no');
   }),
   subirNivel: (id) => void guard(async () => {
     const r = await api.idleLugarNivel(id);
-    lugar = r.lugar;
+    if (mapaAberto && lugarAberto === r.lugar.id) {
+      lugar = r.lugar; // só se ainda é o lugar da tela
+      await carregarNomesLugar(r.lugar);
+    }
     aplicar(r);
     audio.tocar('compra');
     const marco = avisoMarcos(r.marcos_novos);
@@ -455,7 +460,10 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   lugarAcao: (fn, args) => void guard(async () => {
     const r = await api.idleLugarAcao(fn, args);
-    lugar = r.lugar;
+    if (mapaAberto && lugarAberto === r.lugar.id) {
+      lugar = r.lugar; // só se ainda é o lugar da tela
+      await carregarNomesLugar(r.lugar);
+    }
     aplicar(r);
     audio.tocar('compra');
   }),
