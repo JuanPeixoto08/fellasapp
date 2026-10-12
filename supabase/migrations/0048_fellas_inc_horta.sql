@@ -1,7 +1,7 @@
 -- fellasapp: Fellas Inc., Horta do Food truck (minigame 2). Canteiros pela quantidade de Food truck (2×2 a 6×6; o
 -- canteiro é linha × 6 + coluna); plantas crescem em tempo real, maduras dão bônus (produção, geradores, melhorias,
 -- oportunidades), morrem de velhas. A cada passo de 5 min um canteiro vazio com duas vizinhas maduras do par certo pode
--- brotar uma espécie nova (5%); onde uma planta morreu de velha pode brotar o Morango com Pescoço (1%). O banco anda a
+-- brotar uma espécie nova (5%); onde uma planta morreu de velha pode brotar o Morango com Pescoço (0,1%). O banco anda a
 -- horta a cada chamada (idle_lock), no máximo 7 dias pra trás, com sorte de semente (jogador, canteiro, passo). Mesmo
 -- catálogo de games/idle/horta.ts (teste de paridade). Vender a startup não mexe na horta. Idempotente.
 
@@ -240,7 +240,7 @@ begin
         v_esp := null;
         if cardinality(cand) > 0 and public.idle_horta_sorte(s.user_id, c, t, 1) < 0.05 then
           v_esp := cand[1 + floor(public.idle_horta_sorte(s.user_id, c, t, 2) * cardinality(cand))::int];
-        elsif morta[c + 1] and public.idle_horta_sorte(s.user_id, c, t, 3) < 0.01 then
+        elsif morta[c + 1] and public.idle_horta_sorte(s.user_id, c, t, 3) < 0.001 then -- 0,1% por passo: ~7% das mortes (decisão do Juan)
           v_esp := 8;
         end if;
         if v_esp is not null then

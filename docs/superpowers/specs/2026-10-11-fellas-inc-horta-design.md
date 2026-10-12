@@ -31,10 +31,11 @@ novas (coleção). Decisões do Juan nesta conversa.
 - Cruzamento: a cada passo de 5 min, canteiro destrancado vazio com duas vizinhas (8 ao redor, destrancadas) maduras
   do par de alguma receita → 5% de chance de brotar uma muda dessa espécie (se mais de uma receita serve, sorteia).
   Par igual (Pix + Pix) precisa de duas vizinhas Pix.
-- Morango com Pescoço: canteiro vazio onde uma planta morreu de velha nas últimas 6 h (e nada nasceu depois): 1% por
-  passo. Só sai assim (a semente libera ao colher).
+- Morango com Pescoço: canteiro vazio onde uma planta morreu de velha nas últimas 6 h (e nada nasceu depois): 0,1% por
+  passo (~7% das mortes; o Juan baixou de 1% depois da revisão). Só sai assim (a semente libera ao colher).
 - Avanço preguiçoso: a cada chamada o banco anda a horta do último passo até agora, no máximo 7 dias (2016 passos).
   Sorte com semente (jogador, canteiro, passo): reabrir dá o mesmo resultado.
+- Os descontos da horta se multiplicam com a Promoção e a meia-preço (decisão do Juan: pode chegar a 25% do preço).
 - Bônus somam por planta madura destrancada: produção (mult = 1 + soma), geradores e melhorias (desconto = soma, teto
   50%), oportunidades/Investidor (+soma).
 - Produção da horta entra na taxa (`idle_rate_at`, igual pra recorde, placar, pontos da venda). A conta (`idle_settle`)
