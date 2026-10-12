@@ -5,8 +5,10 @@
 -- ===== catálogo (igual a games/idle/mapa.ts; teste de paridade em idleMapa.test.ts) =====
 create table if not exists public.idle_cat_place (
   id int primary key, faixa text not null, horas double precision not null, era int not null, lote int not null,
-  lancado boolean not null, custo_base double precision not null, moeda text, numero text
+  lancado boolean not null, custo_base double precision not null, moeda text, numero text,
+  moeda_inicial double precision not null default 0
 );
+-- (a tabela nasce aqui, na 0057 ainda não aplicada; moeda_inicial = a moeda com que o lugar abre)
 create table if not exists public.idle_cat_place_marco (
   id int primary key, lugar int not null, tipo text not null check (tipo in ('nivel', 'lendario', 'fas', 'volume')),
   valor double precision, bonus double precision not null
@@ -21,16 +23,16 @@ alter table public.idle_cat_place_desafio enable row level security;
 revoke all on public.idle_cat_place, public.idle_cat_place_marco, public.idle_cat_place_desafio from anon, authenticated;
 delete from public.idle_cat_place where true;
 delete from public.idle_cat_place_marco where true;
-insert into public.idle_cat_place (id, faixa, horas, era, lote, lancado, custo_base, moeda, numero) values
-  (1, 'barato', 2, 2, 2, false, 100, null, null),
-  (2, 'barato', 2, 2, 2, false, 100, null, null),
-  (3, 'barato', 2, 2, 1, true, 100, 'cupom', 'pct'),
-  (4, 'medio', 6, 3, 1, true, 150, 'ficha', 'nota'),
-  (5, 'medio', 6, 3, 2, false, 150, null, null),
-  (6, 'medio', 6, 3, 3, false, 150, null, null),
-  (7, 'caro', 16, 4, 1, true, 250, 'gorjeta', 'estrelas'),
-  (8, 'caro', 16, 4, 3, false, 250, null, null),
-  (9, 'caro', 16, 4, 3, false, 250, null, null);
+insert into public.idle_cat_place (id, faixa, horas, era, lote, lancado, custo_base, moeda, numero, moeda_inicial) values
+  (1, 'barato', 2, 2, 2, false, 100, null, null, 0),
+  (2, 'barato', 2, 2, 2, false, 100, null, null, 0),
+  (3, 'barato', 2, 2, 1, true, 100, 'cupom', 'pct', 108),
+  (4, 'medio', 6, 3, 1, true, 150, 'ficha', 'nota', 0),
+  (5, 'medio', 6, 3, 2, false, 150, null, null, 0),
+  (6, 'medio', 6, 3, 3, false, 150, null, null, 0),
+  (7, 'caro', 16, 4, 1, true, 250, 'gorjeta', 'estrelas', 0),
+  (8, 'caro', 16, 4, 3, false, 250, null, null, 0),
+  (9, 'caro', 16, 4, 3, false, 250, null, null, 0);
 insert into public.idle_cat_place_marco (id, lugar, tipo, valor, bonus) values
   (31, 3, 'nivel', 5, 0.02), (32, 3, 'nivel', 10, 0.02), (33, 3, 'nivel', 15, 0.03), (34, 3, 'nivel', 20, 0.03),
   (35, 3, 'nivel', 25, 0.04), (36, 3, 'lendario', null, 0.03), (37, 3, 'fas', 100000, 0.03), (38, 3, 'volume', 50, 0.02),
@@ -134,6 +136,8 @@ begin
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
   perform public.idle_save(s);
+  s := public.idle_place_depois(s);
+  perform public.idle_save(s);
   -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
   v_novos := public.idle_place_marcos_todos(s.user_id);
   return public.idle_mapa_json(s) || jsonb_build_object('marcos_novos', to_jsonb(v_novos));
@@ -171,7 +175,7 @@ begin
   end if;
   s.valuation := s.valuation - v_preco;
   perform public.idle_save(s);
-  insert into public.idle_place_state (user_id, lugar) values (s.user_id, p_lugar);
+  insert into public.idle_place_state (user_id, lugar, moeda) values (s.user_id, p_lugar, c.moeda_inicial);
   select count(*) into v_n from public.idle_place_state where user_id = s.user_id;
   perform public.idle_ganhar(s.user_id, 'mapa_abriu', v_n);
   return public.idle_json(s) || jsonb_build_object('mapa', public.idle_mapa_json(s));
@@ -498,8 +502,11 @@ returns void language sql volatile set search_path = public as $$
 $$;
 
 -- ===== o contrato das partes 2 a 4 (camisetaria = tee/3, copão = cup/4, jantar = din/7; o mesmo em games/idle/mecanicas.ts) =====
--- * Cada lugar troca só os stubs dele: idle_<x>_avancar(s) e idle_<x>_json(s). Os despachantes abaixo (idle_place_avancar e
---   idle_place_mecanica_json) já chamam os seis e não mudam mais.
+-- * Cada lugar troca só os stubs dele: idle_<x>_avancar(s), idle_<x>_depois(s) e idle_<x>_json(s). Os despachantes abaixo
+--   (idle_place_avancar, idle_place_depois e idle_place_mecanica_json) já chamam os nove e não mudam mais.
+-- * O que precisa da conta fechada (registrar, caderninho, desafio, conquistas) vai no idle_<x>_depois, que devolve o s (o
+--   prêmio de desafio mexe no valuation). idle_lugar e idle_mapa já rodam o idle_place_depois; a RPC de mecânica termina com
+--   `return idle_place_responder(s, p_lugar)` (depois, save, marcos e a resposta padrão).
 -- * RPC de mecânica (idle_tee_*, idle_cup_*, idle_din_*): trava + fecha a conta (idle_settle(idle_lock(auth.uid()))), salva
 --   (idle_save) e só então mexe no lugar; devolve idle_json(s) || jsonb_build_object('lugar', idle_lugar_json(s, p_lugar),
 --   'marcos_novos', to_jsonb(idle_place_marcos(s.user_id, p_lugar))). Grant só na RPC; tudo que é ajudante fica revogado
@@ -520,6 +527,13 @@ create or replace function public.idle_cup_avancar(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$ begin return; end; $$;
 create or replace function public.idle_din_avancar(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$ begin return; end; $$;
+-- o que precisa da conta fechada (registrar, caderninho, desafio, conquistas): devolve o s (o prêmio de desafio mexe no valuation)
+create or replace function public.idle_tee_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$ begin return s; end; $$;
+create or replace function public.idle_cup_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$ begin return s; end; $$;
+create or replace function public.idle_din_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$ begin return s; end; $$;
 create or replace function public.idle_tee_json(s public.idle_state)
 returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
 create or replace function public.idle_cup_json(s public.idle_state)
@@ -541,6 +555,23 @@ begin
     perform public.idle_din_avancar(s);
   end if;
   update public.idle_place_state set avancado_em = now() where user_id = s.user_id and avancado_em < now();
+end;
+$$;
+
+-- depois da conta fechada e salva: o "depois" de cada lugar aberto (devolve o s; o prêmio de desafio mexe no valuation)
+create or replace function public.idle_place_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$
+begin
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 3) then
+    s := public.idle_tee_depois(s);
+  end if;
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 4) then
+    s := public.idle_cup_depois(s);
+  end if;
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 7) then
+    s := public.idle_din_depois(s);
+  end if;
+  return s;
 end;
 $$;
 
@@ -584,6 +615,19 @@ returns jsonb language sql stable set search_path = public as $$
   where c.id = p_lugar
 $$;
 
+-- fim de toda RPC de mecânica: roda o depois, salva e devolve a resposta padrão
+create or replace function public.idle_place_responder(s public.idle_state, p_lugar int)
+returns jsonb language plpgsql volatile set search_path = public as $$
+declare
+  v int[];
+begin
+  s := public.idle_place_depois(s);
+  perform public.idle_save(s);
+  v := public.idle_place_marcos_todos(s.user_id);
+  return public.idle_json(s) || jsonb_build_object('lugar', public.idle_lugar_json(s, p_lugar), 'marcos_novos', to_jsonb(v));
+end;
+$$;
+
 create or replace function public.idle_lugar(p_lugar int)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -597,6 +641,8 @@ begin
     raise exception 'idle_bad_choice' using errcode = 'P0001';
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
+  perform public.idle_save(s);
+  s := public.idle_place_depois(s);
   perform public.idle_save(s);
   -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
   v_novos := public.idle_place_marcos_todos(s.user_id);
@@ -696,6 +742,11 @@ revoke all on function public.idle_place_semana_idx(int, int, int, date) from pu
 revoke all on function public.idle_place_desafio_da_semana(int) from public, anon, authenticated;
 revoke all on function public.idle_place_desafio(public.idle_state, int, text, double precision) from public, anon, authenticated;
 revoke all on function public.idle_place_nota(uuid, int, text, int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_tee_depois(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_cup_depois(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_din_depois(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_place_depois(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_place_responder(public.idle_state, int) from public, anon, authenticated;
 revoke all on function public.idle_tee_avancar(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_cup_avancar(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_din_avancar(public.idle_state) from public, anon, authenticated;

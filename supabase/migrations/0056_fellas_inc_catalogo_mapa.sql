@@ -407,6 +407,8 @@ insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, va
   (84, 'Conhece a cidade', 'Três lugares e nenhum convite pro aniversário.', 'Abrir 3 lugares do Mapa do rolê', 'mapa_abriu', null, 3, false),
   (85, 'Dono do pedaço', 'Uma semana mandando no pedaço. Ninguém respeitou.', 'Ser o 1º da semana em algum lugar', 'mapa_dono', null, null, false),
   (86, 'Tá no pódio', 'Foto na parede. Ninguém olha, mas tá lá.', 'Entrar no pódio de algum lugar', 'mapa_podio', null, null, false),
+  (87, 'Esgotou', 'Esgotou. O fornecedor já subiu o preço.', 'Coleção com 200% de procura', 'tee_pct', null, 200, false),
+  (88, 'Quatro dez', 'Até o @luisviton deu dez. Print e emoldura.', 'Coleção com nota 10 dos 4 influencers', 'tee_quatro_dez', null, null, false),
   (101, '6-7', 'Seis sete. Ninguém sabe por quê.', 'Ter exatamente 67 de algum gerador', 'gerador_exato', null, 67, true),
   (102, 'Farmou aura', '+1000 de aura.', 'Ficar em 1º no placar', 'aura', null, null, true),
   (103, 'Aura negativa', 'Vendeu por um real e um abraço.', 'Vender a startup e ganhar só 1 ponto', 'aura_negativa', null, null, true),
@@ -418,7 +420,8 @@ insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, va
   (110, 'Pai tá on', 'O pai tá on.', 'Ser o unicórnio da semana', 'unicornio', null, null, true),
   (111, 'Brainrot', 'Tung tung tung empreendedor.', 'Pegar 3 oportunidades em menos de 1 minuto', 'brainrot', null, 60, true),
   (112, 'Ele tem pescoço sim', 'Você viu com seus próprios olhos.', 'Ver um Morango com Pescoço brotar', 'horta_morango', null, null, true),
-  (113, 'São a mesma pessoa?', 'Nunca foram vistos juntos.', 'Tentar sentar o Gemaplys e o MC V.V juntos', 'conv_mesma', null, null, true);
+  (113, 'São a mesma pessoa?', 'Nunca foram vistos juntos.', 'Tentar sentar o Gemaplys e o MC V.V juntos', 'conv_mesma', null, null, true),
+  (114, 'Coleção encalhada', 'Vai virar pano de chão de luxo.', 'Coleção com menos de 20% de procura', 'tee_encalhe', null, null, true);
 
 insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values
   (1, 0, 1, 'Virou MEI', 'Abre a árvore. Produção +5%.', 1, 'producao', 1.05, null),

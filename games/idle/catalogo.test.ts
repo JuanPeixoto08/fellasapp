@@ -46,10 +46,10 @@ describe('catálogo', () => {
     expect(catalogo.cargos).toContain('CEO de nada');
   });
 
-  it('conquistas: 86 visíveis e 12 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
+  it('conquistas: 88 visíveis e 13 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
     const c = catalogo.conquistas;
-    expect(c.filter((x) => !x.escondida)).toHaveLength(86);
-    expect(c.filter((x) => x.escondida)).toHaveLength(12);
+    expect(c.filter((x) => !x.escondida)).toHaveLength(88);
+    expect(c.filter((x) => x.escondida)).toHaveLength(13);
     expect(new Set(c.map((x) => x.id)).size).toBe(c.length);
     for (let g = 1; g <= 30; g++) expect(c.find((x) => x.id === g)).toMatchObject({ tipo: 'gerador', alvo: g, valor: 100, escondida: false });
     expect(c.find((x) => x.id === 7)!.nome).toBe('Estágio não remunerado em escala');
@@ -63,7 +63,7 @@ describe('catálogo', () => {
   it('escondidas: as da spec; a Guiana Brasileira é a Filial em Portugal (a melhoria 283, que mudou de nome)', () => {
     expect(catalogo.conquistas.filter((x) => x.escondida).map((x) => x.nome)).toEqual([
       '6-7', 'Farmou aura', 'Aura negativa', 'Tá saindo da jaula', 'Guiana Brasileira', 'Fez o L', '3h06',
-      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?',
+      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?', 'Coleção encalhada',
     ]);
     expect(catalogo.melhorias.find((m) => m.id === 283)).toMatchObject({ nome: 'Filial em Portugal', gerador: 28, requer: 25 });
     expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });

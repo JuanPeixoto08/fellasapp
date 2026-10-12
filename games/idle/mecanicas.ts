@@ -2,8 +2,11 @@
 // o desafio e os marcos; o miolo de cada lugar vem daqui. As partes 2 a 4 preenchem (camisetaria = 3, copão = 4, jantar = 7).
 //
 // O contrato das partes 2 a 4 (o mesmo bloco está na 0057, junto dos despachantes):
-// * No banco, cada lugar só troca os stubs dele: idle_tee_* (3), idle_cup_* (4), idle_din_* (7) — idle_<x>_avancar(s) e
-//   idle_<x>_json(s). idle_place_avancar e idle_place_mecanica_json já chamam os seis.
+// * No banco, cada lugar só troca os stubs dele: idle_tee_* (3), idle_cup_* (4), idle_din_* (7) — idle_<x>_avancar(s),
+//   idle_<x>_depois(s) e idle_<x>_json(s). idle_place_avancar, idle_place_depois e idle_place_mecanica_json já chamam os nove.
+// * O que precisa da conta fechada (registrar, caderninho, desafio, conquistas) vai no idle_<x>_depois, que devolve o s (o
+//   prêmio de desafio mexe no valuation). idle_lugar e idle_mapa já rodam o idle_place_depois; a RPC de mecânica termina com
+//   `return idle_place_responder(s, p_lugar)` (depois, save, marcos e a resposta padrão).
 // * A RPC de cada ação trava, fecha a conta e salva (idle_save) antes de mexer no lugar, e devolve
 //   idle_json(s) || jsonb_build_object('lugar', idle_lugar_json(s, p), 'marcos_novos', ...); a tela chama por
 //   `acao(fn, args)` (args com os nomes p_* da função) e main.ts avisa os marcos_novos ("Marco: +N%").

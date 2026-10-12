@@ -38,8 +38,8 @@ beforeEach(async () => {
 describe('catálogo', () => {
   it('o banco tem os mesmos lugares e marcos de mapa.ts', async () => {
     const ls = await q<Record<string, unknown>>('select * from public.idle_cat_place order by id');
-    expect(ls.map((r) => ({ id: r.id, faixa: r.faixa, horas: r.horas, era: r.era, lote: r.lote, custoBase: r.custo_base, moeda: r.moeda, numero: r.numero })))
-      .toEqual(LUGARES.map(({ id, faixa, horas, era, lote, custoBase, moeda, numero }) => ({ id, faixa, horas, era, lote, custoBase, moeda, numero })));
+    expect(ls.map((r) => ({ id: r.id, faixa: r.faixa, horas: r.horas, era: r.era, lote: r.lote, custoBase: r.custo_base, moeda: r.moeda, moedaInicial: r.moeda_inicial, numero: r.numero })))
+      .toEqual(LUGARES.map(({ id, faixa, horas, era, lote, custoBase, moeda, moedaInicial, numero }) => ({ id, faixa, horas, era, lote, custoBase, moeda, moedaInicial, numero })));
     const ms = await q<Record<string, unknown>>('select * from public.idle_cat_place_marco order by id');
     expect(ms.map((r) => ({ id: r.id, lugar: r.lugar, tipo: r.tipo, valor: r.valor, bonus: r.bonus }))).toEqual(MARCOS.map((m) => ({ ...m })));
   });
@@ -78,6 +78,13 @@ describe('abrir', () => {
     expect(antes - s.valuation).toBeCloseTo(2 * 3600 * r, 0);
     expect(s.mapa.lugares.find((l) => l.id === 3)).toMatchObject({ aberto: true, nivel: 1 });
     expect(s.conquistas.map((c) => c.id)).toContain(83);
+  });
+  it('a camisetaria abre com 108 cupons; os outros lugares abrem com 0', async () => {
+    await empresa(4);
+    await abrir(3);
+    await abrir(4);
+    const ms = await q<{ lugar: number; moeda: number }>('select lugar, moeda from public.idle_place_state where user_id = $1 order by lugar', [A]);
+    expect(ms).toEqual([{ lugar: 3, moeda: 108 }, { lugar: 4, moeda: 0 }]);
   });
   it('recusas: era baixa, lote não lançado, já aberto, sem dinheiro, lugar que não existe', async () => {
     await empresa(2);
@@ -135,6 +142,7 @@ describe('nível e marcos', () => {
     await empresa(2);
     await expect(nivel(3)).rejects.toThrow(/idle_lugar_fechado/);
     await abrir(3);
+    await moeda(3, 0);
     await expect(nivel(3)).rejects.toThrow(/idle_lugar_moeda/);
     await q('update public.idle_place_state set nivel = 25, moeda = 1e30 where user_id = $1 and lugar = 3', [A]);
     await expect(nivel(3)).rejects.toThrow(/idle_lugar_nivel_max/);
@@ -452,5 +460,42 @@ describe('o contrato das partes 2 a 4', () => {
     const l = await lugar(3);
     expect(l.podio.map((p) => p.nome)).toEqual(['depois', 'antes2']);
     expect(l.semana.map((p) => p.user_id)).toEqual([C, B]);
+  });
+});
+
+describe('gancho depois (idle_place_depois)', () => {
+  const stub = (fn: string) => q(`create or replace function public.${fn}(s public.idle_state)
+    returns public.idle_state language plpgsql volatile set search_path = public as $$ begin s.valuation := s.valuation + 5; return s; end; $$`);
+  const val = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+  it('chama o depois só dos lugares abertos', async () => {
+    await empresa(4, 1000);
+    await stub('idle_tee_depois');
+    await stub('idle_cup_depois');
+    await mapa();
+    expect(await val()).toBe(1000); // nenhum aberto
+    await q(`insert into public.idle_place_state (user_id, lugar) values ($1, 3)`, [A]);
+    await mapa();
+    expect(await val()).toBe(1005); // só o 3
+  });
+  it('idle_lugar roda o depois e salva o s que ele devolve', async () => {
+    await empresa(4, 1000);
+    await q(`insert into public.idle_place_state (user_id, lugar) values ($1, 3)`, [A]);
+    await stub('idle_tee_depois');
+    await t.rpc('idle_lugar', { p_lugar: 3 });
+    expect(await val()).toBe(1005);
+  });
+  it('idle_place_responder roda o depois, salva e devolve lugar e marcos_novos', async () => {
+    await empresa(4, 1000);
+    await q(`insert into public.idle_place_state (user_id, lugar) values ($1, 3)`, [A]);
+    await stub('idle_tee_depois');
+    const r = (await q<{ r: { valuation: number; lugar: { id: number }; marcos_novos: number[] } }>(
+      `select public.idle_place_responder(s, 3) as r from public.idle_state s where user_id = $1`, [A]))[0].r;
+    expect(r.valuation).toBe(1005);
+    expect(r.lugar.id).toBe(3);
+    expect(r.marcos_novos).toEqual([]);
+    expect(await val()).toBe(1005);
+  });
+  it('ajudantes revogados de authenticated', async () => {
+    await expect(t.asRole('authenticated', `select public.idle_place_depois(s) from public.idle_state s`)).rejects.toThrow();
   });
 });
