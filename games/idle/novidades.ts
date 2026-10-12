@@ -13,6 +13,7 @@ export const NOVIDADES: readonly Novidade[] = [
       'Trocar custa: são 3 trocas, e cada uma volta em 1 h. Tirar alguém é de graça.',
       'Tem convidado que mexe na Bolsa, na Horta, nos eventos e nas oportunidades. Passa o mouse (ou segura o dedo) pra ver.',
       'Gemaplys e MC V.V nunca sentam juntos. Ninguém sabe por quê.',
+      'Tela inicial nova: cada minigame ganhou uma porta (com o resumo do que está rolando) e abre em tela cheia.',
       '11 conquistas novas do podcast.',
     ],
   },

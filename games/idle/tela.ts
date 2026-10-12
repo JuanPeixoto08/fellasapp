@@ -225,7 +225,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     botao.append(ic, el('strong', 'porta-nome', nome), st, el('span', 'porta-abrir', abrirPorta ? 'Abrir →' : 'Em breve'), badge);
     if (!abrirPorta) {
       botao.disabled = true;
-      botao.classList.add('em-breve');
+      botao.classList.add('porta-breve');
       st.textContent = nome === 'Lives' ? 'Chega na Live na Twitch' : 'Os lugares do rolê';
     }
     portas.append(botao);

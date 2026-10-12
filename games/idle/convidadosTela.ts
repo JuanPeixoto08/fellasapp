@@ -47,6 +47,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
   let escolhendo: number | null = null;
   let marcado: number | null = null; // o convidado em destaque na seleção
   let recado: string | null = null; // "São a mesma pessoa?" (some no próximo toque)
+  let sentou: number | null = null; // a cadeira que acabou de receber alguém: quando o banco confirmar, a seleção pula pra próxima vazia
   let ultimo: [IdleState, boolean, number] | null = null;
   const refazer = () => ultimo && renderizar(...ultimo);
   const escolher = (i: number) => {
@@ -67,6 +68,10 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
     const c: Cadeiras = s.convidados ?? SEM;
     const tr = trocasAgora(c, agoraMs);
     const algum = c.cadeira.some((id, i) => id && destrancada(i, ppp));
+    if (sentou !== null && c.cadeira[sentou]) {
+      escolhendo = null;
+      sentou = null;
+    }
     if (escolhendo === null || !destrancada(escolhendo, ppp)) {
       const vazia = [0, 1, 2].find((i) => destrancada(i, ppp) && !c.cadeira[i]);
       escolhendo = vazia ?? 0;
@@ -194,7 +199,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
       let acao: HTMLElement;
       if (onde >= 0) acao = el('span', 'conv-ja', onde === ch ? 'Já está nesta cadeira' : `Na cadeira ${DA_CADEIRA[onde]}`);
       else {
-        const bt = button(`Sentar ${['na frente', 'no meio', 'no canto'][ch]}`, 'btn main', () => { marcado = null; escolhendo = null; a.sentar(ch, foco); });
+        const bt = button(`Sentar ${['na frente', 'no meio', 'no canto'][ch]}`, 'btn main', () => { marcado = null; sentou = ch; a.sentar(ch, foco); });
         bt.disabled = ocupado || tr.trocas < 1;
         acao = bt;
       }

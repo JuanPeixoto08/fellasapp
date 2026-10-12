@@ -598,8 +598,8 @@ body:has(.idle) { background: #121212; }
 .idle .porta-abrir { grid-column: 1 / -1; justify-self: end; font: 400 16px var(--i-pixel); color: var(--i-lilas); }
 .idle .porta-badge { position: absolute; top: -9px; right: -6px; padding: 1px 6px; font: 400 14px var(--i-pixel); color: #1A1408; background: var(--gold); box-shadow: 0 0 0 2px #14121A; }
 .idle .porta.trancada { opacity: 0.6; }
-.idle .porta.em-breve { opacity: 0.5; cursor: default; }
-.idle .porta.em-breve .porta-abrir { color: var(--i-mudo); }
+.idle .porta.porta-breve { opacity: 0.5; cursor: default; }
+.idle .porta.porta-breve .porta-abrir { color: var(--i-mudo); }
 .idle .bancada-caixa { display: grid; gap: 8px; }
 .idle .bancada-caixa-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .idle .bancada-caixa-cab strong { display: flex; align-items: center; gap: 8px; font: 400 22px var(--i-pixel); }
@@ -612,16 +612,17 @@ body:has(.idle) { background: #121212; }
 .idle .bancada-caixa.chegou .caixinha-cab strong, .idle .bancada-caixa.chegou .selo { animation: caixa-pula 0.5s ease-out 3; }
 
 /* o minigame em tela cheia: Voltar, ícone, nome e o F$ em cima; o minigame embaixo */
-.idle .minigame-tela { position: fixed; inset: 0; z-index: 9; display: grid; grid-template-rows: auto minmax(0, 1fr); color: var(--paper); background: #121118; }
+.idle .minigame-tela { position: fixed; inset: 0; z-index: 9; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); color: var(--paper); background: #121118; }
 .idle .minigame-topo { display: flex; align-items: center; gap: 12px; padding: max(8px, env(safe-area-inset-top)) 14px 8px; background: var(--i-fundo2); box-shadow: 0 2px 0 0 var(--i-borda); }
-.idle .minigame-topo h2 { margin: 0; font: 400 24px var(--i-pixel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .minigame-topo h2 { min-width: 0; margin: 0; font: 400 24px var(--i-pixel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .minigame-topo .chip-valor { flex: none; }
 .idle .minigame-topo .porta-icone { flex: none; width: 32px; height: 32px; }
 .idle .minigame-topo .espaco { flex: 1; }
 .idle .voltar-minigame { flex: none; height: 36px; padding: 0 12px; font-size: 20px; }
 .idle .minigame-corpo { min-height: 0; overflow: auto; padding: 12px 14px max(14px, env(safe-area-inset-bottom)); }
 
 /* o estúdio do PPP em pixel art: cada peça na posição da arte (160 × 80) vezes a escala --e */
-.idle .convidados { --e: 2; display: grid; gap: 14px; }
+.idle .convidados { --e: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .idle .conv-esq, .idle .conv-dir { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .idle .estudio { position: relative; width: calc(160px * var(--e)); height: calc(80px * var(--e)); justify-self: center; box-shadow: 0 0 0 2px #14121A, 0 0 0 4px var(--i-borda2); }
 .idle .estudio > * { position: absolute; left: calc(var(--x) * var(--e) * 1px); top: calc(var(--y) * var(--e) * 1px); background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
