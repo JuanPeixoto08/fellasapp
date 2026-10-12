@@ -61,7 +61,8 @@ describe('mapa', () => {
     expect(p3.style.left).toBe('50%');
     expect(p3.style.top).toBe('50%');
     expect(p4.style.left).toBe(`${(30 / 160) * 100}%`); // posicaoGenerica(4) = 30, 48
-    expect(d.ligar).toHaveBeenCalledTimes(1); // só o 3 (fechado e lançado)
+    // só o 3 (fechado e lançado): o pino e a linha da lista do PC, cada um com a sua chave
+    expect(d.ligar.mock.calls.map((c) => c[1])).toEqual(['pino3', 'linha3'])
   });
   it('o pino do lugar com tema leva o destaque dele; sem tema, o de sempre', () => {
     const t = criarMapaTela({ entrar: vi.fn(), abrir: vi.fn() }, dicas);
@@ -80,6 +81,20 @@ describe('mapa', () => {
     document.body.append(t.elemento);
     t.renderizar(estado([pino(3), pino(4)]), 10, 4, false);
     expect(t.precos().map((p) => p.preco)).toEqual([1000, 1000]); // o pino e a linha da lista do celular
+    t.elemento.remove();
+  });
+  it('foco do teclado: o pino e a linha com foco voltam pro do mesmo lugar depois de redesenhar', () => {
+    const t = criarMapaTela({ entrar: vi.fn(), abrir: vi.fn() }, dicas);
+    document.body.replaceChildren(t.elemento);
+    const m = estado([pino(3), pino(4, { lancado: true, aberto: true, nivel: 2 })]);
+    t.renderizar(m, 1e9, 4, false);
+    t.elemento.querySelector<HTMLElement>('.pino[data-lugar="4"]')!.focus();
+    t.renderizar(m, 1e9, 4, false);
+    expect(document.activeElement).toBe(t.elemento.querySelector('.pino[data-lugar="4"]'));
+    t.elemento.querySelector<HTMLElement>('.lugar-linha[data-lugar="3"]')!.focus();
+    t.renderizar(m, 1e9, 4, true); // ocupado: o fechado apaga
+    t.renderizar(estado([pino(3, { aberto: true, nivel: 1 }), pino(4, { lancado: true, aberto: true, nivel: 2 })]), 1e9, 4, false);
+    expect(document.activeElement).toBe(t.elemento.querySelector('.lugar-linha[data-lugar="3"]'));
     t.elemento.remove();
   });
 });

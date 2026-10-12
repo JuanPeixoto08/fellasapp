@@ -93,4 +93,60 @@ describe('moldura do lugar', () => {
     t.renderizar(null, false, 0, new Map());
     expect(t.elemento.textContent).toContain('Carregando');
   });
+  it('prêmio do desafio com o número em pt-BR (igual à caixinha)', () => {
+    const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
+    t.renderizar(lugar({ desafio: { id: 1, texto: 'x', premio: 'horas', premio_valor: 1.5, feito: false } }), false, 0, new Map());
+    expect(t.elemento.querySelector('.desafio-premio')!.textContent).toBe('Prêmio: 1,5 h de produção em F$');
+  });
+});
+
+describe('foco do teclado entre um desenho e outro', () => {
+  const montar = () => {
+    const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
+    document.body.replaceChildren(t.elemento);
+    return t;
+  };
+  it('Subir nível com foco continua com foco depois de redesenhar', () => {
+    const t = montar();
+    t.renderizar(lugar({ moeda: 1000 }), false, 0, new Map());
+    t.elemento.querySelector<HTMLButtonElement>('.subir-nivel')!.focus();
+    t.renderizar(lugar({ moeda: 900 }), false, 0, new Map());
+    expect(document.activeElement).toBe(t.elemento.querySelector('.subir-nivel'));
+  });
+  it('desabilitado enquanto a ação roda: o foco volta quando ele acende de novo', () => {
+    const t = montar();
+    t.renderizar(lugar({ moeda: 1000 }), false, 0, new Map());
+    t.elemento.querySelector<HTMLButtonElement>('.subir-nivel')!.focus();
+    t.renderizar(lugar({ moeda: 1000 }), true, 0, new Map());
+    t.renderizar(lugar({ moeda: 1000 }), true, 0, new Map());
+    t.renderizar(lugar({ moeda: 800, nivel: 4 }), false, 0, new Map());
+    expect(document.activeElement).toBe(t.elemento.querySelector('.subir-nivel'));
+  });
+  it('marco e desafio da faixa: o foco vai pro equivalente', () => {
+    const t = montar();
+    t.renderizar(lugar(), false, 0, new Map());
+    t.elemento.querySelectorAll<HTMLElement>('.marco')[1].focus();
+    t.renderizar(lugar({ marcos: [32] }), false, 0, new Map());
+    expect(document.activeElement).toBe(t.elemento.querySelectorAll('.marco')[1]);
+    t.elemento.querySelector<HTMLElement>('.desafio-corpo')!.focus();
+    t.renderizar(lugar(), false, 0, new Map());
+    expect(document.activeElement).toBe(t.elemento.querySelector('.desafio-corpo'));
+  });
+  it('o miolo (a mecânica) fica no lugar: o foco dentro dele não sai', () => {
+    const botao = document.createElement('button');
+    const miolo = document.createElement('div');
+    miolo.append(botao);
+    MECANICAS[3] = { criar: () => ({ elemento: miolo, renderizar: () => undefined }), foto: () => document.createElement('canvas'), caderninho: () => document.createElement('div'), libera: () => [] };
+    try {
+      const t = montar();
+      t.renderizar(lugar(), false, 0, new Map());
+      const corpo = t.elemento.querySelector('.lugar-corpo');
+      botao.focus();
+      t.renderizar(lugar({ moeda: 70 }), false, 0, new Map());
+      expect(t.elemento.querySelector('.lugar-corpo')).toBe(corpo);
+      expect(document.activeElement).toBe(botao);
+    } finally {
+      delete MECANICAS[3];
+    }
+  });
 });

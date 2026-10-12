@@ -3,7 +3,8 @@
 // caderninho. Quem decide é o banco; aqui só mostra e chama.
 import { button, el } from '../shared/hud/hud';
 import type { LugarEstado, ProducaoLugar } from '../shared/types';
-import { dicaDesafio, dicaMarco, dicaNivel, plural, TERMOS_LUGAR } from './dica';
+import { dicaDesafio, dicaMarco, dicaNivel, num, plural, TERMOS_LUGAR } from './dica';
+import { criarFoco } from './foco';
 import { formatarValor } from './formatar';
 import { formatarNumero, LUGARES, MARCOS, type Marco } from './mapa';
 import { MECANICAS, type Dicas, type TelaMecanica } from './mecanicas';
@@ -13,8 +14,8 @@ import { aplicarTema } from './temasLugar';
 /** Um número da moeda do lugar, resumido como o F$ ("1,2 mil"), sem o "F$". */
 const quantia = (n: number) => formatarValor(n).replace('F$ ', '');
 const ROTULO_MARCO = (m: Marco) => (m.tipo === 'nivel' ? `Nív. ${m.valor}` : m.tipo === 'lendario' ? 'Lenda' : m.tipo === 'fas' ? 'Fãs' : 'Volume');
-const PREMIO = (d: NonNullable<LugarEstado['desafio']>) => (d.premio === 'horas' ? `${d.premio_valor} h de produção em F$`
-  : d.premio === 'legado' ? `${d.premio_valor} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado` : 'Investidor na hora');
+const PREMIO = (d: NonNullable<LugarEstado['desafio']>) => (d.premio === 'horas' ? `${num(d.premio_valor)} h de produção em F$`
+  : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado` : 'Investidor na hora');
 
 export function criarLugarTela(
   a: { voltar(): void; nivel(id: number): void; acao(fn: string, args: Record<string, unknown>): void },
@@ -24,8 +25,11 @@ export function criarLugarTela(
   const raiz = el('div', 'lugar-tela');
   /** A tela da mecânica de cada lugar, criada uma vez (o miolo guarda o que a pessoa está montando). */
   const telas = new Map<number, TelaMecanica>();
-  /** O miolo fica o mesmo entre um desenho e outro (tirar e pôr a mecânica de volta zeraria a rolagem dela). */
+  /** O miolo fica o mesmo (e no lugar) entre um desenho e outro: tirar e pôr a mecânica de volta zeraria a rolagem dela e
+   *  tiraria o foco do teclado de dentro dela. Só o cabeçalho e a faixa são trocados. */
   const corpo = el('div', 'lugar-corpo');
+  /** O foco do teclado no cabeçalho e na faixa volta pro equivalente depois de redesenhar (data-foco). */
+  const foco = criarFoco(raiz);
 
   const bloco = (cls: string, titulo: string) => {
     const s = el('section', `lugar-bloco ${cls}`);
@@ -40,14 +44,18 @@ export function criarLugarTela(
 
   function renderizar(l: LugarEstado | null, ocupado: boolean, agoraMs: number, nomes: Map<string, string>): void {
     aplicarTema(raiz, l?.id ?? null); // as cores do ícone do lugar (sem tema: as de sempre)
+    const chave = foco.guardar();
     if (!l) {
       raiz.replaceChildren(el('p', 'vazio lugar-carregando', 'Carregando o lugar…'));
       return;
     }
     if (!l.aberto) {
       const p = el('div', 'lugar-fechado');
-      p.append(el('p', 'vazio', 'Esse lugar ainda tá fechado. Abre ele no mapa.'), button('Voltar pro mapa', 'btn', () => a.voltar()));
+      const voltar = button('Voltar pro mapa', 'btn', () => a.voltar());
+      voltar.dataset.foco = 'voltar';
+      p.append(el('p', 'vazio', 'Esse lugar ainda tá fechado. Abre ele no mapa.'), voltar);
       raiz.replaceChildren(p);
+      foco.devolver(chave);
       return;
     }
     const cat = LUGARES.find((x) => x.id === l.id);
@@ -72,6 +80,7 @@ export function criarLugarTela(
       numeros.append(n);
     }
     const subir = button('', 'btn main subir-nivel', () => a.nivel(l.id));
+    subir.dataset.foco = 'subir';
     if (l.preco_nivel === null) {
       subir.append(el('span', undefined, 'Nível máximo'));
       subir.disabled = true;
@@ -138,6 +147,7 @@ export function criarLugarTela(
       const d = l.desafio;
       const corpoD = el('div', `desafio-corpo${d.feito ? ' feito' : ''}`);
       corpoD.tabIndex = 0;
+      corpoD.dataset.foco = 'desafio';
       corpoD.append(el('p', 'desafio-texto', d.texto));
       const pe = el('p', 'desafio-premio');
       pe.append(el('span', undefined, `Prêmio: ${PREMIO(d)}`));
@@ -153,6 +163,7 @@ export function criarLugarTela(
       const ganho = l.marcos.includes(m.id);
       const q = el('span', `marco${ganho ? ' ganho' : ''}`);
       q.tabIndex = 0;
+      q.dataset.foco = `marco${m.id}`;
       q.append(el('span', 'marco-rot', ROTULO_MARCO(m)), el('b', undefined, `+${Math.round(m.bonus * 100)}%`));
       q.setAttribute('aria-label', dicaMarco(m, l));
       dicas.ligar(q, `marco${m.id}`, ganho ? 'Marco ganho' : 'Marco', () => dicaMarco(m, l));
@@ -164,7 +175,13 @@ export function criarLugarTela(
     cad.append(mec ? mec.caderninho(l.caderninho) : el('p', 'sub', 'O que você descobrir aqui fica anotado.'));
 
     faixa.append(podio, semana, desafio, marcos, cad);
-    raiz.replaceChildren(cab, corpo, faixa);
+    // o miolo não sai do lugar (mover um elemento tira o foco de dentro dele): troca só o cabeçalho e a faixa
+    const [cabAntes, corpoAntes, faixaAntes] = [...raiz.children];
+    if (raiz.children.length === 3 && corpoAntes === corpo) {
+      cabAntes.replaceWith(cab);
+      faixaAntes.replaceWith(faixa);
+    } else raiz.replaceChildren(cab, corpo, faixa);
+    foco.devolver(chave);
   }
 
   return { elemento: raiz, renderizar };

@@ -24,7 +24,8 @@ export function tempoDeProducao(segundos: number): string {
   return par(d, d === 1 ? 'dia' : 'dias', Math.floor((s % 86400) / 3600), 'h');
 }
 
-const num = (x: number, casas = 2) => (Math.round(x * 10 ** casas) / 10 ** casas).toLocaleString('pt-BR');
+/** Número em pt-BR com até `casas` casas (1,5; 1.234,57). */
+export const num = (x: number, casas = 2) => (Math.round(x * 10 ** casas) / 10 ** casas).toLocaleString('pt-BR');
 const pct = (x: number) => `${num(x * 100, 1)}%`;
 const vezes = (x: number) => `×${num(x)}`;
 const hortaProd = (s: IdleState) => s.horta_bonus?.producao ?? 0;

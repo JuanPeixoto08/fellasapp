@@ -8,6 +8,7 @@ import { dicaPino } from './dica';
 import { formatarValor } from './formatar';
 import { posicaoGenerica } from './mapa';
 import type { Dicas } from './mecanicas';
+import { criarFoco } from './foco';
 import { aplicarTema } from './temasLugar';
 
 export const MAPA_W = 160;
@@ -36,6 +37,8 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
   let atuais: Precos[] = [];
   /** O F$ de agora (sobe entre um desenho e outro): a caixinha do pino conta o que falta com ele. */
   let valorAgora = 0;
+  /** Os pinos e as linhas são refeitos a cada desenho: o foco do teclado volta pro do mesmo lugar (data-foco). */
+  const foco = criarFoco(raiz);
 
   /** O quadro do mapa em escala inteira: na tela de verdade (px do aparelho = px do CSS × o zoom do PC). */
   function ajustar() {
@@ -91,6 +94,7 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
     const { estado, semEra, disabled, soDinheiro } = situacao(p, valuation, era, ocupado);
     const bt = button('', `pino ${estado}`, () => (p.aberto ? a.entrar(p.id) : a.abrir(p.id)));
     bt.dataset.lugar = String(p.id);
+    bt.dataset.foco = `pino${p.id}`;
     aplicarTema(bt, p.id); // o destaque do pino com as cores do lugar
     const pos = p.x !== null && p.y !== null ? { x: p.x, y: p.y } : posicaoGenerica(p.id);
     bt.style.left = `${(pos.x / MAPA_W) * 100}%`;
@@ -118,10 +122,13 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
     const { estado, semEra, disabled, soDinheiro } = situacao(p, valuation, era, ocupado);
     const bt = button('', `lugar-linha ${estado}`, () => (p.aberto ? a.entrar(p.id) : a.abrir(p.id)));
     bt.dataset.lugar = String(p.id);
+    bt.dataset.foco = `linha${p.id}`;
     aplicarTema(bt, p.id);
     bt.disabled = disabled;
     if (soDinheiro) precos.push({ botao: bt, preco: p.preco });
     bt.setAttribute('aria-label', rotulo(p, estado, semEra));
+    // a mesma caixinha do pino (no PC a lista fica do lado do mapa), com a chave dela
+    if (estado === 'fechado') dicas.ligar(bt, `linha${p.id}`, nomeLugar(p), () => dicaPino(p, valorAgora, era));
     const meio = el('span', 'meio');
     meio.append(el('strong', undefined, nomeLugar(p)));
     if (p.frase) meio.append(el('span', 'sub', p.frase));
@@ -140,6 +147,7 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
   function renderizar(m: MapaEstado | null, valuation: number, era: number, ocupado: boolean): void {
     atuais = [];
     valorAgora = valuation;
+    const chave = foco.guardar();
     if (!m) {
       quadro.replaceChildren(el('div', 'mapa-generico'), el('p', 'vazio mapa-carregando', 'Carregando o mapa…'));
       rodape.replaceChildren();
@@ -174,6 +182,7 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
       legenda.append(s);
     }
     rodape.replaceChildren(resumo, legenda);
+    foco.devolver(chave);
     ajustar();
   }
 
