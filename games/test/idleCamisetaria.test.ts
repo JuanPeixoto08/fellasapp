@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LugarEstado } from '../shared/types';
 import {
-  CONFLITOS, CORES, CRESCE, custoLote, distanciaFoco, ESTILOS, FAS_TETO, liberado, notas, PECAS, pctProcura, pecasLote, pecaTema,
-  pesoVenda, PRECO_MULT, precoRelatorio, procura, PUBLICO_BASE, publico, rotulo, TEMAS, tendencia, vendidoAte, type Lancamento,
+  CONFLITOS, CORES, CRESCE, custoLote, distanciaFoco, ESTILOS, FAS_TETO, fasExcesso, fasNota, liberado, notas, PECAS, pctProcura,
+  pecasLote, pecaTema, pesoVenda, PRECO_MULT, precoPeca, precoRelatorio, procura, PUBLICO_BASE, publico, rotulo, TEMAS, tendencia,
+  vendidoAte, type Lancamento,
 } from '../idle/camisetaria';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
@@ -399,5 +400,385 @@ describe('o JSON da camisetaria', () => {
     const c11 = cs.find((c) => c.nome === 'Coleção 11')!;
     expect(m.historico[0]).toEqual({ id: c11.id, nome: 'Coleção 11', tema: c11.tema, estilo: 1, peca: 1, cor: 1, notas: c11.notas, pct: c11.pct });
     expect(m.semana).toBe(12);
+  });
+});
+
+// ===== parte B: venda, revelação, caderninho, desafios, encerrar e relatório =====
+
+type Estado = { moeda: number; fas: number; volume: number; lendario: boolean; marcos: number[] };
+const estado = async () => (await q<Estado>(
+  'select moeda, fas, volume, lendario, marcos from public.idle_place_state where user_id = $1 and lugar = 3', [A]))[0];
+const abrirJogo = () => t.rpc('idle_open'); // trava + fecha a conta + salva: só o avancar roda (sem o depois)
+const encerrar = () => t.rpc<Resp>('idle_tee_encerrar');
+const relatorio = (estilo: number) => t.rpc<Resp>('idle_tee_relatorio', { p_estilo: estilo });
+const lugarB = () => t.rpc<LugarEstado & { mecanica: Tee; marcos_novos: number[] }>('idle_lugar', { p_lugar: 3 });
+const prods = () => q<{ nome: string; partes: number[]; numero: number; criado_em: Date }>(
+  'select nome, partes, numero, criado_em from public.idle_place_prod where user_id = $1 and lugar = 3 order by id', [A]);
+const notasCad = () => q<{ tipo: string; a: number; b: number; rotulo: number }>(
+  'select tipo, a, b, rotulo from public.idle_place_notes where user_id = $1 and lugar = 3 order by tipo, a, b', [A]);
+const conquistas = async () => (await q<{ c: number }>(
+  'select conquista_id as c from public.idle_conquistas where user_id = $1 order by 1', [A])).map((x) => x.c);
+const daCamisetaria = async () => (await conquistas()).filter((c) => [87, 88, 114].includes(c));
+const valuation = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+/** Mexe no resultado guardado da última coleção (antes de ficar pronta): notas (e a média junto), %, procura, tema da semana, peça. */
+async function ajustar(o: { notas?: number[]; pct?: number; procura?: number; tendencia?: number; peca?: number }) {
+  const cs = await colecoes();
+  const c = cs[cs.length - 1];
+  const ns = o.notas ?? c.notas;
+  await q(`update public.idle_tee_colecoes set notas = $2::int[], media = $3, pct = $4, procura = $5, tendencia = $6, peca = $7 where id = $1`,
+    [c.id, ns, ns.reduce((a, b) => a + b, 0) / 4, o.pct ?? c.pct, o.procura ?? c.procura, o.tendencia ?? c.tendencia, o.peca ?? c.peca]);
+}
+const OTIMAS_N1 = TEMAS.filter((tm) => tm.nivel === 1)
+  .flatMap((tm) => ESTILOS.filter((es) => es.nivel === 1 && rotulo(tm.id, es.id) === 4).map((es) => [tm.id, es.id] as const));
+const NAO_OTIMA_N1 = TEMAS.filter((tm) => tm.nivel === 1)
+  .flatMap((tm) => ESTILOS.filter((es) => es.nivel === 1 && rotulo(tm.id, es.id) < 4).map((es) => [tm.id, es.id] as const))[0];
+
+describe('paridade TS × SQL (parte B)', () => {
+  it('fãs da nota, fãs do excesso e preço da peça iguais a camisetaria.ts', async () => {
+    const rows = await q<{ m: number; n: number; f: number }>(
+      `select k / 4.0::double precision as m, n, public.idle_tee_fas_nota(k / 4.0::double precision, n) as f
+         from generate_series(4, 40) k cross join generate_series(1, 25) n`);
+    expect(rows).toHaveLength(37 * 25);
+    for (const x of rows) expect(x.f, `${x.m}@${x.n}`).toBe(fasNota(x.m, x.n));
+    const r = rng(5);
+    let teto = 0;
+    let sobra0 = 0;
+    for (let i = 0; i < 200; i++) {
+      const nivel = ent(r, 1, 25);
+      const estoque = pecasLote(nivel, ent(r, 0, 2) as 0 | 1 | 2);
+      const p = r() * estoque * 2.5;
+      const [x] = await q<{ f: number }>('select public.idle_tee_fas_excesso($1, $2, $3) as f', [p, estoque, nivel]);
+      const esperado = fasExcesso(p, estoque, nivel);
+      if (esperado === 0) { sobra0++; expect(x.f).toBe(0); } else expect(rel(x.f, esperado)).toBeLessThan(1e-12);
+      if (esperado === publico(nivel) * 0.2) teto++;
+    }
+    expect(teto).toBeGreaterThan(5);
+    expect(sobra0).toBeGreaterThan(5);
+    const precos = await q<{ id: number; p: number }>('select id, public.idle_tee_preco_peca(id) as p from public.idle_tee_cat_peca order by id');
+    expect(precos.map((x) => x.p)).toEqual(PECAS.map((pc) => precoPeca(pc.id)));
+  });
+});
+
+describe('a venda (avancar)', () => {
+  it('Review Focus 1: lança e some 3 dias: venda termina sozinha, cupom e fãs do excesso entram uma vez, revelação na próxima visita', async () => {
+    await camisetaria(1000);
+    await lancar({ lote: 0, nome: 'Sumiu' }); // 12 peças, 1 h
+    await ajustar({ procura: 30 }); // sobra procura: 18 a mais que o estoque
+    const [c] = await colecoes();
+    const m0 = await cupons();
+    andar(3 * 24 * H);
+    await abrirJogo(); // só anda a venda
+    let x = (await colecoes())[0];
+    expect(x).toMatchObject({ vendido: 12, revelada: false });
+    expect(await cupons()).toBeCloseTo(m0 + 12 * precoPeca(1), 9);
+    expect((await estado()).fas).toBe(fasExcesso(30, 12, 1));
+    expect(await prods()).toEqual([]);
+    expect(await notasCad()).toEqual([]);
+    expect((await estado()).volume).toBe(0);
+    await lugarB(); // a próxima visita revela
+    x = (await colecoes())[0];
+    expect(x.revelada).toBe(true);
+    const ps = await prods();
+    expect(ps).toHaveLength(1);
+    expect(ps[0]).toMatchObject({ nome: 'Sumiu', partes: [1, 1, 1, 1], numero: c.pct });
+    expect(ps[0].criado_em.getTime()).toBe(c.pronta_em.getTime());
+    expect(await notasCad()).toEqual([
+      { tipo: 'combo', a: 1, b: 1, rotulo: c.rotulo },
+      { tipo: 'peca', a: 1, b: 1, rotulo: c.peca_tema + 1 },
+    ]);
+    const e1 = await estado();
+    expect(e1.volume).toBe(1);
+    expect(e1.fas).toBe(fasExcesso(30, 12, 1) + fasNota(c.media, 1));
+    const m1 = await cupons();
+    // mais visitas não pagam nada de novo
+    await lugarB();
+    andar(H);
+    await abrirJogo();
+    await lugarB();
+    expect(await cupons()).toBe(m1);
+    expect(await estado()).toEqual(e1);
+    expect(await prods()).toHaveLength(1);
+  });
+  it('Review Focus 2: venda atravessando sexta 18h e sábado 2h segue o peso 2× e termina exatamente em min(procura, estoque)', async () => {
+    await camisetaria(1000);
+    andar(47 * H); // quarta 15h + 47 h = sexta 14h de Brasília
+    await lancar(); // médio: pronta sexta 16h, fim sábado 4h
+    const [c] = await colecoes();
+    const total = Math.min(c.procura, c.pecas);
+    const pronta = c.pronta_em.getTime();
+    expect(new Date(pronta).toISOString()).toMatch(/T19:00:00/); // 16h de Brasília
+    const m0 = await cupons();
+    const v: Record<number, number> = {};
+    for (const h of [1, 2, 3, 4, 6, 9, 10, 11, 12, 13, 30]) {
+      agora = pronta + h * H;
+      vi.setSystemTime(agora);
+      await abrirJogo();
+      const [x] = await colecoes();
+      v[h] = x.vendido;
+      expect(rel(x.vendido, vendidoAte(total, pronta, agora)), `${h} h`).toBeLessThan(1e-12);
+      expect(rel((await cupons()) - m0, x.vendido * precoPeca(1)), `${h} h`).toBeLessThan(1e-9);
+    }
+    // 16h-18h pesa 1, 18h-2h pesa 2, 2h-4h pesa 1: 20 "horas" de peso no total
+    expect(rel(v[1], total / 20)).toBeLessThan(1e-12);
+    expect(rel(v[3] - v[2], 2 * v[1])).toBeLessThan(1e-9);
+    expect(v[12]).toBe(total);
+    expect(v[13]).toBe(total);
+    expect(v[30]).toBe(total);
+    expect(rel((await cupons()) - m0, total * precoPeca(1))).toBeLessThan(1e-12);
+  });
+  it('sem sobra de procura: vende só a procura e não ganha fã de excesso', async () => {
+    await camisetaria(1000);
+    await lancar({ lote: 2 }); // 84 peças
+    await ajustar({ procura: 50, notas: [5, 5, 5, 5] });
+    andar(20 * H);
+    await abrirJogo();
+    expect((await colecoes())[0].vendido).toBe(50);
+    expect((await estado()).fas).toBe(0);
+  });
+  it('marcos de volume, fãs e lendário só saem no depois (idle_lugar), nunca no avancar', async () => {
+    await camisetaria(1000);
+    await q('update public.idle_place_state set volume = 49, fas = 99990 where user_id = $1 and lugar = 3', [A]);
+    await lancar({ lote: 0 });
+    await ajustar({ notas: [10, 10, 10, 10], procura: 1000, pct: 50 });
+    andar(14 * H);
+    await abrirJogo();
+    let e = await estado();
+    expect(e.fas).toBe(99990 + fasExcesso(1000, 12, 1)); // passou de 100 mil no avancar
+    expect(e).toMatchObject({ marcos: [], volume: 49, lendario: false });
+    expect(await daCamisetaria()).toEqual([]);
+    const r = await lugarB();
+    e = await estado();
+    expect(e).toMatchObject({ volume: 50, lendario: true });
+    expect(e.fas).toBe(99990 + fasExcesso(1000, 12, 1) + fasNota(10, 1));
+    expect(r.marcos_novos).toEqual([36, 37, 38]);
+    expect(e.marcos).toEqual([36, 37, 38]);
+    expect(await daCamisetaria()).toEqual([88]);
+  });
+});
+
+describe('a revelação (depois)', () => {
+  it('conquistas 87 (200% de procura), 88 (quatro dez) e 114 (encalhe, menos de 20%)', async () => {
+    await camisetaria(1e6);
+    const passo = async (o: Partial<Opcoes>, aj: Parameters<typeof ajustar>[0]) => {
+      andar(60_000);
+      await lancar({ lote: 0, ...o });
+      await ajustar(aj);
+      andar(H);
+      await lugarB();
+      await fechar();
+    };
+    await passo({}, { pct: 199, notas: [10, 10, 10, 9] });
+    expect(await daCamisetaria()).toEqual([]);
+    await passo({ tema: 2 }, { pct: 200, notas: [5, 5, 5, 5] });
+    expect(await daCamisetaria()).toEqual([87]);
+    await passo({ tema: 3 }, { pct: 19.9, notas: [5, 5, 5, 5] });
+    expect(await daCamisetaria()).toEqual([87, 114]);
+    expect((await estado()).lendario).toBe(false);
+    await passo({ tema: 4 }, { pct: 20, notas: [10, 10, 10, 10] });
+    expect(await daCamisetaria()).toEqual([87, 88, 114]);
+    expect((await estado()).lendario).toBe(true);
+  });
+  it('revela em ordem várias coleções prontas de uma vez (cada uma com a hora em que ficou pronta)', async () => {
+    await camisetaria(1e6);
+    await lancar({ lote: 0, nome: 'Primeira' });
+    andar(H);
+    await abrirJogo(); // só a venda anda
+    await fechar();
+    andar(H);
+    await lancar({ lote: 0, nome: 'Segunda', tema: 2 });
+    andar(13 * H);
+    await lugarB();
+    const cs = await colecoes();
+    expect(cs.map((c) => c.revelada)).toEqual([true, true]);
+    const ps = await prods();
+    expect(ps.map((p) => p.nome)).toEqual(['Primeira', 'Segunda']);
+    expect(ps.map((p) => p.criado_em.getTime())).toEqual(cs.map((c) => c.pronta_em.getTime()));
+    expect((await estado()).volume).toBe(2);
+  });
+  it('Review Focus 5: mesmo par numa das 3 últimas derruba 2; só o tema ou só o estilo da última, 1', async () => {
+    await camisetaria(1e6);
+    const quedas: number[][] = [];
+    for (const [tema, estilo] of [[2, 1], [4, 3], [2, 1], [2, 3], [5, 3], [4, 2]]) {
+      andar(60_000);
+      await lancar({ tema, estilo, lote: 0 });
+      const cs = await colecoes();
+      const c = cs[cs.length - 1];
+      const semRep = notas({ id: c.id, tema, estilo, peca: 1, cor: 1, foco: [3, 5, 2], lote: 0, nivel: 1, fas: 0, tendencia: c.tendencia, ultimas: [] });
+      // sem bater no teto nem no chão, a queda é exata
+      expect(Math.max(...semRep), `${tema}/${estilo}`).toBeLessThan(10);
+      expect(Math.min(...semRep), `${tema}/${estilo}`).toBeGreaterThan(2);
+      quedas.push(semRep.map((n, k) => n - c.notas[k]));
+      await fechar();
+    }
+    expect(quedas).toEqual([[0, 0, 0, 0], [0, 0, 0, 0], [2, 2, 2, 2], [1, 1, 1, 1], [1, 1, 1, 1], [0, 0, 0, 0]]);
+  });
+});
+
+describe('desafios da camisetaria', () => {
+  type D = { id: number; lugar: number; tipo: string; valor: number; texto: string; premio: string; premio_valor: number };
+  let todos: D[] = [];
+  async function soDesafio(id: number) {
+    if (todos.length === 0) todos = await q<D>('select * from public.idle_cat_place_desafio where lugar = 3 order by id');
+    const d = todos.find((x) => x.id === id)!;
+    await q('delete from public.idle_cat_place_desafio where lugar = 3');
+    await q(`insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values ($1, $2, $3, $4, $5, $6, $7)`,
+      [d.id, d.lugar, d.tipo, d.valor, d.texto, d.premio, d.premio_valor]);
+  }
+  const feitos = async () => (await q<{ d: number }>(
+    'select desafio as d from public.idle_place_challenges where user_id = $1 and lugar = 3', [A])).map((x) => x.d);
+  const limpar = async () => {
+    await q('delete from public.idle_place_challenges where user_id = $1', [A]);
+    await q('delete from public.idle_tee_colecoes where user_id = $1', [A]);
+    await q('delete from public.idle_place_notes where user_id = $1', [A]);
+  };
+  type Caso = { o?: Partial<Opcoes>; aj?: Parameters<typeof ajustar>[0] };
+  async function revelar({ o = {}, aj = {} }: Caso) {
+    andar(60_000);
+    await lancar({ lote: 0, ...o });
+    await ajustar(aj);
+    andar(4 * H);
+    await lugarB();
+    await fechar();
+  }
+  const [ot, oe] = OTIMAS_N1[0];
+  const [nt, ne] = NAO_OTIMA_N1;
+  const CASOS: [number, Caso[], Caso][] = [
+    [301, [{ aj: { notas: [8, 8, 8, 7] } }], { aj: { notas: [8, 8, 8, 8] } }],
+    [302, [{ aj: { pct: 299.9 } }], { aj: { pct: 300 } }],
+    [303, [{ o: { lote: 2 }, aj: { procura: 83.9 } }, { o: { lote: 1 }, aj: { procura: 1000 } }], { o: { lote: 2 }, aj: { procura: 84 } }],
+    [304, [{ aj: { tendencia: 2, notas: [9, 9, 9, 9] } }, { aj: { tendencia: 1, notas: [7, 7, 7, 6] } }], { aj: { tendencia: 1, notas: [7, 7, 7, 7] } }],
+    [305, [{ aj: { notas: [10, 10, 10, 7] } }], { aj: { notas: [8, 8, 8, 8] } }],
+    [306, [{ aj: { notas: [9, 9, 9, 8] } }], { aj: { notas: [1, 1, 1, 9] } }],
+    [307, [{ aj: { notas: [10, 10, 9, 10] } }], { aj: { notas: [1, 1, 10, 1] } }],
+    [308, [{ aj: { notas: [10, 9, 10, 10] } }], { aj: { notas: [1, 10, 1, 1] } }],
+    [309, [{ o: { tema: nt, estilo: ne } }], { o: { tema: ot, estilo: oe } }],
+    [310, [{ aj: { peca: 1, notas: [10, 10, 10, 10] } }, { aj: { peca: 6, notas: [7, 7, 7, 6] } }], { aj: { peca: 6, notas: [7, 7, 7, 7] } }],
+    [311, [{}, {}], {}],
+    [312, [{ aj: { pct: 599 } }], { aj: { pct: 600 } }],
+  ];
+  it('cada tipo com o valor da coleção: o que não alcança não paga, o que alcança paga', async () => {
+    expect(OTIMAS_N1.length).toBeGreaterThan(0);
+    await camisetaria(1e8);
+    for (const [id, nao, sim] of CASOS) {
+      await soDesafio(id);
+      await limpar();
+      for (const caso of nao) {
+        await revelar(caso);
+        expect(await feitos(), `${id} ${JSON.stringify(caso)}`).toEqual([]);
+      }
+      await revelar(sim);
+      expect(await feitos(), `${id}`).toEqual([id]);
+    }
+  });
+  it('combinação ótima só conta quando é nova no caderninho', async () => {
+    await camisetaria(1e8);
+    await soDesafio(309);
+    await revelar({ o: { tema: ot, estilo: oe } });
+    expect(await feitos()).toEqual([309]);
+    await q('delete from public.idle_place_challenges where user_id = $1', [A]);
+    await revelar({ o: { tema: ot, estilo: oe } }); // a mesma de novo: já estava no caderninho
+    expect(await feitos()).toEqual([]);
+  });
+  it('pago uma vez só na semana', async () => {
+    await camisetaria(1e8);
+    await soDesafio(301);
+    const taxa = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+    for (const k of [0, 1]) {
+      andar(60_000);
+      await lancar({ lote: 0, tema: k + 1 });
+      await ajustar({ notas: [9, 9, 9, 9] });
+      andar(H);
+      await abrirJogo(); // fecha a conta até agora (sem o depois)
+      const v0 = await valuation();
+      await lugarB(); // revela: paga (ou não) o desafio sem passar tempo
+      const dv = (await valuation()) - v0;
+      if (k === 0) expect(rel(dv, 2 * 3600 * (await taxa()))).toBeLessThan(1e-6); // dv sai de dois números grandes (valuation 1e15)
+      else expect(dv).toBe(0);
+      await fechar();
+    }
+    expect(await feitos()).toEqual([301]);
+  });
+});
+
+describe('encerrar', () => {
+  it('Review Focus 3: para a venda na hora, devolve 50% do custo do que sobrou, e não entra mais nada', async () => {
+    await camisetaria(1000);
+    await lancar(); // 36 peças, 108 cupons
+    await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/); // ainda em produção
+    andar(2 * H + 3 * H);
+    const [c] = await colecoes();
+    const vendido = vendidoAte(Math.min(c.procura, c.pecas), c.pronta_em.getTime(), agora);
+    const resp = await encerrar();
+    const [x] = await colecoes();
+    expect(x.encerrada_em!.getTime()).toBe(agora);
+    expect(rel(x.vendido, vendido)).toBeLessThan(1e-12);
+    const esperado = 1000 - 108 + vendido * precoPeca(1) + 0.5 * (108 / 36) * (36 - vendido);
+    expect(rel(await cupons(), esperado)).toBeLessThan(1e-12);
+    expect(resp.lugar.mecanica.ativa).toBeNull();
+    expect(x.revelada).toBe(true); // o responder revela
+    const e = await estado();
+    andar(20 * H);
+    await lugarB();
+    expect((await colecoes())[0].vendido).toBe(x.vendido);
+    expect(await estado()).toEqual(e);
+    await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/);
+    await lancar({ tema: 2 }); // livre de novo
+  });
+  it('lote fiado não devolve cupom', async () => {
+    await camisetaria(0);
+    await lancar({ lote: 0 });
+    andar(H + H);
+    const [c] = await colecoes();
+    expect(c.fiado).toBe(true);
+    const vendido = vendidoAte(Math.min(c.procura, c.pecas), c.pronta_em.getTime(), agora);
+    await encerrar();
+    expect(rel(await cupons(), vendido * precoPeca(1))).toBeLessThan(1e-12);
+  });
+  it('depois do fim da venda não tem o que encerrar; lugar fechado: idle_lugar_fechado', async () => {
+    await expect(encerrar()).rejects.toThrow(/idle_lugar_fechado/);
+    await camisetaria(1000);
+    await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/);
+    await lancar();
+    andar(14 * H);
+    await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/);
+  });
+});
+
+describe('relatório dos influencers', () => {
+  it('só de estilo já lançado, cobra o preço do nível e grava o foco no caderninho', async () => {
+    await expect(relatorio(1)).rejects.toThrow(/idle_lugar_fechado/);
+    await camisetaria(1000, 2);
+    await expect(relatorio(1)).rejects.toThrow(/idle_tee_sem_lancar/);
+    await lancar({ estilo: 4 });
+    await expect(relatorio(1)).rejects.toThrow(/idle_tee_sem_lancar/);
+    await expect(relatorio(99)).rejects.toThrow(/idle_tee_sem_lancar/);
+    const m0 = await cupons();
+    await setCupons(precoRelatorio(2) - 0.01);
+    await expect(relatorio(4)).rejects.toThrow(/idle_lugar_moeda/);
+    expect((await notasCad()).filter((n) => n.tipo === 'foco')).toEqual([]);
+    await setCupons(m0);
+    const resp = await relatorio(4);
+    const [a, tc, d] = ESTILOS[3].foco;
+    expect((await notasCad()).filter((n) => n.tipo === 'foco')).toEqual([{ tipo: 'foco', a: 4, b: 0, rotulo: a * 100 + tc * 10 + d }]);
+    expect(rel(await cupons(), m0 - precoRelatorio(2))).toBeLessThan(1e-12);
+    expect(resp.lugar.caderninho).toContainEqual({ tipo: 'foco', a: 4, b: 0, rotulo: 523 });
+    // de novo: já tem, não cobra outra vez
+    const m1 = await cupons();
+    await relatorio(4);
+    expect(await cupons()).toBe(m1);
+  });
+});
+
+describe('acesso (parte B)', () => {
+  it('encerrar e relatório só para authenticated; os ajudantes novos ficam escondidos', async () => {
+    for (const sql of ['select public.idle_tee_fas_nota(7, 1)', 'select public.idle_tee_fas_excesso(10, 5, 1)', 'select public.idle_tee_preco_peca(1)',
+      'select public.idle_tee_avancar(s) from public.idle_state s', 'select public.idle_tee_depois(s) from public.idle_state s']) {
+      await expect(t.asRole('authenticated', sql), sql).rejects.toThrow(/permission denied/);
+    }
+    const priv = await q<{ anon: boolean; auth: boolean }>(
+      `select has_function_privilege('anon', f, 'execute') as anon, has_function_privilege('authenticated', f, 'execute') as auth
+         from unnest(array['public.idle_tee_lancar(int, int, int, int, int, int, int, int, text)', 'public.idle_tee_encerrar()',
+                           'public.idle_tee_relatorio(int)']) f`);
+    expect(priv.map((p) => [p.anon, p.auth])).toEqual([[false, true], [false, true], [false, true]]);
   });
 });

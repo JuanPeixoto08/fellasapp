@@ -442,3 +442,189 @@ revoke all on function public.idle_tee_tendencia(date) from public, anon, authen
 revoke all on function public.idle_tee_json(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) from public, anon;
 grant execute on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) to authenticated;
+
+-- ===== parte B: a venda, a revelação (caderninho, conquistas, desafios), encerrar e o relatório =====
+
+-- preço de uma peça vendida: o custo da peça × PRECO_MULT (precoPeca)
+create or replace function public.idle_tee_preco_peca(p_peca int)
+returns double precision language sql stable set search_path = public as $$
+  select p.custo * k.preco_mult from public.idle_tee_cat_peca p, public.idle_tee_const k where p.id = p_peca
+$$;
+
+-- fãs que a coleção traz pela nota ao ser revelada: média 7 ou mais dá 10% do público do nível por ponto acima de 6
+-- (fasNota; round do JS: meio pra cima)
+create or replace function public.idle_tee_fas_nota(p_media double precision, p_nivel int)
+returns double precision language sql stable set search_path = public as $$
+  select case when p_media >= 7
+              then floor(public.idle_tee_publico(p_nivel) * 0.1::double precision * (p_media - 6) + 0.5)
+              else 0 end::double precision
+$$;
+
+-- fãs da procura que sobrou depois de esgotar, no fim da venda: metade da sobra, até 20% do público do nível (fasExcesso)
+create or replace function public.idle_tee_fas_excesso(p_procura double precision, p_estoque double precision, p_nivel int)
+returns double precision language sql stable set search_path = public as $$
+  select least(0.5::double precision * greatest(0::double precision, p_procura - p_estoque),
+               public.idle_tee_publico(p_nivel) * 0.2::double precision)
+$$;
+
+-- anda a venda até agora (roda no idle_lock, antes de fechar a conta). Só mexe nos cupons e nos fãs do lugar e no vendido
+-- da coleção; marcos, conquistas, pódio, caderninho e desafio ficam pro idle_tee_depois. A coleção vende as 12 h dela
+-- mesmo sem a pessoa passar (visto_em não conta aqui). Encerrada: parou na hora (o encerrar andou até ela) e os fãs do
+-- excesso não vêm. No fim da venda: vendido = min(procura, estoque) exato, os fãs do excesso entram e a coleção sai da conta.
+create or replace function public.idle_tee_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$
+declare
+  c       public.idle_tee_colecoes;
+  v_novo  double precision;
+  v_moeda double precision := 0;
+  v_fas   double precision := 0;
+begin
+  for c in select * from public.idle_tee_colecoes x
+            where x.user_id = s.user_id and x.encerrada_em is null and not x.fas_excesso_pago and x.pronta_em <= now()
+            order by x.pronta_em, x.id
+            for update loop
+    v_novo := public.idle_tee_vendido_ate(least(c.procura, c.pecas::double precision), c.pronta_em, now());
+    v_moeda := v_moeda + (v_novo - c.vendido) * public.idle_tee_preco_peca(c.peca);
+    if now() >= c.fim_em then
+      v_fas := v_fas + public.idle_tee_fas_excesso(c.procura, c.pecas, c.nivel);
+    end if;
+    update public.idle_tee_colecoes set vendido = v_novo, fas_excesso_pago = (now() >= c.fim_em) where id = c.id;
+  end loop;
+  if v_moeda <> 0 or v_fas <> 0 then
+    update public.idle_place_state set moeda = moeda + v_moeda, fas = fas + v_fas where user_id = s.user_id and lugar = 3;
+  end if;
+end;
+$$;
+
+-- a revelação, depois da conta fechada e salva: cada coleção pronta e ainda não revelada, na ordem em que ficou pronta,
+-- entra no pódio e no placar da semana com a hora em que ficou pronta, vai pro caderninho (rótulo da combinação e peça ×
+-- tema + 1), soma volume, fãs da nota e lendário (4 notas 10), dá as conquistas e confere o desafio da semana. Devolve o s
+-- (o prêmio do desafio mexe no valuation; quem chama salva).
+create or replace function public.idle_tee_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$
+declare
+  c       public.idle_tee_colecoes;
+  v_nova  boolean;
+  v_dez   boolean;
+  v_menor int;
+  v_sem   int;
+begin
+  for c in select * from public.idle_tee_colecoes x
+            where x.user_id = s.user_id and not x.revelada and x.pronta_em <= now()
+            order by x.pronta_em, x.id
+            for update loop
+    -- combinação ótima nova: ótima e o caderninho ainda não tinha esse tema × estilo (antes desta revelação)
+    v_nova := c.rotulo = 4 and not exists (select 1 from public.idle_place_notes n
+                                            where n.user_id = s.user_id and n.lugar = 3 and n.tipo = 'combo'
+                                              and n.a = c.tema and n.b = c.estilo);
+    v_dez := c.notas = array[10, 10, 10, 10];
+    v_menor := least(c.notas[1], c.notas[2], c.notas[3], c.notas[4]);
+    update public.idle_tee_colecoes set revelada = true where id = c.id;
+    perform public.idle_place_registrar(s.user_id, 3, c.nome, array[c.tema, c.estilo, c.peca, c.cor], c.pct, c.pronta_em, 0);
+    perform public.idle_place_nota(s.user_id, 3, 'combo', c.tema, c.estilo, c.rotulo);
+    perform public.idle_place_nota(s.user_id, 3, 'peca', c.peca, c.tema, c.peca_tema + 1);
+    update public.idle_place_state
+       set volume = volume + 1, fas = fas + public.idle_tee_fas_nota(c.media, c.nivel), lendario = lendario or v_dez
+     where user_id = s.user_id and lugar = 3;
+    perform public.idle_ganhar(s.user_id, 'tee_pct', c.pct);
+    if v_dez then
+      perform public.idle_ganhar(s.user_id, 'tee_quatro_dez');
+    end if;
+    if c.pct < 20 then
+      perform public.idle_ganhar(s.user_id, 'tee_encalhe');
+    end if;
+    -- o desafio da semana (só um tipo vale por semana; os outros devolvem o s igual)
+    select count(*) into v_sem from public.idle_tee_colecoes x
+     where x.user_id = s.user_id and x.criada_em >= (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo');
+    s := public.idle_place_desafio(s, 3, 'tee_nota', c.media);
+    s := public.idle_place_desafio(s, 3, 'tee_pct', c.pct);
+    s := public.idle_place_desafio(s, 3, 'tee_esgotou_grande', case when c.lote = 2 and c.procura >= c.pecas then 1 else 0 end);
+    s := public.idle_place_desafio(s, 3, 'tee_tendencia', case when c.tema = c.tendencia then c.media end);
+    s := public.idle_place_desafio(s, 3, 'tee_quatro', v_menor);
+    s := public.idle_place_desafio(s, 3, 'tee_luis', c.notas[4]);
+    s := public.idle_place_desafio(s, 3, 'tee_resenha', c.notas[3]);
+    s := public.idle_place_desafio(s, 3, 'tee_mauro', c.notas[2]);
+    s := public.idle_place_desafio(s, 3, 'tee_otima', case when v_nova then 1 else 0 end);
+    s := public.idle_place_desafio(s, 3, 'tee_moletom', case when c.peca = 6 then c.media end);
+    s := public.idle_place_desafio(s, 3, 'tee_colecoes', v_sem);
+  end loop;
+  return s;
+end;
+$$;
+
+-- encerrar antes (saldão): a venda para agora e o estoque que sobrou devolve 50% do que custou (lote fiado custou 0: nada)
+create or replace function public.idle_tee_encerrar()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  c public.idle_tee_colecoes;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  perform public.idle_save(s);
+  perform 1 from public.idle_place_state where user_id = s.user_id and lugar = 3 for update;
+  if not found then
+    raise exception 'idle_lugar_fechado' using errcode = 'P0001';
+  end if;
+  perform public.idle_tee_avancar(s); -- a venda até agora (o idle_lock já andou; aqui fica explícito e não paga duas vezes)
+  select * into c from public.idle_tee_colecoes x
+   where x.user_id = s.user_id and x.encerrada_em is null and x.pronta_em <= now() and now() < x.fim_em
+   order by x.criada_em desc, x.id desc limit 1
+   for update;
+  if not found then
+    raise exception 'idle_tee_sem_venda' using errcode = 'P0001';
+  end if;
+  update public.idle_tee_colecoes set encerrada_em = now() where id = c.id;
+  update public.idle_place_state set moeda = moeda + 0.5 * c.custo / c.pecas * (c.pecas - c.vendido)
+   where user_id = s.user_id and lugar = 3;
+  return public.idle_place_responder(s, 3);
+end;
+$$;
+
+-- o relatório dos influencers: o foco ideal de um estilo que a pessoa já lançou, no caderninho (arte·100 + tecido·10 + div).
+-- Quem já tem o relatório desse estilo não paga de novo.
+create or replace function public.idle_tee_relatorio(p_estilo int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  st      public.idle_place_state;
+  v_foco  int[];
+  v_preco double precision;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  perform public.idle_save(s);
+  select * into st from public.idle_place_state where user_id = s.user_id and lugar = 3 for update;
+  if not found then
+    raise exception 'idle_lugar_fechado' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.idle_tee_colecoes c where c.user_id = s.user_id and c.estilo = p_estilo) then
+    raise exception 'idle_tee_sem_lancar' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.idle_place_notes n
+                  where n.user_id = s.user_id and n.lugar = 3 and n.tipo = 'foco' and n.a = p_estilo and n.b = 0) then
+    v_preco := public.idle_tee_preco_relatorio(st.nivel);
+    if st.moeda < v_preco then
+      raise exception 'idle_lugar_moeda' using errcode = 'P0001';
+    end if;
+    select e.foco into v_foco from public.idle_tee_cat_estilo e where e.id = p_estilo;
+    update public.idle_place_state set moeda = moeda - v_preco where user_id = s.user_id and lugar = 3;
+    perform public.idle_place_nota(s.user_id, 3, 'foco', p_estilo, 0, v_foco[1] * 100 + v_foco[2] * 10 + v_foco[3]);
+  end if;
+  return public.idle_place_responder(s, 3);
+end;
+$$;
+
+revoke all on function public.idle_tee_preco_peca(int) from public, anon, authenticated;
+revoke all on function public.idle_tee_fas_nota(double precision, int) from public, anon, authenticated;
+revoke all on function public.idle_tee_fas_excesso(double precision, double precision, int) from public, anon, authenticated;
+revoke all on function public.idle_tee_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_tee_depois(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_tee_encerrar() from public, anon;
+grant execute on function public.idle_tee_encerrar() to authenticated;
+revoke all on function public.idle_tee_relatorio(int) from public, anon;
+grant execute on function public.idle_tee_relatorio(int) to authenticated;

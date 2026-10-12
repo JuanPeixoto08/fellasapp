@@ -36,7 +36,7 @@ export type GameErrorCode =
   | 'idle_dourado_gone' | 'idle_dourado_pego'
   | 'idle_horta_ocupado' | 'idle_horta_vazio' | 'idle_horta_trancado' | 'idle_horta_semente' | 'idle_horta_verde'
   | 'idle_lugar_aberto' | 'idle_lugar_fechado' | 'idle_lugar_nome' | 'idle_lugar_moeda' | 'idle_lugar_nivel_max'
-  | 'idle_tee_ocupada' | 'idle_tee_trancado' | 'idle_tee_foco' | 'idle_tee_sem_lancar'
+  | 'idle_tee_ocupada' | 'idle_tee_trancado' | 'idle_tee_foco' | 'idle_tee_sem_lancar' | 'idle_tee_sem_venda'
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
@@ -93,6 +93,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_tee_trancado: 'Isso ainda não liberou na camisetaria',
   idle_tee_foco: 'O foco precisa somar 10',
   idle_tee_sem_lancar: 'Lança uma coleção com esse estilo antes',
+  idle_tee_sem_venda: 'Não tem coleção à venda agora',
   idle_opp_cap: 'Chega de oportunidade por hoje',
   idle_hire_self: 'Não dá pra se contratar',
   idle_hire_twice: 'Essa pessoa já trabalha pra você',
@@ -153,7 +154,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_dourado_gone', 'idle_dourado_pego',
   'idle_horta_ocupado', 'idle_horta_vazio', 'idle_horta_trancado', 'idle_horta_semente', 'idle_horta_verde',
   'idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max',
-  'idle_tee_ocupada', 'idle_tee_trancado', 'idle_tee_foco', 'idle_tee_sem_lancar',
+  'idle_tee_ocupada', 'idle_tee_trancado', 'idle_tee_foco', 'idle_tee_sem_lancar', 'idle_tee_sem_venda',
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
   'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
