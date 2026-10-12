@@ -21,12 +21,13 @@ export function portaBolsa(s: IdleState, b: BolsaEstado | null): ResumoPorta {
 
 export function portaHorta(s: IdleState, h: HortaEstado | null, agoraMs: number): ResumoPorta {
   if ((s.generators[10] ?? 0) < 1) return { st: 'Compra 1 Food truck pra abrir', badge: null, trancada: true };
-  const bonus = s.horta_bonus ? resumoBonus(s.horta_bonus) : 'Nada madura ainda';
+  // só o bônus principal (a lista toda passava do tamanho da porta; o resto está dentro da Horta)
+  const bonus = (s.horta_bonus ? resumoBonus(s.horta_bonus) : 'Nada madura ainda').split(' · ')[0];
   if (!h) return { st: bonus, badge: null, trancada: false };
   const maduras = h.plantas.filter((p) => madura(fase(daPlanta(p), Date.parse(p.inicio), agoraMs))).length;
   const vazios = h.lado * h.lado - h.plantas.length;
   return {
-    st: `${h.lado} × ${h.lado} · ${bonus} · coleção ${h.descobertas.length}/8`,
+    st: `${bonus} · coleção ${h.descobertas.length}/8`,
     badge: maduras ? (maduras === 1 ? '1 madura' : `${maduras} maduras`) : vazios > 0 ? `${vazios} vazios` : null,
     trancada: false,
   };

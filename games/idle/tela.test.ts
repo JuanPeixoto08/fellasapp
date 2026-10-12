@@ -125,7 +125,7 @@ describe('tela da Fellas Inc.', () => {
     const horta = { lado: 2, food_trucks: 3, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: comFT.server_now };
     tela.renderizar(modelo({ estado: comFT, hortaAberta: true, horta }));
     expect(porta.classList.contains('trancada')).toBe(false);
-    expect(porta.textContent).toContain('2 × 2');
+    expect(porta.textContent).toContain('coleção 2/8');
     expect(porta.textContent).toContain('4 vazios');
     const cheia = root.querySelector<HTMLElement>('.minigame-tela')!;
     expect(cheia.hasAttribute('hidden')).toBe(false);

@@ -32,8 +32,18 @@ describe('o resumo das portas', () => {
       plantas: [{ canteiro: 0, especie: 1, inicio: new Date(AGORA - 2 * 3600_000).toISOString(), origem: 'plantada' }],
     };
     const r = portaHorta(estado({ generators: gens({ 11: 3 }), horta_bonus: h.bonus }), h, AGORA);
-    expect(r.st).toBe('2 × 2 · Produção +1% · coleção 2/8');
+    expect(r.st).toBe('Produção +1% · coleção 2/8');
     expect(r.badge).toBe('1 madura');
+  });
+  it('Horta: o resumo cabe na porta (só o bônus principal, não a lista toda)', () => {
+    const h: HortaEstado = {
+      lado: 5, food_trucks: 124, descobertas: [1, 2, 4], server_now: '', bonus: { producao: 0.05, geradores: 0.02, melhorias: 0, oportunidades: 0.2 }, plantas: [],
+    };
+    expect(portaHorta(estado({ generators: gens({ 11: 124 }), horta_bonus: h.bonus }), h, AGORA).st).toBe('Produção +5% · coleção 3/8');
+    const semProducao = { ...h.bonus, producao: 0 };
+    expect(portaHorta(estado({ generators: gens({ 11: 124 }), horta_bonus: semProducao }), { ...h, bonus: semProducao }, AGORA).st).toBe('Geradores 2% mais baratos · coleção 3/8');
+    const nada = { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 };
+    expect(portaHorta(estado({ generators: gens({ 11: 124 }), horta_bonus: nada }), { ...h, bonus: nada }, AGORA).st).toBe('Nada madura ainda · coleção 3/8');
   });
   it('Convidados: quantos sentados e as trocas; cadeira aberta vazia vira selo', () => {
     const c = { cadeira: [1, null, null], desde: ['2026-10-14T17:00:00Z', null, null], trocas: 3, trocas_t: null, ppp: 30, derrubada_ate: null };
