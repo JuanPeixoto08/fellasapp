@@ -21,7 +21,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', volumeMusica: 1, chaves: { efeitos: true, avisos: true }, novidadeNova: false, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', volumeMusica: 1, chaves: { efeitos: true, avisos: true }, novidadeNova: false, horta: null, hortaAberta: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -36,6 +36,7 @@ beforeEach(() => {
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
     config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
+    horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;
@@ -88,6 +89,39 @@ describe('tela da Fellas Inc.', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it('gaveta Horta: apagada sem Food truck; aberta mostra a horta em tela cheia (com-gaveta); Caixinha fecha', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const gaveta = root.querySelector<HTMLButtonElement>('.gaveta-horta')!;
+    expect(gaveta.classList.contains('trancada')).toBe(true);
+    gaveta.click();
+    expect(acoes.horta).toHaveBeenCalledWith('abrir');
+    const comFT = estado({ generators: [1, ...Array(9).fill(0), 3, ...Array(19).fill(0)] });
+    const horta = { lado: 2, food_trucks: 3, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: comFT.server_now };
+    tela.renderizar(modelo({ estado: comFT, hortaAberta: true, horta }));
+    expect(gaveta.classList.contains('trancada')).toBe(false);
+    const banc = root.querySelector('.bancada')!;
+    expect(banc.classList.contains('com-gaveta')).toBe(true);
+    expect(banc.classList.contains('com-bolsa')).toBe(false);
+    expect(root.querySelector('.gaveta-corpo .horta-grade')).not.toBeNull();
+    expect(root.querySelector('.bancada-topo h2')!.textContent).toBe('Horta');
+    root.querySelector<HTMLButtonElement>('.bancada-topo .fechar')!.click();
+    expect(acoes.horta).toHaveBeenLastCalledWith('fechar');
+    root.querySelector<HTMLButtonElement>('.gaveta:not(.gaveta-bolsa):not(.gaveta-horta)')!.click();
+    expect(acoes.horta).toHaveBeenLastCalledWith('fechar');
+  });
+  it('os descontos da horta entram nos preços da Loja', () => {
+    const tela = criarTela(root, acoes);
+    const preco1 = () => root.querySelector<HTMLButtonElement>('.gerador button[data-qtd="1"]')!.textContent;
+    tela.renderizar(modelo({ estado: estado({ valuation: 0 }) }));
+    const cheio = preco1();
+    tela.renderizar(modelo({ estado: estado({ valuation: 0, horta_bonus: { producao: 0, geradores: 0.5, melhorias: 0, oportunidades: 0 } }) }));
+    tela.renderizar(modelo({ estado: estado({ half_price: true }) }));
+    const metade = preco1();
+    tela.renderizar(modelo({ estado: estado({ horta_bonus: { producao: 0, geradores: 0.5, melhorias: 0, oportunidades: 0 } }) }));
+    expect(preco1()).toBe(metade);
+    expect(preco1()).not.toBe(cheio);
   });
   it('a oportunidade não passa mais na cena (fica só na Caixinha)', () => {
     const tela = criarTela(root, acoes);

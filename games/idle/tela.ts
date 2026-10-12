@@ -2,10 +2,11 @@
 // mudança de estado; `atualizarValor` ~10x por segundo (só o número e quais botões estão liberados).
 // Texto de usuário sempre por textContent.
 import { button, el } from '../shared/hud/hud';
-import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, MelhoriaBolsa } from '../shared/types';
+import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, LadoBolsa, MelhoriaBolsa } from '../shared/types';
 import { ativos } from './ativos';
 import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
+import { criarHortaTela } from './hortaTela';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
@@ -48,6 +49,9 @@ export type Modelo = {
   chaves: Record<ChaveSom, boolean>;
   /** Volume da música, de 0 (desligada) a 1. */
   volumeMusica: number;
+  /** Horta (minigame 2): gaveta aberta e o último estado buscado (null = ainda não buscou). */
+  hortaAberta: boolean;
+  horta: HortaEstado | null;
   /** Agora no relógio do servidor (ms): a Promoção valendo muda os preços. Sem = a hora do estado. */
   agora?: number;
   /** Tem patch note que a pessoa ainda não leu (bolinha na engrenagem). */
@@ -59,6 +63,7 @@ export type Acoes = {
   pegar(janela: number): void; trocarAba(aba: Aba): void; caixa(aberta: boolean): void; tentarDeNovo(): void;
   contratar(userId: string): void; editor(acao: AcaoEditor): void; mudarVisual(campo: Campo, valor: number): void;
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
+  horta(acao: 'abrir' | 'fechar'): void; plantar(canteiro: number, especie: number): void; colher(canteiro: number): void; arrancar(canteiro: number): void;
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
@@ -196,6 +201,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const larga = () => window.matchMedia?.('(min-width: 1100px)').matches === true;
   const gavetaCaixa = button('', 'gaveta', () => {
     a.bolsa('fechar');
+    a.horta('fechar');
     if (!larga()) a.caixa(true); // no PC a lista já está aberta na bancada
   });
   const caixaIcone = el('span', 'gaveta-caixa');
@@ -214,14 +220,25 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   bolsaCaixa.append(iconeBolsa);
   gavetaBolsa.append(bolsaCaixa, el('span', 'gaveta-nome', 'Bolsa'));
   gavetas.append(gavetaBolsa);
+  // gaveta Horta (minigame 2): sem Food truck fica apagada; tocar abre (o main busca a horta)
+  const gavetaHorta = button('', 'gaveta gaveta-horta', () => a.horta('abrir'));
+  const hortaCaixa = el('span', 'gaveta-caixa');
+  const iconeHorta = el('span', 'gaveta-icone gaveta-icone-gerador');
+  iconeHorta.style.backgroundImage = `url(${ativos.gerador(11)})`;
+  hortaCaixa.append(iconeHorta);
+  gavetaHorta.append(hortaCaixa, el('span', 'gaveta-nome', 'Horta'));
+  gavetas.append(gavetaHorta);
+  const hortaTela = criarHortaTela({ plantar: (c, e) => a.plantar(c, e), colher: (c) => a.colher(c), arrancar: (c) => a.arrancar(c) });
   const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t) => a.negociar(e, l, q, t), melhorar: (tp, n) => a.melhorar(tp, n) });
   // topo da Bolsa em tela cheia (só no celular, pelo CSS)
   const bancadaTopo = el('div', 'bancada-topo');
-  const fecharBolsa = button('', 'fechar', () => a.bolsa('fechar'));
+  let gavetaAberta: 'bolsa' | 'horta' | null = null;
+  const fecharBolsa = button('', 'fechar', () => (gavetaAberta === 'horta' ? a.horta('fechar') : a.bolsa('fechar')));
   fecharBolsa.setAttribute('aria-label', 'Fechar a Bolsa');
   fecharBolsa.append(iconeFechar());
   const valorBolsa = el('span', 'chip-valor');
-  bancadaTopo.append(fecharBolsa, el('h2', undefined, 'Bolsa'), valorBolsa);
+  const tituloGaveta = el('h2', undefined, 'Bolsa');
+  bancadaTopo.append(fecharBolsa, tituloGaveta, valorBolsa);
   const corpoBancada = el('div', 'gaveta-corpo');
   const bancada = el('section', 'bancada');
   bancada.setAttribute('aria-label', 'Bancada');
@@ -340,6 +357,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   // Promoção relâmpago valendo: custo pela metade; a meia-preço da Caixinha não soma (o banco faz igual)
   let agoraTela = Date.now();
   const custoAgora = (s: IdleState) => custoMult(catalogo, s) * (promoAtiva(s, agoraTela) ? 0.5 : 1);
+  // a horta: geradores e melhorias mais baratos (o banco aplica igual)
+  const custoGerador = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.geradores ?? 0));
+  const custoMelhoria = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.melhorias ?? 0));
   const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
 
   function linhaGerador(s: IdleState, gid: number) {
@@ -349,7 +369,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     const sprite = el('div', 'sprite');
     sprite.style.backgroundImage = `url(${ativos.gerador(gid)})`;
     const meio = el('div', 'meio');
-    meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid))} cada`));
+    meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid) * (1 + (s.horta_bonus?.producao ?? 0)))} cada`));
     // ligado a uma empresa da Bolsa: cada um libera +1 ação dela (só depois de abrir a Bolsa)
     const ligada = (s.generators[18] ?? 0) >= 1 ? empresaDoGerador(gid) : undefined;
     if (ligada) {
@@ -357,7 +377,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       etq.title = `Cada ${g.nome} libera +1 ação ${deEmpresa(ligada)} ${ligada.nome} na Bolsa`;
       meio.append(etq);
     }
-    const cm = custoAgora(s);
+    const cm = custoGerador(s);
     const botoes = el('div', 'compra');
     const um = button(formatarValor(preco(g.custo, n, 1, cm) * meiaAgora(s)), 'btn', () => a.comprar('gerador', gid, 1));
     um.dataset.qtd = '1';
@@ -525,9 +545,22 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     gavetaBolsa.classList.toggle('trancada', !trader);
     gavetaBolsa.setAttribute('aria-label', trader ? 'Bolsa' : 'Bolsa: compra 1 Grupo de trader pra abrir');
     gavetaBolsa.setAttribute('aria-pressed', String(m.bolsaAberta));
-    gavetaCaixa.setAttribute('aria-pressed', String(!m.bolsaAberta));
-    bancada.classList.toggle('com-bolsa', m.bolsaAberta && jogando);
-    if (m.bolsaAberta && jogando && s) {
+    const foodTruck = (s?.generators[10] ?? 0) >= 1; // gerador 11 (Food truck)
+    gavetaHorta.classList.toggle('trancada', !foodTruck);
+    gavetaHorta.setAttribute('aria-label', foodTruck ? 'Horta' : 'Horta: compra 1 Food truck pra abrir');
+    gavetaHorta.setAttribute('aria-pressed', String(m.hortaAberta));
+    gavetaCaixa.setAttribute('aria-pressed', String(!m.bolsaAberta && !m.hortaAberta));
+    gavetaAberta = !jogando ? null : m.hortaAberta ? 'horta' : m.bolsaAberta ? 'bolsa' : null;
+    bancada.classList.toggle('com-gaveta', gavetaAberta !== null);
+    bancada.classList.toggle('com-bolsa', gavetaAberta === 'bolsa');
+    bancada.classList.toggle('com-horta', gavetaAberta === 'horta');
+    tituloGaveta.textContent = gavetaAberta === 'horta' ? 'Horta' : 'Bolsa';
+    fecharBolsa.setAttribute('aria-label', gavetaAberta === 'horta' ? 'Fechar a Horta' : 'Fechar a Bolsa');
+    if (gavetaAberta === 'horta' && s) {
+      const semHorta: HortaEstado = { lado: 0, food_trucks: 0, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: s.server_now };
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, s.rate, s.valuation, m.ocupado, agoraTela);
+      corpoBancada.replaceChildren(hortaTela.elemento);
+    } else if (m.bolsaAberta && jogando && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado);
       corpoBancada.replaceChildren(bolsaTela.elemento);
     } else {
@@ -555,7 +588,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
           break;
         }
       }
-      const cm = custoAgora(s);
+      const cm = custoMelhoria(s);
       const disponiveis = catalogo.melhorias
         .filter((x) => !s.upgrades.includes(x.id) && liberada(catalogo, x, s))
         .sort((x, y) => x.preco - y.preco);
@@ -839,7 +872,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     numero.textContent = formatarValor(valor);
     valorBolsa.textContent = formatarValor(valor);
     atualizarPrazos();
-    for (const p of bolsaTela.precos()) p.botao.disabled = p.preco > valor;
+    for (const p of [...bolsaTela.precos(), ...hortaTela.precos()]) p.botao.disabled = p.preco > valor;
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {

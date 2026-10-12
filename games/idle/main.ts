@@ -4,7 +4,7 @@ import './idle.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
-import type { BolsaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
+import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual } from '../shared/types';
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
@@ -28,7 +28,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -102,6 +102,20 @@ let conquistasConhecidas: number[] | null = null;
 // Bolsa: gaveta aberta e o último mercado buscado; um temporizador busca de novo na virada do minuto enquanto aberta
 let bolsaAberta = false;
 let bolsa: BolsaEstado | null = null;
+// Horta: gaveta aberta e o último estado; busca de novo a cada 2 min aberta (o que brotou sozinho aparece)
+let hortaAberta = false;
+let horta: HortaEstado | null = null;
+let timerHorta: ReturnType<typeof setInterval> | null = null;
+const RECARREGA_HORTA = ['idle_horta_ocupado', 'idle_horta_vazio', 'idle_horta_trancado', 'idle_horta_semente', 'idle_horta_verde'];
+async function carregarHorta() {
+  if (!hortaAberta || (ancora?.estado.generators[10] ?? 0) < 1) return; // gerador 11 = Food truck
+  try {
+    horta = await api.idleHorta();
+    render();
+  } catch {
+    // sem rede: tenta de novo no próximo ciclo
+  }
+}
 let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;
 let buscandoBolsa = false;
@@ -249,8 +263,43 @@ const tela = criarTela(document.getElementById('app')!, {
     aplicar(await api.idleBuyNode(id));
     audio.tocar('no');
   }),
+  horta: (acao) => {
+    hortaAberta = acao === 'abrir';
+    if (hortaAberta && bolsaAberta) {
+      bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
+      poPendentes = [];
+      if (timerBolsa !== null) clearTimeout(timerBolsa);
+    }
+    if (timerHorta) clearInterval(timerHorta);
+    timerHorta = hortaAberta ? setInterval(() => { if (!document.hidden) void carregarHorta(); }, 120_000) : null;
+    render();
+    if (hortaAberta) void carregarHorta();
+  },
+  plantar: (canteiro, especie) => void guard(async () => {
+    const r = await api.idleHortaPlantar(canteiro, especie);
+    horta = r.horta;
+    aplicar(r);
+    audio.tocar('plantar');
+  }),
+  colher: (canteiro) => void guard(async () => {
+    const r = await api.idleHortaColher(canteiro);
+    horta = r.horta;
+    aplicar(r);
+    audio.tocar(r.descobriu ? 'no' : 'pegar'); // espécie nova: o acorde subindo
+  }),
+  arrancar: (canteiro) => void guard(async () => {
+    const r = await api.idleHortaArrancar(canteiro);
+    horta = r.horta;
+    aplicar(r);
+    audio.tocar('fechar');
+  }),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
+    if (bolsaAberta && hortaAberta) {
+      hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
+      if (timerHorta) clearInterval(timerHorta);
+      timerHorta = null;
+    }
     if (!bolsaAberta) poPendentes = [];
     if (!bolsaAberta && timerBolsa !== null) clearTimeout(timerBolsa);
     render();
@@ -345,7 +394,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova, hortaAberta, horta,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });
@@ -374,6 +423,7 @@ function aplicar(estado: IdleState) {
 
 async function recarregar() {
   aplicar(await api.idleOpen());
+  if (hortaAberta) void carregarHorta(); // virada da horta (planta madura, morta ou brotada): a gaveta acompanha
 }
 
 async function salvarVisual(v: IdleVisual) {
@@ -432,6 +482,7 @@ async function guard(trabalho: () => Promise<void>) {
       if (RECARREGA.includes(err.code)) await recarregar().catch(() => undefined);
       if (RECARREGA_PLACAR.includes(err.code)) await carregarPlacar();
       if (RECARREGA_BOLSA.includes(err.code)) await carregarBolsa();
+      if (RECARREGA_HORTA.includes(err.code)) await carregarHorta();
     }
   } finally {
     ocupado = false;
@@ -487,6 +538,7 @@ document.addEventListener('visibilitychange', () => {
   else voltouDoFundo();
   if (!document.hidden) void prepararDesenhista();
   if (!document.hidden && bolsaAberta) void carregarBolsa();
+  if (!document.hidden && hortaAberta) void carregarHorta();
   if (!document.hidden && fase !== 'carregando' && fase !== 'sem_sessao' && fase !== 'abrindo') void guard(recarregar);
 });
 
