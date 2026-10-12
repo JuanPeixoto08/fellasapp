@@ -56,13 +56,14 @@ export function naCadeira(kit: Kit, cadeira: Imagem, v: Visual): Imagem {
   return out;
 }
 
-/** Quem fica em cada vaga: você na de dono; a equipe (contrato mais recente primeiro) nas de contratado, na ordem do
- *  JSON; vaga sobrando fica com o freela dela. */
-export function ocuparVagas(v: Vagas, dono: Visual, equipe: Visual[]): Ocupada[] {
+/** Quem fica em cada vaga: você na de dono; os fixos (o convidado da frente no PPP Podcast) nas vagas deles; a equipe
+ *  (contrato mais recente primeiro) nas de contratado, na ordem do JSON; vaga sobrando fica com o freela dela. */
+export function ocuparVagas(v: Vagas, dono: Visual, equipe: Visual[], fixos: Record<string, Visual> = {}): Ocupada[] {
   const out: Ocupada[] = [];
   let i = 0;
   for (const vaga of v.vagas) {
     if (vaga.papel === 'dono') out.push({ vaga, quem: { visual: dono } });
+    else if (fixos[vaga.id]) out.push({ vaga, quem: { visual: fixos[vaga.id] } }); // o convidado do PPP Podcast
     else if (i < equipe.length) out.push({ vaga, quem: { visual: equipe[i++] } });
     else if (vaga.freela === 'estagiario') out.push({ vaga, quem: { estagiario: true } });
     else if (vaga.freela) out.push({ vaga, quem: { visual: vaga.freela } });

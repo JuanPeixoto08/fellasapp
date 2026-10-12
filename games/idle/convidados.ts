@@ -1,5 +1,6 @@
 // Convidados do PPP Podcast (minigame 3): o catálogo e as contas da página (puro). Quem decide é o banco (0051, mesmas
 // contas: teste de paridade); aqui só se mostra. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-convidados-design.md.
+import type { IdleVisual } from '../shared/types';
 import { douradoEm, janelaS, tipoDourado, type TipoDourado } from './dourados';
 import { semente } from './oportunidades';
 
@@ -204,3 +205,25 @@ export const custosConv = (s: ComCadeiras) => {
   const { c, ppp } = ctx(s);
   return { geradores: custoGeradores(c, ppp), melhorias: custoMelhorias(c, ppp) };
 };
+
+/** Como cada convidado aparece na cena do PPP Podcast (de costas, na vaga "ppp-convidado"): o visual do kit de
+ *  personagens (pele, cabelo, cor, roupa, cor da roupa, acessório, cor do acessório). */
+export const VISUAL_CONVIDADO: Record<number, IdleVisual> = {
+  1: { pele: 3, cabelo: 0, cor_cabelo: 0, roupa: 1, cor_roupa: 3, acessorio: 0, cor_acessorio: 0 },
+  2: { pele: 4, cabelo: 5, cor_cabelo: 1, roupa: 2, cor_roupa: 0, acessorio: 0, cor_acessorio: 0 },
+  3: { pele: 5, cabelo: 3, cor_cabelo: 0, roupa: 0, cor_roupa: 0, acessorio: 3, cor_acessorio: 0 },
+  4: { pele: 1, cabelo: 0, cor_cabelo: 0, roupa: 1, cor_roupa: 0, acessorio: 0, cor_acessorio: 0 },
+  5: { pele: 4, cabelo: 2, cor_cabelo: 0, roupa: 1, cor_roupa: 0, acessorio: 3, cor_acessorio: 0 },
+  6: { pele: 5, cabelo: 4, cor_cabelo: 4, roupa: 1, cor_roupa: 0, acessorio: 3, cor_acessorio: 0 },
+  7: { pele: 0, cabelo: 1, cor_cabelo: 0, roupa: 1, cor_roupa: 1, acessorio: 0, cor_acessorio: 0 },
+  8: { pele: 4, cabelo: 0, cor_cabelo: 0, roupa: 1, cor_roupa: 3, acessorio: 2, cor_acessorio: 1 },
+  9: { pele: 2, cabelo: 1, cor_cabelo: 0, roupa: 0, cor_roupa: 3, acessorio: 4, cor_acessorio: 0 },
+  10: { pele: 5, cabelo: 4, cor_cabelo: 0, roupa: 1, cor_roupa: 9, acessorio: 0, cor_acessorio: 0 },
+  11: { pele: 4, cabelo: 1, cor_cabelo: 1, roupa: 1, cor_roupa: 0, acessorio: 3, cor_acessorio: 0 },
+};
+/** O convidado da cadeira da frente na cena (id da vaga → visual), se a cadeira está aberta. */
+export function naCena(s: ComCadeiras): Record<string, IdleVisual> {
+  const { c, ppp } = ctx(s);
+  const id = c.cadeira[0];
+  return id && destrancada(0, ppp) ? { 'ppp-convidado': VISUAL_CONVIDADO[id] } : {};
+}

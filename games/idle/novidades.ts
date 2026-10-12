@@ -4,6 +4,19 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-convidados',
+    titulo: 'Convidados no PPP Podcast',
+    data: '2026-10-12',
+    itens: [
+      'Gaveta nova na bancada: os Convidados. Abre com 1 PPP Podcast; o meio abre com 25 e o canto com 50.',
+      '11 convidados, cada um com um bônus e um defeito. A cadeira da frente vale tudo, a do meio metade, a do canto um quarto.',
+      'Trocar custa: são 3 trocas, e cada uma volta em 1 h. Tirar alguém é de graça.',
+      'Tem convidado que mexe na Bolsa, na Horta, nos eventos e nas oportunidades. Passa o mouse (ou segura o dedo) pra ver.',
+      'Gemaplys e MC V.V nunca sentam juntos. Ninguém sabe por quê.',
+      '11 conquistas novas do podcast.',
+    ],
+  },
+  {
     id: '2026-10-12-oportunidades-sorte',
     titulo: 'Oportunidades na sorte',
     data: '2026-10-12',

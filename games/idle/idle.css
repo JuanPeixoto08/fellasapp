@@ -366,6 +366,47 @@
 .idle .colecao-item.escondida { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; color: var(--i-mudo); }
 .idle .colecao-item .interrogacao { font: 400 18px var(--i-pixel); color: var(--i-mudo); }
 
+/* Convidados (minigame 3): o estúdio do PPP Podcast (3 cadeiras lado a lado, a da frente maior) e a lista dos 11 */
+.idle .convidados { display: flex; flex-direction: column; gap: 12px; }
+.idle .conv-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.idle .conv-titulo { margin: 0; font: 400 23px var(--i-pixel); }
+.idle .conv-trocas { font: 400 17px var(--i-pixel); color: var(--i-lilas); }
+.idle .conv-estudio { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; align-items: stretch; }
+.idle .conv-cadeira { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px 12px; text-align: center; background: var(--i-painel); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .conv-cadeira.frente { --c: var(--gold); }
+.idle .conv-cadeira.escolhendo { --c: var(--i-lilas); }
+.idle .conv-cadeira.trancada { opacity: 0.55; }
+.idle .conv-cadeira:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 4px; }
+.idle .conv-rotulo { font: 400 16px var(--i-pixel); color: var(--i-mudo); }
+.idle .conv-retrato { width: 96px; height: 96px; background: var(--i-painel2) center / contain no-repeat; image-rendering: pixelated; }
+.idle .conv-cadeira:not(.frente) .conv-retrato { width: 64px; height: 64px; }
+.idle .conv-retrato.vazio { box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .conv-retrato.mini { flex: none; width: 48px; height: 48px; }
+.idle .conv-cadeira .meio { display: grid; gap: 2px; }
+.idle .conv-cadeira strong, .idle .conv-item strong { font: 400 19px var(--i-pixel); }
+.idle .convidados .bom { font-size: 13px; color: var(--mint); }
+.idle .convidados .ruim { font-size: 13px; color: #FF9B8F; }
+.idle .vivo-conv { color: var(--gold); }
+.idle .bts-conv { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.idle .conv-lista { display: grid; gap: 6px; }
+.idle .conv-lista-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.idle .conv-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .conv-item .meio { flex: 1; display: grid; gap: 1px; min-width: 0; }
+.idle .conv-ja { flex: none; font-size: 12px; color: var(--i-mudo); text-align: right; max-width: 90px; }
+@media (max-width: 520px) {
+  .idle .conv-estudio { grid-template-columns: minmax(0, 1fr); }
+  .idle .conv-cadeira { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'rot rot' 'ret meio' 'bts bts'; text-align: left; justify-items: start; }
+  .idle .conv-cadeira .conv-rotulo { grid-area: rot; }
+  .idle .conv-cadeira .conv-retrato { grid-area: ret; width: 64px; height: 64px; }
+  .idle .conv-cadeira .meio { grid-area: meio; }
+  .idle .conv-cadeira .bts-conv, .idle .conv-cadeira > .btn { grid-area: bts; justify-self: stretch; }
+}
+/* etiqueta do humor (VSauce) e os lotes do Vorcaro na Bolsa */
+.idle .etq.humor { color: var(--i-lilas); }
+.idle .bolsa-detalhe .lote .rot2 { color: var(--gold); }
+
 /* Bolsa (minigame 1): lista + detalhe; no celular a bancada com-gaveta vira tela cheia */
 .idle .gaveta-icone-gerador { background-size: 128px 32px; }
 .idle .bancada-topo { display: none; }
@@ -473,6 +514,7 @@
   .idle .bancada.com-gaveta .gavetas { display: flex; }
   .idle .bancada.com-gaveta .gaveta-corpo { padding: 10px 14px 14px; overflow: hidden; }
   .idle .bancada.com-horta .gaveta-corpo { overflow: auto; } /* a horta rola dentro da bancada */
+  .idle .bancada.com-convidados .gaveta-corpo { overflow: auto; }
   .idle .bolsa { height: 100%; }
   .idle .bolsa-miolo { grid-template-columns: minmax(0, 1fr) 300px; flex: 1; min-height: 0; }
   .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
@@ -494,6 +536,7 @@
   .idle .bolsa-lista { overflow: auto; min-height: 0; padding: 2px; }
   .idle .bancada.com-bolsa .bolsa-detalhe { overflow: auto; position: static; box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
   .idle .bancada.com-horta .gaveta-corpo { overflow: auto; } /* a horta rola (a Bolsa tem lista e detalhe lado a lado) */
+  .idle .bancada.com-convidados .gaveta-corpo { overflow: auto; }
 }
 
 /* PC estreito (1100–1279): o resumo desce pra baixo da cena, senão o dinheiro passa por cima do painel */

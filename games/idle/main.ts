@@ -9,7 +9,7 @@ import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
-import { eventoEm, eventosEntre } from './convidados';
+import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { temNovidade } from './novidades';
@@ -439,7 +439,7 @@ function aplicar(estado: IdleState) {
   const antes = ancora?.estado ?? null;
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
-  palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO) });
+  palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO), fixos: naCena(estado) });
   if (fase === 'antes') palco.preparar(['cena-0-abrindo', 'cena-1']);
   // nunca salvou o visual: o editor aparece sozinho (antes do Abrir CNPJ ou já jogando), até o primeiro "Bora"
   if (deveAbrirEditor(estado, fase, editorFechado, rascunho !== null)) rascunho = { ...PADRAO };

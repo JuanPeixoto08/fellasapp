@@ -150,6 +150,29 @@ wh.__hortaSorte = async (forcar) => {
   await db.query('update public.mock_horta set forcar = $1 where true', [forcar]);
 };
 
+// convidados no mock: __ppp(n) põe n PPP Podcasts (e 1 de cada gerador antes, pra liberar); trocas cheias; o tempo
+// sentado anda h horas (Kojima sobe, faixas do MC V.V passam); a próxima faixa do MC V.V cai agora
+const wc = window as unknown as { __ppp: (n: number) => Promise<void>; __convHoras: (h: number) => Promise<void>; __convTrocas: () => Promise<void>; __faixaAgora: () => Promise<void> };
+const avisar = () => document.dispatchEvent(new Event('visibilitychange'));
+wc.__ppp = async (n) => {
+  await dono(`update public.idle_state set generators[13] = $2, strategies = '{0,0,0,0}',
+    generators[1:12] = array(select greatest(g, 1) from unnest(generators[1:12]) g) where user_id = $1`, [ME, n]);
+  avisar();
+};
+wc.__convTrocas = async () => { await dono('update public.idle_state set conv_trocas = 3, conv_trocas_t = null where user_id = $1', [ME]); avisar(); };
+wc.__convHoras = async (h) => {
+  await dono(`update public.idle_state set conv_desde = array(select d - make_interval(secs => $2::float8 * 3600) from unnest(conv_desde) d),
+    conv_trocas_t = conv_trocas_t - make_interval(secs => $2::float8 * 3600) where user_id = $1`, [ME, h]);
+  avisar();
+};
+wc.__faixaAgora = async () => {
+  // a vaga do MC V.V (9) passa a ter sentado há 2 h / peso, menos 1 s: a faixa 1 cai no próximo segundo
+  await dono(`update public.idle_state set conv_desde[i] = date_trunc('second', now()) + interval '1 second' - make_interval(secs => 7200 / (array[1, 0.5, 0.25])[i])
+    from (select generate_subscripts(conv_cadeira, 1) i from public.idle_state where user_id = $1) x
+    where user_id = $1 and conv_cadeira[x.i] = 9`, [ME]);
+  avisar();
+};
+
 // painel do ?mock pra testar os eventos sem abrir o console (só no dev)
 {
   const painel = document.createElement('div');
@@ -172,6 +195,24 @@ wh.__hortaSorte = async (forcar) => {
     const b = document.createElement('button');
     b.textContent = nome;
     b.style.cssText = 'padding:6px 8px;background:#2E7D3A;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void f());
+    painel.append(b);
+  }
+  const conv: [string, () => Promise<void>][] = [
+    ['+25 PPP Podcasts', async () => {
+      const { ready } = await import('./mockDb');
+      const r = await (await ready).query<{ n: number }>('select generators[13] as n from public.idle_state where user_id = $1', [ME]);
+      await wc.__ppp((r.rows[0]?.n ?? 0) + 25);
+    }],
+    ['Trocas cheias', () => wc.__convTrocas()],
+    ['Convidados +1 h', () => wc.__convHoras(1)],
+    ['Convidados +24 h', () => wc.__convHoras(24)],
+    ['Faixa do MC V.V agora', () => wc.__faixaAgora()],
+  ];
+  for (const [nome, f] of conv) {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#8E0B20;color:#fff;border:0;cursor:pointer';
     b.addEventListener('click', () => void f());
     painel.append(b);
   }

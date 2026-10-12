@@ -108,6 +108,15 @@ describe('vagas', () => {
     expect(ocuparVagas(v, PADRAO, []).map((o) => o.quem)).toEqual([{ visual: F }, { visual: PADRAO }, { estagiario: true }, { visual: F }]);
     expect(ocuparVagas(v, PADRAO, [E1, E2, E1, E2]).filter((o) => o.vaga.papel === 'contratado')).toHaveLength(3);
   });
+  it('o convidado do PPP Podcast fica na vaga dele (fixo) e a equipe segue nas outras', () => {
+    const F: Visual = { ...PADRAO, pele: 5 };
+    const v: Vagas = { quadros: 8, vagas: [vaga('ppp-convidado', 'contratado', F), vaga('voce', 'dono'), vaga('c', 'contratado', F)] };
+    const G = { ...PADRAO, cabelo: 3 };
+    const E1 = { ...PADRAO, roupa: 1 };
+    expect(ocuparVagas(v, PADRAO, [E1], { 'ppp-convidado': G }).map((o) => [o.vaga.id, o.quem])).toEqual([
+      ['ppp-convidado', { visual: G }], ['voce', { visual: PADRAO }], ['c', { visual: E1 }],
+    ]);
+  });
   it('trilha muda a posição por quadro; null some', () => {
     const v: Vaga = { ...vaga('voce', 'dono'), trilha: [null, { x: 5, pose: 1 }, {}] };
     expect(posicaoNoQuadro(v, 0)).toBeNull();

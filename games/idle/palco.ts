@@ -30,8 +30,8 @@ export function quadroEm(nome: NomeCena, decorridoMs: number, umaVez: boolean): 
 }
 
 /** Quem aparece nas cenas: você e sua equipe (contrato mais recente primeiro). */
-export type Gente = { dono: Visual; equipe: Visual[] };
-export const chaveGente = (g: Gente) => [chave(g.dono), ...g.equipe.map(chave)].join('|');
+export type Gente = { dono: Visual; equipe: Visual[]; /** vaga → visual (o convidado do PPP Podcast) */ fixos?: Record<string, Visual> };
+export const chaveGente = (g: Gente) => [chave(g.dono), ...g.equipe.map(chave), ...Object.entries(g.fixos ?? {}).map(([k, v]) => `${k}:${chave(v)}`)].join('|');
 
 export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) => Camadas, kit: Promise<Kit | null> | (() => Promise<Kit | null>)) {
   canvas.width = LARGURA;
@@ -56,7 +56,7 @@ export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) 
       let kitFalhou: unknown = null;
       const pedirKit = c.vagas ? (typeof kit === 'function' ? kit() : kit).catch((e) => { kitFalhou = e ?? new Error('kit'); return null; }) : null;
       const [fundo, frente, k2] = await Promise.all([carregarImagem(c.fundo), c.frente ? carregarImagem(c.frente) : null, pedirKit]);
-      const tira = c.vagas ? montarTira({ fundo, frente, vagas: c.vagas }, ocuparVagas(c.vagas, quem.dono, quem.equipe), k2) : fundo;
+      const tira = c.vagas ? montarTira({ fundo, frente, vagas: c.vagas }, ocuparVagas(c.vagas, quem.dono, quem.equipe, quem.fixos), k2) : fundo;
       const cv = document.createElement('canvas');
       pintar(cv, tira);
       if (kitFalhou) {
