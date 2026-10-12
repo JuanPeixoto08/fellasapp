@@ -2,7 +2,7 @@
 // lugares de mentira em idle_places quando precisam.
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { LUGARES, MARCOS } from '../idle/mapa';
+import { custoNivel, LUGARES, MARCOS, multMapa } from '../idle/mapa';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -113,5 +113,55 @@ describe('abrir', () => {
     const l = (await mapa()).lugares.find((x) => x.id === 3)!;
     expect(l).toMatchObject({ nome: 'Lugar de teste', x: 40 });
     expect((await mapa()).lugares.find((x) => x.id === 4)!.nome).toBeNull();
+  });
+});
+
+const nivel = (l: number) => t.rpc<{ lugar: { nivel: number }; marcos_novos: number[] }>('idle_place_nivel', { p_lugar: l });
+const moeda = (l: number, v: number) => q('update public.idle_place_state set moeda = $3 where user_id = $1 and lugar = $2', [A, l, v]);
+
+describe('nível e marcos', () => {
+  it('sobe pagando custo_base × 1,55^(n−1) da moeda do lugar', async () => {
+    await empresa(2);
+    await abrir(3);
+    await moeda(3, 1000);
+    const r = await nivel(3);
+    expect(r.lugar.nivel).toBe(2);
+    const sobra = (await q<{ m: number }>('select moeda as m from public.idle_place_state where user_id = $1 and lugar = 3', [A]))[0].m;
+    expect(sobra).toBeCloseTo(1000 - custoNivel(LUGARES[2], 1)!);
+  });
+  it('recusas: fechado, sem moeda, nível 25', async () => {
+    await empresa(2);
+    await expect(nivel(3)).rejects.toThrow(/idle_lugar_fechado/);
+    await abrir(3);
+    await expect(nivel(3)).rejects.toThrow(/idle_lugar_moeda/);
+    await q('update public.idle_place_state set nivel = 25, moeda = 1e30 where user_id = $1 and lugar = 3', [A]);
+    await expect(nivel(3)).rejects.toThrow(/idle_lugar_nivel_max/);
+  });
+  it('nível 5 ganha o marco 31 e a produção da empresa sobe 2%', async () => {
+    await empresa(2);
+    await abrir(3);
+    const antes = await taxa();
+    await q('update public.idle_place_state set nivel = 4, moeda = 1e9 where user_id = $1 and lugar = 3', [A]);
+    const r = await nivel(3);
+    expect(r.marcos_novos).toEqual([31]);
+    expect(await taxa()).toBeCloseTo(antes * 1.02, 6);
+  });
+  it('marcos de fãs, volume e lendário', async () => {
+    await empresa(2);
+    await abrir(3);
+    await q('update public.idle_place_state set fas = 10000, volume = 50, lendario = true where user_id = $1 and lugar = 3', [A]);
+    expect(await q<{ m: number[] }>('select public.idle_place_marcos($1, 3) as m', [A])).toEqual([{ m: [36, 37, 38] }]);
+    expect(await q<{ m: number[] }>('select public.idle_place_marcos($1, 3) as m', [A])).toEqual([{ m: [] }]);
+  });
+  it('paridade do mult com mapa.ts: Monopólio dobra, Marca forte soma por lugar', async () => {
+    await empresa(4);
+    for (const l of [3, 4, 7]) await abrir(l);
+    await q(`update public.idle_place_state set marcos = '{31,32,41}' where user_id = $1 and lugar in (3, 4)`, [A]);
+    const bonus = 0.02 + 0.02 + 0.02 + 0.02 + 0.02 + 0.02; // os dois lugares com {31,32,41}: 6 marcos de 2%
+    const mult = async () => (await q<{ m: number }>('select public.idle_place_mult(s) as m from public.idle_state s where user_id = $1', [A]))[0].m;
+    await q(`update public.idle_state set strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    expect(await mult()).toBeCloseTo(multMapa(bonus, 3, { marcosMult: 1, porLugar: 0 }));
+    await q(`update public.idle_state set strategies = '{0,2,1,0}' where user_id = $1`, [A]);
+    expect(await mult()).toBeCloseTo(multMapa(bonus, 3, { marcosMult: 2, porLugar: 0.05 }));
   });
 });

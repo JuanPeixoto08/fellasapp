@@ -177,3 +177,122 @@ revoke all on function public.idle_mapa() from public, anon;
 grant execute on function public.idle_mapa() to authenticated;
 revoke all on function public.idle_place_abrir(int) from public, anon;
 grant execute on function public.idle_place_abrir(int) to authenticated;
+
+
+-- ===== parte B: nível, marcos, produção da empresa =====
+
+create or replace function public.idle_place_mult(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  with est as (
+    select e.sociais from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
+  )
+  select 1
+       + coalesce((select sum(m.bonus) from public.idle_place_state st
+                     join public.idle_cat_place_marco m on m.id = any (st.marcos)
+                    where st.user_id = s.user_id), 0)
+         * coalesce((select max((x.sociais ->> 'marcosMult')::double precision) from est x
+                      where (x.sociais ->> 'marcosMult') is not null), 1)
+       + coalesce((select sum((x.sociais ->> 'porLugar')::double precision) from est x
+                    where (x.sociais ->> 'porLugar') is not null), 0)
+         * (select count(*) from public.idle_place_state st where st.user_id = s.user_id)
+$$;
+
+create or replace function public.idle_place_marcos(p_user uuid, p_lugar int)
+returns int[] language plpgsql volatile set search_path = public as $$
+declare
+  st      public.idle_place_state;
+  v_novos int[];
+begin
+  select * into st from public.idle_place_state where user_id = p_user and lugar = p_lugar for update;
+  if not found then
+    return '{}';
+  end if;
+  select coalesce(array_agg(m.id order by m.id), '{}') into v_novos
+    from public.idle_cat_place_marco m
+   where m.lugar = p_lugar and not (m.id = any (st.marcos))
+     and case m.tipo
+           when 'nivel' then st.nivel >= m.valor
+           when 'lendario' then st.lendario
+           when 'fas' then st.fas >= m.valor
+           when 'volume' then st.volume >= m.valor
+           else false
+         end;
+  if cardinality(v_novos) > 0 then
+    update public.idle_place_state set marcos = marcos || v_novos where user_id = p_user and lugar = p_lugar;
+  end if;
+  return v_novos;
+end;
+$$;
+
+-- provisória: a parte C troca pela completa
+create or replace function public.idle_lugar_json(s public.idle_state, p_lugar int)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object('id', p_lugar, 'nivel', st.nivel, 'moeda', st.moeda, 'marcos', to_jsonb(st.marcos))
+    from public.idle_place_state st where st.user_id = s.user_id and st.lugar = p_lugar
+$$;
+
+create or replace function public.idle_place_nivel(p_lugar int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  st      public.idle_place_state;
+  c       public.idle_cat_place;
+  v_custo double precision;
+  v_novos int[];
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  select * into st from public.idle_place_state where user_id = s.user_id and lugar = p_lugar for update;
+  if not found then
+    raise exception 'idle_lugar_fechado' using errcode = 'P0001';
+  end if;
+  if st.nivel >= 25 then
+    raise exception 'idle_lugar_nivel_max' using errcode = 'P0001';
+  end if;
+  select * into c from public.idle_cat_place where id = p_lugar;
+  v_custo := c.custo_base * power(1.55, st.nivel - 1);
+  if st.moeda < v_custo then
+    raise exception 'idle_lugar_moeda' using errcode = 'P0001';
+  end if;
+  perform public.idle_save(s);
+  update public.idle_place_state set moeda = moeda - v_custo, nivel = nivel + 1 where user_id = s.user_id and lugar = p_lugar;
+  v_novos := public.idle_place_marcos(s.user_id, p_lugar);
+  return public.idle_json(s) || jsonb_build_object('lugar', public.idle_lugar_json(s, p_lugar), 'marcos_novos', to_jsonb(v_novos));
+end;
+$$;
+
+-- produção em t (a da 0051) × o bônus do Mapa do rolê
+create or replace function public.idle_rate_at(s public.idle_state, t timestamptz)
+returns double precision language sql stable set search_path = public as $$
+  with est as (
+    select e.* from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
+  ), gen as (
+    select c.renda * s.generators[c.id]
+         * power(2::double precision, (select count(*) from public.idle_cat_upg u
+                                        where u.tipo = 'gerador' and u.gerador = c.id and u.id = any (s.upgrades)))
+         * (1 + coalesce((select sum(u.por_unidade * s.generators[u.fonte]) from public.idle_cat_upg u
+                           where u.tipo = 'sinergia' and u.alvo = c.id and u.id = any (s.upgrades)), 0))
+         * coalesce((select exp(sum(ln(e.gen_mult))) from est e where c.id between e.gen_de and e.gen_ate), 1)
+         * case when c.id = 11 then public.idle_conv_food(s, t) else 1 end as v
+      from public.idle_cat_gen c
+  )
+  select coalesce((select sum(v) from gen), 0)
+       * coalesce((select exp(sum(ln(u.mult))) from public.idle_cat_upg u where u.tipo = 'geral' and u.id = any (s.upgrades)), 1)
+       * coalesce((select exp(sum(ln(e.prod_mult))) from est e), 1)
+       * (1 + coalesce((select sum(e.por_gerador_distinto) from est e), 0)
+            * (select count(*) from public.idle_cat_gen c where s.generators[c.id] > 0))
+       * public.idle_social_mult(s, t)
+       * public.idle_bonus_mult(s)
+       * (1 + (select b.producao from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), t) b))
+       * public.idle_conv_prod(s, t)
+       * public.idle_place_mult(s)
+$$;
+
+revoke all on function public.idle_place_mult(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_place_marcos(uuid, int) from public, anon, authenticated;
+revoke all on function public.idle_lugar_json(public.idle_state, int) from public, anon, authenticated;
+revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_place_nivel(int) from public, anon;
+grant execute on function public.idle_place_nivel(int) to authenticated;
