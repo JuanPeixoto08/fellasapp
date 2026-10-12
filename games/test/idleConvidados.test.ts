@@ -255,3 +255,35 @@ describe('Bolsa: Vorcaro e VSauce', () => {
     expect(typeof (await estado()).empresas[0].humor).toBe('number');
   });
 });
+
+describe('Horta: Terry e Viniccius13', () => {
+  type Planta = { canteiro: number; especie: number; amadurece_s: number; vida_s: number };
+  const plantar = (c: number, e: number) => t.rpc<Estado & { horta: { plantas: Planta[] } }>('idle_horta_plantar', { p_canteiro: c, p_especie: e });
+  beforeEach(async () => {
+    await q('delete from public.idle_cat_conquista where true');
+    await q(`update public.idle_state set generators[11] = 25 where user_id = $1`, [A]);
+  });
+
+  it('plantar com o Terry na frente: amadurece 30% antes e vive 20% menos; a de antes não muda', async () => {
+    let s = await plantar(0, 1);
+    expect(s.horta.plantas[0]).toMatchObject({ amadurece_s: 3600, vida_s: 28800 });
+    await sentar(0, 7);
+    s = await plantar(1, 1);
+    const nova = s.horta.plantas.find((p) => p.canteiro === 1)!;
+    expect(nova.amadurece_s).toBeCloseTo(2520, 6);
+    expect(nova.vida_s).toBeCloseTo(23040, 6);
+    expect(s.horta.plantas.find((p) => p.canteiro === 0)).toMatchObject({ amadurece_s: 3600 });
+    andar(2520 * 1000 + 1000); // a nova já está madura e dá o bônus; a velha não
+    const [{ b }] = await q<{ b: number }>(`select (public.idle_horta_bonus($1, 3, now())).producao as b`, [A]);
+    expect(b).toBeCloseTo(0.01, 9);
+  });
+  it('Viniccius13: semente 50% mais cara', async () => {
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    const r = await taxa();
+    const [{ v: v0 }] = await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]);
+    await sentar(0, 8);
+    await q(`update public.idle_state set settled_at = now() + interval '1 day', valuation = $2 where user_id = $1`, [A, v0]);
+    const s = await plantar(0, 1);
+    expect(v0 - s.valuation).toBeCloseTo(600 * r * 1.5, 0);
+  });
+});
