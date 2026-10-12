@@ -56,8 +56,11 @@ export const idleLugarNivel = (lugar: number) =>
   call<IdleState & { lugar: LugarEstado; marcos_novos: number[] }>('select public.idle_place_nivel($1) as v', [lugar]);
 export const idleLugarAcao = (fn: string, args: Record<string, unknown>) => {
   if (!/^idle_(tee|cup|din)_[a-z_]+$/.test(fn)) throw new Error(`ação de lugar desconhecida: ${fn}`);
-  const valores = Object.values(args);
-  return call<IdleState & { lugar: LugarEstado }>(`select public.${fn}(${valores.map((_, i) => `$${i + 1}`).join(', ')}) as v`, valores);
+  // por nome, como o PostgREST (fn(p_x => $1, ...)): a ordem das chaves de args não importa
+  const nomes = Object.keys(args);
+  if (nomes.some((n) => !/^p_[a-z_]+$/.test(n))) throw new Error(`argumento de lugar desconhecido em ${fn}`);
+  return call<IdleState & { lugar: LugarEstado; marcos_novos?: number[] }>(
+    `select public.${fn}(${nomes.map((n, i) => `${n} => $${i + 1}`).join(', ')}) as v`, nomes.map((n) => args[n]));
 };
 export const fellas = (ids: string[]) =>
   call<Fella[]>(`select coalesce(json_agg(json_build_object('id', id, 'name', coalesce(display_name, username), 'avatarUrl', null)), '[]'::json) as v from public.profiles where id = any($1::uuid[])`, [ids]);
