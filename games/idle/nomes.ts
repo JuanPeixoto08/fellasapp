@@ -161,9 +161,9 @@ export type TipoConquista =
   // horta (0048): de estado (contadores e coleção) e de evento (plantou/colheu/descobriu/brotou)
   | 'horta_plantou' | 'horta_colheu' | 'horta_morreu' | 'horta_colecao'
   | 'horta_pix' | 'horta_mandioca' | 'horta_coentro' | 'horta_inhame' | 'horta_abacate' | 'horta_morango'
-  // convidados (0051): de estado (vistos, Kojima, derrubada, Ana) e de evento (sentou, mesa, CR, FGC, HL3, mesma pessoa, dia de oportunidades)
+  // convidados (0051): de estado (vistos, Kojima, derrubada, Toby) e de evento (sentou, mesa, CR, FGC, HL3, mesma pessoa, dia de oportunidades)
   | 'conv_sentou' | 'conv_mesa' | 'conv_vistos' | 'conv_cr' | 'conv_fgc' | 'conv_kojima' | 'conv_hl3' | 'conv_derrubada'
-  | 'conv_ana' | 'opp_dia' | 'conv_mesma';
+  | 'conv_toby' | 'opp_dia' | 'conv_mesma';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -260,7 +260,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 78, tipo: 'conv_kojima', nome: 'Que geometria', frase: 'Ficou 24 h no estúdio e entregou uma encomenda.', condicao: 'Deixar o Kojima 24 h sentado' },
   { id: 79, tipo: 'conv_hl3', nome: 'Half-Life 3 confirmado', frase: 'Ele finalmente contou até 3.', condicao: 'Sentar o Gabe Newell na 3ª cadeira' },
   { id: 80, tipo: 'conv_derrubada', valor: 1, nome: 'Sample não liberado', frase: 'Lost media brasileira.', condicao: 'Ter uma faixa do MC V.V derrubada por copyright' },
-  { id: 81, tipo: 'conv_ana', nome: 'Cozinheira matutina', frase: 'Acordou às 5h, fez a maquiagem básica e saiu 11h50.', condicao: 'Estar com a Ana Mary B sentada às 6h' },
+  { id: 81, tipo: 'conv_toby', nome: 'Já já sai o Chapter 5', frase: 'Ficou 20 horas esperando. O Toby também.', condicao: 'Deixar o Toby Fox 20 h sentado sem trocar' },
   { id: 82, tipo: 'opp_dia', valor: 15, nome: 'Receba!', frase: 'Obrigado meu Deus, obrigado meu pai.', condicao: 'Pegar 15 oportunidades num dia' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },

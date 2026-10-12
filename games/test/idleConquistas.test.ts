@@ -167,6 +167,12 @@ describe('escondidas e leitura', () => {
     expect(b.descobertas).not.toContain(103); // ninguém tem
     expect(b.descobertas).not.toContain(1); // só as escondidas
   });
+  it('os textos das conquistas no jogo (nomes.ts) são os do banco depois de todas as migrações', async () => {
+    type Linha = { id: number; nome: string; frase: string; condicao: string; tipo: string };
+    const banco = await q<Linha>('select id, nome, frase, condicao, tipo from public.idle_cat_conquista order by id');
+    const jogo = [...catalogo.conquistas].sort((x, y) => x.id - y.id).map(({ id, nome, frase, condicao, tipo }) => ({ id, nome, frase, condicao, tipo }));
+    expect(jogo).toEqual(banco);
+  });
   it('membro lê as conquistas dos outros; anônimo não', async () => {
     await abrir(A);
     await mudar(A, 'generators[1] = 100');
