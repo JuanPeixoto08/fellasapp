@@ -123,6 +123,9 @@ export type IdleState = {
   promo_ate: string | null; viral: string[];
   /** Bônus da horta agora (0048); a página aplica nos preços. */
   horta_bonus?: BonusHorta;
+  /** Convidados (0051): as 3 cadeiras (id ou null), desde quando, as trocas guardadas e a âncora da recarga, os PPP
+   *  Podcasts e o fim da derrubada do MC V.V valendo agora. */
+  convidados?: IdleConvidados;
   /** Entrega 2 (0038): seu visual (null = nunca salvou), quem você contratou (contratos ativos, do mais recente ao
    *  mais antigo), quem te contratou, o que entra na conta dos contratos, o preço do próximo contrato e o próximo
    *  vencimento que muda a sua taxa (null = nenhum). */
@@ -134,6 +137,9 @@ export type IdleState = {
   bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
   pontos_venda: number;
   conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
+};
+export type IdleConvidados = {
+  cadeira: (number | null)[]; desde: (string | null)[]; trocas: number; trocas_t: string | null; ppp: number; derrubada_ate: string | null;
 };
 export type IdleConquista = { id: number; em: string };
 export type IdleContratado = { user_id: string; cargo: string; avatar: IdleVisual | null; ate: string };

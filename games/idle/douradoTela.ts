@@ -61,7 +61,7 @@ function anel(): SVGSVGElement {
   return svg;
 }
 
-export type EventoNaTela = { seg: number; lado: number; tipo: TipoDourado; x: number; y: number; agoraMs: number };
+export type EventoNaTela = { seg: number; lado: number; tipo: TipoDourado; x: number; y: number; agoraMs: number; /** s na tela (Gemaplys encurta) */ janelaS?: number };
 
 export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado: number) => void) {
   const camada = document.createElement('div');
@@ -80,7 +80,7 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
     /** Mostra o evento (se ainda dá tempo e não apareceu antes). A dupla chama duas vezes, lado 0 e 1. */
     mostrar(e: EventoNaTela) {
       const chave = `${e.seg}:${e.lado}`;
-      const ateMs = e.seg * 1000 + JANELA_S * 1000;
+      const ateMs = e.seg * 1000 + (e.janelaS ?? JANELA_S) * 1000;
       if (ativos.has(chave) || encerrados.has(chave) || e.agoraMs >= ateMs) return;
       const tipo = (e.tipo === 3 ? 2 : e.tipo) as 0 | 1 | 2;
       const b = document.createElement('button');
@@ -91,6 +91,7 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
       const pct = Math.round(e.x * 100);
       b.style.setProperty('--x', e.lado !== 1 ? `${pct}%` : `calc(${pct}% ${e.x > 0.5 ? '-' : '+'} 84px)`);
       b.style.top = `${Math.round(e.y * 100)}%`;
+      if (e.janelaS !== undefined) b.style.setProperty('--janela', `${e.janelaS}s`);
       b.style.setProperty('--ja', `-${Math.max(0, Math.round((e.agoraMs - e.seg * 1000) / 1000))}s`);
       b.append(anel(), icone(tipo));
       b.addEventListener('click', () => {

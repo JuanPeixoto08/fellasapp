@@ -55,7 +55,7 @@ describe('pegar um evento', () => {
   beforeEach(async () => {
     await t.db.exec(`
       create table public.teste_dourado (s bigint primary key, tipo int);
-      create or replace function public.idle_dourado(u uuid, s bigint) returns int language sql stable as
+      create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
         'select tipo from public.teste_dourado where teste_dourado.s = idle_dourado.s';`);
     await t.member(A);
     await t.member(B, { isMember: false });

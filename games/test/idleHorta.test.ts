@@ -180,7 +180,7 @@ describe('os bônus', () => {
     await q('delete from public.idle_horta_plantas where user_id = $1', [A]);
     await por(0, 4, 3 * 3600); // Inhame maduro
     await t.db.exec(`create table public.teste_dourado (s bigint primary key, tipo int);
-      create or replace function public.idle_dourado(u uuid, s bigint) returns int language sql stable as
+      create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
         'select tipo from public.teste_dourado where teste_dourado.s = idle_dourado.s';`);
     const [{ seg }] = await q<{ seg: number }>('select floor(extract(epoch from now()))::int as seg');
     await q('insert into public.teste_dourado values ($1, 0)', [seg]);

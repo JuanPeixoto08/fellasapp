@@ -690,3 +690,109 @@ begin
   return v_novas;
 end;
 $$;
+
+-- ===== eventos na tela: Gemaplys e as faixas do MC V.V =====
+-- o tipo sorteado do segundo s (vale pros da sorte e pras faixas): igual a dourados.ts tipoDourado
+create or replace function public.idle_dourado_tipo(u uuid, s bigint)
+returns int language plpgsql immutable set search_path = public as $$
+declare
+  p  constant numeric := 2147483647;
+  k  constant numeric := 1013904223;
+  h1 numeric;
+  h2 numeric;
+  r  int;
+begin
+  h1 := mod(s::numeric * s * 48271 + s::numeric * 16807 + public.idle_opp_seed(u)::numeric * 69621 + 12345, p);
+  h2 := mod(h1 * h1 + k, p);
+  r := mod(mod(h2 * h2 + k, p), 100)::int;
+  return case when r < 2 then 3 when r < 20 then 2 when r < 55 then 1 else 0 end;
+end;
+$$;
+revoke all on function public.idle_dourado_tipo(uuid, bigint) from public, anon, authenticated;
+
+-- o evento do segundo s (a da 0045) + o Gemaplys: com peso `gema`, mais segundos valem (até 2× na frente)
+drop function if exists public.idle_dourado(uuid, bigint);
+create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0)
+returns int language plpgsql immutable set search_path = public as $$
+declare
+  p  constant numeric := 2147483647;
+  k  constant numeric := 1013904223;
+  h1 numeric;
+  h2 numeric;
+begin
+  h1 := mod(s::numeric * s * 48271 + s::numeric * 16807 + public.idle_opp_seed(u)::numeric * 69621 + 12345, p);
+  h2 := mod(h1 * h1 + k, p);
+  if mod(h2, 600) <> 0 and not (gema > 0 and mod(mod((h2 + 777) * (h2 + 777) + k, p), 2400) < 4 * gema) then
+    return null;
+  end if;
+  return public.idle_dourado_tipo(u, s);
+end;
+$$;
+revoke all on function public.idle_dourado(uuid, bigint, double precision) from public, anon, authenticated;
+
+-- a faixa do MC V.V no segundo seg: o tipo do evento, ou null (não é faixa, ou foi derrubada)
+create or replace function public.idle_conv_faixa(s public.idle_state, seg bigint)
+returns int language plpgsql immutable set search_path = public as $$
+declare
+  p     double precision := public.idle_conv_peso(s, 9);
+  d     timestamptz := public.idle_conv_desde(s, 9);
+  ds    bigint;
+  passo bigint;
+begin
+  if p <= 0 or d is null then
+    return null;
+  end if;
+  ds := floor(extract(epoch from d))::bigint;
+  passo := round(7200 / p)::bigint;
+  if seg - ds < passo or mod(seg - ds, passo) <> 0
+     or public.idle_horta_sorte(s.user_id, 50, ds + (seg - ds) / passo, 9) < 0.25 then
+    return null;
+  end if;
+  return public.idle_dourado_tipo(s.user_id, seg);
+end;
+$$;
+
+
+-- pegar evento (a da 0048) + o Gemaplys (mais eventos, menos tempo) e as faixas do MC V.V
+create or replace function public.idle_dourado_pegar(p_seg bigint, p_lado int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_me   uuid := auth.uid();
+  v_tipo int;
+  v_ini  timestamptz;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 60 then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  v_tipo := coalesce(public.idle_dourado(v_me, p_seg, public.idle_conv_peso(s, 3)), public.idle_conv_faixa(s, p_seg));
+  v_ini := to_timestamp(p_seg);
+  if v_tipo is null or now() < v_ini - interval '2 seconds' or now() > v_ini + make_interval(secs => 15 - 6 * public.idle_conv_peso(s, 3)) then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  if p_lado is null or p_lado not in (0, 1) or (p_lado = 1 and v_tipo <> 3) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  delete from public.idle_dourados_pegos where user_id = v_me and pegou_em < now() - interval '1 hour';
+  insert into public.idle_dourados_pegos (user_id, seg, lado) values (v_me, p_seg, p_lado) on conflict do nothing;
+  if not found then
+    raise exception 'idle_dourado_pego' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  case v_tipo
+    when 0 then s.valuation := s.valuation + public.idle_rate(s) * 1200 * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), now()) b));
+    when 1 then s.promo_ate := greatest(coalesce(s.promo_ate, now()), now() + interval '30 seconds');
+    else s.viral_ate := array(select v from unnest(s.viral_ate) v where v > now()) || (now() + interval '60 seconds');
+  end case;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;

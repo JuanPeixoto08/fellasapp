@@ -154,3 +154,57 @@ describe('os efeitos', () => {
     expect(manha).toBeGreaterThan(tarde / 0.95);
   });
 });
+
+describe('eventos na tela', () => {
+  it('a sorte com o Gemaplys é a mesma da página (gema 0, 0,5 e 1) e dobra os eventos na frente', async () => {
+    const { douradoEm } = await import('../idle/dourados');
+    const ini = 1_760_000_000;
+    const n: number[] = [];
+    for (const gema of [0, 0.5, 1]) {
+      const sql = await q<{ s: string; d: number }>(
+        `select s::text, public.idle_dourado($1::uuid, s, $4) as d from generate_series($2::bigint, $3::bigint) s
+          where public.idle_dourado($1::uuid, s, $4) is not null order by s`, [A, ini, ini + 29_999, gema]);
+      const ts: { s: string; d: number }[] = [];
+      for (let s = ini; s < ini + 30_000; s++) {
+        const d = douradoEm(A, s, gema);
+        if (d !== null) ts.push({ s: String(s), d });
+      }
+      expect(sql).toEqual(ts);
+      n.push(ts.length);
+    }
+    expect(n[2] / n[0]).toBeGreaterThan(1.6);
+    expect(n[2] / n[0]).toBeLessThan(2.4);
+  });
+  it('MC V.V: a faixa (a cada 2 h) é um evento que dá pra pegar; a derrubada não', async () => {
+    const { faixaEm } = await import('../idle/convidados');
+    await sentar(0, 9);
+    const [{ ds }] = await q<{ ds: string }>('select floor(extract(epoch from conv_desde[1]))::bigint::text as ds from public.idle_state where user_id = $1', [A]);
+    const d = Number(ds);
+    const c = { cadeira: [9, null, null], desde: [new Date(d * 1000).toISOString(), null, null], trocas: 2, trocas_t: null };
+    let pegou = false;
+    for (let k = 1; k <= 12 && !pegou; k++) {
+      const seg = d + k * 7200;
+      const tipo = faixaEm(A, c, 60, seg);
+      const [{ f }] = await q<{ f: number | null }>('select public.idle_conv_faixa(s, $2) as f from public.idle_state s where user_id = $1', [A, seg]);
+      expect(f).toBe(tipo);
+      if (tipo !== null && tipo !== 3) {
+        andar(seg * 1000 - agora + 1000);
+        const r = await t.rpc<Estado>('idle_dourado_pegar', { p_seg: seg, p_lado: 0 });
+        expect(r).toBeTruthy();
+        pegou = true;
+      }
+    }
+    expect(pegou).toBe(true);
+    expect(faixaEm(A, c, 60, d + 7201)).toBeNull();
+  });
+  it('com o Gemaplys na frente o evento some em 9 s (15 − 6 de folga do banco)', async () => {
+    await t.db.exec(`create table public.teste_dourado (s bigint primary key, tipo int);
+      create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
+        'select tipo from public.teste_dourado where teste_dourado.s = idle_dourado.s';`);
+    await sentar(0, 3);
+    const seg = Math.floor(agora / 1000);
+    await q('insert into public.teste_dourado values ($1, 0)', [seg]);
+    andar(10_000);
+    await expect(t.rpc('idle_dourado_pegar', { p_seg: seg, p_lado: 0 })).rejects.toThrow(/idle_dourado_gone/);
+  });
+});

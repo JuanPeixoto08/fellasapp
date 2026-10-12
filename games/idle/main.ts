@@ -8,7 +8,8 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual } fr
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { douradoEm, douradosEntre, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { eventoEm, eventosEntre } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas } from './legado';
 import { temNovidade } from './novidades';
@@ -70,7 +71,7 @@ function agendarDouradosNoFundo() {
   if (!s || fase !== 'jogando' || !s.started) return;
   const agora = agoraSrv();
   const de = Math.floor(agora / 1000);
-  for (const ev of douradosEntre(s.user_id, de, de + SOM_A_FRENTE_S)) {
+  for (const ev of eventosEntre(s, de, de + SOM_A_FRENTE_S)) {
     if (somNoFundo.has(ev.seg)) continue;
     somNoFundo.add(ev.seg);
     audio.tocarEm('dourado', (ev.seg * 1000 - agora) / 1000);
@@ -370,7 +371,7 @@ function vivoAgora(s: IdleState, agora: number): number | null {
 }
 
 /** Um evento na tela (a dupla são dois ícones lado a lado) e o som característico. */
-function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number) {
+function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS = JANELA_S) {
   const uid = ancora?.estado.user_id;
   if (!uid) return;
   mostrados.set(seg, tipo);
@@ -378,7 +379,7 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number) {
   for (const k of mostrados.keys()) if (k < seg - 60) mostrados.delete(k);
   for (const lado of tipo === 3 ? [0, 1] : [0]) {
     const p = posicao(uid, seg, lado);
-    tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs });
+    tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs, janelaS });
   }
   if (!soou) audio.tocar('dourado');
 }
@@ -505,8 +506,8 @@ setInterval(() => {
   const seg = Math.floor(agoraMs / 1000);
   if (fase === 'jogando' && ancora.estado.started && seg !== segVisto) {
     for (let x = Math.max(segVisto + 1, seg - (JANELA_S - 1)); x <= seg; x++) {
-      const d = douradoEm(ancora.estado.user_id, x);
-      if (d !== null) mostrarDourado(x, d, agoraMs);
+      const e = eventoEm(ancora.estado, x);
+      if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS);
     }
     segVisto = seg;
   }

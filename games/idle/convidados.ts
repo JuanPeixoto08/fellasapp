@@ -1,5 +1,6 @@
 // Convidados do PPP Podcast (minigame 3): o catálogo e as contas da página (puro). Quem decide é o banco (0051, mesmas
 // contas: teste de paridade); aqui só se mostra. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-convidados-design.md.
+import { douradoEm, janelaS, tipoDourado, type TipoDourado } from './dourados';
 import { semente } from './oportunidades';
 
 export type Convidado = { id: number; nome: string; bordao: string; bonus: string; defeito: string };
@@ -111,3 +112,37 @@ export function multFoodTruck({ c, ppp }: Omit<Ctx, 'uid'>, tMs: number): number
 export const custoGeradores = (c: Cadeiras, ppp: number) => 1 - 0.1 * peso(c, ppp, GABE);
 export const custoMelhorias = (c: Cadeiras, ppp: number) => 1 + 0.1 * peso(c, ppp, CR);
 export const deltaOportunidades = (c: Cadeiras, ppp: number) => Math.ceil(5 * peso(c, ppp, LUVA)) - Math.ceil(3 * peso(c, ppp, GABE));
+
+// ---------- eventos na tela: Gemaplys (mais eventos, menos tempo) e as faixas do MC V.V ----------
+/** A faixa do MC V.V no segundo `seg` (epoch): o tipo do evento, ou null (não é faixa ou foi derrubada). */
+export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): TipoDourado | null {
+  const p = peso(c, ppp, MCVV);
+  const d = sentadoDesde(c, MCVV);
+  if (!p || d === null) return null;
+  const dS = Math.floor(d / 1000);
+  const passo = faixaS(p);
+  const k = (seg - dS) / passo;
+  if (k < 1 || !Number.isInteger(k) || derrubada(uid, dS, k)) return null;
+  return tipoDourado(uid, seg);
+}
+
+type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras };
+const SEM: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
+const ctx = (s: ComCadeiras) => ({ c: s.convidados ?? SEM, ppp: s.generators[12] ?? 0 });
+
+/** O evento do segundo `seg` pra esse estado (a sorte, com o Gemaplys, ou a faixa do MC V.V) e quanto fica na tela. */
+export function eventoEm(s: ComCadeiras, seg: number): { tipo: TipoDourado; janelaS: number } | null {
+  const { c, ppp } = ctx(s);
+  const gema = peso(c, ppp, GEMAPLYS);
+  const tipo = douradoEm(s.user_id, seg, gema) ?? faixaEm(s.user_id, c, ppp, seg);
+  return tipo === null ? null : { tipo, janelaS: janelaS(gema) };
+}
+/** Os eventos de [de, ate) (s), pra agendar o som com a aba escondida. */
+export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {
+  const out: { seg: number; tipo: TipoDourado }[] = [];
+  for (let x = de; x < ate; x++) {
+    const e = eventoEm(s, x);
+    if (e) out.push({ seg: x, tipo: e.tipo });
+  }
+  return out;
+}

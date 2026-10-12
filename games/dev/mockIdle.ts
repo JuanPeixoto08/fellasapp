@@ -103,10 +103,10 @@ w.__dourado = async (tipo = 2) => {
   const seg = Math.floor(Date.now() / 1000);
   const ja = await db.query<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'idle_dourado_sorte'");
   if (!ja.rows[0].n) {
-    await db.exec(`alter function public.idle_dourado(uuid, bigint) rename to idle_dourado_sorte;
+    await db.exec(`alter function public.idle_dourado(uuid, bigint, double precision) rename to idle_dourado_sorte;
       create table public.mock_dourado (s bigint primary key, tipo int);
-      create function public.idle_dourado(u uuid, s bigint) returns int language sql stable as
-        'select coalesce((select tipo from public.mock_dourado m where m.s = idle_dourado.s), public.idle_dourado_sorte(u, s))';`);
+      create function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
+        'select coalesce((select tipo from public.mock_dourado m where m.s = idle_dourado.s), public.idle_dourado_sorte(u, s, gema))';`);
   }
   await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
   (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);

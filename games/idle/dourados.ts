@@ -19,13 +19,23 @@ function h1(uid: string, s: number): bigint {
   return (b * b * 48271n + b * 16807n + BigInt(semente(uid)) * 69621n + 12345n) % P;
 }
 
-/** O evento que aparece pro jogador no segundo `s` (epoch), ou null. */
-export function douradoEm(uid: string, s: number): TipoDourado | null {
-  const h2 = mistura(h1(uid, s));
-  if (h2 % 600n !== 0n) return null;
-  const r = Number(mistura(h2) % 100n);
+/** O tipo sorteado pro segundo `s` (vale pros eventos da sorte e pras faixas do MC V.V). */
+export function tipoDourado(uid: string, s: number): TipoDourado {
+  const r = Number(mistura(mistura(h1(uid, s))) % 100n);
   return r < 2 ? 3 : r < 20 ? 2 : r < 55 ? 1 : 0;
 }
+
+/** O evento que aparece pro jogador no segundo `s` (epoch), ou null. `gema` = o peso do Gemaplys (0 a 1): mais
+ *  segundos valem (até 2× com ele na frente), igual a idle_dourado na 0051. */
+export function douradoEm(uid: string, s: number, gema = 0): TipoDourado | null {
+  const h2 = mistura(h1(uid, s));
+  const extra = gema > 0 && Number(mistura(h2 + 777n) % 2400n) < 4 * gema;
+  if (h2 % 600n !== 0n && !extra) return null;
+  return tipoDourado(uid, s);
+}
+
+/** Quanto tempo o evento fica na tela com o Gemaplys (peso `gema`): metade com ele na frente. */
+export const janelaS = (gema = 0) => JANELA_S * (1 - gema / 2);
 
 /** Os eventos de [de, ate) (segundos): pra agendar o som com a aba escondida. */
 export function douradosEntre(uid: string, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {
