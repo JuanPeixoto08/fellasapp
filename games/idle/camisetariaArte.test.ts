@@ -84,6 +84,152 @@ describe('estampa', () => {
   });
 });
 
+describe('o que cada estilo faz (nos pixels)', () => {
+  const H = (c: number[]): string => '#' + c.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const cores = (img: ImageData): Set<string> => {
+    const s = new Set<string>();
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const c = corEm(img, x, y); if (c[3]) s.add(H(c)); }
+    return s;
+  };
+  const linhas = (t: number): string[] => (arte.estampas as Record<string, string[]>)[String(t)];
+  /** Os pixels do desenho do tema (já na posição da estampa) e a volta de 1 px em torno dele. */
+  const desenho = (t: number): Set<string> => {
+    const s = new Set<string>();
+    linhas(t).forEach((l, y) => [...l].forEach((ch, x) => { if (ch !== '.') s.add(`${x + 2},${y + 2}`); }));
+    return s;
+  };
+  const volta = (t: number): Set<string> => {
+    const d = desenho(t), s = new Set<string>();
+    for (const k of d) {
+      const [x, y] = k.split(',').map(Number);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!d.has(`${x + dx},${y + dy}`)) s.add(`${x + dx},${y + dy}`);
+    }
+    return s;
+  };
+  const xyDe = (k: string): [number, number] => k.split(',').map(Number) as [number, number];
+  const PRETO = '#0B0A0E', BRANCO = '#F4F1EA';
+
+  it('Rabisco desenha com caneta azul', () => {
+    for (const t of TEMAS) expect(cores(estampa(t.id, 2)).has('#2B3A8C'), t.nome).toBe(true);
+  });
+
+  it('Grafite usa as duas cores de destaque do lugar (contorno e respingo)', () => {
+    for (const t of TEMAS) {
+      const c = cores(estampa(t.id, 4));
+      expect(c.has('#FFD25E') && c.has('#5ED18A'), t.nome).toBe(true);
+    }
+  });
+
+  it('Vintage desbota (nenhum preto puro) e falha (some pixel do desenho)', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 5);
+      expect(cores(img).has(PRETO), t.nome).toBe(false);
+      expect([...desenho(t.id)].filter((k) => !corEm(img, ...xyDe(k))[3]).length, t.nome).toBeGreaterThan(0);
+    }
+  });
+
+  it('Estêncil tem uma cor só, com vazados dentro do desenho', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 6);
+      expect(cores(img).size, t.nome).toBe(1);
+      expect([...desenho(t.id)].filter((k) => !corEm(img, ...xyDe(k))[3]).length, t.nome).toBeGreaterThan(0);
+    }
+  });
+
+  it('Tie-dye tem o fundo redondo em espiral com 3 ou mais cores e os cantos vazios', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 7);
+      const ocupado = new Set([...desenho(t.id), ...volta(t.id)]);
+      const fundo = new Set<string>();
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (!ocupado.has(`${x},${y}`) && corEm(img, x, y)[3]) fundo.add(H(corEm(img, x, y)));
+      expect(fundo.size, t.nome).toBeGreaterThanOrEqual(3);
+      expect(corEm(img, 0, 0)[3], t.nome).toBe(0);
+    }
+  });
+
+  it('Xilogravura é preto e papel, com moldura preta', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 8);
+      expect([...cores(img)].sort(), t.nome).toEqual(['#0B0A0E', '#E8E0CC']);
+      for (let k = 0; k < 16; k++) for (const [x, y] of [[k, 0], [k, 15], [0, k], [15, k]]) expect(H(corEm(img, x, y))).toBe(PRETO);
+    }
+  });
+
+  it('Neon fica numa placa escura de cantos cortados', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 9);
+      expect(H(corEm(img, 0, 7)), t.nome).toBe('#15141B');
+      expect(H(corEm(img, 15, 8)), t.nome).toBe('#15141B');
+      expect(corEm(img, 0, 0)[3], t.nome).toBe(0);
+    }
+  });
+
+  it('Bordado faz o ponto em X: vizinhos da mesma cor no desenho saem em dois tons alternados', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 10);
+      let pares = 0;
+      linhas(t.id).forEach((r, y) => [...r].forEach((ch, x) => {
+        if (ch === '.' || r[x + 1] !== ch) return;
+        pares++;
+        expect(corEm(img, x + 2, y + 2), `${t.nome} (${x},${y})`).not.toEqual(corEm(img, x + 3, y + 2));
+      }));
+      expect(pares, t.nome).toBeGreaterThan(0);
+    }
+  });
+
+  it('Pop art tem a retícula: um ponto a cada 2 px no fundo', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 11);
+      expect(corEm(img, 0, 0), t.nome).toEqual(corEm(img, 2, 0));
+      expect(corEm(img, 0, 0), t.nome).toEqual(corEm(img, 0, 2));
+      expect(corEm(img, 1, 0), t.nome).not.toEqual(corEm(img, 0, 0));
+      expect(corEm(img, 1, 0), t.nome).toEqual(corEm(img, 0, 1));
+    }
+  });
+
+  it('Colagem mostra o papel dos recortes', () => {
+    for (const t of TEMAS) {
+      const c = cores(estampa(t.id, 12));
+      expect(c.has('#E8E0CC') || c.has('#FF8FB8'), t.nome).toBe(true);
+    }
+  });
+
+  it('Aquarela não tem preto puro nem contorno escuro', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 13);
+      expect(cores(img).has(PRETO), t.nome).toBe(false);
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const c = corEm(img, x, y);
+        if (c[3]) expect(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], `${t.nome} (${x},${y})`).toBeGreaterThan(30);
+      }
+    }
+  });
+
+  it('Gótico é só preto e branco, com o contorno branco colado no desenho', () => {
+    for (const t of TEMAS) {
+      const img = estampa(t.id, 14);
+      expect([...cores(img)].sort(), t.nome).toEqual([PRETO, BRANCO].sort());
+      for (const k of volta(t.id)) expect(H(corEm(img, ...xyDe(k))), t.nome).toBe(BRANCO);
+    }
+  });
+
+  it('Y2K tem o rosa-choque e o cromado', () => {
+    const CROMADO = ['#F4F6FF', '#B4C4F0', '#4A5A8C', '#D8E0FF', '#8DA2D9'];
+    for (const t of TEMAS) {
+      const c = cores(estampa(t.id, 15));
+      expect(c.has('#FF4FA3'), t.nome).toBe(true);
+      expect(CROMADO.filter((x) => c.has(x)).length, t.nome).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('a estampa guardada não se estraga se quem recebeu mexer nela', () => {
+    const a = estampa(1, 3);
+    const antes = chave(a);
+    a.data.fill(0);
+    expect(chave(estampa(1, 3))).toBe(antes);
+  });
+});
+
 describe('peças e cores', () => {
   it('o tecido troca de cor na hora e o resto não muda', () => {
     for (const p of PECAS) {

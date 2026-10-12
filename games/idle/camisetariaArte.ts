@@ -88,7 +88,12 @@ function principal(m: Grade): RGB {
   return melhor[0];
 }
 
-type Ctx = { m: Grade; cheio: boolean[]; a1: number[]; a2: number[]; main: RGB; detalhe: (c: RGB) => boolean; tema: number };
+/** detalhe = bem mais escuro que a cor principal (olho, boca); destaque = detalhe ou bem mais claro (dente, roda, barriga):
+ *  os estilos de uma cor só (estêncil, gótico) vazam o destaque para a figura não virar um borrão. */
+type Ctx = {
+  m: Grade; cheio: boolean[]; a1: number[]; a2: number[]; main: RGB; tema: number;
+  detalhe: (c: RGB) => boolean; destaque: (c: RGB) => boolean;
+};
 
 function contexto(tema: number): Ctx {
   const m = motivo(tema);
@@ -99,7 +104,8 @@ function contexto(tema: number): Ctx {
   const a2 = anel(com1);
   const main = principal(m);
   const lim = luz(main) * 0.6;
-  return { m, cheio, a1, a2, main, detalhe: (c) => luz(c) < lim, tema };
+  const claro = luz(main) + 60;
+  return { m, cheio, a1, a2, main, tema, detalhe: (c) => luz(c) < lim, destaque: (c) => luz(c) < lim || luz(c) > claro };
 }
 
 const pintar = (g: Grade, idx: readonly number[], c: RGB | ((i: number) => RGB | null)): void => {
@@ -176,10 +182,10 @@ const ESTILO: Record<number, (cx: Ctx) => Grade> = {
     for (const i of cx.a1) { const [x, y] = xy(i); if (sorte(x, y, 57) % 4) g[i] = marrom; }
     return g;
   },
-  // 6 Estêncil: uma cor só, detalhes vazados, pontes cortando e respingo de spray em volta
+  // 6 Estêncil: uma cor só, detalhes e destaques vazados, pontes cortando e respingo de spray em volta
   6: (cx) => {
     const tinta = mistura(cx.main, PRETO, 0.5);
-    const g: Grade = cx.m.map((c) => (c && !cx.detalhe(c) ? tinta : null));
+    const g: Grade = cx.m.map((c) => (c && !cx.destaque(c) ? tinta : null));
     const ponte = 9;
     for (let y = 0; y < L; y++) {
       const i = pos(ponte, y);
@@ -248,7 +254,7 @@ const ESTILO: Record<number, (cx: Ctx) => Grade> = {
     const g: Grade = cx.m.map((c, i) => {
       if (!c) return null;
       const [x, y] = xy(i);
-      return (x + y) % 2 === 0 ? c : mistura(c, PRETO, 0.25);
+      return (x + y) % 2 === 0 ? c : mistura(c, luz(c) < 50 ? BRANCO : PRETO, 0.25); // linha escura ganha o tom claro
     });
     for (const i of cx.a1) { const [x, y] = xy(i); if ((x + y) % 2 === 0) g[i] = mistura(corPerto(cx.m, i), PRETO, 0.55); }
     return g;
@@ -304,9 +310,9 @@ const ESTILO: Record<number, (cx: Ctx) => Grade> = {
     }
     return g;
   },
-  // 14 Gótico: preto chapado, detalhes e contorno em branco, e uma volta preta por fora
+  // 14 Gótico: preto chapado, detalhes, destaques e contorno em branco, e uma volta preta por fora
   14: (cx) => {
-    const g: Grade = cx.m.map((c) => (c ? (cx.detalhe(c) ? BRANCO : PRETO) : null));
+    const g: Grade = cx.m.map((c) => (c ? (cx.destaque(c) ? BRANCO : PRETO) : null));
     pintar(g, cx.a1, BRANCO);
     pintar(g, cx.a2, PRETO);
     return g;
@@ -334,11 +340,23 @@ function imagem(g: Grade, w: number, h: number): ImageData {
   return img;
 }
 
-/** A estampa 16×16 do tema no estilo (os dois de 1 em diante, como em TEMAS e ESTILOS). */
+/** Estampas já feitas (são 450 no máximo; a tela da bancada redesenha a prévia a cada clique). */
+const feitas = new Map<string, Uint8ClampedArray>();
+
+/** A estampa 16×16 do tema no estilo (os dois de 1 em diante, como em TEMAS e ESTILOS). Cada chamada devolve uma
+ *  imagem nova (quem recebe pode mexer nela sem estragar a guardada). */
 export function estampa(tema: number, estilo: number): ImageData {
-  const f = ESTILO[estilo];
-  if (!f) throw new Error(`estilo sem arte: ${estilo}`);
-  return imagem(f(contexto(tema)), L, L);
+  const k = `${tema},${estilo}`;
+  let dados = feitas.get(k);
+  if (!dados) {
+    const f = ESTILO[estilo];
+    if (!f) throw new Error(`estilo sem arte: ${estilo}`);
+    dados = imagem(f(contexto(tema)), L, L).data;
+    feitas.set(k, dados);
+  }
+  const img = new ImageData(L, L);
+  img.data.set(dados);
+  return img;
 }
 
 /** A peça 24×24 com o tecido na cor (c = a cor, s = sombra, h = luz; o resto vem da paleta). */
