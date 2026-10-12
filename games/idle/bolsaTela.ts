@@ -53,6 +53,13 @@ export function criarBolsaTela(a: {
     relogioEl.textContent = `preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
   function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): void {
+    // redesenhar troca a lista e o detalhe por novos: guarda a rolagem e o foco pra devolver no fim (no PC a lista
+    // rola sozinha e voltaria pro topo a cada clique)
+    const rolouLista = raiz.querySelector<HTMLElement>('.bolsa-lista')?.scrollTop ?? 0;
+    const detalheAntes = raiz.querySelector<HTMLElement>('.bolsa-detalhe');
+    const rolouDetalhe = detalheAntes && detalheAntes.dataset.empresa === String(escolhida) ? detalheAntes.scrollTop : 0;
+    const ativo = document.activeElement;
+    const focoEmpresa = ativo instanceof HTMLElement && raiz.contains(ativo) ? ativo.closest<HTMLElement>('.acao')?.dataset.empresa : undefined;
     ultimo = [b, valuation, ocupado];
     raiz.replaceChildren();
     relogioEl = null;
@@ -141,6 +148,7 @@ export function criarBolsaTela(a: {
       const p = pos(m.id);
       const tem = p?.qtd ?? 0;
       const d = el('div', 'bolsa-detalhe');
+      d.dataset.empresa = String(m.id);
       d.setAttribute('aria-live', 'polite');
       const cab = el('div', 'cab');
       const nome = el('span', 'tk', e.codigo);
@@ -202,7 +210,10 @@ export function criarBolsaTela(a: {
         d.append(comprar, vender, el('p', 'aviso', 'Preço em segundos da sua produção: quando ela cresce, o F$ sobe junto.'));
       }
       miolo.append(d);
+      d.scrollTop = rolouDetalhe;
     }
+    lista.scrollTop = rolouLista;
+    if (focoEmpresa) lista.querySelector<HTMLElement>(`.acao[data-empresa="${focoEmpresa}"]`)?.focus({ preventScroll: true });
     atuais = precos;
   }
   /** Os botões que o F$ acende e apaga (vazio com a Bolsa fora da tela). */

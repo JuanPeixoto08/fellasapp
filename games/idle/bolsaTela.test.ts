@@ -138,6 +138,25 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.bolsa')!.textContent).toContain('Compra 1 Grupo de trader pra abrir a Bolsa');
     expect(document.querySelectorAll('.acao')).toHaveLength(0);
   });
+  it('escolher uma empresa lá embaixo não sobe a lista e o foco fica nela', () => {
+    tela.renderizar(B(), 1e9, false);
+    document.querySelector<HTMLElement>('.bolsa-lista')!.scrollTop = 180;
+    linha(4).focus();
+    linha(4).click();
+    expect(document.querySelector<HTMLElement>('.bolsa-lista')!.scrollTop).toBe(180);
+    expect(document.activeElement).toBe(linha(4));
+    tela.renderizar(B(), 1e9, false); // o minuto virou: redesenha sem mexer na rolagem
+    expect(document.querySelector<HTMLElement>('.bolsa-lista')!.scrollTop).toBe(180);
+  });
+  it('a rolagem do detalhe fica na mesma empresa e volta ao topo em outra', () => {
+    tela.renderizar(B(), 1e9, false);
+    linha(1).click();
+    document.querySelector<HTMLElement>('.bolsa-detalhe')!.scrollTop = 90;
+    tela.renderizar(B(), 1e9, false);
+    expect(document.querySelector<HTMLElement>('.bolsa-detalhe')!.scrollTop).toBe(90);
+    linha(4).click();
+    expect(document.querySelector<HTMLElement>('.bolsa-detalhe')!.scrollTop).toBe(0);
+  });
   it('carregando: avisa', () => {
     tela.renderizar(null, 1e9, false);
     expect(document.querySelector('.bolsa')!.textContent).toContain('Carregando a Bolsa…');

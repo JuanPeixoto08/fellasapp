@@ -240,6 +240,10 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const tituloGaveta = el('h2', undefined, 'Bolsa');
   bancadaTopo.append(fecharBolsa, tituloGaveta, valorBolsa);
   const corpoBancada = el('div', 'gaveta-corpo');
+  // a Bolsa e a Horta continuam no corpo entre um desenho e outro: tirar e pôr de volta zeraria a rolagem delas
+  const noCorpo = (n: HTMLElement) => {
+    if (corpoBancada.childNodes.length !== 1 || corpoBancada.firstChild !== n) corpoBancada.replaceChildren(n);
+  };
   const bancada = el('section', 'bancada');
   bancada.setAttribute('aria-label', 'Bancada');
   bancada.append(bancadaTopo, gavetas, corpoBancada);
@@ -559,10 +563,10 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     if (gavetaAberta === 'horta' && s) {
       const semHorta: HortaEstado = { lado: 0, food_trucks: 0, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: s.server_now };
       hortaTela.renderizar(foodTruck ? m.horta : semHorta, s.rate, s.valuation, m.ocupado, agoraTela);
-      corpoBancada.replaceChildren(hortaTela.elemento);
+      noCorpo(hortaTela.elemento);
     } else if (m.bolsaAberta && jogando && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado);
-      corpoBancada.replaceChildren(bolsaTela.elemento);
+      noCorpo(bolsaTela.elemento);
     } else {
       corpoBancada.replaceChildren(...(s && jogando ? itensCaixinha(s, m) : []));
     }

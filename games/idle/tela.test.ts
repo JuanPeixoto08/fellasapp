@@ -606,6 +606,18 @@ describe('empresa, resumo e bancada', () => {
     expect(acoes.bolsa).toHaveBeenCalledWith('fechar');
     vi.restoreAllMocks();
   });
+  it('Bolsa ou Horta aberta: redesenhar a página não tira a gaveta do lugar (sair e voltar zera a rolagem)', () => {
+    const tela = criarTela(root, acoes);
+    for (const aberta of [{ bolsaAberta: true }, { hortaAberta: true }]) {
+      tela.renderizar(modelo(aberta));
+      const corpo = root.querySelector('.gaveta-corpo')!;
+      const obs = new MutationObserver(() => {});
+      obs.observe(corpo, { childList: true });
+      tela.renderizar(modelo(aberta));
+      expect(obs.takeRecords()).toHaveLength(0);
+      obs.disconnect();
+    }
+  });
   it('topo: a engrenagem abre as Configurações; a bolinha aparece com novidade não lida', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ novidadeNova: true }));
