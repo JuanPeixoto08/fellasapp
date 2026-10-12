@@ -1,0 +1,156 @@
+// Convidados no PPP Podcast (0051): migrações reais no PGlite. O relógio é o do vitest (o now() do PGlite segue o Date
+// falso): cada teste para o tempo e anda quando precisa.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { derrubada, kojimaMult, manhaBrasilia } from '../idle/convidados';
+import { freshDb, quartaATarde, type TestDb } from './db';
+
+const A = '00000000-0000-0000-0000-00000000000a';
+const H = 3_600_000;
+
+let t: TestDb;
+const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
+type Conv = { cadeira: (number | null)[]; desde: (string | null)[]; trocas: number; trocas_t: string | null; ppp: number };
+type Estado = { valuation: number; rate: number; convidados: Conv; opp_left: number; mesma_pessoa?: boolean };
+const sentar = (c: number, id: number) => t.rpc<Estado>('idle_conv_sentar', { p_cadeira: c, p_convidado: id });
+const tirar = (c: number) => t.rpc<Estado>('idle_conv_tirar', { p_cadeira: c });
+const abrir = () => t.rpc<Estado>('idle_open');
+const taxa = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+const conquistas = async () => (await q<{ id: number }>('select conquista_id as id from public.idle_conquistas where user_id = $1 order by 1', [A])).map((x) => x.id);
+let agora = 0;
+const andar = (ms: number) => { agora += ms; vi.setSystemTime(agora); };
+const ppp = (n: number) => q(`update public.idle_state set generators[13] = $2 where user_id = $1`, [A, n]);
+
+beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  agora = quartaATarde().getTime();
+  vi.setSystemTime(agora);
+  t = await freshDb({ conquistas: true });
+  await t.member(A);
+  await t.as(A);
+  await t.rpc('idle_start');
+  await q(`update public.idle_state set valuation = 1e15, generators[1] = 50, generators[11] = 10, generators[13] = 60, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+});
+afterEach(() => vi.useRealTimers());
+
+describe('sentar, tirar e as trocas', () => {
+  it('sentar grava a cadeira e gasta 1 troca; a 4ª seguida não dá; 1 h depois volta uma', async () => {
+    let s = await sentar(0, 1);
+    expect(s.convidados.cadeira).toEqual([1, null, null]);
+    expect(s.convidados.trocas).toBe(2);
+    await sentar(1, 2);
+    s = await sentar(2, 4);
+    expect(s.convidados.trocas).toBe(0);
+    await expect(sentar(0, 5)).rejects.toThrow(/idle_conv_sem_troca/);
+    andar(H + 1000);
+    s = await sentar(0, 5); // troca o Cristiano pelo Kojima
+    expect(s.convidados.cadeira).toEqual([5, 2, 4]);
+    expect(s.convidados.trocas).toBe(0);
+    andar(3 * H);
+    expect((await abrir()).convidados).toMatchObject({ trocas: 0 }); // guardado é o da âncora; a página calcula a recarga
+    s = await sentar(0, 1);
+    expect(s.convidados.trocas).toBe(2); // voltaram as 3 e gastou 1
+  });
+  it('tirar é de graça; o mesmo convidado não senta em duas', async () => {
+    await sentar(0, 1);
+    const s = await tirar(0);
+    expect(s.convidados.cadeira).toEqual([null, null, null]);
+    expect(s.convidados.trocas).toBe(2);
+    await sentar(1, 3);
+    await expect(sentar(2, 3)).rejects.toThrow(/idle_conv_ja_sentado/);
+  });
+  it('cadeiras pelos PPP Podcasts: sem nenhum fecha; o meio abre com 25, o canto com 50', async () => {
+    await ppp(0);
+    await expect(sentar(0, 1)).rejects.toThrow(/idle_conv_fechado/);
+    await ppp(24);
+    await expect(sentar(1, 1)).rejects.toThrow(/idle_conv_trancada/);
+    await ppp(25);
+    await sentar(1, 1);
+    await expect(sentar(2, 2)).rejects.toThrow(/idle_conv_trancada/);
+  });
+  it('Gemaplys e MC V.V: não muda nada, a escondida sai', async () => {
+    await sentar(0, 3);
+    const s = await sentar(1, 9);
+    expect(s.mesma_pessoa).toBe(true);
+    expect(s.convidados.cadeira).toEqual([3, null, null]);
+    expect(s.convidados.trocas).toBe(2);
+    expect(await conquistas()).toContain(113);
+  });
+  it('conquistas: primeiro sentado, mesa cheia, Cristiano na frente, Gabe no canto', async () => {
+    await sentar(0, 1);
+    await sentar(1, 2);
+    await sentar(2, 6);
+    expect(await conquistas()).toEqual(expect.arrayContaining([73, 74, 76, 79]));
+  });
+  it('vender a startup não mexe nas cadeiras', async () => {
+    await sentar(0, 1);
+    await q(`update public.idle_state set prestige_earned = 0 where user_id = $1`, [A]);
+    await q(`update public.idle_state set valuation = 1e30, generators[30] = 100 where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    const [{ c }] = await q<{ c: number[] }>('select conv_cadeira as c from public.idle_state where user_id = $1', [A]);
+    expect(c).toEqual([1, null, null]);
+  });
+});
+
+describe('os efeitos', () => {
+  // sem o catálogo das conquistas: cada uma ganha daria +1% e atrapalharia a conta exata
+  beforeEach(async () => { await q('delete from public.idle_cat_conquista where true'); });
+  it('Cristiano na frente: produção ×1,15 e melhorias 10% mais caras', async () => {
+    const r0 = await taxa();
+    await sentar(0, 1);
+    expect(await taxa()).toBeCloseTo(r0 * 1.15, 6);
+  });
+  it('Luva +5 e Gabe −3 no limite do dia', async () => {
+    const base = (await abrir()).opp_left;
+    await sentar(0, 4);
+    expect((await abrir()).opp_left).toBe(base + 5);
+    await sentar(1, 6);
+    expect((await abrir()).opp_left).toBe(base + 5 - 2);
+  });
+  it('Gabe: o gerador sai 10% mais barato', async () => {
+    const preco = async () => {
+      const [{ v }] = await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]);
+      await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+      const s = await t.rpc<Estado>('idle_buy', { p_kind: 'gerador', p_id: 2, p_qty: 1 });
+      await q(`update public.idle_state set valuation = $2, generators[2] = generators[2] - 1 where user_id = $1`, [A, v]);
+      return v - s.valuation;
+    };
+    await q(`update public.idle_state set valuation = 1e6 where user_id = $1`, [A]);
+    const sem = await preco();
+    await sentar(0, 6);
+    expect(await preco()).toBeCloseTo(sem * 0.9, 3);
+  });
+  it('Kojima: a conta de 7 h de uma vez soma os degraus de hora em hora', async () => {
+    await sentar(0, 5);
+    const [{ desde }] = await q<{ desde: string }>('select conv_desde[1]::text as desde from public.idle_state where user_id = $1', [A]);
+    const d = Date.parse(desde);
+    const base = (await taxa()) / kojimaMult(1, d, agora);
+    await q(`update public.idle_state set settled_at = now(), valuation = 0 where user_id = $1`, [A]);
+    andar(7 * H);
+    const [{ v }] = await q<{ v: number }>(`select (public.idle_settle(s, now())).valuation as v from public.idle_state s where user_id = $1`, [A]);
+    let esperado = 0;
+    for (let h = 0; h < 7; h++) esperado += base * kojimaMult(1, d, d + h * H) * 3600;
+    expect(v / esperado).toBeCloseTo(1, 6);
+    expect(v).toBeGreaterThan(base * 0.9 * 7 * 3600);
+  });
+  it('paridade com convidados.ts: manhã, derrubada', async () => {
+    for (const h of [0, 8, 9, 14, 15, 23]) {
+      const ts = Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`);
+      const [{ m }] = await q<{ m: boolean }>('select public.idle_conv_manha(to_timestamp($1)) as m', [ts / 1000]);
+      expect(m).toBe(manhaBrasilia(ts));
+    }
+    const desde = 1_791_000_000;
+    for (let k = 1; k <= 40; k++) {
+      const [{ d }] = await q<{ d: boolean }>(
+        `select public.idle_horta_sorte($1, 50, $2::bigint + $3, 9) < 0.25 as d`, [A, desde, k]);
+      expect(d).toBe(derrubada(A, desde, k));
+    }
+  });
+  it('Ana: de manhã o Food truck rende o dobro; à tarde a produção cai 5%', async () => {
+    await sentar(0, 10);
+    const r = async (iso: string) => (await q<{ r: number }>('select public.idle_rate_at(s, $2::timestamptz) as r from public.idle_state s where user_id = $1', [A, iso]))[0].r;
+    const manha = await r('2026-10-14T12:00:00Z');
+    const tarde = await r('2026-10-14T18:00:00Z');
+    expect(manha).toBeGreaterThan(tarde / 0.95);
+  });
+});
