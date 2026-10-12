@@ -84,6 +84,8 @@ export type Tela = {
   relogioBonus(s: IdleState | null, agoraMs: number): void;
   /** Oportunidade nova caiu na Caixinha: a gaveta pula e brilha (junto do "plim"). */
   chegouOportunidade(): void;
+  /** Recado no estúdio dos Convidados ("São a mesma pessoa?"). */
+  recadoConvidados(texto: string | null): void;
 };
 
 /** Bolsa sem trader: só o aviso pra abrir (sem buscar nada). */
@@ -947,5 +949,6 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     pulo = setTimeout(() => gavetaCaixa.classList.remove('chegou'), 2000);
   }
 
-  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus, chegouOportunidade };
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus, chegouOportunidade,
+    recadoConvidados: (texto: string | null) => convidadosTela.recado(texto) };
 }

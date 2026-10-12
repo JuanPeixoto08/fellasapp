@@ -388,6 +388,7 @@
 .idle .convidados .bom { font-size: 13px; color: var(--mint); }
 .idle .convidados .ruim { font-size: 13px; color: #FF9B8F; }
 .idle .vivo-conv { color: var(--gold); }
+.idle .conv-recado { margin: 0; padding: 8px 10px; font: 400 18px var(--i-pixel); color: var(--gold); background: var(--i-painel2); }
 .idle .bts-conv { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .idle .conv-lista { display: grid; gap: 6px; }
 .idle .conv-lista-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

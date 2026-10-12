@@ -38,6 +38,7 @@ export function dicaConvidado(id: number, p: number, cadeira: number | null, viv
 export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): void; tirar(cadeira: number): void }, ligar: Ligar = () => undefined) {
   const raiz = el('div', 'convidados');
   let escolhendo: number | null = null;
+  let recado: string | null = null; // "São a mesma pessoa?" (some no próximo toque)
   let ultimo: [IdleState, boolean, number] | null = null;
   const refazer = () => ultimo && renderizar(...ultimo);
 
@@ -72,7 +73,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
         meio.append(el('strong', undefined, convidado(id).nome), el('span', 'bom', bonus), el('span', 'ruim', defeito));
         if (viva) meio.append(el('span', 'sub vivo-conv', viva));
         const bts = el('div', 'bts-conv');
-        const trocar = button('Trocar', 'btn compacto', () => { escolhendo = escolhendo === i ? null : i; refazer(); });
+        const trocar = button('Trocar', 'btn compacto', () => { recado = null; escolhendo = escolhendo === i ? null : i; refazer(); });
         trocar.disabled = ocupado;
         const tirar = button('Tirar', 'btn compacto', () => a.tirar(i));
         tirar.disabled = ocupado;
@@ -81,14 +82,14 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
         cad.tabIndex = 0;
         ligar(cad, `cadeira${i}`, () => dicaConvidado(id, PESOS[i], i, viva));
       } else {
-        const b = button('Chamar convidado', 'btn main compacto', () => { escolhendo = escolhendo === i ? null : i; refazer(); });
+        const b = button('Chamar convidado', 'btn main compacto', () => { recado = null; escolhendo = escolhendo === i ? null : i; refazer(); });
         b.disabled = ocupado || tr.trocas < 1;
         cad.append(el('div', 'conv-retrato vazio'), b);
       }
       estudio.append(cad);
     }
 
-    raiz.append(topo, estudio);
+    raiz.append(topo, ...(recado ? [el('p', 'conv-recado', recado)] : []), estudio);
     if (escolhendo !== null && destrancada(escolhendo, ppp)) {
       const ch = escolhendo;
       const lista = el('div', 'conv-lista');
@@ -125,5 +126,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
     renderizar,
     /** Fecha a lista de escolha (ex.: depois de sentar). */
     fecharLista() { escolhendo = null; },
+    /** Um recado no estúdio até o próximo toque (ex.: Gemaplys e MC V.V juntos). */
+    recado(texto: string | null) { recado = texto; refazer(); },
   };
 }

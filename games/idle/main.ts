@@ -286,10 +286,12 @@ const tela = criarTela(document.getElementById('app')!, {
     const r = await api.idleConvSentar(cadeira, convidado);
     aplicar(r);
     if (r.mesma_pessoa) {
-      aviso = 'São a mesma pessoa? Gemaplys e MC V.V nunca sentam juntos.';
+      tela.recadoConvidados('São a mesma pessoa? Gemaplys e MC V.V nunca sentam juntos.');
       audio.tocar('erro');
-      render();
-    } else audio.tocar('oportunidade');
+    } else {
+      tela.recadoConvidados(null);
+      audio.tocar('oportunidade');
+    }
   }),
   tirar: (cadeira) => void guard(async () => {
     aplicar(await api.idleConvTirar(cadeira));
