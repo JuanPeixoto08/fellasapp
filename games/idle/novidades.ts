@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-oportunidades-sorte',
+    titulo: 'Oportunidades na sorte',
+    data: '2026-10-12',
+    itens: [
+      'As oportunidades agora vêm na sorte: o tipo e a hora de cada uma não seguem mais uma ordem.',
+      'Continua uma a cada 10 minutos, e cada um tem a sua.',
+    ],
+  },
+  {
     id: '2026-10-12-dicas',
     titulo: 'Caixinhas de informação',
     data: '2026-10-12',

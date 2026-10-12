@@ -1,5 +1,6 @@
-// Oportunidades ("cookie dourado"): uma por janela de 10 min, num segundo sorteado pela conta abaixo (igual ao
-// banco: idle_opp_at / idle_opp_kind na 0034). Não precisa ser segredo: o banco confere a janela antes de pagar.
+// Oportunidades ("cookie dourado"): uma por janela de 10 min, o segundo e o tipo sorteados pela conta abaixo (igual ao
+// banco: idle_opp_sorte / idle_opp_at / idle_opp_kind na 0049). Não precisa ser segredo: o banco confere a janela
+// antes de pagar.
 export const JANELA_S = 600;
 export const VALIDADE_S = 4 * 3600;
 /** Quantas oportunidades dá pra pegar por dia (igual ao banco). */
@@ -7,10 +8,30 @@ export const LIMITE_DIA = 10;
 
 export const semente = (uid: string) => parseInt(uid.replace(/-/g, '').slice(0, 7), 16);
 
-/** Quando a oportunidade da janela w aparece (ms). */
-export const instante = (uid: string, w: number) => (w * JANELA_S + ((semente(uid) * 31 + w * 7919) % 590)) * 1000;
+// a sorte da janela: a mesma mistura dos eventos na tela (dourados.ts), com outros pesos. BigInt: os quadrados passam
+// de 2^53. Antes da 0049 era uma conta em sequência (o tipo girava 0, 1, 2 e o segundo andava 249 s por janela).
+const P = 2147483647n;
+const K = 1013904223n;
+const mistura = (x: bigint) => (x * x + K) % P;
+/** null com id que não é uuid ou janela que não é inteira (sem hora do servidor): aí nada aparece, como na conta antiga. */
+function sorte(uid: string, w: number): bigint | null {
+  const u = semente(uid);
+  if (!Number.isInteger(w) || !Number.isInteger(u)) return null;
+  const b = BigInt(w);
+  return mistura(mistura((b * b * 69621n + b * 48271n + BigInt(u) * 16807n + 7n) % P));
+}
 
-export const tipo = (uid: string, w: number) => ((semente(uid) + w * 13) % 3) as 0 | 1 | 2;
+/** Quando a oportunidade da janela w aparece (ms): um segundo sorteado entre 0 e 589 da janela. */
+export const instante = (uid: string, w: number) => {
+  const s = sorte(uid, w);
+  return s === null ? NaN : (w * JANELA_S + Number(s % 590n)) * 1000;
+};
+
+/** O tipo da janela w (0, 1 ou 2), sorteado. */
+export const tipo = (uid: string, w: number) => {
+  const s = sorte(uid, w);
+  return (s === null ? 0 : Number(mistura(s) % 3n)) as 0 | 1 | 2;
+};
 
 export const TEXTO_TIPO: Record<0 | 1 | 2, string> = {
   0: '15 minutos de produção na hora',
