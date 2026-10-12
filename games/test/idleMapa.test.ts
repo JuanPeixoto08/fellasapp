@@ -221,6 +221,8 @@ describe('produções e pódio', () => {
 
 describe('desafio da semana', () => {
   beforeEach(async () => {
+    // só o de teste no lugar 3 (os da camisetaria, da 0058, sairiam no sorteio da semana)
+    await q('delete from public.idle_cat_place_desafio where lugar = 3');
     await q(`insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values
              (9001, 3, 'teste', 5, 'desafio de teste', 'horas', 2)`);
     await empresa(2);

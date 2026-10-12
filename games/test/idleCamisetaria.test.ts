@@ -1,0 +1,403 @@
+// Camisetaria (0058, lugar 3 do Mapa do rolê): migrações reais no PGlite. As contas do banco batem com camisetaria.ts
+// (paridade com semente fixa); o relógio fica parado numa quarta à tarde (o now() do PGlite segue o Date falso).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { LugarEstado } from '../shared/types';
+import {
+  CONFLITOS, CORES, CRESCE, custoLote, distanciaFoco, ESTILOS, FAS_TETO, liberado, notas, PECAS, pctProcura, pecasLote, pecaTema,
+  pesoVenda, PRECO_MULT, precoRelatorio, procura, PUBLICO_BASE, publico, rotulo, TEMAS, tendencia, vendidoAte, type Lancamento,
+} from '../idle/camisetaria';
+import { freshDb, quartaATarde, type TestDb } from './db';
+
+const A = '00000000-0000-0000-0000-00000000000a';
+const B = '00000000-0000-0000-0000-00000000000b';
+const H = 3600_000;
+
+let t: TestDb;
+const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
+let agora = 0;
+const andar = (ms: number) => { agora += ms; vi.setSystemTime(agora); };
+
+// gerador pseudoaleatório fixo: os mesmos casos toda vez
+function rng(seed: number) {
+  return () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+}
+const ent = (r: () => number, a: number, b: number) => a + Math.floor(r() * (b - a + 1));
+const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(1e-300, Math.abs(b));
+
+type Colecao = {
+  id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; arte: number; tecido: number; div: number;
+  lote: number; nivel: number; pecas: number; custo: number; tendencia: number; rotulo: number; peca_tema: number; notas: number[];
+  media: number; procura: number; pct: number; criada_em: Date; pronta_em: Date; fim_em: Date; encerrada_em: Date | null;
+  vendido: number; fiado: boolean; revelada: boolean;
+};
+type Ativa = Record<string, unknown> & { id: number; notas: number[] | null; media: number | null; pct: number | null; procura: number | null; rotulo: number | null };
+type Tee = {
+  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: Ativa | null; ultimo_fiado: string | null;
+  historico: { id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; notas: number[]; pct: number }[];
+  semana: number;
+};
+type Resp = { lugar: LugarEstado & { mecanica: Tee }; marcos_novos: number[] };
+
+type Opcoes = { tema: number; estilo: number; peca: number; cor: number; arte: number; tecido: number; div: number; lote: number; nome: string };
+const PADRAO: Opcoes = { tema: 1, estilo: 1, peca: 1, cor: 1, arte: 3, tecido: 5, div: 2, lote: 1, nome: 'Drop Meme' };
+const lancar = (o: Partial<Opcoes> = {}) => {
+  const x = { ...PADRAO, ...o };
+  return t.rpc<Resp>('idle_tee_lancar', {
+    p_tema: x.tema, p_estilo: x.estilo, p_peca: x.peca, p_cor: x.cor, p_arte: x.arte, p_tecido: x.tecido, p_div: x.div, p_lote: x.lote, p_nome: x.nome,
+  });
+};
+const lugar = () => t.rpc<LugarEstado & { mecanica: Tee }>('idle_lugar', { p_lugar: 3 });
+const colecoes = () => q<Colecao>(
+  `select id::int as id, nome, tema, estilo, peca, cor, arte, tecido, div, lote, nivel, pecas, custo, tendencia, rotulo, peca_tema, notas,
+          media, procura, pct, criada_em, pronta_em, fim_em, encerrada_em, vendido, fiado, revelada
+     from public.idle_tee_colecoes where user_id = $1 order by criada_em, id`, [A]);
+const cupons = async () => (await q<{ m: number }>('select moeda as m from public.idle_place_state where user_id = $1 and lugar = 3', [A]))[0]?.m;
+const setCupons = (m: number) => q('update public.idle_place_state set moeda = $2 where user_id = $1 and lugar = 3', [A, m]);
+const semana = async () => (await q<{ s: string }>('select public.games_week_start()::text as s'))[0].s;
+/** A com a camisetaria aberta no nível `nivel` e `moeda` cupons. */
+async function camisetaria(moeda = 1e6, nivel = 1) {
+  await q(`update public.idle_state set valuation = 1e15, generators[1] = 50, generators[7] = 1, strategies = '{0,0,0,0}',
+             settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+  await t.rpc('idle_place_abrir', { p_lugar: 3 });
+  await q('update public.idle_place_state set moeda = $2, nivel = $3 where user_id = $1 and lugar = 3', [A, moeda, nivel]);
+}
+/** A coleção ativa acaba (fechada na mão, como o encerrar da parte B). */
+const fechar = () => q('update public.idle_tee_colecoes set encerrada_em = now() where user_id = $1 and encerrada_em is null', [A]);
+
+beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  agora = quartaATarde().getTime();
+  vi.setSystemTime(agora);
+  t = await freshDb({ conquistas: true });
+  await t.member(A);
+  await t.member(B);
+  await t.as(A);
+  await t.rpc('idle_start');
+});
+afterEach(() => vi.useRealTimers());
+
+describe('catálogo', () => {
+  it('o banco tem os mesmos temas, estilos, peças, cores, conflitos e constantes de camisetaria.ts', async () => {
+    const temas = await q<Record<string, unknown>>('select * from public.idle_tee_cat_tema order by id');
+    expect(temas.map((r) => ({ id: r.id, nome: r.nome, vibes: r.vibes, nivel: r.nivel }))).toEqual(TEMAS.map((x) => ({ ...x, vibes: [...x.vibes] })));
+    const estilos = await q<Record<string, unknown>>('select * from public.idle_tee_cat_estilo order by id');
+    expect(estilos.map((r) => ({ id: r.id, nome: r.nome, vibes: r.vibes, foco: r.foco, nivel: r.nivel })))
+      .toEqual(ESTILOS.map((x) => ({ ...x, vibes: [...x.vibes], foco: [...x.foco] })));
+    const pecas = await q<Record<string, unknown>>('select * from public.idle_tee_cat_peca order by id');
+    expect(pecas.map((r) => ({ id: r.id, nome: r.nome, custo: r.custo, mult: r.mult, gosta: r.gosta, odeia: r.odeia, nivel: r.nivel })))
+      .toEqual(PECAS.map((x) => ({ ...x, gosta: [...x.gosta], odeia: [...x.odeia] })));
+    const cores = await q<Record<string, unknown>>('select * from public.idle_tee_cat_cor order by id');
+    expect(cores.map((r) => ({ id: r.id, nome: r.nome, hex: r.hex, forte: r.forte, nivel: r.nivel }))).toEqual(CORES.map((x) => ({ ...x })));
+    const conflitos = await q<{ a: string; b: string }>('select a, b from public.idle_tee_cat_conflito order by a, b');
+    expect(conflitos.map((c) => [c.a, c.b])).toEqual(CONFLITOS.map(([a, b]) => [a, b]).sort((x, y) => (x[0] + ' ' + x[1]).localeCompare(y[0] + ' ' + y[1])));
+    expect(await q('select publico_base, cresce, preco_mult, fas_teto from public.idle_tee_const')).toEqual([
+      { publico_base: PUBLICO_BASE, cresce: CRESCE, preco_mult: PRECO_MULT, fas_teto: FAS_TETO },
+    ]);
+  });
+  it('os 12 desafios da camisetaria (302 e 312 com 300% e 600%)', async () => {
+    const d = await q<{ id: number; tipo: string; valor: number; premio: string; premio_valor: number; texto: string }>(
+      'select id, tipo, valor, premio, premio_valor, texto from public.idle_cat_place_desafio where lugar = 3 order by id');
+    expect(d.map((x) => [x.id, x.tipo, x.valor, x.premio, x.premio_valor])).toEqual([
+      [301, 'tee_nota', 8, 'horas', 2], [302, 'tee_pct', 300, 'horas', 3], [303, 'tee_esgotou_grande', 1, 'legado', 2],
+      [304, 'tee_tendencia', 7, 'horas', 2], [305, 'tee_quatro', 8, 'legado', 3], [306, 'tee_luis', 9, 'investidor', 1],
+      [307, 'tee_resenha', 10, 'horas', 2], [308, 'tee_mauro', 10, 'horas', 2], [309, 'tee_otima', 1, 'legado', 2],
+      [310, 'tee_moletom', 7, 'legado', 3], [311, 'tee_colecoes', 3, 'horas', 3], [312, 'tee_pct', 600, 'investidor', 1],
+    ]);
+    expect(d.find((x) => x.id === 302)!.texto).toBe('Coleção com 300% de procura');
+    expect(d.find((x) => x.id === 312)!.texto).toBe('Coleção com 600% de procura');
+  });
+  it('catálogo, coleções e ajudantes ficam escondidos de quem joga', async () => {
+    for (const tab of ['idle_tee_cat_tema', 'idle_tee_cat_estilo', 'idle_tee_cat_peca', 'idle_tee_cat_cor', 'idle_tee_cat_conflito', 'idle_tee_const', 'idle_tee_colecoes']) {
+      await expect(t.asRole('authenticated', `select * from public.${tab}`)).rejects.toThrow();
+    }
+    for (const sql of [
+      'select public.idle_tee_rotulo(1, 1)', 'select public.idle_tee_peca_tema(1, 1)', 'select public.idle_tee_distancia(1, 3, 5, 2)',
+      `select public.idle_tee_notas(1, 1, 1, 1, 1, 3, 5, 2, 1, '{}', '{}')`, 'select public.idle_tee_pecas_lote(1, 1)',
+      'select public.idle_tee_custo_lote(1, 1, 1)', 'select public.idle_tee_publico(1)', `select public.idle_tee_procura(1, 1, 0, '{5,5,5,5}')`,
+      `select public.idle_tee_pct_procura(1, 1, 0, '{5,5,5,5}')`, 'select public.idle_tee_preco_relatorio(1)',
+      'select public.idle_tee_peso(now(), now())', 'select public.idle_tee_vendido_ate(1, now(), now())',
+      'select public.idle_tee_tendencia(current_date)', `select public.idle_tee_liberado('tema', 1, 1)`,
+      `select public.idle_tee_json(s) from public.idle_state s`,
+    ]) {
+      await expect(t.asRole('authenticated', sql), sql).rejects.toThrow(/permission denied/);
+    }
+  });
+});
+
+describe('paridade TS × SQL', () => {
+  it('200 lançamentos com semente fixa: rótulo, peça × tema, distância e notas exatos; procura e % com erro < 1e-9', async () => {
+    const r = rng(2026);
+    const OTIMAS = TEMAS.flatMap((tm) => ESTILOS.filter((es) => rotulo(tm.id, es.id) === 4).map((es) => [tm.id, es.id] as const));
+    const visto = { rep20: 0, rep10: 0, luis: 0, tendencia: 0, teto: 0, nota1: 0, nota10: 0 };
+    for (let i = 0; i < 200; i++) {
+      // um quarto dos casos numa combinação ótima (o ramo do @luisviton precisa dela e do foco certeiro)
+      const [tema, estilo] = r() < 0.25 ? OTIMAS[ent(r, 0, OTIMAS.length - 1)] : [ent(r, 1, 30), ent(r, 1, 15)];
+      let foco: [number, number, number];
+      if (r() < 0.3) foco = [...ESTILOS[estilo - 1].foco];
+      else { const a = ent(r, 0, 10); const tc = ent(r, 0, 10 - a); foco = [a, tc, 10 - a - tc]; }
+      const n = ent(r, 0, 4);
+      const ultimas = Array.from({ length: n }, () => (r() < 0.3 ? { tema, estilo: r() < 0.5 ? estilo : ent(r, 1, 15) } : { tema: ent(r, 1, 30), estilo: r() < 0.3 ? estilo : ent(r, 1, 15) }));
+      const l: Lancamento = {
+        id: ent(r, 1, 50_000_000), tema, estilo, peca: ent(r, 1, 6), cor: ent(r, 1, 12), foco, lote: ent(r, 0, 2) as 0 | 1 | 2,
+        nivel: ent(r, 1, 25), fas: r() < 0.3 ? 0 : Math.floor(r() ** 2 * 50_000), tendencia: r() < 0.3 ? tema : ent(r, 1, 30), ultimas,
+      };
+      const ns = notas(l);
+      const u3 = ultimas.slice(0, 3);
+      if (u3.some((u) => u.tema === tema && u.estilo === estilo)) visto.rep20++;
+      else if (ultimas[0] && (ultimas[0].tema === tema || ultimas[0].estilo === estilo)) visto.rep10++;
+      if (rotulo(tema, estilo) === 4 && distanciaFoco(estilo, foco) <= 1) visto.luis++;
+      if (tema === l.tendencia) visto.tendencia++;
+      if (Math.sqrt(l.fas) / 30 > FAS_TETO) visto.teto++;
+      if (ns.includes(1)) visto.nota1++;
+      if (ns.includes(10)) visto.nota10++;
+      const [x] = await q<{ rot: number; pt: number; dist: number; notas: number[]; procura: number; pct: number }>(
+        `select public.idle_tee_rotulo($2, $3) as rot, public.idle_tee_peca_tema($4, $2) as pt, public.idle_tee_distancia($3, $6, $7, $8) as dist,
+                public.idle_tee_notas($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::int[], $11::int[]) as notas,
+                public.idle_tee_procura($12, $4, $13, $14::int[]) as procura, public.idle_tee_pct_procura($12, $4, $13, $14::int[]) as pct`,
+        [l.id, tema, estilo, l.peca, l.cor, foco[0], foco[1], foco[2], l.tendencia, ultimas.map((u) => u.tema), ultimas.map((u) => u.estilo), l.nivel, l.fas, ns]);
+      const caso = JSON.stringify(l);
+      expect(x.rot, caso).toBe(rotulo(tema, estilo));
+      expect(x.pt, caso).toBe(pecaTema(l.peca, tema));
+      expect(x.dist, caso).toBe(distanciaFoco(estilo, foco));
+      expect(x.notas, caso).toEqual(ns);
+      expect(rel(x.procura, procura(l, ns)), caso).toBeLessThan(1e-9);
+      expect(rel(x.pct, pctProcura(l, ns)), caso).toBeLessThan(1e-9);
+    }
+    // os casos passam por todos os ramos (repetição, @luisviton, tema da semana, teto dos fãs, notas presas em 1 e 10)
+    for (const [ramo, n] of Object.entries(visto)) expect(n, ramo).toBeGreaterThan(3);
+  });
+  it('todos os pares tema × estilo dão o mesmo rótulo', async () => {
+    const rows = await q<{ t: number; e: number; r: number }>(
+      'select t.id as t, e.id as e, public.idle_tee_rotulo(t.id, e.id) as r from public.idle_tee_cat_tema t cross join public.idle_tee_cat_estilo e');
+    expect(rows).toHaveLength(450);
+    for (const x of rows) expect(x.r, `${x.t}×${x.e}`).toBe(rotulo(x.t, x.e));
+  });
+  it('lote, custo, público e relatório em todos os níveis; o que libera em cada nível', async () => {
+    const rows = await q<{ n: number; l: number; pecas: number; custo: number; pub: number; rel: number }>(
+      `select n, l, public.idle_tee_pecas_lote(n, l) as pecas, public.idle_tee_custo_lote(6, n, l) as custo,
+              public.idle_tee_publico(n) as pub, public.idle_tee_preco_relatorio(n) as rel
+         from generate_series(1, 25) n cross join generate_series(0, 2) l order by n, l`);
+    for (const x of rows) {
+      const lote = x.l as 0 | 1 | 2;
+      expect(x.pecas).toBe(pecasLote(x.n, lote));
+      expect(x.custo).toBe(custoLote(6, x.n, lote));
+      expect(rel(x.pub, publico(x.n))).toBeLessThan(1e-12);
+      expect(rel(x.rel, precoRelatorio(x.n))).toBeLessThan(1e-12);
+    }
+    const lib = await q<{ tipo: 'tema' | 'estilo' | 'peca' | 'cor'; id: number; n: number; ok: boolean }>(
+      `select x.tipo, x.id, n, public.idle_tee_liberado(x.tipo, x.id, n) as ok
+         from (select 'tema' as tipo, id from public.idle_tee_cat_tema union all select 'estilo', id from public.idle_tee_cat_estilo
+               union all select 'peca', id from public.idle_tee_cat_peca union all select 'cor', id from public.idle_tee_cat_cor) x
+        cross join generate_series(1, 25) n`);
+    expect(lib).toHaveLength((30 + 15 + 6 + 12) * 25);
+    for (const x of lib) expect(x.ok, `${x.tipo}:${x.id}@${x.n}`).toBe(liberado(x.tipo, x.id, x.n));
+  });
+  it('peso da venda e vendido em 200 intervalos (atravessando os shows de sexta e sábado)', async () => {
+    const r = rng(77);
+    const segunda = Date.UTC(2026, 9, 12, 3); // segunda 12/10 00h de Brasília
+    let noShow = 0;
+    for (let i = 0; i < 200; i++) {
+      const a = segunda - 7 * 24 * H + Math.floor(r() * 21 * 24 * H);
+      const b = a + Math.floor(r() * 30 * H);
+      const pronta = a;
+      const tt = pronta - 2 * H + Math.floor(r() * 16 * H);
+      const total = Math.floor(r() * 5000) + r();
+      const [x] = await q<{ p: number; v: number }>(
+        'select public.idle_tee_peso($1::timestamptz, $2::timestamptz) as p, public.idle_tee_vendido_ate($3, $1::timestamptz, $4::timestamptz) as v',
+        [new Date(a).toISOString(), new Date(b).toISOString(), total, new Date(tt).toISOString()]);
+      expect(x.p, `${a} ${b}`).toBe(pesoVenda(a, b));
+      if (pesoVenda(a, b) > b - a) noShow++;
+      expect(rel(x.v, vendidoAte(total, pronta, tt)), `${pronta} ${tt}`).toBeLessThan(1e-12);
+    }
+    expect(noShow).toBeGreaterThan(20); // boa parte atravessa um show
+    // sexta 18h às sábado 2h de Brasília: 8 h que pesam 16
+    const sexta = segunda + 4 * 24 * H + 18 * H;
+    const [x] = await q<{ p: number }>('select public.idle_tee_peso($1::timestamptz, $2::timestamptz) as p',
+      [new Date(sexta).toISOString(), new Date(sexta + 8 * H).toISOString()]);
+    expect(x.p).toBe(16 * H);
+    expect(pesoVenda(sexta, sexta + 8 * H)).toBe(16 * H);
+    // no fim da venda, o vendido é exatamente o total
+    const [y] = await q<{ v: number }>(`select public.idle_tee_vendido_ate(1234.5, $1::timestamptz, $1::timestamptz + interval '13 hours') as v`,
+      [new Date(sexta - 3 * H).toISOString()]);
+    expect(y.v).toBe(1234.5);
+  });
+  it('tema da semana igual ao de camisetaria.ts por 60 semanas', async () => {
+    const rows = await q<{ s: string; t: number }>(
+      `select (date '2026-01-05' + 7 * k)::text as s, public.idle_tee_tendencia(date '2026-01-05' + 7 * k) as t from generate_series(0, 59) k`);
+    for (const x of rows) expect(x.t, x.s).toBe(tendencia(x.s));
+  });
+});
+
+describe('lançar', () => {
+  it('grava tudo calculado (igual a camisetaria.ts), desconta o cupom e devolve o lugar', async () => {
+    await camisetaria(1000);
+    const resp = await lancar();
+    const [c] = await colecoes();
+    const sem = await semana();
+    const l: Lancamento = { id: c.id, tema: 1, estilo: 1, peca: 1, cor: 1, foco: [3, 5, 2], lote: 1, nivel: 1, fas: 0, tendencia: tendencia(sem), ultimas: [] };
+    const ns = notas(l);
+    expect(c).toMatchObject({
+      nome: 'Drop Meme', tema: 1, estilo: 1, peca: 1, cor: 1, arte: 3, tecido: 5, div: 2, lote: 1, nivel: 1, pecas: pecasLote(1, 1),
+      custo: custoLote(1, 1, 1), tendencia: tendencia(sem), rotulo: rotulo(1, 1), peca_tema: pecaTema(1, 1), notas: ns,
+      media: ns.reduce((a, b) => a + b, 0) / 4, encerrada_em: null, vendido: 0, fiado: false, revelada: false,
+    });
+    expect(rel(c.procura, procura(l, ns))).toBeLessThan(1e-9);
+    expect(rel(c.pct, pctProcura(l, ns))).toBeLessThan(1e-9);
+    expect(c.criada_em.getTime()).toBe(agora);
+    expect(c.pronta_em.getTime()).toBe(agora + 2 * H);
+    expect(c.fim_em.getTime()).toBe(agora + 14 * H);
+    expect(await cupons()).toBe(1000 - 108);
+    expect(resp.lugar.moeda).toBe(1000 - 108);
+    expect(resp.lugar.mecanica.ativa).toMatchObject({ id: c.id, nome: 'Drop Meme', notas: null });
+    expect(resp.marcos_novos).toEqual([]);
+  });
+  it('lote pequeno 1 h, grande 4 h; nome sem espaço nas pontas; fãs e nível entram na conta', async () => {
+    await camisetaria(1e6, 4);
+    await q('update public.idle_place_state set fas = 2500 where user_id = $1 and lugar = 3', [A]);
+    await lancar({ lote: 2, peca: 3, tema: 9, nome: '  Crise  ' });
+    let [c] = await colecoes();
+    expect(c.nome).toBe('Crise');
+    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(4 * H);
+    expect(c.pecas).toBe(pecasLote(4, 2));
+    const l: Lancamento = { id: c.id, tema: 9, estilo: 1, peca: 3, cor: 1, foco: [3, 5, 2], lote: 2, nivel: 4, fas: 2500, tendencia: c.tendencia, ultimas: [] };
+    expect(rel(c.procura, procura(l, notas(l)))).toBeLessThan(1e-9);
+    expect(await cupons()).toBe(1e6 - custoLote(3, 4, 2));
+    await fechar();
+    await lancar({ lote: 0 });
+    c = (await colecoes())[1];
+    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(H);
+  });
+  it('as últimas 3 coleções (a mais recente primeiro) entram na repetição, igual ao TS', async () => {
+    await camisetaria();
+    const feitas: { tema: number; estilo: number }[] = [];
+    for (const [tema, estilo] of [[1, 1], [2, 2], [3, 3], [5, 3], [2, 2], [2, 1], [1, 1], [4, 2]]) {
+      andar(60_000);
+      await lancar({ tema, estilo });
+      const cs = await colecoes();
+      const c = cs[cs.length - 1];
+      const l: Lancamento = { id: c.id, tema, estilo, peca: 1, cor: 1, foco: [3, 5, 2], lote: 1, nivel: 1, fas: 0, tendencia: c.tendencia, ultimas: [...feitas].reverse() };
+      expect(c.notas, `${tema}/${estilo}`).toEqual(notas(l));
+      feitas.push({ tema, estilo });
+      await fechar();
+    }
+  });
+  it('recusas: cada uma com o erro certo e nada gravado', async () => {
+    await camisetaria(1000);
+    const nada = async () => {
+      expect(await colecoes()).toHaveLength(0);
+      expect(await cupons()).toBe(1000);
+    };
+    for (const [o, erro] of [
+      [{ tema: 7 }, /idle_tee_trancado/], [{ estilo: 4 }, /idle_tee_trancado/], [{ peca: 3 }, /idle_tee_trancado/], [{ cor: 5 }, /idle_tee_trancado/],
+      [{ tema: 31 }, /idle_bad_choice/], [{ estilo: 0 }, /idle_bad_choice/], [{ peca: 7 }, /idle_bad_choice/], [{ cor: 13 }, /idle_bad_choice/],
+      [{ arte: 3, tecido: 5, div: 1 }, /idle_tee_foco/], [{ arte: -1, tecido: 6, div: 5 }, /idle_tee_foco/], [{ arte: 11, tecido: -1, div: 0 }, /idle_tee_foco/],
+      [{ lote: 3 }, /idle_bad_choice/], [{ lote: -1 }, /idle_bad_choice/],
+      [{ nome: '   ' }, /idle_lugar_nome/], [{ nome: 'x'.repeat(31) }, /idle_lugar_nome/],
+    ] as [Partial<Opcoes>, RegExp][]) {
+      await expect(lancar(o), JSON.stringify(o)).rejects.toThrow(erro);
+      await nada();
+    }
+    await setCupons(107);
+    await expect(lancar({ lote: 1 })).rejects.toThrow(/idle_lugar_moeda/);
+    expect(await colecoes()).toHaveLength(0);
+    expect(await cupons()).toBe(107);
+  });
+  it('com coleção rodando: idle_tee_ocupada; depois do fim da venda (ou encerrada) libera', async () => {
+    await camisetaria();
+    await lancar();
+    await expect(lancar({ tema: 2 })).rejects.toThrow(/idle_tee_ocupada/);
+    andar(2 * H + 1); // pronta, à venda
+    await expect(lancar({ tema: 2 })).rejects.toThrow(/idle_tee_ocupada/);
+    expect(await colecoes()).toHaveLength(1);
+    andar(12 * H); // a venda acabou
+    await lancar({ tema: 2 });
+    await fechar();
+    await lancar({ tema: 3 });
+    expect(await colecoes()).toHaveLength(3);
+  });
+  it('lugar fechado: idle_lugar_fechado', async () => {
+    await expect(lancar()).rejects.toThrow(/idle_lugar_fechado/);
+    await t.as(B);
+    await expect(lancar()).rejects.toThrow(/idle_lugar_fechado/);
+  });
+  it('trancado pelo nível libera quando o lugar sobe', async () => {
+    await camisetaria(1e6, 2);
+    await lancar({ tema: 7, estilo: 4 });
+    expect((await colecoes())[0]).toMatchObject({ tema: 7, estilo: 4, nivel: 2 });
+  });
+});
+
+describe('o fornecedor fia', () => {
+  it('sem cupom pro lote pequeno: o pequeno sai de graça, uma vez a cada 24 h', async () => {
+    await camisetaria(0);
+    await expect(lancar({ lote: 1 })).rejects.toThrow(/idle_lugar_moeda/);
+    await lancar({ lote: 0 });
+    expect((await colecoes())[0]).toMatchObject({ lote: 0, fiado: true, custo: 0, pecas: 12 });
+    expect(await cupons()).toBe(0);
+    expect((await lugar()).mecanica.ultimo_fiado).not.toBeNull();
+    await fechar();
+    andar(23 * H);
+    await expect(lancar({ lote: 0 })).rejects.toThrow(/idle_lugar_moeda/);
+    andar(H);
+    await lancar({ lote: 0 });
+    expect((await colecoes()).map((c) => c.fiado)).toEqual([true, true]);
+  });
+  it('com cupom pro pequeno da peça escolhida, paga (não fia)', async () => {
+    await camisetaria(36);
+    await lancar({ lote: 0 });
+    expect((await colecoes())[0]).toMatchObject({ fiado: false, custo: 36 });
+    expect(await cupons()).toBe(0);
+  });
+  it('a peça escolhida decide: 30 cupons pagam o pequeno de ecobag (24) e não o de camiseta (36)', async () => {
+    await camisetaria(30);
+    await lancar({ lote: 0, peca: 2 });
+    expect((await colecoes())[0]).toMatchObject({ fiado: false, custo: 24 });
+    await fechar();
+    await lancar({ lote: 0, peca: 1 }); // 6 cupons: fia a camiseta
+    expect((await colecoes())[1]).toMatchObject({ fiado: true, custo: 0 });
+    expect(await cupons()).toBe(6);
+  });
+});
+
+describe('o JSON da camisetaria', () => {
+  it('lugar fechado: sem mecânica', async () => {
+    expect((await lugar()).mecanica).toBeNull();
+  });
+  it('tema da semana, lotes, relatório e nenhuma coleção', async () => {
+    await camisetaria(1000, 3);
+    const m = (await lugar()).mecanica;
+    expect(m).toMatchObject({ tendencia: tendencia(await semana()), lotes: [pecasLote(3, 0), pecasLote(3, 1), pecasLote(3, 2)], ativa: null, historico: [], semana: 0, ultimo_fiado: null });
+    expect(rel(m.precos.relatorio, precoRelatorio(3))).toBeLessThan(1e-12);
+  });
+  it('esconde notas, média, procura, % e rótulo até ficar pronta', async () => {
+    await camisetaria();
+    await lancar();
+    let a = (await lugar()).mecanica.ativa!;
+    expect(a).toMatchObject({ notas: null, media: null, pct: null, procura: null, rotulo: null, peca_tema: null, nome: 'Drop Meme', lote: 1, pecas: 36 });
+    expect(a.pronta).toBe(false);
+    andar(2 * H - 1);
+    expect((await lugar()).mecanica.ativa!.notas).toBeNull();
+    andar(1);
+    a = (await lugar()).mecanica.ativa!;
+    const [c] = await colecoes();
+    expect(a).toMatchObject({ pronta: true, notas: c.notas, media: c.media, pct: c.pct, procura: c.procura, rotulo: c.rotulo, peca_tema: c.peca_tema });
+    expect((await lugar()).mecanica.semana).toBe(1);
+  });
+  it('histórico: as reveladas, a mais recente primeiro (até 10)', async () => {
+    await camisetaria();
+    for (let i = 1; i <= 12; i++) {
+      andar(60_000);
+      await lancar({ tema: (i % 6) + 1, nome: `Coleção ${i}` });
+      await fechar();
+    }
+    await q('update public.idle_tee_colecoes set revelada = true where user_id = $1 and nome <> $2', [A, 'Coleção 12']);
+    const m = (await lugar()).mecanica;
+    expect(m.ativa).toBeNull();
+    expect(m.historico.map((h) => h.nome)).toEqual(Array.from({ length: 10 }, (_, k) => `Coleção ${11 - k}`));
+    const cs = await colecoes();
+    const c11 = cs.find((c) => c.nome === 'Coleção 11')!;
+    expect(m.historico[0]).toEqual({ id: c11.id, nome: 'Coleção 11', tema: c11.tema, estilo: 1, peca: 1, cor: 1, notas: c11.notas, pct: c11.pct });
+    expect(m.semana).toBe(12);
+  });
+});

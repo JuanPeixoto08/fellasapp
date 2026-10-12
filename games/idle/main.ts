@@ -127,7 +127,8 @@ let lugarAberto: number | null = null;
 let lugar: LugarEstado | null = null;
 let nomesLugar = new Map<string, string>(); // user_id -> nome de quem aparece no pódio e na semana
 let timerMapa: ReturnType<typeof setInterval> | null = null;
-const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked', 'idle_cant_afford'];
+const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked', 'idle_cant_afford',
+  'idle_tee_ocupada', 'idle_tee_trancado', 'idle_tee_foco', 'idle_tee_sem_lancar'];
 async function carregarMapa() {
   if (!mapaAberto) return;
   try {

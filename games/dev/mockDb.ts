@@ -31,6 +31,7 @@ import m54 from '../../supabase/migrations/0054_fellas_inc_catalogo_fez_o_l.sql?
 import m55 from '../../supabase/migrations/0055_fellas_inc_fez_o_l.sql?raw';
 import m56 from '../../supabase/migrations/0056_fellas_inc_catalogo_mapa.sql?raw';
 import m57 from '../../supabase/migrations/0057_fellas_inc_mapa.sql?raw';
+import m58 from '../../supabase/migrations/0058_fellas_inc_camisetaria.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 
@@ -44,7 +45,7 @@ export const FRIENDS: [string, string, number][] = [
 export const ready = (async () => {
   const db = new PGlite();
   await db.exec(SKELETON);
-  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m56, m57]) await db.exec(m);
+  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m56, m57, m58]) await db.exec(m);
   // lugares de mentira pro ?mock não ficar vazio (os de verdade só no banco, carregados fora do repositório)
   await db.exec(`insert into public.idle_places (id, nome, frase, x, y)
     select g, 'Lugar ' || g, 'Um lugar de mentira pro ?mock.', 30 + ((g - 1) % 3) * 50, 18 + ((g - 1) / 3) * 30
