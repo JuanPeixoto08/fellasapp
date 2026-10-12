@@ -1,11 +1,13 @@
 // Banco da entrega 3 da Fellas Inc.: a árvore de habilidades (comprar nós e o que cada ramo faz), com as migrações
 // reais no PGlite. A conta da produção, do teto, da caixinha e do preço do contrato com a árvore está na paridade.
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { abertura, efeitosArvore } from '../idle/economia';
 import { CAIXA_PADRAO, pendentes, tipo } from '../idle/oportunidades';
-import { freshDb, type TestDb } from './db';
+import { freshDb, quartaATarde, type TestDb } from './db';
+
+afterEach(() => vi.useRealTimers());
 
 const A = '00000000-0000-0000-0000-00000000000a';
 const B = '00000000-0000-0000-0000-00000000000b';
@@ -133,6 +135,8 @@ describe('o que cada ramo faz', () => {
     expect(s.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
   });
   it('Oportunidades: caixinha de 4 (e 5), +3 por dia e bônus em dobro', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // numa quarta à tarde (ver quartaATarde), não na virada do dia
+    vi.setSystemTime(quartaATarde());
     await abrir(A);
     await q('update public.idle_state set week_start = public.games_week_start() - 7 where user_id = $1', [A]);
     const sem = await t.rpc<Estado>('idle_open');

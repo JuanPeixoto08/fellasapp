@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { instante, pendentes, tipo } from '../idle/oportunidades';
-import { freshDb, type TestDb } from './db';
+import { freshDb, quartaATarde, type TestDb } from './db';
 
 export const A = '00000000-0000-0000-0000-00000000000a';
 export const B = '00000000-0000-0000-0000-00000000000b';
@@ -174,7 +174,13 @@ describe('estratégia por era', () => {
 const claim = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window: w });
 
 describe('oportunidades no banco', () => {
-  beforeEach(async () => { await t.rpc('idle_start'); });
+  // relógio parado numa quarta à tarde (ver quartaATarde): sempre tem 3 guardadas e o dia inteiro de cota
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(quartaATarde());
+    await t.rpc('idle_start');
+  });
+  afterEach(() => vi.useRealTimers());
   const semana = (s: Estado) => Date.parse(s.week_start + 'T00:00:00-03:00');
   // para o relógio até as pegas: a conta do bônus não depende de milissegundos
   const parar = () => q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
