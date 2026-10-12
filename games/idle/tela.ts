@@ -8,7 +8,7 @@ import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
 import { criarHortaTela } from './hortaTela';
 import { criarConvidadosTela } from './convidadosTela';
-import { custosConv, multGerador, peso, SEM_CADEIRAS, VORCARO } from './convidados';
+import { custosConv, multGerador, peso, SEM_CADEIRAS, VINI, VORCARO } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
@@ -592,7 +592,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       noCorpo(convidadosTela.elemento);
     } else if (gavetaAberta === 'horta' && s) {
       const semHorta: HortaEstado = { lado: 0, food_trucks: 0, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: s.server_now };
-      hortaTela.renderizar(foodTruck ? m.horta : semHorta, s.rate, s.valuation, m.ocupado, agoraTela);
+      // a semente custa minutos da produção; com o Viniccius13 sentado, 50% mais (× o peso)
+      const taxaSemente = s.rate * (1 + 0.5 * peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VINI));
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela);
       noCorpo(hortaTela.elemento);
     } else if (m.bolsaAberta && jogando && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));

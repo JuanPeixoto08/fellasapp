@@ -3,7 +3,7 @@
 import { button, el } from '../shared/hud/hud';
 import type { HortaEstado } from '../shared/types';
 import { formatarValor } from './formatar';
-import { dica, ESPECIES, especie, falta, fase, GRADE, madura, precoSemente, proximoLado, resumoBonus, type Especie } from './horta';
+import { daPlanta, dica, ESPECIES, falta, fase, GRADE, madura, precoSemente, proximoLado, resumoBonus, type Especie } from './horta';
 import { iconePlanta } from './hortaArte';
 
 type Precos = { botao: HTMLButtonElement; preco: number };
@@ -59,7 +59,7 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
         b.dataset.canteiro = String(c);
         b.setAttribute('aria-pressed', String(escolhido === c));
         if (p) {
-          const e = especie(p.especie);
+          const e = daPlanta(p);
           const f = fase(e, Date.parse(p.inicio), agoraMs);
           b.append(iconePlanta(p.especie, f));
           b.classList.add(`fase-${f}`);
@@ -91,7 +91,7 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
         }
         cartao.append(lista);
       } else {
-        const e = especie(p.especie);
+        const e = daPlanta(p);
         const f = fase(e, Date.parse(p.inicio), agoraMs);
         const r = falta(e, Date.parse(p.inicio), agoraMs);
         const cab = el('div', 'cab');

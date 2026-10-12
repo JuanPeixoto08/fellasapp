@@ -90,3 +90,14 @@ describe('a horta na tela', () => {
     expect(tela.precos().map((p) => p.preco)).toEqual([1200, 1200]);
   });
 });
+
+describe('com os convidados', () => {
+  it('a planta que entrou com o Terry usa os tempos dela (amadurece antes)', () => {
+    tela.renderizar(HORTA({ plantas: [
+      { canteiro: 0, especie: 1, inicio: em(0.8 * H), origem: 'plantada', amadurece_s: 2520, vida_s: 23040 },
+      { canteiro: 1, especie: 1, inicio: em(0.8 * H), origem: 'plantada' },
+    ] }), 2, 1e9, false, AGORA);
+    expect(canteiro(0).getAttribute('aria-label')).toBe('Canteiro 1: Pé de Pix, madura');
+    expect(canteiro(1).getAttribute('aria-label')).toBe('Canteiro 2: Pé de Pix, crescendo');
+  });
+});

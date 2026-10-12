@@ -26,6 +26,11 @@ export const ESPECIES: readonly Especie[] = [
   { id: 8, nome: 'Morango com Pescoço', custoS: 1800, amadureceS: 8 * H, vidaS: 24 * H, producao: 0.08, geradores: 0, melhorias: 0, oportunidades: 0, pais: null, rara: true },
 ];
 export const especie = (id: number): Especie => ESPECIES.find((e) => e.id === id)!;
+/** A espécie com os tempos da planta (o Terry muda os de quem entra com ele sentado; sem tempos, os do catálogo). */
+export function daPlanta(p: { especie: number; amadurece_s?: number | null; vida_s?: number | null }): Especie {
+  const e = especie(p.especie);
+  return p.amadurece_s || p.vida_s ? { ...e, amadureceS: p.amadurece_s ?? e.amadureceS, vidaS: p.vida_s ?? e.vidaS } : e;
+}
 
 /** A grade é sempre lida numa 6 × 6 (canteiro = linha × 6 + coluna); o lado atual vem dos Food trucks. */
 export const GRADE = 6;
@@ -74,12 +79,12 @@ export function bonusHorta(plantas: readonly PlantaNaTela[], lado: number, agora
 }
 
 const pctAbs = (x: number) => `${Math.round(Math.abs(x) * 1000) / 10}`.replace('.', ',');
-/** "Produção +5% · Geradores −3% · Oportunidades +5%". */
+/** "Produção +5% · Geradores 3% mais baratos · Oportunidades +5%". */
 export function resumoBonus(b: BonusHorta): string {
   const partes: string[] = [];
   if (b.producao) partes.push(`Produção ${b.producao > 0 ? '+' : '−'}${pctAbs(b.producao)}%`);
-  if (b.geradores) partes.push(`Geradores −${pctAbs(b.geradores)}%`);
-  if (b.melhorias) partes.push(`Melhorias −${pctAbs(b.melhorias)}%`);
+  if (b.geradores) partes.push(`Geradores ${pctAbs(b.geradores)}% mais baratos`);
+  if (b.melhorias) partes.push(`Melhorias ${pctAbs(b.melhorias)}% mais baratas`);
   if (b.oportunidades) partes.push(`Oportunidades +${pctAbs(b.oportunidades)}%`);
   return partes.length ? partes.join(' · ') : 'Nada madura ainda';
 }

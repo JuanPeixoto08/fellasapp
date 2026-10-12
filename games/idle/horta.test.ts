@@ -72,8 +72,8 @@ describe('os bônus', () => {
     expect(bonusHorta(muitos, 6, agora).geradores).toBe(0.5);
   });
   it('resumo em texto', () => {
-    expect(resumoBonus({ producao: 0.05, geradores: 0.03, melhorias: 0, oportunidades: 0.05 })).toBe('Produção +5% · Geradores −3% · Oportunidades +5%');
-    expect(resumoBonus({ producao: -0.01, geradores: 0, melhorias: 0.03, oportunidades: 0 })).toBe('Produção −1% · Melhorias −3%');
+    expect(resumoBonus({ producao: 0.05, geradores: 0.03, melhorias: 0, oportunidades: 0.05 })).toBe('Produção +5% · Geradores 3% mais baratos · Oportunidades +5%');
+    expect(resumoBonus({ producao: -0.01, geradores: 0, melhorias: 0.03, oportunidades: 0 })).toBe('Produção −1% · Melhorias 3% mais baratas');
     expect(resumoBonus({ producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 })).toBe('Nada madura ainda');
   });
 });
