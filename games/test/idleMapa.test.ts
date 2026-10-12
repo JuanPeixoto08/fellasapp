@@ -165,3 +165,128 @@ describe('nível e marcos', () => {
     expect(await mult()).toBeCloseTo(multMapa(bonus, 3, { marcosMult: 2, porLugar: 0.05 }));
   });
 });
+
+const registrar = (u: string, l: number, nome: string, numero: number, quando = 'now()') =>
+  q<{ id: number }>(`select public.idle_place_registrar($1, $2, $3, '{1,2}', $4) as id`, [u, l, nome, numero])
+    .then(async (r) => { if (quando !== 'now()') await q(`update public.idle_place_prod set criado_em = ${quando} where id = $1`, [r[0].id]); return r[0].id; });
+type Lugar = { podio: { user_id: string; nome: string; numero: number }[]; semana: { user_id: string; numero: number }[]; desafio: unknown; dono: unknown; mecanica: unknown; caderninho: unknown[] };
+const lugar = (l: number) => t.rpc<Lugar>('idle_lugar', { p_lugar: l });
+const C = '00000000-0000-0000-0000-00000000000c';
+const D = '00000000-0000-0000-0000-00000000000d';
+async function outros() {
+  for (const u of [B, C, D]) {
+    if (u !== B) await t.member(u);
+    await t.as(u); await t.rpc('idle_start'); await t.as(A);
+  }
+}
+
+describe('produções e pódio', () => {
+  it('nome inválido é recusado', async () => {
+    await expect(q(`select public.idle_place_nome('   ')`)).rejects.toThrow(/idle_lugar_nome/);
+    await expect(q(`select public.idle_place_nome($1)`, ['x'.repeat(31)])).rejects.toThrow(/idle_lugar_nome/);
+    expect(await q(`select public.idle_place_nome('  oi ') as v`)).toEqual([{ v: 'oi' }]);
+  });
+  it('pódio: 3 melhores, uma vez por pessoa, empate fica com quem fez antes', async () => {
+    await outros();
+    await registrar(A, 3, 'A1', 300, `now() - interval '3 days'`);
+    await registrar(A, 3, 'A2', 290);           // a 2ª da A não entra: só a melhor dela
+    await registrar(B, 3, 'B1', 250, `now() - interval '2 days'`);
+    await registrar(C, 3, 'C1', 250, `now() - interval '1 day'`); // empate com B: B fez antes
+    await registrar(D, 3, 'D1', 100);
+    const p = (await lugar(3)).podio;
+    expect(p.map((x) => x.nome)).toEqual(['A1', 'B1', 'C1']);
+  });
+  it('entrar no pódio dá "Tá no pódio"', async () => {
+    await registrar(A, 3, 'Primeira', 10);
+    const ids = (await q<{ id: number }>('select conquista_id as id from public.idle_conquistas where user_id = $1', [A])).map((x) => x.id);
+    expect(ids).toContain(86);
+  });
+  it('placar da semana só conta a semana', async () => {
+    await outros();
+    await registrar(A, 4, 'velho', 900, `now() - interval '14 days'`);
+    await registrar(B, 4, 'novo', 500);
+    expect((await lugar(4)).semana.map((x) => x.numero)).toEqual([500]);
+  });
+});
+
+describe('desafio da semana', () => {
+  beforeEach(async () => {
+    await q(`insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values
+             (9001, 3, 'teste', 5, 'desafio de teste', 'horas', 2)`);
+    await empresa(2);
+    await abrir(3);
+  });
+  it('paga uma vez por semana: 2 h de produção', async () => {
+    const r = await taxa();
+    const v = async () => (await q<{ v: number }>(
+      `select (public.idle_place_desafio(s, 3, 'teste', 6)).valuation - s.valuation as v from public.idle_state s where user_id = $1`, [A]))[0].v;
+    expect(await v()).toBeCloseTo(2 * 3600 * r, 0);
+    expect(await v()).toBe(0);
+  });
+  it('não paga com valor abaixo nem com outro tipo', async () => {
+    const dif = async (tipo: string, valor: number) => (await q<{ v: number }>(
+      `select (public.idle_place_desafio(s, 3, $2, $3)).valuation - s.valuation as v from public.idle_state s where user_id = $1`, [A, tipo, valor]))[0].v;
+    expect(await dif('teste', 4)).toBe(0);
+    expect(await dif('outro', 99)).toBe(0);
+  });
+  it('legado soma pontos pra gastar sem mexer nos ganhos', async () => {
+    await q(`update public.idle_cat_place_desafio set premio = 'legado', premio_valor = 3 where id = 9001`);
+    // a função roda uma vez só (no CTE); depois compara com o antes
+    const r = await q<{ ganhou: number; gasto: number }>(
+      `with x as (select public.idle_place_desafio(s, 3, 'teste', 9) as n, s.prestige_earned as e0, s.prestige_spent as g0
+                    from public.idle_state s where user_id = $1)
+       select (n).prestige_earned - e0 as ganhou, (n).prestige_spent - g0 as gasto from x`, [A]);
+    expect(r[0]).toEqual({ ganhou: 0, gasto: -3 });
+  });
+  it('o idle_lugar mostra o desafio e se já foi feito', async () => {
+    expect((await lugar(3)).desafio).toMatchObject({ id: 9001, feito: false });
+  });
+});
+
+describe('semana e presença', () => {
+  it('idle_lock marca visto_em', async () => {
+    await q(`update public.idle_state set visto_em = null where user_id = $1`, [A]);
+    await mapa();
+    expect((await q<{ v: string | null }>('select visto_em as v from public.idle_state where user_id = $1', [A]))[0].v).not.toBeNull();
+  });
+  it('a foto de segunda guarda o dono de cada lugar uma vez e dá "Dono do pedaço"', async () => {
+    await outros();
+    await registrar(B, 3, 'da B', 400, `public.games_week_start()::timestamp at time zone 'America/Sao_Paulo' - interval '2 days'`);
+    await registrar(A, 3, 'da A', 100, `public.games_week_start()::timestamp at time zone 'America/Sao_Paulo' - interval '2 days'`);
+    // semana passada com empresa aberta (a foto da empresa precisa de alguém jogando antes desta semana)
+    await q(`update public.idle_state set week_start = public.games_week_start() - 7, started = true where true`);
+    await q(`select public.idle_weekly_reset()`);
+    await q(`select public.idle_weekly_reset()`);
+    const w = await q<{ dono_id: string; lugar: number }>('select dono_id, lugar from public.idle_place_weeks');
+    expect(w).toEqual([{ dono_id: B, lugar: 3 }]);
+    const ids = (await q<{ id: number }>('select conquista_id as id from public.idle_conquistas where user_id = $1', [B])).map((x) => x.id);
+    expect(ids).toContain(85);
+    expect((await lugar(3)).dono).toMatchObject({ user_id: B });
+  });
+  it('sem placa da empresa (ninguém jogava antes desta semana) o dono do pedaço sai do mesmo jeito', async () => {
+    await outros();
+    await registrar(B, 3, 'da B', 400, `public.games_week_start()::timestamp at time zone 'America/Sao_Paulo' - interval '2 days'`);
+    await q(`select public.idle_weekly_reset()`);
+    expect(await q('select week_start from public.idle_weeks')).toHaveLength(0);
+    expect(await q<{ dono_id: string }>('select dono_id from public.idle_place_weeks')).toEqual([{ dono_id: B }]);
+    const ids = (await q<{ id: number }>('select conquista_id as id from public.idle_conquistas where user_id = $1', [B])).map((x) => x.id);
+    expect(ids).toContain(85);
+  });
+  it('idle_lugar de lugar fechado responde sem erro; de lugar que não existe, idle_bad_choice', async () => {
+    expect(await lugar(3)).toMatchObject({ aberto: false, mecanica: null });
+    await expect(lugar(42)).rejects.toThrow(/idle_bad_choice/);
+  });
+  it('quem nunca abriu a empresa também vê o lugar (fechado)', async () => {
+    await t.as(B);
+    expect(await lugar(3)).toMatchObject({ aberto: false, nivel: null });
+  });
+  it('paridade do sorteio da semana com mapa.ts', async () => {
+    const { semanaIdx } = await import('../idle/mapa');
+    for (const semana of ['2026-10-12', '2026-10-19', '2027-03-01']) {
+      for (const l of [3, 4, 7]) {
+        const r = await q<{ i: number }>('select public.idle_place_semana_idx($1, 0, 12, $2::date) as i', [l, semana]);
+        expect(r[0].i).toBe(semanaIdx(l, 0, 12, semana));
+      }
+    }
+  });
+});

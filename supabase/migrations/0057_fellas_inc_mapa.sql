@@ -296,3 +296,268 @@ revoke all on function public.idle_lugar_json(public.idle_state, int) from publi
 revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_place_nivel(int) from public, anon;
 grant execute on function public.idle_place_nivel(int) to authenticated;
+
+-- ===== parte C: produções, pódio, placar da semana, desafio, caderninho, foto de segunda =====
+
+-- nome que a pessoa dá à produção: sem espaço nas pontas, de 1 a 30 letras, sem quebra de linha (igual a nomeValido)
+create or replace function public.idle_place_nome(p_nome text)
+returns text language plpgsql immutable set search_path = public as $$
+declare v text := btrim(coalesce(p_nome, ''));
+begin
+  if char_length(v) < 1 or char_length(v) > 30 or v ~ '[\r\n]' then
+    raise exception 'idle_lugar_nome' using errcode = 'P0001';
+  end if;
+  return v;
+end;
+$$;
+
+-- pódio de sempre: os 3 melhores, uma vez por pessoa (a melhor dela); empate fica com quem fez antes (criado_em, id)
+create or replace function public.idle_place_podio(p_lugar int)
+returns jsonb language sql stable set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'user_id', x.user_id, 'nome', x.nome, 'partes', to_jsonb(x.partes),
+                                               'numero', x.numero, 'criado_em', x.criado_em,
+                                               'avatar', public.idle_avatar_json(x.user_id))
+                            order by x.numero desc, x.criado_em, x.id), '[]'::jsonb)
+    from (select * from (select distinct on (p.user_id) p.*
+                           from public.idle_place_prod p where p.lugar = p_lugar
+                          order by p.user_id, p.numero desc, p.criado_em, p.id) melhor
+           order by melhor.numero desc, melhor.criado_em, melhor.id
+           limit 3) x
+$$;
+
+-- placar da semana (de segunda 0h a segunda 0h de Brasília): igual ao pódio, só com o que foi feito na semana
+create or replace function public.idle_place_semana(p_lugar int, p_semana date default public.games_week_start())
+returns jsonb language sql stable set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'numero', x.numero,
+                                               'avatar', public.idle_avatar_json(x.user_id))
+                            order by x.numero desc, x.criado_em, x.id), '[]'::jsonb)
+    from (select * from (select distinct on (p.user_id) p.*
+                           from public.idle_place_prod p
+                          where p.lugar = p_lugar
+                            and p.criado_em >= (p_semana::timestamp at time zone 'America/Sao_Paulo')
+                            and p.criado_em < ((p_semana + 7)::timestamp at time zone 'America/Sao_Paulo')
+                          order by p.user_id, p.numero desc, p.criado_em, p.id) melhor
+           order by melhor.numero desc, melhor.criado_em, melhor.id
+           limit 3) x
+$$;
+
+-- grava a produção; se entrou no pódio de sempre, "Tá no pódio". Devolve o id.
+create or replace function public.idle_place_registrar(p_user uuid, p_lugar int, p_nome text, p_partes int[], p_numero double precision)
+returns bigint language plpgsql volatile set search_path = public as $$
+declare v_id bigint;
+begin
+  insert into public.idle_place_prod (user_id, lugar, nome, partes, numero)
+  values (p_user, p_lugar, public.idle_place_nome(p_nome), p_partes, p_numero)
+  returning id into v_id;
+  if exists (select 1 from jsonb_array_elements(public.idle_place_podio(p_lugar)) e where (e ->> 'id')::bigint = v_id) then
+    perform public.idle_ganhar(p_user, 'mapa_podio');
+  end if;
+  return v_id;
+end;
+$$;
+
+-- sorteio da semana (igual a semanaIdx de games/idle/mapa.ts; teste de paridade)
+create or replace function public.idle_place_semana_idx(p_lugar int, p_sal int, p_n int, p_semana date default public.games_week_start())
+returns int language sql immutable set search_path = public as $$
+  select (((((p_semana - date '2026-01-05') / 7)::bigint * 2654435761 + p_lugar::bigint * 40503 + p_sal::bigint * 97)
+           % 4294967296) % greatest(p_n, 1))::int
+$$;
+
+-- o desafio desta semana do lugar (linha toda nula se o lugar não tem desafios)
+create or replace function public.idle_place_desafio_da_semana(p_lugar int)
+returns public.idle_cat_place_desafio language sql stable set search_path = public as $$
+  select d.* from public.idle_cat_place_desafio d
+   where d.lugar = p_lugar
+   order by d.id
+  offset public.idle_place_semana_idx(p_lugar, 0, (select count(*)::int from public.idle_cat_place_desafio x where x.lugar = p_lugar))
+   limit 1
+$$;
+
+-- paga o prêmio do desafio da semana se é desse tipo, o valor alcança e ainda não foi feito. Não salva: quem chama salva.
+create or replace function public.idle_place_desafio(s public.idle_state, p_lugar int, p_tipo text, p_valor double precision)
+returns public.idle_state language plpgsql volatile set search_path = public as $$
+declare d public.idle_cat_place_desafio;
+begin
+  d := public.idle_place_desafio_da_semana(p_lugar);
+  if d.id is null or d.tipo <> p_tipo or (d.valor is not null and coalesce(p_valor, -1e308) < d.valor) then
+    return s;
+  end if;
+  insert into public.idle_place_challenges (user_id, lugar, week_start, desafio)
+  values (s.user_id, p_lugar, public.games_week_start(), d.id)
+  on conflict do nothing;
+  if not found then
+    return s; -- já fez nesta semana
+  end if;
+  if d.premio = 'horas' then
+    s.valuation := s.valuation + d.premio_valor * 3600 * public.idle_rate(s);
+  elsif d.premio = 'investidor' then
+    s.valuation := s.valuation + 1200 * public.idle_rate(s);
+  else -- legado: pontos pra gastar na árvore, sem mexer no que a próxima venda rende
+    s.prestige_spent := s.prestige_spent - d.premio_valor::int;
+  end if;
+  return s;
+end;
+$$;
+
+-- caderninho: o rótulo que a pessoa deu (upsert)
+create or replace function public.idle_place_nota(p_user uuid, p_lugar int, p_tipo text, p_a int, p_b int, p_rotulo int)
+returns void language sql volatile set search_path = public as $$
+  insert into public.idle_place_notes (user_id, lugar, tipo, a, b, rotulo) values (p_user, p_lugar, p_tipo, p_a, p_b, p_rotulo)
+  on conflict (user_id, lugar, tipo, a, b) do update set rotulo = excluded.rotulo
+$$;
+
+-- anda os lugares abertos até agora (as partes 2 a 4 acrescentam o "when" de cada lugar)
+create or replace function public.idle_place_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$
+begin
+  update public.idle_place_state set avancado_em = now() where user_id = s.user_id and avancado_em < now();
+end;
+$$;
+
+-- o JSON da mecânica de cada lugar (as partes 2 a 4 acrescentam o de cada lugar)
+create or replace function public.idle_place_mecanica_json(s public.idle_state, p_lugar int)
+returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
+
+-- a tela do lugar (substitui a provisória da parte B)
+create or replace function public.idle_lugar_json(s public.idle_state, p_lugar int)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'id', c.id, 'moeda_nome', c.moeda, 'numero', c.numero, 'lancado', c.lancado,
+    'nome', p.nome, 'frase', p.frase, 'icone', p.icone,
+    'aberto', st.lugar is not null, 'nivel', st.nivel, 'moeda', st.moeda, 'fas', st.fas, 'volume', st.volume,
+    'lendario', st.lendario, 'marcos', to_jsonb(coalesce(st.marcos, '{}')),
+    'preco_nivel', case when st.nivel < 25 then c.custo_base * power(1.55, st.nivel - 1) end,
+    'desafio', (select jsonb_build_object('id', d.id, 'texto', d.texto, 'premio', d.premio, 'premio_valor', d.premio_valor,
+                                          'feito', exists (select 1 from public.idle_place_challenges ch
+                                                            where ch.user_id = s.user_id and ch.lugar = c.id
+                                                              and ch.week_start = public.games_week_start()))
+                  from public.idle_place_desafio_da_semana(c.id) d where d.id is not null),
+    'podio', public.idle_place_podio(c.id),
+    'semana', public.idle_place_semana(c.id),
+    'dono', (select jsonb_build_object('user_id', w.dono_id, 'numero', w.numero, 'avatar', public.idle_avatar_json(w.dono_id))
+               from public.idle_place_weeks w
+              where w.lugar = c.id and w.week_start = public.games_week_start() - 7 and w.dono_id is not null),
+    'caderninho', coalesce((select jsonb_agg(jsonb_build_object('tipo', n.tipo, 'a', n.a, 'b', n.b, 'rotulo', n.rotulo)
+                                             order by n.tipo, n.a, n.b)
+                              from public.idle_place_notes n where n.user_id = s.user_id and n.lugar = c.id), '[]'::jsonb),
+    'mecanica', public.idle_place_mecanica_json(s, c.id),
+    'server_now', now())
+  from public.idle_cat_place c
+  left join public.idle_places p on p.id = c.id
+  left join public.idle_place_state st on st.user_id = s.user_id and st.lugar = c.id
+  where c.id = p_lugar
+$$;
+
+create or replace function public.idle_lugar(p_lugar int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare s public.idle_state;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.idle_cat_place where id = p_lugar) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  perform public.idle_save(s);
+  return public.idle_lugar_json(s, p_lugar);
+end;
+$$;
+
+-- foto da semana que acabou (a da 0041) + o dono do pedaço de cada lugar do Mapa do rolê
+create or replace function public.idle_weekly_reset()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_new    date := public.games_week_start();
+  v_old    date := public.games_week_start() - 7;
+  v_podium jsonb;
+  v_champ  uuid;
+  v_gravou date;
+  v_dono   uuid;
+begin
+  perform pg_advisory_xact_lock(hashtext('fellas-inc-semana')); -- uma foto por vez
+  if exists (select 1 from public.idle_weeks where week_start = v_old) then
+    return;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'valuation', x.v, 'rate', x.rate, 'era', x.era,
+                                               'strategies', to_jsonb(x.strategies)) order by x.rate desc, x.v desc, x.user_id), '[]')
+    into v_podium
+    from (select s.user_id,
+                 (public.idle_settle(s, greatest(s.settled_at, v_new::timestamp at time zone 'America/Sao_Paulo'))).valuation as v,
+                 -- a taxa da meia-noite usa os geradores e estratégias de agora (só os contratos são os de 00:00)
+                 public.idle_rate_at(s, v_new::timestamp at time zone 'America/Sao_Paulo') as rate,
+                 public.idle_era(s.generators) as era, s.strategies
+            from public.idle_state s
+           where s.started and s.week_start < v_new
+           order by 3 desc, 2 desc, 1
+           limit 3) x;
+  -- Mapa do rolê: o 1º da semana em cada lugar vira o dono do pedaço da semana seguinte (0057)
+  insert into public.idle_place_weeks (week_start, lugar, dono_id, numero)
+  select v_old, c.id, (sem.x -> 0 ->> 'user_id')::uuid, (sem.x -> 0 ->> 'numero')::double precision
+    from public.idle_cat_place c
+    cross join lateral (select public.idle_place_semana(c.id, v_old) as x) sem
+   where jsonb_array_length(sem.x) > 0
+  on conflict (week_start, lugar) do nothing;
+  if jsonb_array_length(v_podium) = 0 then
+    -- sem placa o idle_lock não refaz a foto: pode dar a conquista aqui
+    for v_dono in select distinct w.dono_id from public.idle_place_weeks w
+                   where w.week_start = v_old and w.dono_id is not null order by 1 loop
+      perform public.idle_fechar_e_ganhar(v_dono, 'mapa_dono');
+    end loop;
+    return; -- ninguém jogava antes desta semana: sem placa
+  end if;
+  v_champ := (v_podium -> 0 ->> 'user_id')::uuid;
+  insert into public.idle_weeks (week_start, unicorn_id, podium, most_hired_id)
+  values (v_old, v_champ, v_podium, public.idle_most_hired(v_old))
+  on conflict (week_start) do nothing
+  returning week_start into v_gravou;
+  if v_gravou is not null then
+    update public.profiles set badges = array_remove(badges, 'weekly_unicorn') where 'weekly_unicorn' = any (badges);
+    if v_champ is not null then
+      update public.profiles set badges = array_append(badges, 'weekly_unicorn') where id = v_champ;
+      perform public.idle_fechar_e_ganhar(v_champ, 'unicornio');
+    end if;
+  end if;
+  -- depois da placa gravada (antes, o idle_lock do idle_fechar_e_ganhar refaria a foto: recursão)
+  for v_dono in select distinct w.dono_id from public.idle_place_weeks w
+                 where w.week_start = v_old and w.dono_id is not null order by 1 loop
+    perform public.idle_fechar_e_ganhar(v_dono, 'mapa_dono');
+  end loop;
+end;
+$$;
+
+-- trava (a da 0048) + os lugares andam até agora + visto_em (as mecânicas sabem se a pessoa passou desde o último ciclo)
+create or replace function public.idle_lock(p_user uuid)
+returns public.idle_state language plpgsql volatile set search_path = public as $$
+declare
+  s public.idle_state;
+begin
+  if not exists (select 1 from public.idle_weeks where week_start = public.games_week_start() - 7)
+     and exists (select 1 from public.idle_state where started and week_start < public.games_week_start()) then
+    perform public.idle_weekly_reset();
+  end if;
+  insert into public.idle_state (user_id, week_start) values (p_user, public.games_week_start())
+  on conflict (user_id) do update set user_id = excluded.user_id
+  returning * into s;
+  perform public.idle_horta_avancar(s); -- a horta anda até agora antes de qualquer conta
+  perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0057)
+  update public.idle_state set visto_em = now() where user_id = p_user; -- o s devolvido fica com o visto_em antigo
+  return s;
+end;
+$$;
+
+revoke all on function public.idle_place_nome(text) from public, anon, authenticated;
+revoke all on function public.idle_place_podio(int) from public, anon, authenticated;
+revoke all on function public.idle_place_semana(int, date) from public, anon, authenticated;
+revoke all on function public.idle_place_registrar(uuid, int, text, int[], double precision) from public, anon, authenticated;
+revoke all on function public.idle_place_semana_idx(int, int, int, date) from public, anon, authenticated;
+revoke all on function public.idle_place_desafio_da_semana(int) from public, anon, authenticated;
+revoke all on function public.idle_place_desafio(public.idle_state, int, text, double precision) from public, anon, authenticated;
+revoke all on function public.idle_place_nota(uuid, int, text, int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_place_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_place_mecanica_json(public.idle_state, int) from public, anon, authenticated;
+revoke all on function public.idle_lugar_json(public.idle_state, int) from public, anon, authenticated;
+revoke all on function public.idle_lugar(int) from public, anon;
+grant execute on function public.idle_lugar(int) to authenticated;
+revoke all on function public.idle_weekly_reset() from public, anon, authenticated;
+revoke all on function public.idle_lock(uuid) from public, anon, authenticated;
