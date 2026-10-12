@@ -167,11 +167,11 @@ export type IdleVisual = {
 };
 
 /** Bolsa da Fellas Inc. (0043 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
-export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[] };
-export type BolsaPosicao = { empresa: number; qtd: number; custo: number };
+export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[]; /** só com o VSauce sentado (0051) */ humor?: number | null };
+export type BolsaPosicao = { empresa: number; qtd: number; custo: number; /** lote do Vorcaro (1 = normal; 0051) */ alavanca?: number };
 /** Horta do Food truck (0048): os bônus das maduras agora, as plantas vivas, as descobertas. */
 export type BonusHorta = { producao: number; geradores: number; melhorias: number; oportunidades: number };
-export type PlantaHorta = { canteiro: number; especie: number; inicio: string; origem: 'plantada' | 'cruzou' | 'morango' };
+export type PlantaHorta = { canteiro: number; especie: number; inicio: string; origem: 'plantada' | 'cruzou' | 'morango'; /** os tempos dela (o Terry muda; 0051) */ amadurece_s?: number | null; vida_s?: number | null };
 export type HortaEstado = {
   lado: number; food_trucks: number; plantas: PlantaHorta[]; descobertas: number[]; bonus: BonusHorta; server_now: string;
 };

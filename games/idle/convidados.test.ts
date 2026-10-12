@@ -83,3 +83,18 @@ describe('os efeitos', () => {
     expect(derrubadaAte(UID, 1, desde, desde + H)).toBeNull(); // antes da 1ª faixa
   });
 });
+
+describe('os textos', async () => {
+  const { efeitosTexto, aoVivo, KOJIMA, MCVV } = await import('./convidados');
+  it('por extenso e escalados pela cadeira', () => {
+    expect(efeitosTexto(1, 1)).toEqual(['produção +15%', 'melhorias 10% mais caras']);
+    expect(efeitosTexto(6, 0.5)).toEqual(['geradores 5% mais baratos', '−2 oportunidades por dia']);
+    expect(efeitosTexto(9, 0.25)).toEqual(['uma faixa a cada 8 h: evento dourado garantido', '25% de derrubada: produção −2,5% por 30 min']);
+  });
+  it('ao vivo: Kojima subindo, a próxima faixa do MC V.V', () => {
+    const d = Date.parse('2026-10-12T00:00:00Z');
+    expect(aoVivo(KOJIMA, 1, d, UID, d + 90 * 60_000)).toBe('Agora: produção −7,9% · sobe em 30 min');
+    expect(aoVivo(KOJIMA, 1, d, UID, d + 30 * H)).toBe('Agora: produção +40% (no máximo)');
+    expect(aoVivo(MCVV, 1, d, UID, d + 30 * 60_000)).toBe('Próxima faixa em 1 h 30 min');
+  });
+});

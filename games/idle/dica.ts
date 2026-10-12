@@ -5,6 +5,7 @@ import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import { estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
+import { multGerador } from './convidados';
 
 export type LinhaDica = { texto: string; tom?: 'bom' | 'ruim' | 'fraco' };
 export type Dica = { titulo: string; linhas: LinhaDica[] };
@@ -46,7 +47,8 @@ function partesGerador(s: IdleState, gid: number) {
 /** Quanto rende uma unidade de cada gerador agora (com tudo, horta inclusa). */
 function porUnidade(s: IdleState) {
   const f = fatores(catalogo, s);
-  return f.porGerador.map((x) => x * f.global * (1 + hortaProd(s)));
+  const agora = Date.parse(s.server_now);
+  return f.porGerador.map((x, i) => x * f.global * (1 + hortaProd(s)) * multGerador(s, i + 1, Number.isFinite(agora) ? agora : Date.now()));
 }
 
 export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Dica {
@@ -63,6 +65,8 @@ export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Di
   if (p.sinergia) linhas.push({ texto: `Sinergias: +${num(p.sinergia * 100, 0)}%`, tom: 'fraco' });
   if (p.est !== 1) linhas.push({ texto: `Estratégia: ${vezes(p.est)}`, tom: 'fraco' });
   if (hortaProd(s)) linhas.push({ texto: `Horta: ${hortaProd(s) > 0 ? '+' : '−'}${pct(Math.abs(hortaProd(s)))}`, tom: 'fraco' });
+  const conv = multGerador(s, gid, Date.parse(s.server_now) || Date.now());
+  if (Math.abs(conv - 1) > 1e-9) linhas.push({ texto: `Convidados: ${vezes(conv)}`, tom: conv >= 1 ? 'fraco' : 'ruim' });
   linhas.push({ texto: `O próximo custa ${formatarValor(precoProximo)}${emTempo(s, precoProximo)}` });
   return { titulo: catalogo.geradores[gid - 1].nome, linhas };
 }
@@ -115,6 +119,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   mult('Contratos', contratos);
   mult('Conquistas e árvore', legado);
   mult('Horta', 1 + hortaProd(s));
+  mult('Convidados', multGerador(s, 0, agoraMs));
   if (s.boost_until && Date.parse(s.boost_until) > agoraMs) linhas.push({ texto: 'Agora: ×5 do Investidor', tom: 'bom' });
   const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });

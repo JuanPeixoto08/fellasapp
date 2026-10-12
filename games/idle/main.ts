@@ -29,7 +29,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -106,6 +106,8 @@ let bolsa: BolsaEstado | null = null;
 // Horta: gaveta aberta e o último estado; busca de novo a cada 2 min aberta (o que brotou sozinho aparece)
 let hortaAberta = false;
 let horta: HortaEstado | null = null;
+// Convidados: gaveta aberta (o estado das cadeiras vem com o jogo)
+let convidadosAberto = false;
 let timerHorta: ReturnType<typeof setInterval> | null = null;
 const RECARREGA_HORTA = ['idle_horta_ocupado', 'idle_horta_vazio', 'idle_horta_trancado', 'idle_horta_semente', 'idle_horta_verde'];
 async function carregarHorta() {
@@ -264,8 +266,38 @@ const tela = criarTela(document.getElementById('app')!, {
     aplicar(await api.idleBuyNode(id));
     audio.tocar('no');
   }),
+  convidados: (acao) => {
+    convidadosAberto = acao === 'abrir';
+    if (convidadosAberto) {
+      if (hortaAberta) {
+        hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
+        if (timerHorta) clearInterval(timerHorta);
+        timerHorta = null;
+      }
+      if (bolsaAberta) {
+        bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
+        poPendentes = [];
+        if (timerBolsa !== null) clearTimeout(timerBolsa);
+      }
+    }
+    render();
+  },
+  sentar: (cadeira, convidado) => void guard(async () => {
+    const r = await api.idleConvSentar(cadeira, convidado);
+    aplicar(r);
+    if (r.mesma_pessoa) {
+      aviso = 'São a mesma pessoa? Gemaplys e MC V.V nunca sentam juntos.';
+      audio.tocar('erro');
+      render();
+    } else audio.tocar('oportunidade');
+  }),
+  tirar: (cadeira) => void guard(async () => {
+    aplicar(await api.idleConvTirar(cadeira));
+    audio.tocar('fechar');
+  }),
   horta: (acao) => {
     hortaAberta = acao === 'abrir';
+    if (hortaAberta) convidadosAberto = false;
     if (hortaAberta && bolsaAberta) {
       bolsaAberta = false; // fecha a Bolsa de vez (o temporizador dela e os avisos de pó)
       poPendentes = [];
@@ -296,6 +328,7 @@ const tela = criarTela(document.getElementById('app')!, {
   }),
   bolsa: (acao) => {
     bolsaAberta = acao === 'abrir';
+    if (bolsaAberta) convidadosAberto = false;
     if (bolsaAberta && hortaAberta) {
       hortaAberta = false; // fecha a Horta de vez (o temporizador dela)
       if (timerHorta) clearInterval(timerHorta);
@@ -306,11 +339,11 @@ const tela = criarTela(document.getElementById('app')!, {
     render();
     if (bolsaAberta) void carregarBolsa();
   },
-  negociar: (empresa, lado, qtd, tick) => void guard(async () => {
-    const p = bolsa?.carteira.find((x) => x.empresa === empresa);
+  negociar: (empresa, lado, qtd, tick, lote = 1) => void guard(async () => {
+    const p = bolsa?.carteira.find((x) => x.empresa === empresa && (x.alavanca ?? 1) === lote);
     const m = bolsa?.empresas.find((x) => x.id === empresa);
     const lucro = !p || !m || m.valor >= p.custo / p.qtd;
-    const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick);
+    const r = await api.idleBolsaNegociar(empresa, lado, qtd, tick, lote);
     receberBolsa(r.bolsa);
     aplicar(r);
     audio.tocar(lado === 'comprar' ? 'acaoCompra' : 'acaoVende', { lucro });
@@ -395,7 +428,7 @@ function render() {
   const lista = s ? pendentes(s.user_id, agora, s.opp_claimed.map(Number), inicioSemana(s), caixa(s)) : [];
   vivoAtual = s ? vivoAgora(s, agora) : null;
   tela.renderizar({
-    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova, hortaAberta, horta,
+    fase, estado: s, aba, placar, aviso, ocupado, caixaAberta, agora, editor: rascunho, placarFalhou, config, chaves, volumeMusica, novidadeNova, hortaAberta, horta, convidadosAberto,
     pendentes: s ? lista.slice(0, Math.max(0, s.opp_left)) : [], aoVivo: vivoAtual, vendaAberta, conquistaAviso, bolsaAberta,
     bolsa: bolsa && { ...bolsa, vira_em_ms: faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()), viraram_po: poPendentes },
   });

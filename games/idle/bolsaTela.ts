@@ -35,13 +35,16 @@ function grafico(cls: string, h: number[]) {
 
 const classeVar = (x: number) => (x > 0.0005 ? 'sobe' : x < -0.0005 ? 'cai' : '');
 
+/** O humor da empresa pro VSauce (0 parada · 1 sobe devagar · 2 cai devagar · 3 sobe forte · 4 despenca · 5 maluca). */
+const HUMOR = ['parada', 'subindo devagar', 'caindo devagar', 'subindo forte', 'despencando', 'maluca'];
+
 export function criarBolsaTela(a: {
-  negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number): void;
+  negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote?: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
 }) {
   const raiz = el('div', 'bolsa');
   let escolhida: number | null = null;
-  let ultimo: [BolsaEstado | null, number, boolean] | null = null;
+  let ultimo: [BolsaEstado | null, number, boolean, number] | null = null;
 
   let relogioEl: HTMLElement | null = null;
   // botões de compra que só dependem do F$ (o atualizarValor da página acende e apaga a cada 100 ms)
@@ -52,7 +55,8 @@ export function criarBolsaTela(a: {
     const s = Math.max(0, Math.ceil(ms / 1000));
     relogioEl.textContent = `preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
-  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean): void {
+  /** `alavanca`: o lote das compras agora (1 + o peso do Vorcaro; 1 sem ele). */
+  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean, alavanca = 1): void {
     // redesenhar troca a lista e o detalhe por novos: guarda a rolagem e o foco pra devolver no fim (no PC a lista
     // rola sozinha e voltaria pro topo a cada clique)
     const rolouLista = raiz.querySelector<HTMLElement>('.bolsa-lista')?.scrollTop ?? 0;
@@ -60,7 +64,7 @@ export function criarBolsaTela(a: {
     const rolouDetalhe = detalheAntes && detalheAntes.dataset.empresa === String(escolhida) ? detalheAntes.scrollTop : 0;
     const ativo = document.activeElement;
     const focoEmpresa = ativo instanceof HTMLElement && raiz.contains(ativo) ? ativo.closest<HTMLElement>('.acao')?.dataset.empresa : undefined;
-    ultimo = [b, valuation, ocupado];
+    ultimo = [b, valuation, ocupado, alavanca];
     raiz.replaceChildren();
     relogioEl = null;
     atuais = [];
@@ -72,7 +76,10 @@ export function criarBolsaTela(a: {
       raiz.append(el('p', 'vazio', 'Compra 1 Grupo de trader pra abrir a Bolsa.'));
       return;
     }
-    const pos = (id: number): BolsaPosicao | undefined => b.carteira.find((p) => p.empresa === id);
+    // as ações normais (lote 1) e os lotes alavancados do Vorcaro de cada empresa; o limite conta todos
+    const pos = (id: number): BolsaPosicao | undefined => b.carteira.find((p) => p.empresa === id && (p.alavanca ?? 1) === 1);
+    const lotes = (id: number) => b.carteira.filter((p) => p.empresa === id && (p.alavanca ?? 1) > 1);
+    const total = (id: number) => b.carteira.filter((p) => p.empresa === id).reduce((n, p) => n + p.qtd, 0);
 
     const topo = el('div', 'bolsa-topo');
     const valorTotal = b.carteira.reduce((s, p) => s + p.qtd * (b.empresas.find((e) => e.id === p.empresa)?.valor ?? 0), 0) * b.r;
@@ -133,8 +140,10 @@ export function criarBolsaTela(a: {
       const tem = el('span', 'tem');
       if (p) {
         const l = lucro(m.valor, p);
-        tem.append(el('b', undefined, acoes(p.qtd)), el('span', classeVar(l), `${pct(l)} de lucro`));
-      } else tem.textContent = m.rj_ate !== null ? '' : 'você não tem';
+        tem.append(el('b', undefined, acoes(total(m.id))), el('span', classeVar(l), `${pct(l)} de lucro`));
+      } else if (total(m.id)) tem.append(el('b', undefined, acoes(total(m.id))), el('span', 'sub', 'alavancadas'));
+      else tem.textContent = m.rj_ate !== null ? '' : 'você não tem';
+      if (m.humor !== undefined && m.humor !== null && m.rj_ate === null) nome.append(el('span', `etq humor humor-${m.humor}`, HUMOR[m.humor] ?? ''));
       li.append(nome, m.rj_ate !== null ? el('span') : grafico('mini', m.historico.slice(-30)), preco, tem);
       lista.append(li);
     }
@@ -146,7 +155,7 @@ export function criarBolsaTela(a: {
     if (m) {
       const e = empresa(m.id);
       const p = pos(m.id);
-      const tem = p?.qtd ?? 0;
+      const tem = total(m.id);
       const d = el('div', 'bolsa-detalhe');
       d.dataset.empresa = String(m.id);
       d.setAttribute('aria-live', 'polite');
@@ -165,6 +174,7 @@ export function criarBolsaTela(a: {
         const linhaPreco = el('div', 'preco-grande');
         linhaPreco.append(el('b', undefined, formatarValor(m.valor * b.r)), el('span', classeVar(v.minuto), ` ${pct(v.minuto)} no minuto · ${pct(v.hora)} na hora`));
         d.append(linhaPreco, grafico('graf', m.historico));
+        if (m.humor !== undefined && m.humor !== null) d.append(el('p', 'sub humor-vsauce', `VSauce: ${HUMOR[m.humor] ?? ''} agora. Ou não?`));
         const info = el('div', 'linha2');
         const i1 = el('span');
         i1.append('Você tem ', el('b', undefined, `${tem} de ${m.limite}`));
@@ -193,7 +203,7 @@ export function criarBolsaTela(a: {
         const unidade = m.valor * b.r * (1 + b.corretagem);
         const cabe = m.limite - tem;
         const comprar = el('div', 'bts comprar');
-        comprar.append(el('div', 'rot2', `Comprar (+${(b.corretagem * 100).toLocaleString('pt-BR')}% de corretagem)`));
+        comprar.append(el('div', 'rot2', `Comprar (+${(b.corretagem * 100).toLocaleString('pt-BR')}% de corretagem)${alavanca > 1 ? ` · entram alavancadas ×${alavanca.toLocaleString('pt-BR')} (Vorcaro)` : ''}`));
         for (const [q, n] of [[1, 1], [10, 10], [0, 1]] as const) {
           const bt = button(q === 0 ? 'Máx' : String(q), 'btn main', () => a.negociar(m.id, 'comprar', q, b.tick));
           bt.disabled = ocupado || cabe < n || maxCompra(valuation, m.valor, b.r, m.limite, tem, b.corretagem) < n;
@@ -204,10 +214,26 @@ export function criarBolsaTela(a: {
         vender.append(el('div', 'rot2', 'Vender'));
         for (const q of [1, 10, 0] as const) {
           const bt = button(q === 0 ? 'Tudo' : String(q), 'btn', () => a.negociar(m.id, 'vender', q, b.tick));
-          bt.disabled = ocupado || tem < (q === 10 ? 10 : 1);
+          bt.disabled = ocupado || (p?.qtd ?? 0) < (q === 10 ? 10 : 1);
           vender.append(bt);
         }
-        d.append(comprar, vender, el('p', 'aviso', 'Preço em segundos da sua produção: quando ela cresce, o F$ sobe junto.'));
+        // os lotes do Vorcaro: cada um com o preço pago e os próprios botões (a diferença conta ×alavanca na venda)
+        const blocos: HTMLElement[] = [];
+        for (const lt of lotes(m.id)) {
+          const L = lt.alavanca ?? 1;
+          const compra = lt.custo / lt.qtd;
+          const por = Math.max(0, compra + L * (m.valor - compra));
+          const bl = el('div', 'bts vender lote');
+          bl.dataset.alavanca = String(L);
+          bl.append(el('div', 'rot2', `Alavancadas ×${L.toLocaleString('pt-BR')} · ${acoes(lt.qtd)} · pagou ${formatarValor(compra * b.r)} · vale ${formatarValor(lt.qtd * por * b.r)}`));
+          for (const q of [1, 10, 0] as const) {
+            const bt = button(q === 0 ? 'Tudo' : String(q), 'btn', () => a.negociar(m.id, 'vender', q, b.tick, L));
+            bt.disabled = ocupado || lt.qtd < (q === 10 ? 10 : 1);
+            bl.append(bt);
+          }
+          blocos.push(bl);
+        }
+        d.append(comprar, vender, ...blocos, el('p', 'aviso', 'Preço em segundos da sua produção: quando ela cresce, o F$ sobe junto.'));
       }
       miolo.append(d);
       d.scrollTop = rolouDetalhe;

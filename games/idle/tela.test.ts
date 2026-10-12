@@ -21,7 +21,7 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 const modelo = (x: Partial<Modelo> = {}): Modelo => ({
   fase: 'jogando', estado: estado(), aba: 'loja', placar: null, aviso: null, ocupado: false, pendentes: [], aoVivo: null, caixaAberta: false, editor: null, placarFalhou: false,
-  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', volumeMusica: 1, chaves: { efeitos: true, avisos: true }, novidadeNova: false, horta: null, hortaAberta: false, ...x,
+  vendaAberta: false, conquistaAviso: null, bolsa: null, bolsaAberta: false, config: 'fechada', volumeMusica: 1, chaves: { efeitos: true, avisos: true }, novidadeNova: false, horta: null, hortaAberta: false, convidadosAberto: false, ...x,
 });
 
 let acoes: { [K in keyof Acoes]: Mock<Acoes[K]> };
@@ -37,6 +37,7 @@ beforeEach(() => {
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
     config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
     horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
+    convidados: vi.fn<Acoes['convidados']>(), sentar: vi.fn<Acoes['sentar']>(), tirar: vi.fn<Acoes['tirar']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;

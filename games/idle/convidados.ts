@@ -26,6 +26,8 @@ export const CR = 1, VORCARO = 2, GEMAPLYS = 3, LUVA = 4, KOJIMA = 5, GABE = 6, 
 export const PESOS = [1, 0.5, 0.25] as const;
 export const ABRE_COM = [1, 25, 50] as const;
 export const NOME_CADEIRA = ['frente', 'meio', 'canto'] as const;
+/** "da frente", "do meio", "do canto". */
+export const DA_CADEIRA = ['da frente', 'do meio', 'do canto'] as const;
 export const MAX_TROCAS = 3;
 export const RECARGA_S = 3600;
 const H = 3_600_000;
@@ -127,7 +129,8 @@ export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): Tip
 }
 
 type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras };
-const SEM: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
+export const SEM_CADEIRAS: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
+const SEM = SEM_CADEIRAS;
 const ctx = (s: ComCadeiras) => ({ c: s.convidados ?? SEM, ppp: s.generators[12] ?? 0 });
 
 /** O evento do segundo `seg` pra esse estado (a sorte, com o Gemaplys, ou a faixa do MC V.V) e quanto fica na tela. */
@@ -146,3 +149,58 @@ export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: nu
   }
   return out;
 }
+
+// ---------- textos (o efeito na cadeira, por extenso) ----------
+const pct = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('pt-BR')}%`;
+const vz = (x: number) => `${x.toLocaleString('pt-BR')}×`;
+/** Bônus e defeito do convidado numa cadeira de peso `p`, por extenso ("geradores 10% mais baratos"). */
+export function efeitosTexto(id: number, p: number): [string, string] {
+  switch (id) {
+    case CR: return [`produção +${pct(0.15 * p)}`, `melhorias ${pct(0.1 * p)} mais caras`];
+    case VORCARO: return [`ações compradas agora: o ganho conta ${vz(1 + p)} na venda`, `a perda também conta ${vz(1 + p)}`];
+    case GEMAPLYS: return [`eventos dourados ${vz(1 + p)} mais frequentes`, `ficam ${(janelaS(p)).toLocaleString('pt-BR')} s na tela (eram 12)`];
+    case LUVA: return [`+${Math.ceil(5 * p)} oportunidades por dia`, `produção −${pct(0.05 * p)}`];
+    case KOJIMA: return [`produção sobe até +${pct(0.4 * p)} em 24 h sentado`, `começa em −${pct(0.1 * p)}; trocar zera`];
+    case GABE: return [`geradores ${pct(0.1 * p)} mais baratos`, `−${Math.ceil(3 * p)} oportunidades por dia`];
+    case TERRY: return [`plantas novas amadurecem ${pct(0.3 * p)} mais rápido`, `e vivem ${pct(0.2 * p)} menos`];
+    case VINI: return [`cruzamento da Horta ${vz(1 + p)}`, `sementes ${pct(0.5 * p)} mais caras`];
+    case MCVV: return [`uma faixa a cada ${faixaS(p) / 3600} h: evento dourado garantido`, `25% de derrubada: produção −${pct(0.1 * p)} por 30 min`];
+    case ANA: return [`Food truck rende ${vz(1 + p)} das 6h ao meio-dia`, `o resto do dia, produção −${pct(0.05 * p)}`];
+    case VSAUCE: return ['a Bolsa mostra pra onde cada ação tende', `produção −${pct(0.05 * p)}`];
+    default: return ['', ''];
+  }
+}
+
+const hm = (ms: number) => {
+  const min = Math.max(1, Math.ceil(ms / 60_000));
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`;
+};
+/** A linha "ao vivo" do convidado sentado (Kojima, MC V.V, Ana), ou null. */
+export function aoVivo(id: number, p: number, desdeMs: number, uid: string, agoraMs: number): string | null {
+  if (p <= 0) return null;
+  if (id === KOJIMA) {
+    const m = kojimaMult(p, desdeMs, agoraMs) - 1;
+    const h = Math.floor((agoraMs - desdeMs) / 3_600_000);
+    return `Agora: produção ${m >= 0 ? '+' : '−'}${pct(Math.abs(m))}${h < 24 ? ` · sobe em ${hm(desdeMs + (h + 1) * 3_600_000 - agoraMs)}` : ' (no máximo)'}`;
+  }
+  if (id === MCVV) {
+    const ate = derrubadaAte(uid, p, desdeMs, agoraMs);
+    if (ate !== null) return `Derrubada por copyright · volta em ${hm(ate - agoraMs)}`;
+    const passo = faixaS(p) * 1000;
+    const k = Math.floor((agoraMs - desdeMs) / passo) + 1;
+    return `Próxima faixa em ${hm(desdeMs + k * passo - agoraMs)}`;
+  }
+  if (id === ANA) return manhaBrasilia(agoraMs) ? 'Cozinhando (até o meio-dia)' : 'Se maquiando (volta às 6h)';
+  return null;
+}
+
+/** O que os convidados fazem com a produção de uma unidade do gerador `gid` agora (pra mostrar na Loja). */
+export function multGerador(s: ComCadeiras, gid: number, tMs: number): number {
+  const { c, ppp } = ctx(s);
+  return multProducao({ c, ppp, uid: s.user_id }, tMs) * (gid === 11 ? multFoodTruck({ c, ppp }, tMs) : 1);
+}
+/** Custo dos geradores e das melhorias com os convidados agora (Gabe e Cristiano). */
+export const custosConv = (s: ComCadeiras) => {
+  const { c, ppp } = ctx(s);
+  return { geradores: custoGeradores(c, ppp), melhorias: custoMelhorias(c, ppp) };
+};

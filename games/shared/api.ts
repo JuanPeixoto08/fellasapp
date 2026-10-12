@@ -70,8 +70,11 @@ export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user
 export const idlePrestige = () => rpc<IdleState>('idle_prestige');
 export const idleBuyNode = (no: number) => rpc<IdleState>('idle_buy_node', { p_no: no });
 export const idleBolsa = () => rpc<BolsaEstado>('idle_bolsa');
-export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number) =>
-  rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_negociar', { p_empresa: empresa, p_lado: lado, p_qtd: qtd, p_tick: tick });
+export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote = 1) =>
+  rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_negociar', { p_empresa: empresa, p_lado: lado, p_qtd: qtd, p_tick: tick, p_lote: lote });
+export const idleConvSentar = (cadeira: number, convidado: number) =>
+  rpc<IdleState & { mesma_pessoa?: boolean }>('idle_conv_sentar', { p_cadeira: cadeira, p_convidado: convidado });
+export const idleConvTirar = (cadeira: number) => rpc<IdleState>('idle_conv_tirar', { p_cadeira: cadeira });
 export const idleBolsaMelhorar = (tipo: MelhoriaBolsa, nivel: number) =>
   rpc<IdleState & { bolsa: BolsaEstado }>('idle_bolsa_melhorar', { p_tipo: tipo, p_nivel: nivel });
 export const idleSetAvatar = (v: IdleVisual) =>

@@ -162,3 +162,24 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.bolsa')!.textContent).toContain('Carregando a Bolsa…');
   });
 });
+
+describe('Convidados na Bolsa', () => {
+  it('Vorcaro: o lote alavancado aparece separado, com o preço pago e os próprios botões de vender', () => {
+    tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 10, custo: 300, alavanca: 1 }, { empresa: 1, qtd: 4, custo: 120, alavanca: 2 }] }), 1e9, false, 2);
+    linha(1).click();
+    expect(linha(1).textContent).toContain('14 ações');
+    const d = document.querySelector('.bolsa-detalhe')!;
+    expect(d.textContent).toContain('entram alavancadas ×2 (Vorcaro)');
+    const lote = d.querySelector<HTMLElement>('.lote[data-alavanca="2"]')!;
+    expect(lote.textContent).toContain('Alavancadas ×2 · 4 ações · pagou F$ 60');
+    expect(lote.textContent).toContain('vale F$ 288'); // 4 × (30 + 2 × (33 − 30)) × 2
+    [...lote.querySelectorAll('button')].find((b) => b.textContent === 'Tudo')!.click();
+    expect(negociar).toHaveBeenCalledWith(1, 'vender', 0, 1000, 2);
+  });
+  it('VSauce: o humor de cada empresa vira etiqueta (só quando vem do banco)', () => {
+    tela.renderizar(B(), 1e9, false);
+    expect(document.querySelector('.etq.humor')).toBeNull();
+    tela.renderizar(B({ empresas: [{ id: 1, valor: 33, limite: 120, risco: false, rj_ate: null, historico: [33], humor: 3 }] }), 1e9, false);
+    expect(linha(1).textContent).toContain('subindo forte');
+  });
+});
