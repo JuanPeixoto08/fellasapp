@@ -89,6 +89,12 @@ describe('arte da entrega 3 (ícones das conquistas e da árvore)', () => {
       expect(ativos.no(n.id), no(n.id)).not.toBeNull();
     }
   });
+  it('os 11 retratos dos convidados, 32x32', () => {
+    for (let id = 1; id <= 11; id++) {
+      expect(dim(`convidados/convidado-${String(id).padStart(2, '0')}.png`)).toEqual([32, 32]);
+      expect(ativos.convidado(id)).not.toBeNull();
+    }
+  });
   it('nenhum ícone sobrando (de id que não existe no catálogo)', () => {
     const conquistas = new Set(catalogo.conquistas.map((c) => conquista(c.id)));
     const nos = new Set(catalogo.arvore.map((n) => no(n.id)));

@@ -12,6 +12,7 @@ const gerais = pegar(import.meta.glob('./assets/gerais/*.png', { eager: true, qu
 const conquistas = pegar(import.meta.glob('./assets/conquistas/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const arvore = pegar(import.meta.glob('./assets/arvore/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const pessoas = pegar(import.meta.glob('./assets/pessoas/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
+const convidados = pegar(import.meta.glob('./assets/convidados/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
 const vagas = Object.fromEntries(
   Object.entries(import.meta.glob('./assets/cenas/*-vagas.json', { eager: true, import: 'default' }) as Record<string, Vagas>)
     .map(([arq, v]) => [nomeDe(arq).replace(/-vagas$/, ''), v]),
@@ -33,6 +34,8 @@ export const ativos = {
   gerador: (id: number) => geradores[`gerador-${String(id).padStart(2, '0')}`],
   oportunidade: (k: 0 | 1 | 2) => oportunidades[`oportunidade-${k}`],
   geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
+  /** Retrato 32x32 do convidado do PPP Podcast (1 a 11). */
+  convidado: (id: number): string | null => convidados[`convidado-${String(id).padStart(2, '0')}`] ?? null,
   /** Ícone 16x16 da conquista (null = a arte ainda não chegou). */
   conquista: (id: number): string | null => conquistas[`conquista-${String(id).padStart(3, '0')}`] ?? null,
   /** Ícone 16x16 do nó da árvore (null = a arte ainda não chegou). */
