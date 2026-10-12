@@ -19,7 +19,7 @@ function tempo(ms: number): string {
 }
 /** O bônus de uma espécie em texto curto ("produção +3% · geradores −2%"). */
 function efeitos(e: Especie): string {
-  return resumoBonus(e).replace('Nada madura ainda', '').toLowerCase();
+  return resumoBonus(e).replace('Nada madura ainda', '');
 }
 
 export function criarHortaTela(a: { plantar(canteiro: number, especie: number): void; colher(canteiro: number): void; arrancar(canteiro: number): void }) {
@@ -98,7 +98,7 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
         const meio = el('span', 'meio');
         meio.append(
           el('strong', undefined, e.nome),
-          el('span', 'sub', `${NOME_FASE[f]} · ${r.ate === 'amadurecer' ? 'amadurece em' : 'morre em'} ${tempo(r.ms)}`),
+          el('span', 'sub', `${NOME_FASE[f][0].toUpperCase()}${NOME_FASE[f].slice(1)} · ${r.ate === 'amadurecer' ? 'amadurece em' : 'morre em'} ${tempo(r.ms)}`),
           el('span', 'sub', efeitos(e)),
         );
         cab.append(iconePlanta(p.especie, f), meio);

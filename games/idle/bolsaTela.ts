@@ -141,8 +141,8 @@ export function criarBolsaTela(a: {
       if (p) {
         const l = lucro(m.valor, p);
         tem.append(el('b', undefined, acoes(total(m.id))), el('span', classeVar(l), `${pct(l)} de lucro`));
-      } else if (total(m.id)) tem.append(el('b', undefined, acoes(total(m.id))), el('span', 'sub', 'alavancadas'));
-      else tem.textContent = m.rj_ate !== null ? '' : 'você não tem';
+      } else if (total(m.id)) tem.append(el('b', undefined, acoes(total(m.id))), el('span', 'sub', 'Alavancadas'));
+      else tem.textContent = m.rj_ate !== null ? '' : 'Você não tem';
       if (m.humor !== undefined && m.humor !== null && m.rj_ate === null) nome.append(el('span', `etq humor humor-${m.humor}`, HUMOR[m.humor] ?? ''));
       li.append(nome, m.rj_ate !== null ? el('span') : grafico('mini', m.historico.slice(-30)), preco, tem);
       lista.append(li);

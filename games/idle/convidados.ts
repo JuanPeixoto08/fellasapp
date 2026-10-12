@@ -7,17 +7,17 @@ import { semente } from './oportunidades';
 export type Convidado = { id: number; nome: string; bordao: string; bonus: string; defeito: string };
 
 export const CONVIDADOS: readonly Convidado[] = [
-  { id: 1, nome: 'Cristiano Ronaldo', bordao: 'SIUUU. Já falei hoje que eu sou o melhor da história?', bonus: 'produção +15%', defeito: 'melhorias 10% mais caras' },
-  { id: 2, nome: 'Daniel Vorcaro', bordao: 'Rende 140% do CDI. Confia.', bonus: 'ações compradas com ele: o ganho conta 2× na venda', defeito: 'a perda também conta 2×' },
-  { id: 3, nome: 'Gemaplys', bordao: 'O único canal de jogo que o jogo pede pra parar.', bonus: 'eventos dourados aparecem 2× mais', defeito: 'ficam metade do tempo na tela' },
-  { id: 4, nome: 'Luva de Pedreiro', bordao: 'Receba!', bonus: '+5 oportunidades por dia', defeito: 'produção −5%' },
-  { id: 5, nome: 'Hideo Kojima', bordao: 'Um podcast de Hideo Kojima. Uma cadeira de Hideo Kojima.', bonus: 'produção sobe até +40% em 24 h sentado', defeito: 'começa em −10%; trocar zera' },
-  { id: 6, nome: 'Gabe Newell', bordao: 'Ele sabe contar até 2.', bonus: 'geradores 10% mais baratos', defeito: '−3 oportunidades por dia' },
-  { id: 7, nome: 'Terry Crews', bordao: 'POWER! O peitoral dele tem CNPJ próprio.', bonus: 'plantas amadurecem 30% mais rápido', defeito: 'e vivem 20% menos' },
-  { id: 8, nome: 'Viniccius13', bordao: 'Já fez uma réplica do estúdio no Minecraft. Ficou melhor.', bonus: 'cruzamento da Horta 2×', defeito: 'sementes 50% mais caras' },
-  { id: 9, nome: 'MC V.V', bordao: 'Lançou o BONDA. O YouTube derrubou o BONDA.', bonus: 'a cada 2 h uma faixa: evento dourado garantido', defeito: '25% de chance de derrubada: produção −10% por 30 min' },
-  { id: 10, nome: 'Ana Mary B', bordao: 'Maquiagem básica pro dia a dia.', bonus: 'Food truck rende 2× das 6h ao meio-dia', defeito: 'o resto do dia, produção −5%' },
-  { id: 11, nome: 'VSauce', bordao: 'Hey, VSauce, Michael aqui. Ou não?', bonus: 'a Bolsa mostra pra onde cada ação tende', defeito: 'produção −5%' },
+  { id: 1, nome: 'Cristiano Ronaldo', bordao: 'SIUUU. Já falei hoje que eu sou o melhor da história?', bonus: 'Produção +15%', defeito: 'Melhorias 10% mais caras' },
+  { id: 2, nome: 'Daniel Vorcaro', bordao: 'Rende 140% do CDI. Confia.', bonus: 'Ações compradas com ele: o ganho conta 2× na venda', defeito: 'A perda também conta 2×' },
+  { id: 3, nome: 'Gemaplys', bordao: 'O único canal de jogo que o jogo pede pra parar.', bonus: 'Eventos dourados aparecem 2× mais', defeito: 'Ficam metade do tempo na tela' },
+  { id: 4, nome: 'Luva de Pedreiro', bordao: 'Receba!', bonus: '+5 oportunidades por dia', defeito: 'Produção −5%' },
+  { id: 5, nome: 'Hideo Kojima', bordao: 'Um podcast de Hideo Kojima. Uma cadeira de Hideo Kojima.', bonus: 'Produção sobe até +40% em 24 h sentado', defeito: 'Começa em −10%; trocar zera' },
+  { id: 6, nome: 'Gabe Newell', bordao: 'Ele sabe contar até 2.', bonus: 'Geradores 10% mais baratos', defeito: '−3 oportunidades por dia' },
+  { id: 7, nome: 'Terry Crews', bordao: 'POWER! O peitoral dele tem CNPJ próprio.', bonus: 'Plantas amadurecem 30% mais rápido', defeito: 'E vivem 20% menos' },
+  { id: 8, nome: 'Viniccius13', bordao: 'Já fez uma réplica do estúdio no Minecraft. Ficou melhor.', bonus: 'Cruzamento da Horta 2×', defeito: 'Sementes 50% mais caras' },
+  { id: 9, nome: 'MC V.V', bordao: 'Lançou o BONDA. O YouTube derrubou o BONDA.', bonus: 'A cada 2 h uma faixa: evento dourado garantido', defeito: '25% de chance de derrubada: produção −10% por 30 min' },
+  { id: 10, nome: 'Ana Mary B', bordao: 'Maquiagem básica pro dia a dia.', bonus: 'Food truck rende 2× das 6h ao meio-dia', defeito: 'O resto do dia, produção −5%' },
+  { id: 11, nome: 'VSauce', bordao: 'Hey, VSauce, Michael aqui. Ou não?', bonus: 'A Bolsa mostra pra onde cada ação tende', defeito: 'Produção −5%' },
 ];
 export const convidado = (id: number): Convidado => CONVIDADOS.find((c) => c.id === id)!;
 
@@ -154,8 +154,13 @@ export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: nu
 // ---------- textos (o efeito na cadeira, por extenso) ----------
 const pct = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('pt-BR')}%`;
 const vz = (x: number) => `${x.toLocaleString('pt-BR')}×`;
-/** Bônus e defeito do convidado numa cadeira de peso `p`, por extenso ("geradores 10% mais baratos"). */
+/** Bônus e defeito do convidado numa cadeira de peso `p`, por extenso ("Geradores 10% mais baratos"), com maiúscula. */
 export function efeitosTexto(id: number, p: number): [string, string] {
+  const [b, d] = efeitosCru(id, p);
+  const mai = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  return [mai(b), mai(d)];
+}
+function efeitosCru(id: number, p: number): [string, string] {
   switch (id) {
     case CR: return [`produção +${pct(0.15 * p)}`, `melhorias ${pct(0.1 * p)} mais caras`];
     case VORCARO: return [`ações compradas agora: o ganho conta ${vz(1 + p)} na venda`, `a perda também conta ${vz(1 + p)}`];

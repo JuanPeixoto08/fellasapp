@@ -97,12 +97,12 @@ const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
 /** Oportunidade do tipo "próxima compra pela metade" (2) com uma já guardada: pegar não daria nada. */
 export const meiaPrecoRepetida = (tipo: 0 | 1 | 2, s: IdleState) => tipo === 2 && s.half_price;
 
-/** "some em 3h12" / "some em 40 min": quanto falta pra oportunidade guardada sumir. */
+/** "Some em 3h12" / "Some em 40 min": quanto falta pra oportunidade guardada sumir. */
 export function prazo(ms: number) {
   const min = Math.ceil(ms / 60000);
-  if (min <= 1) return 'some em menos de 1 min';
-  if (min < 60) return `some em ${min} min`;
-  return `some em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
+  if (min <= 1) return 'Some em menos de 1 min';
+  if (min < 60) return `Some em ${min} min`;
+  return `Some em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
 }
 
 /** "+12%" / "+2,5%": o bônus dos contratos em pt-BR, com uma casa no máximo. */

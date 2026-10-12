@@ -87,9 +87,9 @@ describe('os efeitos', () => {
 describe('os textos', async () => {
   const { efeitosTexto, aoVivo, KOJIMA, MCVV } = await import('./convidados');
   it('por extenso e escalados pela cadeira', () => {
-    expect(efeitosTexto(1, 1)).toEqual(['produção +15%', 'melhorias 10% mais caras']);
-    expect(efeitosTexto(6, 0.5)).toEqual(['geradores 5% mais baratos', '−2 oportunidades por dia']);
-    expect(efeitosTexto(9, 0.25)).toEqual(['uma faixa a cada 8 h: evento dourado garantido', '25% de derrubada: produção −2,5% por 30 min']);
+    expect(efeitosTexto(1, 1)).toEqual(['Produção +15%', 'Melhorias 10% mais caras']);
+    expect(efeitosTexto(6, 0.5)).toEqual(['Geradores 5% mais baratos', '−2 oportunidades por dia']);
+    expect(efeitosTexto(9, 0.25)).toEqual(['Uma faixa a cada 8 h: evento dourado garantido', '25% de derrubada: produção −2,5% por 30 min']);
   });
   it('ao vivo: Kojima subindo, a próxima faixa do MC V.V', () => {
     const d = Date.parse('2026-10-12T00:00:00Z');

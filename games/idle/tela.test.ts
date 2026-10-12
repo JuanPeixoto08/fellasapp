@@ -253,10 +253,10 @@ describe('tela da Fellas Inc.', () => {
     vi.useRealTimers();
   });
   it('prazo: horas com minutos, minutos, menos de 1 min', () => {
-    expect(prazo(VALIDADE_S * 1000)).toBe('some em 4h00');
-    expect(prazo((3 * 60 + 12) * 60000)).toBe('some em 3h12');
-    expect(prazo(40 * 60000)).toBe('some em 40 min');
-    expect(prazo(30000)).toBe('some em menos de 1 min');
+    expect(prazo(VALIDADE_S * 1000)).toBe('Some em 4h00');
+    expect(prazo((3 * 60 + 12) * 60000)).toBe('Some em 3h12');
+    expect(prazo(40 * 60000)).toBe('Some em 40 min');
+    expect(prazo(30000)).toBe('Some em menos de 1 min');
   });
   it('melhorias: Compradas mostra as que você já tem, da mais recente pra mais antiga, sem botão de compra', () => {
     const tela = criarTela(root, acoes);

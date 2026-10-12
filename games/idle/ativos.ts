@@ -34,6 +34,8 @@ export const ativos = {
   gerador: (id: number) => geradores[`gerador-${String(id).padStart(2, '0')}`],
   oportunidade: (k: 0 | 1 | 2) => oportunidades[`oportunidade-${k}`],
   geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
+  /** Peças do estúdio do PPP Podcast (fundo, frente, aovivo, cadeira, cadeado). */
+  estudio: (nome: 'fundo' | 'frente' | 'aovivo' | 'cadeira' | 'cadeado'): string | null => convidados[`estudio-${nome}`] ?? null,
   /** Retrato 32x32 do convidado do PPP Podcast (1 a 11). */
   convidado: (id: number): string | null => convidados[`convidado-${String(id).padStart(2, '0')}`] ?? null,
   /** Ícone 16x16 da conquista (null = a arte ainda não chegou). */
