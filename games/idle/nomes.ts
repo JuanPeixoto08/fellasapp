@@ -163,7 +163,9 @@ export type TipoConquista =
   | 'horta_pix' | 'horta_mandioca' | 'horta_coentro' | 'horta_inhame' | 'horta_abacate' | 'horta_morango'
   // convidados (0051): de estado (vistos, Kojima, derrubada, Toby) e de evento (sentou, mesa, CR, FGC, HL3, mesma pessoa, dia de oportunidades)
   | 'conv_sentou' | 'conv_mesa' | 'conv_vistos' | 'conv_cr' | 'conv_fgc' | 'conv_kojima' | 'conv_hl3' | 'conv_derrubada'
-  | 'conv_toby' | 'opp_dia' | 'conv_mesma';
+  | 'conv_toby' | 'opp_dia' | 'conv_mesma'
+  // Fez o L: F$ 13 bi na mão e `valor` do gerador `alvo` (os estagiários) ao mesmo tempo
+  | 'fez_o_l';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -267,7 +269,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
   { id: 105, escondida: true, tipo: 'jaula', valor: 100, nome: 'Tá saindo da jaula', frase: 'Birl! O monstro tá saindo da jaula.', condicao: 'Levar 100 ou mais de uma vez no Máx' },
   { id: 106, escondida: true, tipo: 'melhoria', alvo: 283, nome: 'Guiana Brasileira', frase: 'Fala galera! A Guiana Brasileira agora tem sede.', condicao: 'Comprar "Filial em Portugal"' },
-  { id: 107, escondida: true, tipo: 'gerador', alvo: 7, valor: 50, nome: 'Fez o L', frase: 'L de Luis, que fique claro.', condicao: 'Ter 50 "Estagiário"' },
+  { id: 107, escondida: true, tipo: 'fez_o_l', alvo: 7, valor: 130, nome: 'Fez o L', frase: 'L de Luis, que fique claro.', condicao: 'Ter F$ 13 bi e 130 "Estagiário" ao mesmo tempo' },
   { id: 108, escondida: true, tipo: 'madrugada', nome: '3h06', frase: 'Bora fundar uma empresa?', condicao: 'Abrir a Fellas Inc. entre 3h e 4h da manhã' },
   { id: 109, escondida: true, tipo: 'sigma', nome: 'Modo sigma', frase: 'Lobo solitário do empreendedorismo.', condicao: 'Vender a startup sem nunca ter contratado ninguém' },
   { id: 110, escondida: true, tipo: 'unicornio', nome: 'Pai tá on', frase: 'O pai tá on.', condicao: 'Ser o unicórnio da semana' },

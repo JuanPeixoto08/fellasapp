@@ -72,12 +72,34 @@ describe('conquistas de estado', () => {
     await t.as(B);
     expect(ids(await abrirJogo())).toContain(58);
   });
-  it('6-7 (exatamente 67), Fez o L (50 estagiários) e Guiana Brasileira (a Filial em Portugal)', async () => {
+  it('6-7 (exatamente 67) e Guiana Brasileira (a Filial em Portugal)', async () => {
     await abrir(A);
     await mudar(A, 'generators[2] = 66');
     expect(ids(await abrirJogo())).not.toContain(101);
     await mudar(A, 'generators[2] = 67, generators[7] = 50, upgrades = \'{283}\'');
-    expect((await abrirJogo()).novas).toEqual(expect.arrayContaining([101, 106, 107]));
+    const s = await abrirJogo();
+    expect(s.novas).toEqual(expect.arrayContaining([101, 106]));
+    expect(ids(s)).not.toContain(107); // 50 estagiários não é mais o Fez o L
+  });
+  it('Fez o L: F$ 13 bi na mão e 130 estagiários ao mesmo tempo', async () => {
+    await abrir(A);
+    await mudar(A, 'generators[7] = 130, valuation = 12e9');
+    expect(ids(await abrirJogo())).not.toContain(107);
+    await mudar(A, 'generators[7] = 129, valuation = 13e9');
+    expect(ids(await abrirJogo())).not.toContain(107);
+    await mudar(A, 'generators[7] = 130, valuation = 13e9');
+    expect((await abrirJogo()).novas).toContain(107);
+  });
+  it('a migração do Fez o L tira de quem não tem os F$ 13 bi e os 130 estagiários', async () => {
+    await abrir(A, B);
+    await mudar(A, 'generators[7] = 50, valuation = 1e6');
+    await mudar(B, 'generators[7] = 130, valuation = 2e10');
+    await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 107), ($2, 107)', [A, B]);
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    await t.db.exec(readFileSync(resolve(__dirname, '../../supabase/migrations/0055_fellas_inc_fez_o_l.sql'), 'utf8'));
+    const donos = await q<{ u: string }>('select user_id as u from public.idle_conquistas where conquista_id = 107');
+    expect(donos.map((x) => x.u)).toEqual([B]);
   });
   it('estratégias: as 3 de uma era (uma por empresa) e todas as ligadas', async () => {
     await abrir(A);
