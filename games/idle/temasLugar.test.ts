@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { aplicarTema, TEMAS_LUGAR } from './temasLugar';
 
@@ -30,6 +32,18 @@ describe('tema de cada lugar', () => {
         expect(contraste(cor, t!.superficie)).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+  it('o texto em cima do destaque usa --i-sobre-roxo (branco de sempre; no lugar com tema, o fundo dele) e passa de 4,5:1', () => {
+    const css = readFileSync(resolve(__dirname, 'idle.css'), 'utf8');
+    // toda regra com fundo no destaque e cor de texto própria escreve com o token, nunca com uma cor solta
+    const regras = css.match(/[^{}]+\{[^{}]*background: var\(--i-roxo\)[^{}]*\}/g) ?? [];
+    const comCor = regras.filter((r) => /[{;]\s*color:/.test(r));
+    expect(comCor.length).toBeGreaterThanOrEqual(3); // .btn.main, .aba.ativa, .chave.ligada
+    for (const r of comCor) expect(r, r).toMatch(/[{;]\s*color: var\(--i-sobre-roxo\)/);
+    expect(css).toMatch(/\.idle \{[^}]*--i-sobre-roxo: #fff;/);
+    const tema = css.match(/\.idle \.minigame-tela\[data-tema\], \.idle \.lugar-tela\[data-tema\] \{[^}]*\}/)![0];
+    expect(tema).toContain('--i-sobre-roxo: var(--lugar-fundo)');
+    for (const t of Object.values(TEMAS_LUGAR)) expect(contraste(t!.fundo, t!.acento)).toBeGreaterThanOrEqual(4.5);
   });
   it('aplicar põe as variáveis e o data-tema; lugar sem tema tira tudo', () => {
     const e = document.createElement('div');

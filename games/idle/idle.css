@@ -6,6 +6,7 @@
 .idle {
   --i-painel: #1B1A22; --i-painel2: #22202B; --i-fundo2: #121118; --i-linha: #17161D; --i-borda: #34323F; --i-borda2: #4A4660;
   --i-ativo: #262431; --i-roxo: #5B3FD9; --i-roxo-c: #7D64F0; --i-roxo-e: #3D27A8; --i-roxo-borda: #8C75FF; --i-lilas: #B8A2FF;
+  --i-sobre-roxo: #fff; /* o texto em cima do --i-roxo (no lugar com tema, o fundo dele: o destaque é claro) */
   --i-mudo: #A8A398; --i-pixel: 'Jersey 10', 'Golos Text', monospace;
   background: #121212; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -26,7 +27,7 @@
 .idle .btn:hover:not(:disabled) { --c: var(--i-lilas); }
 .idle .btn:active:not(:disabled) { transform: translateY(1px); }
 .idle .btn.main {
-  background: var(--i-roxo); color: #fff; --c: var(--i-roxo-borda);
+  background: var(--i-roxo); color: var(--i-sobre-roxo); --c: var(--i-roxo-borda);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 var(--i-roxo-e), inset 0 2px 0 var(--i-roxo-c);
 }
 .idle .btn.main:hover:not(:disabled) { --c: #fff; }
@@ -60,7 +61,7 @@
 /* Viralizou / Promoção valendo: selos com o tempo que falta; o ×100 é dourado */
 .idle .selos { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; justify-content: center; }
 .idle .selos:empty { display: none; }
-.idle .selo-bonus { padding: 1px 8px; font: 400 18px var(--i-pixel); color: var(--paper); background: var(--i-roxo); box-shadow: 0 0 0 2px var(--i-roxo-borda); font-variant-numeric: tabular-nums; }
+.idle .selo-bonus { padding: 1px 8px; font: 400 18px var(--i-pixel); color: var(--i-sobre-roxo); background: var(--i-roxo); box-shadow: 0 0 0 2px var(--i-roxo-borda); font-variant-numeric: tabular-nums; }
 .idle .selo-bonus.ouro { color: #2A1D05; background: var(--gold); box-shadow: 0 0 0 2px #FFF1B8, 0 0 18px rgba(242, 210, 122, 0.6); }
 
 /* eventos na tela (tipo cookie dourado): por cima de tudo, num ponto sorteado; brilho, balanço e o anel dos 12 s */
@@ -108,7 +109,7 @@
 .idle .painel { overflow: auto; padding-bottom: 24px; width: 100%; max-width: 560px; justify-self: center; box-shadow: none; }
 .idle .abas { display: flex; gap: 6px; padding: 12px 14px 8px; position: sticky; top: 0; z-index: 1; background: #121212; }
 .idle .aba { flex: 1; min-height: 44px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; color: var(--i-mudo); font: 400 20px var(--i-pixel); cursor: pointer; }
-.idle .aba.ativa { color: #fff; background: var(--i-roxo); --c: var(--i-roxo-borda); }
+.idle .aba.ativa { color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda); }
 .idle .seg-loja { margin: 4px 14px 0; }
 .idle .lista { display: grid; gap: 10px; padding: 12px 14px; margin: 0; list-style: none; }
 
@@ -269,7 +270,7 @@
 .idle .chave { flex: none; min-width: 112px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
   font: 400 19px var(--i-pixel); color: var(--i-mudo); background: var(--i-fundo2); --c: var(--i-borda2);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
-.idle .chave.ligada { color: #fff; background: var(--i-roxo); --c: var(--i-roxo-borda); }
+.idle .chave.ligada { color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda); }
 /* volume da música: barra de pixel (trilho afundado, pegador quadrado roxo) */
 .idle .config-volume .rotulo { flex: none; }
 .idle .volume { flex: 1; min-width: 0; height: 40px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; accent-color: var(--i-roxo); }
@@ -1145,10 +1146,9 @@ body:has(.idle) { background: #121212; }
   --i-mudo: color-mix(in srgb, var(--lugar-texto) 62%, var(--lugar-superficie)); --i-lilas: var(--lugar-acento2);
   --i-roxo: var(--lugar-acento); --i-roxo-borda: color-mix(in srgb, var(--lugar-acento) 55%, var(--lugar-texto));
   --i-roxo-c: color-mix(in srgb, var(--lugar-acento) 70%, var(--lugar-texto)); --i-roxo-e: color-mix(in srgb, var(--lugar-acento) 60%, var(--lugar-fundo));
-  --gold: var(--lugar-acento); --mint: var(--lugar-acento2); --paper: var(--lugar-texto);
+  --gold: var(--lugar-acento); --mint: var(--lugar-acento2); --paper: var(--lugar-texto); --i-sobre-roxo: var(--lugar-fundo);
 }
 .idle .minigame-tela[data-tema] { background: var(--lugar-fundo); }
-.idle .lugar-tela[data-tema] .btn.main { color: var(--lugar-fundo); }
 .idle .lugar-tela[data-tema] .subir-nivel .preco-nivel { color: color-mix(in srgb, var(--lugar-fundo) 80%, var(--lugar-acento)); }
 .idle .pino[data-tema] { --c: color-mix(in srgb, var(--lugar-borda) 55%, var(--lugar-acento)); }
 .idle .pino[data-tema].aberto { --c: var(--lugar-acento); background: color-mix(in srgb, var(--lugar-acento) 22%, var(--lugar-fundo)); }
