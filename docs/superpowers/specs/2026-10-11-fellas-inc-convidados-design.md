@@ -112,7 +112,10 @@ Ids pelo gerador do catálogo (`ATUALIZAR_CATALOGO`), como na Horta. A escondida
   nome, bônus em verde, defeito em vermelho, efeito na cadeira; lista dos 11 ao tocar numa cadeira, com quem já está
   sentado marcado; contador "Trocas: 2/3 · próxima em 43 min"; ao vivo: Kojima com a % subindo, MC V.V com "próxima
   faixa em …" e o selo "Derrubada por copyright", Ana com "Cozinhando (até 12h)" ou "Se maquiando").
-- Retratos em pixel art dos 11 (caricatura no estilo do jogo), mostrados ao Juan numa folha antes de entrar.
+- Retratos 32 × 32 aprovados pelo Juan (folha v3c, 12/10): estilo da imagem do Gemaplys (sem contorno, cores chapadas,
+  cabeça grande). Gemaplys = a imagem dele; Viniccius13 = a skin de Minecraft dele, de frente, sem o fone; os outros
+  desenhados olhando fotos. Gerador em `../fellas-inc-esbocos/conferencia/retratos3.py` (+ `vini.py`); as fotos de
+  referência não vão pro repositório. Falta a referência do Luva de Pedreiro (o Juan manda).
 - Cena: o convidado da cadeira da frente aparece no lugar do `ppp-convidado` (de costas: cabelo, pele e roupa dele).
 - Bolsa: lotes do Vorcaro marcados; setas do VSauce.
 - Textos da Horta passam a dizer "geradores 1% mais baratos" / "melhorias 3% mais baratas" (pedido do Juan).
