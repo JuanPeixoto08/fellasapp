@@ -9,7 +9,7 @@ import { criarBolsaTela } from './bolsaTela';
 import { criarHortaTela } from './hortaTela';
 import { criarConvidadosTela } from './convidadosTela';
 import { portaBolsa, portaConvidados, portaHorta, type ResumoPorta } from './portas';
-import { custosConv, multGerador, peso, SEM_CADEIRAS, VINI, VORCARO } from './convidados';
+import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type Celula } from './legado';
@@ -611,7 +611,15 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const semHorta: HortaEstado = { lado: 0, food_trucks: 0, plantas: [], descobertas: [1, 2], bonus: { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 }, server_now: s.server_now };
       // a semente custa minutos da produção; com o Viniccius13 sentado, 50% mais (× o peso)
       const taxaSemente = s.rate * (1 + 0.5 * peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VINI));
-      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela);
+      // o Terry e o Viniccius13 sentados aparecem do lado da horta, com o efeito na cadeira deles
+      const cad = s.convidados ?? SEM_CADEIRAS;
+      const chips = [TERRY, VINI].flatMap((id) => {
+        const p = peso(cad, s.generators[12] ?? 0, id);
+        if (!p) return [];
+        const [bom, ruim] = efeitosTexto(id, p);
+        return [{ retrato: ativos.convidado(id), titulo: `${id === TERRY ? 'Terry' : 'Vini'} ${['na frente', 'no meio', 'no canto'][cad.cadeira.indexOf(id)]}`, bonus: bom, defeito: ruim }];
+      });
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips);
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
@@ -632,6 +640,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       info.replaceChildren(el('span', undefined, `Era ${s.era} · ${ERAS[s.era - 1]}`));
       if (s.equipe.length) info.append(el('span', undefined, s.equipe.length === 1 ? '1 contratado' : `${s.equipe.length} contratados`));
       if (s.bonus.conquistas > 0) info.append(el('span', undefined, `+${s.bonus.conquistas}% das conquistas`));
+      const naFrente = s.convidados?.cadeira[0];
+      if (naFrente && destrancada(0, s.generators[12] ?? 0)) info.append(el('span', undefined, `${CONVIDADOS.find((c) => c.id === naFrente)?.nome} na frente do PPP`));
       const agoraBoost = s.boost_until && Date.parse(s.boost_until) > Date.parse(s.server_now);
       bonus.textContent = agoraBoost ? 'Produção ×5 por alguns segundos' : s.half_price ? 'Próxima compra pela metade' : '';
       for (let gid = 1; gid <= 30; gid++) {

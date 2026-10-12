@@ -694,3 +694,231 @@ body:has(.idle) { background: #121212; }
   .idle .conv-estudio { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
   .idle .estudio-placa { font-size: 26px; }
 }
+
+/* ===== Bolsa em tela cheia (mockup de 12/10): lista à esquerda, a empresa escolhida à direita, melhorias embaixo ===== */
+.idle .minigame-corpo .bolsa { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; height: auto; }
+.idle .bolsa-esq, .idle .bolsa-dir { display: grid; gap: 8px; align-content: start; min-width: 0; min-height: 0; }
+.idle .bolsa-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.idle .bolsa-cab .rot2 { font: 400 17px var(--i-pixel); color: var(--i-mudo); }
+.idle .minigame-corpo .bolsa-lista { display: grid; gap: 6px; overflow: visible; padding: 2px; }
+.idle .minigame-corpo .acao { grid-template-columns: 32px minmax(0, 1fr) 64px auto 64px; gap: 10px; padding: 6px 10px; background: var(--i-painel); --c: var(--i-borda); }
+.idle .minigame-corpo .acao.escolhida { --c: var(--i-lilas); background: #231F33; }
+.idle .minigame-corpo .acao > :nth-child(2) { display: block; }
+.idle .acao-icone, .idle .det-icone { width: 32px; height: 32px; background: no-repeat 0 0 / 400% 100%; image-rendering: pixelated; }
+.idle .det-icone { flex: none; width: 56px; height: 56px; }
+.idle .minigame-corpo .acao .tk { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .minigame-corpo .acao .tk .etq { margin: 0 0 0 6px; vertical-align: 2px; }
+.idle .etq.humor { background: #2A2440; color: var(--i-lilas); }
+.idle .minigame-corpo svg.mini { width: 64px; height: 28px; }
+.idle .minigame-corpo .acao .tem { min-width: 0; }
+.idle svg .linha { fill: none; stroke-width: 2px; stroke: var(--mint); }
+.idle svg .linha.cai { stroke: #FF8F8F; }
+.idle svg .area { fill: rgba(95, 211, 141, 0.1); stroke: none; }
+.idle svg .area.cai { fill: rgba(255, 143, 143, 0.08); }
+.idle svg .grade-graf { stroke: #262335; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.idle svg .pagou { stroke: var(--gold); stroke-width: 2px; stroke-dasharray: 8 6; }
+.idle .minigame-corpo .bolsa-detalhe { display: grid; grid-template-rows: auto auto minmax(160px, 1fr) auto auto auto; gap: 10px; padding: 0; background: none; box-shadow: none; overflow: visible; }
+.idle .minigame-corpo .bolsa-detalhe .cab { display: flex; align-items: center; gap: 14px; }
+.idle .minigame-corpo .bolsa-detalhe .tk { font-size: 32px; min-width: 0; }
+.idle .minigame-corpo .bolsa-detalhe .tk small { font-size: 14px; }
+.idle .relogio-bolsa { margin-left: auto; font: 400 22px var(--i-pixel); color: var(--gold); text-align: right; white-space: nowrap; }
+.idle .minigame-corpo .preco-grande { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.idle .minigame-corpo .preco-grande b { font: 400 40px var(--i-pixel); line-height: 1; }
+.idle .humor-vsauce { margin-left: auto; font: 400 18px var(--i-pixel); color: var(--i-lilas); }
+.idle .bolsa-graf { position: relative; min-height: 160px; background: #17151F; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .bolsa-graf svg.graf { position: absolute; inset: 0; width: 100%; height: 100%; background: none; }
+.idle .pagou-rot { position: absolute; left: 10px; font: 400 17px var(--i-pixel); color: var(--gold); }
+.idle .bolsa-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.idle .bolsa-info > div { display: grid; gap: 2px; padding: 8px 10px; background: var(--i-painel); }
+.idle .bolsa-info b { font: 400 22px var(--i-pixel); color: var(--paper); }
+.idle .bolsa-info b.sobe { color: var(--mint); } .idle .bolsa-info b.cai { color: #FF8F8F; }
+.idle .bolsa-negocia { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.idle .bolsa-negocia .lote { padding: 8px 10px; background: #2A2112; box-shadow: inset 0 0 0 2px #6B5418; }
+.idle .minigame-corpo .bolsa-melhorias { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.idle .minigame-corpo .melhoria-bolsa { flex-direction: row; align-items: center; justify-content: space-between; background: var(--i-painel); }
+.idle .minigame-corpo .melhoria-bolsa .btn { min-height: 36px; }
+
+@media (min-width: 1100px) {
+  .idle .minigame-corpo .bolsa { grid-template-columns: 440px minmax(0, 1fr); gap: 22px; height: 100%; }
+  .idle .minigame-corpo .bolsa-esq { grid-template-rows: auto auto minmax(0, 1fr); }
+  .idle .minigame-corpo .bolsa-lista { grid-template-rows: repeat(8, minmax(0, 1fr)); min-height: 0; }
+  .idle .bolsa-dir { grid-template-rows: minmax(0, 1fr) auto; }
+  .idle .minigame-corpo .bolsa-detalhe { min-height: 0; }
+  .idle .bolsa-info { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .idle .bolsa-negocia { grid-template-columns: 1fr 1fr 1.3fr; }
+}
+
+/* ===== tela inicial mais enxuta (pedido do Juan): portas baixas, tudo cabe sem rolar e alinha com a Loja ===== */
+.idle .porta { grid-template-columns: 32px minmax(0, 1fr); grid-template-rows: auto auto; gap: 2px 8px; min-height: 0; padding: 8px 10px; }
+.idle .porta-icone { width: 32px; height: 32px; grid-row: span 2; }
+.idle .porta-nome { font-size: 19px; align-self: end; }
+.idle .porta-st { grid-column: 2; align-self: start; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11.5px; }
+.idle .porta-abrir { display: none; }
+@media (min-width: 1100px) {
+  .idle .empresa { grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+  .idle .bancada { grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+  .idle .bancada-caixa { min-height: 0; }
+  .idle .bancada-caixa .escolhas { height: 100%; align-items: stretch; }
+}
+
+/* Loja no PC (painel de 440): ícone e nome em cima, os 3 botões embaixo do nome; nada cortado na borda */
+@media (min-width: 1100px) {
+  .idle .lista-geradores .gerador { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto; gap: 6px 10px; align-items: center; }
+  .idle .lista-geradores .gerador .sprite { grid-row: span 2; align-self: center; width: 48px; height: 48px; background-size: 192px 48px; animation-name: quadros48; }
+  .idle .lista-geradores .gerador .meio strong { font-size: 15px; line-height: 1.2; }
+  .idle .lista-geradores .compra { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 6px; }
+  .idle .lista-geradores .compra .btn { min-width: 0; height: 34px; min-height: 34px; padding: 0 6px; font-size: 17px; overflow: hidden; text-overflow: ellipsis; }
+  .idle .lista-geradores .gerador.trancado { display: flex; }
+}
+@keyframes quadros48 { from { background-position-x: 0; } to { background-position-x: -192px; } }
+
+/* portas com o texto inteiro (quebra em até 3 linhas) e a Caixinha baixinha embaixo; as portas ocupam o espaço que sobra */
+.idle .porta { align-content: start; }
+.idle .porta-st { white-space: normal; overflow: visible; text-overflow: clip; grid-column: 1 / -1; font-size: 12px; line-height: 1.3; }
+.idle .porta-icone { grid-row: auto; }
+.idle .porta-nome { align-self: center; }
+@media (min-width: 1100px) {
+  .idle .bancada { grid-template-rows: minmax(0, 1fr) auto; }
+  .idle .portas { align-items: stretch; }
+  .idle .bancada-caixa .escolhas { height: auto; }
+  .idle .bancada-caixa .escolha { padding: 6px 10px; }
+  .idle .bancada-caixa .escolha .boneco { width: 32px; height: 32px; }
+  .idle .bancada-caixa .btn.compacto { min-height: 32px; height: 32px; }
+  .idle .bancada-caixa-cab { padding: 6px 12px; }
+}
+
+@media (min-width: 1100px) {
+  .idle .porta { grid-template-columns: 1fr; justify-items: center; align-content: center; text-align: center; gap: 6px; padding: 10px; }
+  .idle .porta-icone { width: 48px; height: 48px; }
+  .idle .porta-nome { font-size: 22px; }
+  .idle .porta-st { grid-column: auto; font-size: 12.5px; max-width: 100%; }
+}
+
+/* ===== Horta em tela cheia (mockup de 12/10): bônus, tamanho, convidados e coleção | grade 6 × 6 | canteiro e sementes ===== */
+.idle .minigame-corpo .horta { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.idle .horta-esq, .idle .horta-dir { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; }
+.idle .horta-centro { order: -2; display: grid; gap: 10px; justify-items: center; align-content: start; min-width: 0; }
+.idle .horta-dir { order: -1; }
+.idle .horta-bloco { display: grid; gap: 6px; padding: 12px 14px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .horta .rot2 { font: 400 17px var(--i-pixel); color: var(--i-mudo); }
+.idle .horta .bom { color: var(--mint); font-size: 13px; }
+.idle .horta .ruim { color: #FF8F8F; font-size: 13px; }
+.idle .linha-bonus { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
+.idle .linha-bonus b { font: 400 20px var(--i-pixel); color: var(--mint); text-align: right; }
+.idle .linha-bonus b.nada { color: var(--i-mudo); }
+.idle .linha-bonus b.cai { color: #FF8F8F; }
+.idle .linha-bonus .sub { font-size: 12px; text-align: right; }
+.idle .horta-barra { height: 10px; background: #17151F; box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .horta-barra i { display: block; height: 100%; background: var(--mint); }
+.idle .minigame-corpo .horta-prox { margin: 0; text-align: left; }
+.idle .horta-chip { grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; }
+.idle .horta-chip-retrato { width: 48px; height: 48px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.idle .horta-chip .meio { display: grid; gap: 2px; }
+.idle .horta-chip strong { font: 400 19px var(--i-pixel); }
+.idle .minigame-corpo .colecao-itens { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.idle .minigame-corpo .colecao-item, .idle .minigame-corpo .colecao-item.escondida { flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 0; padding: 6px 2px;
+  background: var(--i-painel2); font: 400 13px var(--i-pixel); line-height: 1; text-align: center; }
+.idle .minigame-corpo .colecao-item svg { width: 36px; height: 36px; }
+.idle .minigame-corpo .colecao-item .nome { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .colecao-item.escondida svg { filter: brightness(0); opacity: 0.4; }
+.idle .horta-dicas { display: grid; gap: 2px; }
+.idle .horta-dicas p { margin: 0; font-size: 12px; }
+.idle .minigame-corpo .horta-grade { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; width: min(100%, 560px); padding: 10px; background: #2A1D12;
+  box-shadow: 0 -2px 0 0 #4A3423, 0 2px 0 0 #4A3423, -2px 0 0 0 #4A3423, 2px 0 0 0 #4A3423; }
+.idle .minigame-corpo .canteiro { min-height: 0; padding: 10%; }
+.idle .minigame-corpo .canteiro.madura { --c: #3F9E68; }
+.idle .minigame-corpo .canteiro.escolhido, .idle .minigame-corpo .canteiro.madura.escolhido { --c: var(--i-lilas); }
+.idle .minigame-corpo .canteiro.tranc { cursor: default; background: #1E1610 no-repeat center / 28% auto; image-rendering: pixelated; opacity: 0.75; --c: #2A1D12; }
+.idle .horta-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 12px; color: var(--i-mudo); }
+.idle .horta-legenda span { display: flex; align-items: center; gap: 6px; }
+.idle .horta-legenda i { display: inline-block; width: 12px; height: 12px; }
+.idle .horta-legenda i.madura { background: #3F9E68; }
+.idle .horta-legenda i.escolhido { background: var(--i-lilas); }
+.idle .horta-legenda i.tranc { background: #1E1610; box-shadow: inset 0 0 0 2px #4A3423; }
+.idle .minigame-corpo .horta-cartao { gap: 10px; padding: 14px; --c: var(--i-borda); }
+.idle .minigame-corpo .horta-cartao .cab { align-items: center; gap: 14px; }
+.idle .minigame-corpo .horta-cartao .cab svg { width: 72px; height: 72px; }
+.idle .horta-cartao .meio { display: grid; gap: 4px; min-width: 0; }
+.idle .horta-cartao .meio > strong { font: 400 24px var(--i-pixel); line-height: 1; }
+.idle .horta-sementes { display: grid; gap: 8px; }
+.idle .minigame-corpo .semente { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; min-height: 52px; padding: 6px 12px; }
+.idle .minigame-corpo .semente .meio { display: grid; gap: 2px; min-width: 0; }
+.idle .minigame-corpo .semente strong { font-size: 18px; line-height: 1; }
+.idle .preco-semente { font: 400 18px var(--i-pixel); color: var(--gold); white-space: nowrap; }
+.idle .semente:disabled .preco-semente, .idle .semente:disabled .bom { opacity: 0.6; }
+
+@media (min-width: 1100px) {
+  .idle .minigame-corpo .horta { grid-template-columns: 300px minmax(0, 1fr) 370px; gap: 22px; height: 100%; align-items: start; }
+  .idle .horta-centro, .idle .horta-dir { order: 0; }
+  .idle .horta-esq, .idle .horta-dir { max-height: 100%; overflow: auto; padding: 2px; }
+  .idle .minigame-corpo .horta-grade { width: min(100%, 540px); }
+}
+
+/* a cena e os números num cartão com moldura (mockup): a cena encostada na borda, os números com respiro do lado */
+@media (min-width: 1100px) {
+  .idle .cartao-empresa { gap: 16px; background: var(--i-painel); --c: var(--i-borda);
+    box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
+  .idle .cartao-empresa .cena { box-shadow: 2px 0 0 0 var(--i-borda); }
+  .idle .valor { gap: 6px; padding: 16px 16px 16px 0; }
+  .idle .numero { font-size: 34px; line-height: 1; white-space: normal; }
+  .idle .taxa { font-size: 20px; }
+  .idle .info { gap: 6px; margin-top: 6px; font-size: 13.5px; line-height: 1.3; }
+}
+/* a horta cabe na altura do PC sem rolar: blocos mais baixos e a coleção mais compacta */
+.idle .minigame-corpo .semente .bom { font: 400 13px 'Golos Text', system-ui, sans-serif; }
+@media (min-width: 1100px) {
+  .idle .horta-esq { gap: 10px; }
+  .idle .horta-esq .horta-bloco { gap: 4px; padding: 10px 12px; }
+  .idle .horta-esq .linha-bonus b { font-size: 18px; }
+  .idle .minigame-corpo .colecao-item svg { width: 30px; height: 30px; }
+  .idle .minigame-corpo .colecao-item, .idle .minigame-corpo .colecao-item.escondida { padding: 4px 2px; }
+}
+
+/* proporção do mockup: a coluna da empresa é a cena + uma coluna de números estreita; a Loja fica com o resto da largura
+   (sem coluna vazia do lado da cena nas telas largas) */
+@media (min-width: 1100px) {
+  .idle:not(.sem-painel) { grid-template-columns: minmax(0, calc(var(--cena-w, 640px) + 226px)) minmax(420px, 1fr); }
+  .idle .lista-geradores { container-type: inline-size; }
+}
+/* Loja larga: cada gerador numa linha só (ícone, nome, os 3 botões do lado) */
+@container (min-width: 440px) {
+  .idle .lista-geradores .gerador { grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: auto; }
+  .idle .lista-geradores .gerador .sprite { grid-row: auto; }
+  .idle .lista-geradores .compra { grid-template-columns: 96px 44px 84px; }
+}
+/* Caixinha mais enxuta: rótulo estreito, texto em 2 linhas, Pegar menor */
+@media (min-width: 1100px) {
+  .idle .bancada-caixa { grid-template-columns: 100px minmax(0, 1fr); }
+  .idle .bancada-caixa .escolha { gap: 8px; padding: 6px 8px; }
+  .idle .bancada-caixa .escolha .escolha-texto strong { font-size: 12.5px; line-height: 1.2; }
+  .idle .bancada-caixa .escolha .escolha-texto .sub { font-size: 11.5px; line-height: 1.2; }
+  .idle .bancada-caixa .btn.compacto { padding: 0 10px; font-size: 17px; }
+}
+/* Bolsa: a lista ocupa a altura toda (com ou sem o aviso de pó); sem lote alavancado, comprar e vender dividem a linha */
+@media (min-width: 1100px) {
+  .idle .minigame-corpo .bolsa-esq { grid-template-rows: auto minmax(0, 1fr); }
+  .idle .minigame-corpo .bolsa-esq:has(> .bolsa-po) { grid-template-rows: auto auto minmax(0, 1fr); }
+  .idle .bolsa-negocia:not(:has(.lote)) { grid-template-columns: 1fr 1fr; }
+}
+/* Convidados: as duas colunas vão até embaixo (cartões das cadeiras e o destaque esticam), sem faixa vazia no pé */
+@media (min-width: 1100px) {
+  .idle .minigame-corpo .convidados { height: 100%; align-items: stretch; }
+  .idle .conv-esq { grid-template-rows: auto minmax(0, 1fr); }
+  .idle .conv-estudio { align-items: stretch; }
+  .idle .conv-dir { grid-template-rows: auto minmax(0, 1fr); }
+  .idle .conv-escolha { grid-template-rows: auto auto minmax(0, 1fr); }
+  .idle .conv-detalhe { align-content: start; }
+  .idle .conv-detalhe > .btn, .idle .conv-detalhe > .conv-ja { align-self: end; }
+}
+/* Horta no PC: a grade fica com 540 e as laterais dividem o resto (sem vão entre a grade e as colunas em tela larga) */
+@media (min-width: 1100px) {
+  .idle .minigame-corpo .horta { grid-template-columns: minmax(280px, 1fr) auto minmax(320px, 1fr); }
+  .idle .minigame-corpo .horta-grade { width: 540px; }
+}
+/* Bolsa no celular: cada empresa numa linha só (o "você tem" do lado do preço, não embaixo) */
+.idle .minigame-corpo .acao .tem { grid-column: auto; text-align: right; }
+@media (max-width: 1099px) {
+  .idle .minigame-corpo .acao { grid-template-columns: 32px minmax(0, 1fr) 48px auto minmax(36px, auto); gap: 8px; padding: 6px 8px; }
+  .idle .minigame-corpo svg.mini { width: 48px; }
+}

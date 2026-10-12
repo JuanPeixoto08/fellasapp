@@ -47,9 +47,9 @@ describe('tela da Bolsa', () => {
     linha(1).click();
     tela.relogio(9_500);
     const r = document.querySelector('.bolsa-detalhe [role="timer"]')!;
-    expect(r.textContent).toBe('preço novo em 0:10');
+    expect(r.textContent).toBe('Preço novo em 0:10');
     tela.relogio(-200);
-    expect(r.textContent).toBe('preço novo em 0:00');
+    expect(r.textContent).toBe('Preço novo em 0:00');
   });
   it('ações que viraram pó: o aviso aparece dentro da Bolsa (a cena fica escondida com ela aberta)', () => {
     tela.renderizar(B({ viraram_po: [{ empresa: 4, qtd: 120 }] }), 1e9, false);
@@ -64,21 +64,21 @@ describe('tela da Bolsa', () => {
     expect(document.querySelector('.carteira')!.textContent).toContain('F$ 660'); // 10 × 33 × 2
     expect(document.querySelector('.carteira')!.textContent).toContain('+F$ 60'); // (330 − 300) × 2
   });
-  it('tocar abre o detalhe; comprar 1/10/Máx e vender 1/10/Tudo mandam o tick visto', () => {
+  it('a 1ª empresa já vem escolhida; comprar 1/10/Máx e vender 1/10/Tudo mandam o tick visto', () => {
     tela.renderizar(B(), 1e9, false);
-    expect(document.querySelector('.bolsa-detalhe')).toBeNull();
+    expect(document.querySelector('.bolsa-detalhe')!.getAttribute('data-empresa')).toBe('1');
     linha(1).click();
     const d = document.querySelector('.bolsa-detalhe')!;
-    expect(d.textContent).toContain('preço novo em 0:42');
-    expect(d.textContent).toContain('Você tem 10 de 120');
+    expect(d.textContent).toContain('Preço novo em 0:42');
+    expect(d.querySelector('.bolsa-info')!.textContent).toContain('Você tem10 de 120');
     expect(d.querySelector('.conta-limite')!.textContent).toBe('Limite: 100 + 20 Food truck'); // Pastel ↔ Food truck
     const bts = [...d.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.textContent);
     expect(bts).toEqual(['1', '10', 'Máx', '1', '10', 'Tudo']);
     [...d.querySelectorAll<HTMLButtonElement>('.comprar button')][2].click();
     [...d.querySelectorAll<HTMLButtonElement>('.vender button')][0].click();
     expect(negociar.mock.calls).toEqual([[1, 'comprar', 0, 1000], [1, 'vender', 1, 1000]]);
-    linha(1).click();
-    expect(document.querySelector('.bolsa-detalhe')).toBeNull();
+    linha(1).click(); // tocar de novo não fecha (sempre tem uma escolhida)
+    expect(document.querySelector('.bolsa-detalhe')!.getAttribute('data-empresa')).toBe('1');
   });
   it('apagados: ocupado, sem F$, no limite, sem ações, empresa quebrada', () => {
     tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 120, custo: 3600 }] }), 1e9, false); // limite do Pastel: 120
@@ -97,12 +97,12 @@ describe('tela da Bolsa', () => {
     tela.renderizar(B(), 1e9, false);
     linha(1).click();
     tela.renderizar(B(), 1e9, false);
-    expect(tela.precos().map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+    expect(tela.precos().map((p) => p.preco)).toEqual([33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05, 1800 * 2, 3600 * 2]);
   });
   it('apagado só por falta de F$ entra na lista (acende quando o dinheiro chega)', () => {
     tela.renderizar(B(), 0, false);
     linha(1).click();
-    expect(tela.precos().map((p) => p.preco)).toEqual([1800 * 2, 3600 * 2, 33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05]);
+    expect(tela.precos().map((p) => p.preco)).toEqual([33 * 2 * 1.05, 10 * 33 * 2 * 1.05, 33 * 2 * 1.05, 1800 * 2, 3600 * 2]);
   });
   it('no limite ou ocupado, os botões de compra ficam fora da lista do F$ (senão acenderiam sozinhos)', () => {
     tela.renderizar(B({ carteira: [{ empresa: 1, qtd: 120, custo: 3600 }] }), 1e9, false);
@@ -113,9 +113,9 @@ describe('tela da Bolsa', () => {
   });
   it('escolher outra empresa põe os botões novos do detalhe na lista do F$', () => {
     tela.renderizar(B(), 1e9, false);
-    expect(tela.precos()).toHaveLength(2);
-    linha(1).click();
     expect(tela.precos()).toHaveLength(5);
+    linha(6).click(); // quebrada: sem botões de compra, só as melhorias
+    expect(tela.precos()).toHaveLength(2);
   });
   it('melhorias: nível atual, efeito e o próximo com o preço em F$ (segundos × r); no 5, No máximo', () => {
     tela.renderizar(B({ corretor: 1, escritorio: 5 }), 1e9, false);
@@ -180,6 +180,6 @@ describe('Convidados na Bolsa', () => {
     tela.renderizar(B(), 1e9, false);
     expect(document.querySelector('.etq.humor')).toBeNull();
     tela.renderizar(B({ empresas: [{ id: 1, valor: 33, limite: 120, risco: false, rj_ate: null, historico: [33], humor: 3 }] }), 1e9, false);
-    expect(linha(1).textContent).toContain('subindo forte');
+    expect(linha(1).textContent).toContain('Subindo forte');
   });
 });

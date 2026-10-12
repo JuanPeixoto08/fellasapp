@@ -33,28 +33,36 @@ beforeEach(() => {
 const canteiro = (c: number) => document.querySelector<HTMLButtonElement>(`.canteiro[data-canteiro="${c}"]`)!;
 
 describe('a horta na tela', () => {
-  it('a grade do tamanho dos Food trucks, com cada canteiro dizendo o que tem', () => {
+  it('a grade 6 × 6: abertos os do tamanho dos Food trucks, cada um dizendo o que tem; o resto com cadeado', () => {
     tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
-    expect(document.querySelectorAll('.canteiro')).toHaveLength(4);
+    expect(document.querySelectorAll('.canteiro[data-canteiro]')).toHaveLength(4);
+    expect(document.querySelectorAll('.canteiro.tranc')).toHaveLength(32);
     expect(canteiro(0).getAttribute('aria-label')).toBe('Canteiro 1: Pé de Pix, madura');
     expect(canteiro(1).getAttribute('aria-label')).toBe('Canteiro 2: Couve do Coach, muda');
     expect(canteiro(6).getAttribute('aria-label')).toBe('Canteiro 3: vazio');
-    expect(document.querySelector('.horta-prox')!.textContent).toBe('3 × 3 com 25 Food trucks (tem 3)');
+    expect(document.querySelector('.horta-prox')!.textContent).toBe('Tem 3 Food trucks · faltam 22');
+    expect(document.querySelector('.horta-legenda')!.textContent).toContain('Abre com 25 Food trucks');
   });
   it('resumo dos bônus e a coleção (com a dica quando os pais já foram descobertos)', () => {
     tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
-    expect(document.querySelector('.horta-bonus')!.textContent).toBe('Produção +1%');
+    const linhas = [...document.querySelectorAll('.horta-bonus-agora .linha-bonus')].map((l) => l.textContent);
+    expect(linhas).toEqual(['Produção+1%', 'Geradores—', 'Melhorias—', 'Oportunidades—']);
     expect(document.querySelector('.horta-colecao-cab')!.textContent).toContain('Coleção 2/8');
     const itens = [...document.querySelectorAll('.colecao-item')];
     expect(itens[0].textContent).toContain('Pé de Pix');
-    expect(itens[3].textContent).toContain('???');
-    expect(itens[3].textContent).toContain('Nasce perto de Pé de Pix e Couve do Coach');
-    expect(itens[7].textContent).toContain('Tem gente que jura que viu');
+    expect(itens[3].textContent).toBe('???');
+    expect(itens[3].getAttribute('title')).toBe('Nasce perto de Pé de Pix e Couve do Coach');
+    const dicas = document.querySelector('.horta-dicas')!.textContent;
+    expect(dicas).toContain('Nasce perto de Pé de Pix e Couve do Coach');
+    expect(dicas).toContain('Tem gente que jura que viu');
+    expect(dicas).not.toContain('Inhame'); // a dica não entrega o nome
   });
   it('canteiro vazio: as sementes descobertas com preço; plantar manda canteiro e espécie', () => {
     tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
     canteiro(6).click();
-    const bts = [...document.querySelectorAll<HTMLButtonElement>('.horta-cartao .semente')];
+    expect(document.querySelector('.horta-cartao')!.textContent).toContain('Canteiro 3 vazio');
+    expect(document.querySelector('.horta-sementes .rot2')!.textContent).toBe('Plantar no canteiro 3');
+    const bts = [...document.querySelectorAll<HTMLButtonElement>('.horta-sementes .semente')];
     expect(bts.map((b) => b.dataset.especie)).toEqual(['1', '2']);
     expect(bts[0].textContent).toContain('F$ 1,2 mil'); // 600 s × r 2
     bts[1].click();
@@ -82,12 +90,32 @@ describe('a horta na tela', () => {
     expect(document.querySelector('.horta')!.textContent).toContain('Compra 1 Food truck pra abrir a horta');
     tela.renderizar(HORTA(), 2, 1e9, true, AGORA);
     canteiro(6).click();
-    expect([...document.querySelectorAll<HTMLButtonElement>('.horta-cartao .semente')].every((b) => b.disabled)).toBe(true);
+    expect([...document.querySelectorAll<HTMLButtonElement>('.horta-sementes .semente')].every((b) => b.disabled)).toBe(true);
   });
   it('a lista do F$: as sementes que só dependem do dinheiro', () => {
     tela.renderizar(HORTA(), 2, 0, false, AGORA);
     canteiro(6).click();
     expect(tela.precos().map((p) => p.preco)).toEqual([1200, 1200]);
+  });
+  it('com planta no escolhido, a semente vai no primeiro canteiro vazio', () => {
+    tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
+    canteiro(0).click();
+    expect(document.querySelector('.horta-sementes .rot2')!.textContent).toBe('Plantar no canteiro 3 (o primeiro vazio)');
+    document.querySelector<HTMLButtonElement>('.horta-sementes .semente[data-especie="1"]')!.click();
+    expect(plantar).toHaveBeenCalledWith(6, 1);
+  });
+  it('horta cheia: sem canteiro vazio, as sementes ficam apagadas e fora da lista do F$', () => {
+    const cheia = [0, 1, 6, 7].map((c) => ({ canteiro: c, especie: 1, inicio: em(2 * H), origem: 'plantada' as const }));
+    tela.renderizar(HORTA({ plantas: cheia }), 2, 1e9, false, AGORA);
+    expect(document.querySelector('.horta-sementes .rot2')!.textContent).toBe('Sem canteiro vazio pra plantar');
+    expect([...document.querySelectorAll<HTMLButtonElement>('.horta-sementes .semente')].every((b) => b.disabled)).toBe(true);
+    expect(tela.precos()).toEqual([]);
+  });
+  it('no 6 × 6 não tem cadeado nem a legenda do próximo tamanho', () => {
+    tela.renderizar(HORTA({ lado: 6, food_trucks: 250 }), 2, 1e9, false, AGORA);
+    expect(document.querySelectorAll('.canteiro.tranc')).toHaveLength(0);
+    expect(document.querySelector('.horta-prox')!.textContent).toBe('Horta no tamanho máximo');
+    expect(document.querySelector('.horta-legenda')!.textContent).not.toContain('Abre com');
   });
 });
 
@@ -99,5 +127,11 @@ describe('com os convidados', () => {
     ] }), 2, 1e9, false, AGORA);
     expect(canteiro(0).getAttribute('aria-label')).toBe('Canteiro 1: Pé de Pix, madura');
     expect(canteiro(1).getAttribute('aria-label')).toBe('Canteiro 2: Pé de Pix, crescendo');
+  });
+  it('o Terry e o Vini sentados aparecem do lado, com o efeito deles', () => {
+    tela.renderizar(HORTA(), 2, 1e9, false, AGORA, [{ retrato: null, titulo: 'Terry na frente', bonus: 'Plantas novas amadurecem 30% mais rápido', defeito: 'E vivem 20% menos' }]);
+    const chip = document.querySelector('.horta-chip')!;
+    expect(chip.textContent).toContain('Terry na frente');
+    expect(chip.textContent).toContain('E vivem 20% menos');
   });
 });

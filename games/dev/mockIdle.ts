@@ -176,7 +176,7 @@ wc.__faixaAgora = async () => {
 // painel do ?mock pra testar os eventos sem abrir o console (só no dev)
 {
   const painel = document.createElement('div');
-  painel.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;display:flex;gap:6px;flex-wrap:wrap;padding:6px;background:#000c;font:12px sans-serif';
+  painel.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99;justify-content:flex-end;max-width:70vw;display:flex;gap:6px;flex-wrap:wrap;padding:6px;background:#000c;font:12px sans-serif';
   const nomes = ['Investidor', 'Promoção', 'Viralizou', 'Dupla ×100'];
   nomes.forEach((nome, tipo) => {
     const b = document.createElement('button');
@@ -216,9 +216,17 @@ wc.__faixaAgora = async () => {
     b.addEventListener('click', () => void f());
     painel.append(b);
   }
-  const t = document.createElement('span');
-  t.textContent = 'mock: eventos';
-  t.style.cssText = 'color:#aaa;align-self:center';
+  // fechado por padrão (um botãozinho no canto), pra não cobrir a Caixinha; abre e fecha no clique
+  const t = document.createElement('button');
+  t.style.cssText = 'padding:6px 8px;background:#333;color:#ddd;border:0;cursor:pointer';
+  const botoes = [...painel.children] as HTMLElement[];
+  const abrir = (aberto: boolean) => {
+    t.textContent = aberto ? 'mock ◂' : 'mock ▸';
+    for (const b of botoes) b.style.display = aberto ? '' : 'none';
+  };
+  let aberto = false;
+  t.addEventListener('click', () => abrir((aberto = !aberto)));
+  abrir(false);
   painel.prepend(t);
   document.body.append(painel);
 }

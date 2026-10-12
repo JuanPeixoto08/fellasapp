@@ -4,6 +4,17 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-12-telas-cheias',
+    titulo: 'Bolsa e Horta de cara nova',
+    data: '2026-10-12',
+    itens: [
+      'A Bolsa em tela cheia: as 8 empresas do lado, o gráfico grande com a linha do quanto você pagou, e comprar e vender embaixo.',
+      'A Horta em tela cheia: a grade 6 × 6 inteira (os canteiros que ainda não abriram ficam com cadeado), o canteiro escolhido e as sementes do lado.',
+      'O Terry e o Vini sentados aparecem do lado da Horta, com o que estão fazendo com ela.',
+      'A tela inicial ficou mais enxuta: tudo cabe sem rolar, e a Loja fica mais larga em tela grande.',
+    ],
+  },
+  {
     id: '2026-10-12-convidados',
     titulo: 'Convidados no PPP Podcast',
     data: '2026-10-12',
