@@ -2,6 +2,8 @@
 // lugares de mentira em idle_places quando precisam.
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import type { IdleState } from '../shared/types';
+import { dicaProducao, porUnidade } from '../idle/dica';
 import { custoNivel, LUGARES, MARCOS, multMapa } from '../idle/mapa';
 import { freshDb, type TestDb } from './db';
 
@@ -311,5 +313,143 @@ describe('semana e presença', () => {
         expect(r[0].i).toBe(semanaIdx(l, 0, 12, semana));
       }
     }
+  });
+});
+
+/** [lugar, sal, n, semana, índice]: os mesmos fixos de idle/mapa.test.ts. */
+const SEMANA_FIXOS: [number, number, number, string, number][] = [
+  [3, 0, 12, '2026-10-12', 3], [4, 0, 12, '2026-10-12', 9], [7, 0, 12, '2026-10-12', 4], [3, 0, 12, '2026-10-19', 10],
+  [7, 1, 5, '2027-03-01', 2], [4, 2, 7, '2026-01-05', 4], [3, 0, 1, '2026-11-02', 0], [7, 0, 12, '2025-12-29', 0],
+];
+
+describe('sorteio da semana (bits altos)', () => {
+  it('o banco dá os valores fixos', async () => {
+    for (const [l, sal, n, semana, idx] of SEMANA_FIXOS) {
+      const r = await q<{ i: number }>('select public.idle_place_semana_idx($1, $2, $3, $4::date) as i', [l, sal, n, semana]);
+      expect(r[0].i).toBe(idx);
+    }
+  });
+  it('52 semanas seguidas com 12 opções: cada lugar passa por todas; o 3 e o 7 não andam juntos', async () => {
+    const ano = async (l: number) => (await q<{ i: number }>(
+      `select public.idle_place_semana_idx($1, 0, 12, date '2026-01-05' + 7 * k) as i from generate_series(0, 51) k order by k`, [l])).map((r) => r.i);
+    for (const l of [3, 4, 7]) expect(new Set(await ano(l)).size).toBe(12);
+    const [a3, a7] = [await ano(3), await ano(7)];
+    expect(a3.some((x, k) => x !== a7[k])).toBe(true);
+  });
+});
+
+describe('nome com emoji e separadores do Unicode', () => {
+  it('16 emojis passam, 31 não; U+2028, U+2029 e U+0085 não', async () => {
+    expect(await q(`select public.idle_place_nome($1) as v`, ['😎'.repeat(16)])).toEqual([{ v: '😎'.repeat(16) }]);
+    await expect(q(`select public.idle_place_nome($1)`, ['😎'.repeat(31)])).rejects.toThrow(/idle_lugar_nome/);
+    for (const cp of [0x2028, 0x2029, 0x85]) {
+      await expect(q(`select public.idle_place_nome($1)`, [`duas${String.fromCodePoint(cp)}linhas`])).rejects.toThrow(/idle_lugar_nome/);
+    }
+  });
+});
+
+describe('a produção na tela conta o Mapa do rolê', () => {
+  it('idle_json manda mapa_mult; por unidade × geradores (dica.ts) bate com a taxa do banco e a caixinha mostra a linha', async () => {
+    await empresa(4);
+    for (const l of [3, 4, 7]) await abrir(l);
+    await q(`update public.idle_place_state set marcos = '{31,32,41}' where user_id = $1 and lugar in (3, 4)`, [A]);
+    await q(`update public.idle_state set strategies = '{0,2,1,0}' where user_id = $1`, [A]);
+    await parar();
+    const s = await t.rpc<IdleState>('idle_open');
+    const mult = (await q<{ m: number }>('select public.idle_place_mult(s) as m from public.idle_state s where user_id = $1', [A]))[0].m;
+    expect(s.mapa_mult).toBeCloseTo(mult, 12);
+    expect(mult).toBeGreaterThan(1);
+    const soma = porUnidade(s).reduce((a, x, i) => a + x * s.generators[i], 0);
+    expect(Math.abs(soma - s.rate) / s.rate).toBeLessThan(1e-9);
+    const linhas = dicaProducao(s, Date.parse(s.server_now)).linhas.map((l) => l.texto);
+    expect(linhas).toContain(`Mapa do rolê: ×${(Math.round(mult * 100) / 100).toLocaleString('pt-BR')}`);
+  });
+});
+
+describe('marcos depois de fechar a conta (idle_lugar e idle_mapa)', () => {
+  /** A na era 2 com a camisetaria aberta, F$ zerado, fãs no marco e 1 h para fechar com a taxa de antes. */
+  async function umaHora() {
+    await empresa(2);
+    await abrir(3);
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '1 hour' where user_id = $1`, [A]);
+    await q('update public.idle_place_state set fas = 10000 where user_id = $1 and lugar = 3', [A]);
+  }
+  const valor = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+  it('idle_lugar devolve marcos_novos; a hora que passou rende com a taxa de antes, a de agora sobe 3%', async () => {
+    await umaHora();
+    const r0 = await taxa();
+    const l = await t.rpc<{ marcos_novos: number[] }>('idle_lugar', { p_lugar: 3 });
+    expect(l.marcos_novos).toEqual([37]);
+    expect((await valor()) / (3600 * r0)).toBeCloseTo(1, 2);
+    expect(await taxa()).toBeCloseTo(r0 * 1.03, 6);
+    expect((await t.rpc<{ marcos_novos: number[] }>('idle_lugar', { p_lugar: 3 })).marcos_novos).toEqual([]);
+  });
+  it('idle_lugar de outro lugar também pega o marco de um lugar aberto', async () => {
+    await umaHora();
+    expect((await t.rpc<{ marcos_novos: number[] }>('idle_lugar', { p_lugar: 4 })).marcos_novos).toEqual([37]);
+  });
+  it('idle_mapa devolve marcos_novos do mesmo jeito', async () => {
+    await umaHora();
+    const r0 = await taxa();
+    expect((await t.rpc<{ marcos_novos: number[] }>('idle_mapa')).marcos_novos).toEqual([37]);
+    expect((await valor()) / (3600 * r0)).toBeCloseTo(1, 2);
+    expect((await t.rpc<{ marcos_novos: number[] }>('idle_mapa')).marcos_novos).toEqual([]);
+  });
+  it('subir de nível com fãs e volume já passados dá os três marcos de uma vez', async () => {
+    await empresa(2);
+    await abrir(3);
+    await q('update public.idle_place_state set nivel = 4, moeda = 1e9, fas = 10000, volume = 50 where user_id = $1 and lugar = 3', [A]);
+    const antes = await taxa();
+    expect((await nivel(3)).marcos_novos).toEqual([31, 37, 38]);
+    expect(await taxa()).toBeCloseTo(antes * (1 + 0.02 + 0.03 + 0.02), 6);
+  });
+});
+
+describe('o contrato das partes 2 a 4', () => {
+  const FUNCOES = [
+    'idle_tee_avancar(public.idle_state)', 'idle_cup_avancar(public.idle_state)', 'idle_din_avancar(public.idle_state)',
+    'idle_tee_json(public.idle_state)', 'idle_cup_json(public.idle_state)', 'idle_din_json(public.idle_state)',
+    'idle_place_avancar(public.idle_state)', 'idle_place_mecanica_json(public.idle_state, integer)', 'idle_place_marcos_todos(uuid)',
+    'idle_place_registrar(uuid, integer, text, integer[], double precision, timestamptz, double precision)',
+  ];
+  it('os stubs de cada lugar existem e ninguém de fora chama', async () => {
+    for (const f of FUNCOES) {
+      for (const papel of ['anon', 'authenticated', 'public']) {
+        const r = await q<{ pode: boolean }>(`select has_function_privilege($1, $2, 'execute') as pode`, [papel, `public.${f}`]);
+        expect(r[0].pode, `${papel} ${f}`).toBe(false);
+      }
+    }
+  });
+  it('o lugar só anda (o stub dele) se está aberto', async () => {
+    await q(`create or replace function public.idle_tee_avancar(s public.idle_state) returns void language plpgsql as $f$
+             begin raise exception 'tee_andou'; end $f$`);
+    await empresa(2);
+    await mapa(); // fechado: não chama
+    await abrir(3);
+    await expect(mapa()).rejects.toThrow(/tee_andou/);
+  });
+  it('a mecânica de cada lugar vem do *_json dele', async () => {
+    await q(`create or replace function public.idle_cup_json(s public.idle_state) returns jsonb language sql stable as $f$ select '{"copo": 1}'::jsonb $f$`);
+    expect((await lugar(4)).mecanica).toEqual({ copo: 1 });
+    expect((await lugar(3)).mecanica).toBeNull();
+  });
+  it('resultado registrado com p_quando na semana passada conta lá, não nesta', async () => {
+    await outros();
+    await q(`select public.idle_place_registrar(p_user => $1, p_lugar => 3, p_nome => 'velho', p_partes => '{1}', p_numero => 100,
+               p_quando => public.games_week_start()::timestamp at time zone 'America/Sao_Paulo' - interval '1 day')`, [B]);
+    expect((await lugar(3)).semana).toEqual([]);
+    const passada = await q<{ x: { user_id: string }[] }>(`select public.idle_place_semana(3, public.games_week_start() - 7) as x`);
+    expect(passada[0].x.map((p) => p.user_id)).toEqual([B]);
+  });
+  it('mesmo número: o desempate maior ganha no pódio e na semana', async () => {
+    await outros();
+    const reg = (u: string, nome: string, d: number) => q(`select public.idle_place_registrar(p_user => $1, p_lugar => 3, p_nome => $2,
+      p_partes => '{1}', p_numero => 100, p_desempate => $3)`, [u, nome, d]);
+    await reg(B, 'antes', 1);
+    await reg(C, 'depois', 5);
+    await reg(B, 'antes2', 2); // a melhor de B passa a ser esta (mesmo número, desempate maior)
+    const l = await lugar(3);
+    expect(l.podio.map((p) => p.nome)).toEqual(['depois', 'antes2']);
+    expect(l.semana.map((p) => p.user_id)).toEqual([C, B]);
   });
 });

@@ -53,21 +53,24 @@ export function multMapa(bonusMarcos: number, abertos: number, est: { marcosMult
   return 1 + bonusMarcos * est.marcosMult + abertos * est.porLugar;
 }
 
-const MODULO32 = 4294967296;
+const MODULO32 = 4294967296n;
 const SEMANA_0 = Date.UTC(2026, 0, 5);
-/** Índice da rodada da semana (0 até n - 1), igual para a mesma semana e o mesmo lugar; o banco faz a mesma conta. */
+/** Índice da rodada da semana (0 até n - 1), igual para a mesma semana e o mesmo lugar; o banco faz a mesma conta
+ *  (idle_place_semana_idx). h = semana × 2654435761 + lugar × 2246822519 + sal × 3266489917 (mod 2³²) e o índice sai dos
+ *  bits altos (⌊h·n / 2³²⌋): os baixos andam juntos de uma semana pra outra e de um lugar pro outro. */
 export function semanaIdx(lugar: number, sal: number, n: number, semana: string): number {
   const [a, m, d] = semana.split('-').map(Number);
   const dias = (Date.UTC(a, m - 1, d) - SEMANA_0) / 86_400_000;
   const w = Math.floor(dias / 7);
-  const h = (((w * 2654435761 + lugar * 40503 + sal * 97) % MODULO32) + MODULO32) % MODULO32;
-  return h % n;
+  const x = BigInt(w) * 2654435761n + BigInt(lugar) * 2246822519n + BigInt(sal) * 3266489917n;
+  const h = ((x % MODULO32) + MODULO32) % MODULO32;
+  return Number((h * BigInt(Math.max(n, 1))) / MODULO32);
 }
 
-/** Nome da pessoa no mapa: sem espaço nas pontas, de 1 a 30 letras, sem quebra de linha. */
+/** Nome da pessoa no mapa: sem espaço nas pontas, de 1 a 30 letras (emoji conta 1), sem quebra de linha (nem as do Unicode). */
 export function nomeValido(nome: string): string | null {
   const t = nome.trim();
-  if (!t || t.length > 30 || /[\r\n]/.test(t)) return null;
+  if (!t || [...t].length > 30 || /[\r\n\u0085\u2028\u2029]/.test(t)) return null;
   return t;
 }
 

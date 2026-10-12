@@ -75,7 +75,7 @@ export const idleLugarNivel = (lugar: number) => rpc<IdleState & { lugar: LugarE
 /** Ação de uma mecânica de lugar (partes 2 a 4): só funções idle_tee_*, idle_cup_* e idle_din_*. */
 export const idleLugarAcao = (fn: string, args: Record<string, unknown>) => {
   if (!/^idle_(tee|cup|din)_[a-z_]+$/.test(fn)) throw new Error(`ação de lugar desconhecida: ${fn}`);
-  return rpc<IdleState & { lugar: LugarEstado }>(fn, args);
+  return rpc<IdleState & { lugar: LugarEstado; marcos_novos?: number[] }>(fn, args);
 };
 export const idleHire = (userId: string) => rpc<IdleState>('idle_hire', { p_user: userId });
 export const idlePrestige = () => rpc<IdleState>('idle_prestige');

@@ -123,6 +123,8 @@ export type IdleState = {
   promo_ate: string | null; viral: string[];
   /** Bônus da horta agora (0048); a página aplica nos preços. */
   horta_bonus?: BonusHorta;
+  /** Mapa do rolê (0057): o multiplicador dos lugares (marcos e estratégias) que já está na taxa; a página multiplica o "cada". */
+  mapa_mult?: number;
   /** Convidados (0051): as 3 cadeiras (id ou null), desde quando, as trocas guardadas e a âncora da recarga, os PPP
    *  Podcasts e o fim da derrubada do MC V.V valendo agora. */
   convidados?: IdleConvidados;
@@ -191,7 +193,8 @@ export type PinoMapa = {
   aberto: boolean; nivel: number | null; moeda_qtd: number | null; fas: number | null;
   dono: { user_id: string; avatar: IdleVisual | null } | null;
 };
-export type MapaEstado = { mapa: string | null; lugares: PinoMapa[]; mult: number };
+/** marcos_novos: os marcos que a mecânica alcançou desde a última vez (a tela avisa "Marco: +N%"). */
+export type MapaEstado = { mapa: string | null; lugares: PinoMapa[]; mult: number; marcos_novos?: number[] };
 export type ProducaoLugar = { id: number; user_id: string; nome: string; partes: number[]; numero: number; criado_em: string; avatar: IdleVisual | null };
 export type NotaCaderninho = { tipo: string; a: number; b: number; rotulo: number };
 export type LugarEstado = {
@@ -203,4 +206,6 @@ export type LugarEstado = {
   podio: ProducaoLugar[]; semana: { user_id: string; numero: number; avatar: IdleVisual | null }[];
   dono: { user_id: string; numero: number; avatar: IdleVisual | null } | null;
   caderninho: NotaCaderninho[]; mecanica: unknown; server_now: string;
+  /** Só na resposta do idle_lugar: os marcos alcançados desde a última vez (de qualquer lugar aberto). */
+  marcos_novos?: number[];
 };

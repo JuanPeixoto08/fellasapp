@@ -90,6 +90,15 @@ describe('tela da Fellas Inc.', () => {
     expect(acoes.abrirCnpj).toHaveBeenCalled();
     expect(root.querySelector('.lista-geradores')!.hasAttribute('hidden')).toBe(true);
   });
+  it('Loja: o "cada" do gerador conta o Mapa do rolê (mapa_mult)', () => {
+    const tela = criarTela(root, acoes);
+    const cada = () => root.querySelector('.lista-geradores .gerador .sub')!.textContent!;
+    tela.renderizar(modelo({ estado: estado({ generators: [10, ...Array(29).fill(0)] }) }));
+    const sem = cada();
+    tela.renderizar(modelo({ estado: estado({ generators: [10, ...Array(29).fill(0)], mapa_mult: 3 }) }));
+    expect(sem).toBe('×10 · +F$ 0,5/s cada');
+    expect(cada()).toBe('×10 · +F$ 1,5/s cada');
+  });
   it('Loja: gerador ligado a uma empresa da Bolsa mostra a etiqueta só com a Bolsa aberta (1 Grupo de trader)', () => {
     const tela = criarTela(root, acoes);
     const gens = (trader: number) => [1, ...Array(10).fill(1), 0, 0, 0, 0, 0, 0, 0, trader, ...Array(11).fill(0)];

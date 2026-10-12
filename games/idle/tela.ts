@@ -454,7 +454,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     const sprite = el('div', 'sprite');
     sprite.style.backgroundImage = `url(${ativos.gerador(gid)})`;
     const meio = el('div', 'meio');
-    meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid) * (1 + (s.horta_bonus?.producao ?? 0)) * multGerador(s, gid, agoraTela))} cada`));
+    meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid) * (1 + (s.horta_bonus?.producao ?? 0)) * multGerador(s, gid, agoraTela) * (s.mapa_mult ?? 1))} cada`));
     // ligado a uma empresa da Bolsa: cada um libera +1 ação dela (só depois de abrir a Bolsa)
     const ligada = (s.generators[18] ?? 0) >= 1 ? empresaDoGerador(gid) : undefined;
     if (ligada) {

@@ -67,9 +67,11 @@ create table if not exists public.idle_place_prod (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
   lugar int not null, nome text not null, partes int[] not null, numero double precision not null,
+  -- o segundo critério de cada lugar (empate no número: maior desempate ganha; depois, quem fez antes)
+  desempate double precision not null default 0,
   criado_em timestamptz not null default now()
 );
-create index if not exists idle_place_prod_rank on public.idle_place_prod (lugar, numero desc, criado_em, id);
+create index if not exists idle_place_prod_rank on public.idle_place_prod (lugar, numero desc, desempate desc, criado_em, id);
 create table if not exists public.idle_place_notes (
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
   lugar int not null, tipo text not null, a int not null, b int not null default 0, rotulo int not null,
@@ -118,7 +120,9 @@ $$;
 
 create or replace function public.idle_mapa()
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
-declare s public.idle_state;
+declare
+  s       public.idle_state;
+  v_novos int[];
 begin
   if not public.is_member() then
     raise exception 'not_member' using errcode = '42501';
@@ -130,7 +134,9 @@ begin
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
   perform public.idle_save(s);
-  return public.idle_mapa_json(s);
+  -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
+  v_novos := public.idle_place_marcos_todos(s.user_id);
+  return public.idle_mapa_json(s) || jsonb_build_object('marcos_novos', to_jsonb(v_novos));
 end;
 $$;
 
@@ -224,6 +230,20 @@ begin
 end;
 $$;
 
+-- idle_place_marcos de cada lugar aberto, em ordem (idle_lugar e idle_mapa: depois de fechar a conta e salvar)
+create or replace function public.idle_place_marcos_todos(p_user uuid)
+returns int[] language plpgsql volatile set search_path = public as $$
+declare
+  v_lugar int;
+  v_novos int[] := '{}';
+begin
+  for v_lugar in select st.lugar from public.idle_place_state st where st.user_id = p_user order by st.lugar loop
+    v_novos := v_novos || public.idle_place_marcos(p_user, v_lugar);
+  end loop;
+  return v_novos;
+end;
+$$;
+
 -- provisória: a parte C troca pela completa
 create or replace function public.idle_lugar_json(s public.idle_state, p_lugar int)
 returns jsonb language sql stable set search_path = public as $$
@@ -290,38 +310,100 @@ returns double precision language sql stable set search_path = public as $$
        * public.idle_place_mult(s)
 $$;
 
+-- o estado que toda função devolve (o da 0051) + o multiplicador do Mapa do rolê (a página multiplica o "cada" e a caixinha)
+create or replace function public.idle_json(s public.idle_state)
+returns jsonb language plpgsql stable set search_path = public as $$
+declare v_rate double precision := public.idle_rate(s);
+begin
+  return jsonb_build_object(
+    'user_id', s.user_id, 'week_start', s.week_start, 'started', s.started, 'valuation', s.valuation,
+    'rate', v_rate, 'generators', to_jsonb(s.generators), 'upgrades', to_jsonb(s.upgrades),
+    'strategies', to_jsonb(s.strategies), 'era', public.idle_era(s.generators), 'boost_until', s.boost_until,
+    'half_price', s.half_price, 'opp_claimed', to_jsonb(s.opp_claimed),
+    'promo_ate', case when s.promo_ate > now() then s.promo_ate end,
+    'viral', to_jsonb(array(select v from unnest(s.viral_ate) v where v > now() order by v)),
+    'convidados', public.idle_conv_json(s),
+    'horta_bonus', (select to_jsonb(b) from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), now()) b),
+    'opp_left', greatest(0, public.idle_opp_cap(s)
+                             - case when s.opp_day = public.games_today() then s.opp_count else 0 end),
+    'server_now', now(),
+    'avatar', public.idle_avatar_json(s.user_id),
+    'equipe', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employee_id, 'cargo', c.cargo,
+                                                            'avatar', public.idle_avatar_json(c.employee_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
+                          from public.idle_contracts c
+                         where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
+    'chefes', coalesce((select jsonb_agg(jsonb_build_object('user_id', c.employer_id, 'cargo', c.cargo,
+                                                            'mult', public.idle_employee_mult(c.employer_id), 'ate', c.ends_at)
+                                         order by c.created_at desc, c.id desc)
+                          from public.idle_contracts c
+                         where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb),
+    'social', jsonb_build_object(
+      'contratei', (select count(*) from public.idle_contracts c
+                     where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()),
+      'empregos', coalesce((select jsonb_agg(public.idle_employee_mult(c.employer_id) order by c.created_at desc, c.id desc)
+                              from public.idle_contracts c
+                             where c.employee_id = s.user_id and c.created_at <= now() and c.ends_at > now()), '[]'::jsonb)),
+    'hire_price', public.idle_hire_price(s),
+    'muda_em', public.idle_next_change(s),
+    'bonus', jsonb_build_object(
+      'arvore', coalesce((select jsonb_agg(a.no_id order by a.no_id) from public.idle_arvore a where a.user_id = s.user_id), '[]'::jsonb),
+      'conquistas', (select count(*) from public.idle_conquistas c where c.user_id = s.user_id)),
+    'pontos', s.prestige_earned - s.prestige_spent,
+    'pontos_vida', s.prestige_earned,
+    'vendas', s.prestige_count,
+    'recorde', greatest(s.best_rate, v_rate),
+    'pontos_venda', case when s.started then greatest(0, public.idle_prestige_total(v_rate) - s.prestige_earned) else 0 end,
+    'conquistas', coalesce((select jsonb_agg(jsonb_build_object('id', c.conquista_id, 'em', c.ganhou_em)
+                                             order by c.ganhou_em, c.conquista_id)
+                              from public.idle_conquistas c where c.user_id = s.user_id), '[]'::jsonb),
+    'novas', coalesce((select jsonb_agg(c.conquista_id order by c.conquista_id)
+                         from public.idle_conquistas c where c.user_id = s.user_id and c.ganhou_em = now()), '[]'::jsonb),
+    'mapa_mult', public.idle_place_mult(s),
+    'descobertas', coalesce((select jsonb_agg(d.id order by d.id)
+                               from (select distinct c.conquista_id as id
+                                       from public.idle_conquistas c
+                                       join public.idle_cat_conquista k on k.id = c.conquista_id
+                                      where k.escondida) d), '[]'::jsonb));
+end;
+$$;
+
 revoke all on function public.idle_place_mult(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_place_marcos(uuid, int) from public, anon, authenticated;
+revoke all on function public.idle_place_marcos_todos(uuid) from public, anon, authenticated;
 revoke all on function public.idle_lugar_json(public.idle_state, int) from public, anon, authenticated;
 revoke all on function public.idle_rate_at(public.idle_state, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_json(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_place_nivel(int) from public, anon;
 grant execute on function public.idle_place_nivel(int) to authenticated;
 
 -- ===== parte C: produções, pódio, placar da semana, desafio, caderninho, foto de segunda =====
 
--- nome que a pessoa dá à produção: sem espaço nas pontas, de 1 a 30 letras, sem quebra de linha (igual a nomeValido)
+-- nome que a pessoa dá à produção: sem espaço nas pontas, de 1 a 30 letras (emoji conta 1), sem quebra de linha, nem as do
+-- Unicode (U+0085, U+2028, U+2029) (igual a nomeValido)
 create or replace function public.idle_place_nome(p_nome text)
 returns text language plpgsql immutable set search_path = public as $$
 declare v text := btrim(coalesce(p_nome, ''));
 begin
-  if char_length(v) < 1 or char_length(v) > 30 or v ~ '[\r\n]' then
+  if char_length(v) < 1 or char_length(v) > 30 or v ~ '[\r\n\u0085\u2028\u2029]' then
     raise exception 'idle_lugar_nome' using errcode = 'P0001';
   end if;
   return v;
 end;
 $$;
 
--- pódio de sempre: os 3 melhores, uma vez por pessoa (a melhor dela); empate fica com quem fez antes (criado_em, id)
+-- pódio de sempre: os 3 melhores, uma vez por pessoa (a melhor dela); empate no número: maior desempate; depois, quem fez
+-- antes (criado_em, id)
 create or replace function public.idle_place_podio(p_lugar int)
 returns jsonb language sql stable set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'user_id', x.user_id, 'nome', x.nome, 'partes', to_jsonb(x.partes),
                                                'numero', x.numero, 'criado_em', x.criado_em,
                                                'avatar', public.idle_avatar_json(x.user_id))
-                            order by x.numero desc, x.criado_em, x.id), '[]'::jsonb)
+                            order by x.numero desc, x.desempate desc, x.criado_em, x.id), '[]'::jsonb)
     from (select * from (select distinct on (p.user_id) p.*
                            from public.idle_place_prod p where p.lugar = p_lugar
-                          order by p.user_id, p.numero desc, p.criado_em, p.id) melhor
-           order by melhor.numero desc, melhor.criado_em, melhor.id
+                          order by p.user_id, p.numero desc, p.desempate desc, p.criado_em, p.id) melhor
+           order by melhor.numero desc, melhor.desempate desc, melhor.criado_em, melhor.id
            limit 3) x
 $$;
 
@@ -330,24 +412,26 @@ create or replace function public.idle_place_semana(p_lugar int, p_semana date d
 returns jsonb language sql stable set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('user_id', x.user_id, 'numero', x.numero,
                                                'avatar', public.idle_avatar_json(x.user_id))
-                            order by x.numero desc, x.criado_em, x.id), '[]'::jsonb)
+                            order by x.numero desc, x.desempate desc, x.criado_em, x.id), '[]'::jsonb)
     from (select * from (select distinct on (p.user_id) p.*
                            from public.idle_place_prod p
                           where p.lugar = p_lugar
                             and p.criado_em >= (p_semana::timestamp at time zone 'America/Sao_Paulo')
                             and p.criado_em < ((p_semana + 7)::timestamp at time zone 'America/Sao_Paulo')
-                          order by p.user_id, p.numero desc, p.criado_em, p.id) melhor
-           order by melhor.numero desc, melhor.criado_em, melhor.id
+                          order by p.user_id, p.numero desc, p.desempate desc, p.criado_em, p.id) melhor
+           order by melhor.numero desc, melhor.desempate desc, melhor.criado_em, melhor.id
            limit 3) x
 $$;
 
--- grava a produção; se entrou no pódio de sempre, "Tá no pódio". Devolve o id.
-create or replace function public.idle_place_registrar(p_user uuid, p_lugar int, p_nome text, p_partes int[], p_numero double precision)
+-- grava a produção; se entrou no pódio de sempre, "Tá no pódio". Devolve o id. p_quando = quando ela aconteceu (resultado
+-- que só aparece depois entra na semana em que saiu); p_desempate = o segundo critério do lugar (empate no número).
+create or replace function public.idle_place_registrar(p_user uuid, p_lugar int, p_nome text, p_partes int[], p_numero double precision,
+                                                       p_quando timestamptz default now(), p_desempate double precision default 0)
 returns bigint language plpgsql volatile set search_path = public as $$
 declare v_id bigint;
 begin
-  insert into public.idle_place_prod (user_id, lugar, nome, partes, numero)
-  values (p_user, p_lugar, public.idle_place_nome(p_nome), p_partes, p_numero)
+  insert into public.idle_place_prod (user_id, lugar, nome, partes, numero, desempate, criado_em)
+  values (p_user, p_lugar, public.idle_place_nome(p_nome), p_partes, p_numero, coalesce(p_desempate, 0), coalesce(p_quando, now()))
   returning id into v_id;
   if exists (select 1 from jsonb_array_elements(public.idle_place_podio(p_lugar)) e where (e ->> 'id')::bigint = v_id) then
     perform public.idle_ganhar(p_user, 'mapa_podio');
@@ -356,11 +440,12 @@ begin
 end;
 $$;
 
--- sorteio da semana (igual a semanaIdx de games/idle/mapa.ts; teste de paridade)
+-- sorteio da semana (igual a semanaIdx de games/idle/mapa.ts; teste de paridade com valores fixos): h = semana × 2654435761
+-- + lugar × 2246822519 + sal × 3266489917 (mod 2³²) e o índice sai dos bits altos, ⌊h·n / 2³²⌋ (os baixos andavam juntos)
 create or replace function public.idle_place_semana_idx(p_lugar int, p_sal int, p_n int, p_semana date default public.games_week_start())
 returns int language sql immutable set search_path = public as $$
-  select (((((p_semana - date '2026-01-05') / 7)::bigint * 2654435761 + p_lugar::bigint * 40503 + p_sal::bigint * 97)
-           % 4294967296) % greatest(p_n, 1))::int
+  select ((((((p_semana - date '2026-01-05') / 7)::bigint * 2654435761 + p_lugar::bigint * 2246822519 + p_sal::bigint * 3266489917)
+             % 4294967296 + 4294967296) % 4294967296) * greatest(p_n, 1)::bigint / 4294967296)::int
 $$;
 
 -- o desafio desta semana do lugar (linha toda nula se o lugar não tem desafios)
@@ -410,17 +495,62 @@ returns void language sql volatile set search_path = public as $$
   on conflict (user_id, lugar, tipo, a, b) do update set rotulo = excluded.rotulo
 $$;
 
--- anda os lugares abertos até agora (as partes 2 a 4 acrescentam o "when" de cada lugar)
+-- ===== o contrato das partes 2 a 4 (camisetaria = tee/3, copão = cup/4, jantar = din/7; o mesmo em games/idle/mecanicas.ts) =====
+-- * Cada lugar troca só os stubs dele: idle_<x>_avancar(s) e idle_<x>_json(s). Os despachantes abaixo (idle_place_avancar e
+--   idle_place_mecanica_json) já chamam os seis e não mudam mais.
+-- * RPC de mecânica (idle_tee_*, idle_cup_*, idle_din_*): trava + fecha a conta (idle_settle(idle_lock(auth.uid()))), salva
+--   (idle_save) e só então mexe no lugar; devolve idle_json(s) || jsonb_build_object('lugar', idle_lugar_json(s, p_lugar),
+--   'marcos_novos', to_jsonb(idle_place_marcos(s.user_id, p_lugar))). Grant só na RPC; tudo que é ajudante fica revogado
+--   de public, anon e authenticated (o regex de shared/api.ts é só cosmético: quem protege é o revoke).
+-- * Erro novo: o código vai em games/shared/errors.ts (FROM_DB e ERROR_TEXT) e, se a tela precisa buscar o lugar de novo,
+--   em RECARREGA_MAPA de games/idle/main.ts.
+-- * idle_place_mecanica_json e os idle_<x>_json são estáveis: só leem, nunca escrevem (rodam dentro do idle_lugar_json).
+-- * visto_em só é lido dentro de idle_<x>_avancar (null = a pessoa nunca passou). O s que chega é o de antes do idle_lock
+--   marcar o visto_em de agora, então s.visto_em é a última visita antes desta.
+-- * libera(n) (mecanicas.ts) = o que o nível n traz, sendo n o nível que se alcança (nivel + 1).
+-- * idle_place_registrar, idle_place_desafio, idle_place_nota e idle_place_marcos só com o estado travado, a conta fechada e
+--   salva antes. Marcos e conquistas nunca dentro do avancar (ele roda no meio do idle_lock).
+
+-- stubs de cada lugar (as partes 2 a 4 trocam pelo de verdade): andar até agora e o JSON da mecânica
+create or replace function public.idle_tee_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$ begin return; end; $$;
+create or replace function public.idle_cup_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$ begin return; end; $$;
+create or replace function public.idle_din_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$ begin return; end; $$;
+create or replace function public.idle_tee_json(s public.idle_state)
+returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
+create or replace function public.idle_cup_json(s public.idle_state)
+returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
+create or replace function public.idle_din_json(s public.idle_state)
+returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
+
+-- anda os lugares abertos até agora: o de cada lugar só se ele está aberto para a pessoa
 create or replace function public.idle_place_avancar(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$
 begin
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 3) then
+    perform public.idle_tee_avancar(s);
+  end if;
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 4) then
+    perform public.idle_cup_avancar(s);
+  end if;
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = 7) then
+    perform public.idle_din_avancar(s);
+  end if;
   update public.idle_place_state set avancado_em = now() where user_id = s.user_id and avancado_em < now();
 end;
 $$;
 
--- o JSON da mecânica de cada lugar (as partes 2 a 4 acrescentam o de cada lugar)
+-- o JSON da mecânica de cada lugar (depois dos stubs: função sql confere as chamadas quando é criada)
 create or replace function public.idle_place_mecanica_json(s public.idle_state, p_lugar int)
-returns jsonb language sql stable set search_path = public as $$ select null::jsonb $$;
+returns jsonb language sql stable set search_path = public as $$
+  select case p_lugar
+           when 3 then public.idle_tee_json(s)
+           when 4 then public.idle_cup_json(s)
+           when 7 then public.idle_din_json(s)
+         end
+$$;
 
 -- a tela do lugar (substitui a provisória da parte B)
 create or replace function public.idle_lugar_json(s public.idle_state, p_lugar int)
@@ -454,7 +584,9 @@ $$;
 
 create or replace function public.idle_lugar(p_lugar int)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
-declare s public.idle_state;
+declare
+  s       public.idle_state;
+  v_novos int[];
 begin
   if not public.is_member() then
     raise exception 'not_member' using errcode = '42501';
@@ -464,7 +596,9 @@ begin
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
   perform public.idle_save(s);
-  return public.idle_lugar_json(s, p_lugar);
+  -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
+  v_novos := public.idle_place_marcos_todos(s.user_id);
+  return public.idle_lugar_json(s, p_lugar) || jsonb_build_object('marcos_novos', to_jsonb(v_novos));
 end;
 $$;
 
@@ -554,11 +688,18 @@ $$;
 revoke all on function public.idle_place_nome(text) from public, anon, authenticated;
 revoke all on function public.idle_place_podio(int) from public, anon, authenticated;
 revoke all on function public.idle_place_semana(int, date) from public, anon, authenticated;
-revoke all on function public.idle_place_registrar(uuid, int, text, int[], double precision) from public, anon, authenticated;
+revoke all on function public.idle_place_registrar(uuid, int, text, int[], double precision, timestamptz, double precision)
+  from public, anon, authenticated;
 revoke all on function public.idle_place_semana_idx(int, int, int, date) from public, anon, authenticated;
 revoke all on function public.idle_place_desafio_da_semana(int) from public, anon, authenticated;
 revoke all on function public.idle_place_desafio(public.idle_state, int, text, double precision) from public, anon, authenticated;
 revoke all on function public.idle_place_nota(uuid, int, text, int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_tee_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_cup_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_din_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_tee_json(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_cup_json(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_din_json(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_place_avancar(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_place_mecanica_json(public.idle_state, int) from public, anon, authenticated;
 revoke all on function public.idle_lugar_json(public.idle_state, int) from public, anon, authenticated;

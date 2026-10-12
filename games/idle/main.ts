@@ -127,17 +127,19 @@ let lugarAberto: number | null = null;
 let lugar: LugarEstado | null = null;
 let nomesLugar = new Map<string, string>(); // user_id -> nome de quem aparece no pódio e na semana
 let timerMapa: ReturnType<typeof setInterval> | null = null;
-const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked'];
+const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked', 'idle_cant_afford'];
 async function carregarMapa() {
   if (!mapaAberto) return;
   try {
     if (lugarAberto === null) {
       const m = await api.idleMapa();
+      avisarMarcos(m.marcos_novos, true); // ganhou de qualquer jeito: avisa mesmo se a tela já mudou
       if (!mapaAberto || lugarAberto !== null) return; // fechou o mapa ou entrou num lugar enquanto buscava
       mapa = m;
     } else {
       const id = lugarAberto;
       const l = await api.idleLugar(id);
+      avisarMarcos(l.marcos_novos, true);
       if (!mapaAberto || lugarAberto !== id) return; // saiu do lugar enquanto buscava
       lugar = l;
       await carregarNomesLugar(l);
@@ -171,6 +173,15 @@ const avisoMarcos = (ids: number[]): string | null => {
   const total = ids.reduce((t, id) => t + (MARCOS.find((m) => m.id === id)?.bonus ?? 0), 0);
   return ids.length ? `Marco: +${Math.round(total * 100)}% de produção` : null;
 };
+/** Marcos que chegaram (subir nível, ação da mecânica ou a mecânica andando sozinha no idle_lugar/idle_mapa): avisa e toca.
+ *  `recarregarEstado`: a resposta não trouxe o estado da empresa (idle_lugar/idle_mapa), então busca a taxa nova. */
+function avisarMarcos(ids: number[] | undefined, recarregarEstado = false) {
+  const marco = avisoMarcos(ids ?? []);
+  if (!marco) return;
+  aviso = marco;
+  audio.tocar('conquista');
+  if (recarregarEstado) void recarregar().catch(() => undefined);
+}
 let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;
 let buscandoBolsa = false;
@@ -452,11 +463,7 @@ const tela = criarTela(document.getElementById('app')!, {
     }
     aplicar(r);
     audio.tocar('compra');
-    const marco = avisoMarcos(r.marcos_novos);
-    if (marco) {
-      aviso = marco;
-      audio.tocar('conquista');
-    }
+    avisarMarcos(r.marcos_novos);
   }),
   lugarAcao: (fn, args) => void guard(async () => {
     const r = await api.idleLugarAcao(fn, args);
@@ -466,6 +473,7 @@ const tela = criarTela(document.getElementById('app')!, {
     }
     aplicar(r);
     audio.tocar('compra');
+    avisarMarcos(r.marcos_novos);
   }),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);

@@ -28,6 +28,8 @@ const num = (x: number, casas = 2) => (Math.round(x * 10 ** casas) / 10 ** casas
 const pct = (x: number) => `${num(x * 100, 1)}%`;
 const vezes = (x: number) => `×${num(x)}`;
 const hortaProd = (s: IdleState) => s.horta_bonus?.producao ?? 0;
+/** O multiplicador do Mapa do rolê que o banco já pôs na taxa (sem lugar: 1). */
+export const multMapaDe = (s: IdleState) => s.mapa_mult ?? 1;
 /** "· 2 min da sua produção" (sem produção ainda, nada). */
 const emTempo = (s: IdleState, preco: number) => (s.rate > 0 ? ` · ${tempoDeProducao(preco / s.rate)} da sua produção` : '');
 
@@ -45,11 +47,11 @@ function partesGerador(s: IdleState, gid: number) {
   return { dobras, sinergia, est };
 }
 
-/** Quanto rende uma unidade de cada gerador agora (com tudo, horta inclusa). */
-function porUnidade(s: IdleState) {
+/** Quanto rende uma unidade de cada gerador agora (com tudo, horta e Mapa do rolê inclusos). */
+export function porUnidade(s: IdleState) {
   const f = fatores(catalogo, s);
   const agora = Date.parse(s.server_now);
-  return f.porGerador.map((x, i) => x * f.global * (1 + hortaProd(s)) * multGerador(s, i + 1, Number.isFinite(agora) ? agora : Date.now()));
+  return f.porGerador.map((x, i) => x * f.global * (1 + hortaProd(s)) * multGerador(s, i + 1, Number.isFinite(agora) ? agora : Date.now()) * multMapaDe(s));
 }
 
 export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Dica {
@@ -121,6 +123,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   mult('Conquistas e árvore', legado);
   mult('Horta', 1 + hortaProd(s));
   mult('Convidados', multGerador(s, 0, agoraMs));
+  mult('Mapa do rolê', multMapaDe(s));
   if (s.boost_until && Date.parse(s.boost_until) > agoraMs) linhas.push({ texto: 'Agora: ×5 do Investidor', tom: 'bom' });
   const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
