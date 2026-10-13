@@ -2,7 +2,7 @@
 -- Parte A: o catálogo escondido, as coleções, as contas (espelho de games/idle/camisetaria.ts, com teste de paridade em
 -- games/test/idleCamisetaria.test.ts), lançar uma coleção e o JSON da tela. A parte B troca idle_tee_avancar e
 -- idle_tee_depois (venda, revelação, caderninho, desafios) e traz encerrar e o relatório.
--- Depende da 0057 (a moldura: idle_place_*, os stubs idle_tee_* e o contrato das partes 2 a 4).
+-- Depende da 0065 (a moldura: idle_place_*, os stubs idle_tee_* e o contrato das partes 2 a 4).
 
 -- ===== catálogo (igual a games/idle/camisetaria.ts; escondido de quem joga: a tela usa o TS) =====
 create table if not exists public.idle_tee_cat_tema (id int primary key, nome text not null, vibes text[] not null, nivel int not null);
@@ -403,7 +403,7 @@ begin
 end;
 $$;
 
--- ===== o JSON da tela (troca o stub da 0057; estável: só lê) =====
+-- ===== o JSON da tela (troca o stub da 0065; estável: só lê) =====
 -- ativa = a coleção em produção ou à venda; notas, média, procura, %, rótulo e peça × tema só depois de pronta.
 -- ultima = a última revelada (a que ficou pronta por último), com tudo: a tela mostra a revelação dela quando a pessoa não
 -- viu (ficou pronta e acabou com ela longe), fechando com quanto vendeu, a receita e o saldão (o padrão das partes 3 e 4).

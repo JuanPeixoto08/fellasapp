@@ -1,4 +1,4 @@
-// Camisetaria (0058, lugar 3 do Mapa do rolê): migrações reais no PGlite. As contas do banco batem com camisetaria.ts
+// Camisetaria (0066, lugar 3 do Mapa do rolê): migrações reais no PGlite. As contas do banco batem com camisetaria.ts
 // (paridade com semente fixa); o relógio fica parado numa quarta à tarde (o now() do PGlite segue o Date falso).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

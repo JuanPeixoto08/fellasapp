@@ -1,7 +1,7 @@
 // Mapa do rolê: o registro das mecânicas de cada lugar. A moldura (lugarTela.ts) desenha o cabeçalho, o pódio, a semana,
 // o desafio e os marcos; o miolo de cada lugar vem daqui. As partes 2 a 4 preenchem (camisetaria = 3, copão = 4, jantar = 7).
 //
-// O contrato das partes 2 a 4 (o mesmo bloco está na 0057, junto dos despachantes):
+// O contrato das partes 2 a 4 (o mesmo bloco está na 0065, junto dos despachantes):
 // * No banco, cada lugar só troca os stubs dele: idle_tee_* (3), idle_cup_* (4), idle_din_* (7) — idle_<x>_avancar(s),
 //   idle_<x>_depois(s) e idle_<x>_json(s). idle_place_avancar, idle_place_depois e idle_place_mecanica_json já chamam os nove.
 // * O que precisa da conta fechada (registrar, caderninho, desafio, conquistas) vai no idle_<x>_depois, que devolve o s (o

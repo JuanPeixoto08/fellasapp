@@ -33,10 +33,10 @@ import m60 from '../../supabase/migrations/0060_fellas_inc_catalogo_arvore.sql?r
 import m61 from '../../supabase/migrations/0061_fellas_inc_arvore_dourados_horta.sql?raw';
 import m62 from '../../supabase/migrations/0062_fellas_inc_oportunidades_empilham.sql?raw';
 import m63 from '../../supabase/migrations/0063_fellas_inc_dobro_e_orbita.sql?raw';
-import m56 from '../../supabase/migrations/0056_fellas_inc_catalogo_mapa.sql?raw';
-import m57 from '../../supabase/migrations/0057_fellas_inc_mapa.sql?raw';
-import m58 from '../../supabase/migrations/0058_fellas_inc_camisetaria.sql?raw';
-import m59 from '../../supabase/migrations/0059_fellas_inc_copao.sql?raw';
+import m64 from '../../supabase/migrations/0064_fellas_inc_catalogo_mapa.sql?raw';
+import m65 from '../../supabase/migrations/0065_fellas_inc_mapa.sql?raw';
+import m66 from '../../supabase/migrations/0066_fellas_inc_camisetaria.sql?raw';
+import m67 from '../../supabase/migrations/0067_fellas_inc_copao.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 
@@ -50,7 +50,7 @@ export const FRIENDS: [string, string, number][] = [
 export const ready = (async () => {
   const db = new PGlite();
   await db.exec(SKELETON);
-  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m60, m61, m62, m63, m56, m57, m58, m59]) await db.exec(m);
+  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m60, m61, m62, m63, m64, m65, m66, m67]) await db.exec(m);
   // lugares de mentira pro ?mock não ficar vazio (os de verdade só no banco, carregados fora do repositório)
   await db.exec(`insert into public.idle_places (id, nome, frase, x, y)
     select g, 'Lugar ' || g, 'Um lugar de mentira pro ?mock.', 30 + ((g - 1) % 3) * 50, 18 + ((g - 1) / 3) * 30

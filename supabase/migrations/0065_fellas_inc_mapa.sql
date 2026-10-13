@@ -1,6 +1,6 @@
 -- fellasapp: Fellas Inc., Mapa do rolê, a moldura (spec 2026-10-12-fellas-inc-mapa-do-role-design.md).
 -- Os lugares de verdade (nome, frase, ícone, mapa, posição) NÃO estão aqui: entram por um SQL fora do repositório.
--- Depende da 0056 (estratégias Marca forte/Monopólio e as conquistas mapa_*).
+-- Depende da 0064 (estratégias Marca forte/Monopólio e as conquistas mapa_*).
 
 -- ===== catálogo (igual a games/idle/mapa.ts; teste de paridade em idleMapa.test.ts) =====
 create table if not exists public.idle_cat_place (
@@ -8,7 +8,7 @@ create table if not exists public.idle_cat_place (
   lancado boolean not null, custo_base double precision not null, moeda text, numero text,
   moeda_inicial double precision not null default 0
 );
--- (a tabela nasce aqui, na 0057 ainda não aplicada; moeda_inicial = a moeda com que o lugar abre)
+-- (a tabela nasce aqui, na 0065 ainda não aplicada; moeda_inicial = a moeda com que o lugar abre)
 create table if not exists public.idle_cat_place_marco (
   id int primary key, lugar int not null, tipo text not null check (tipo in ('nivel', 'lendario', 'fas', 'volume')),
   valor double precision, bonus double precision not null
@@ -325,7 +325,7 @@ returns double precision language sql stable set search_path = public as $$
        * public.idle_place_mult(s)
 $$;
 
--- o estado que toda função devolve (o da 0051) + o multiplicador do Mapa do rolê (a página multiplica o "cada" e a caixinha)
+-- o estado que toda função devolve (o da 0062) + o multiplicador do Mapa do rolê (a página multiplica o "cada" e a caixinha)
 -- e quantos lugares a pessoa tem abertos (a porta do Mapa não fica trancada pra quem vendeu a startup e tem lugar)
 create or replace function public.idle_json(s public.idle_state)
 returns jsonb language plpgsql stable set search_path = public as $$
@@ -334,8 +334,10 @@ begin
   return jsonb_build_object(
     'user_id', s.user_id, 'week_start', s.week_start, 'started', s.started, 'valuation', s.valuation,
     'rate', v_rate, 'generators', to_jsonb(s.generators), 'upgrades', to_jsonb(s.upgrades),
-    'strategies', to_jsonb(s.strategies), 'era', public.idle_era(s.generators), 'boost_until', s.boost_until,
-    'half_price', s.half_price, 'opp_claimed', to_jsonb(s.opp_claimed),
+    'strategies', to_jsonb(s.strategies), 'era', public.idle_era(s.generators),
+    'boosts', to_jsonb(array(select b from unnest(s.boost_ate) b where b > now() order by b)),
+    'boost_until', (select max(b) from unnest(s.boost_ate) b where b > now()), -- a página velha lê só este
+    'meias', s.meias, 'half_price', s.meias > 0, 'opp_claimed', to_jsonb(s.opp_claimed),
     'promo_ate', case when s.promo_ate > now() then s.promo_ate end,
     'viral', to_jsonb(array(select v from unnest(s.viral_ate) v where v > now() order by v)),
     'convidados', public.idle_conv_json(s),
@@ -706,7 +708,7 @@ begin
            where s.started and s.week_start < v_new
            order by 3 desc, 2 desc, 1
            limit 3) x;
-  -- Mapa do rolê: o 1º da semana em cada lugar vira o dono do pedaço da semana seguinte (0057)
+  -- Mapa do rolê: o 1º da semana em cada lugar vira o dono do pedaço da semana seguinte (0065)
   insert into public.idle_place_weeks (week_start, lugar, dono_id, numero)
   select v_old, c.id, (sem.x -> 0 ->> 'user_id')::uuid, (sem.x -> 0 ->> 'numero')::double precision
     from public.idle_cat_place c
@@ -755,7 +757,7 @@ begin
   on conflict (user_id) do update set user_id = excluded.user_id
   returning * into s;
   perform public.idle_horta_avancar(s); -- a horta anda até agora antes de qualquer conta
-  perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0057)
+  perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0065)
   -- só quando é a própria pessoa (travada por outro ou pelo cron não conta); o s devolvido fica com o visto_em antigo
   update public.idle_state set visto_em = now() where user_id = p_user and p_user = auth.uid();
   return s;

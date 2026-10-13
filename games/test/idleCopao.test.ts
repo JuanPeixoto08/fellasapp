@@ -1,4 +1,4 @@
-// Copão (0059, lugar 4 do Mapa do rolê), parte A: migrações reais no PGlite. As contas do banco batem com copao.ts (a nota
+// Copão (0067, lugar 4 do Mapa do rolê), parte A: migrações reais no PGlite. As contas do banco batem com copao.ts (a nota
 // e as partes dela bit a bit; o que é decimal com erro relativo < 1e-12) e as RPCs de pôr, tirar e escolher o DJ. O relógio
 // fica parado numa quarta às 15h de Brasília (o now() do PGlite segue o Date falso).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
