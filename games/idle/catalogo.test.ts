@@ -69,18 +69,22 @@ describe('catálogo', () => {
     expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });
     expect(catalogo.conquistas.some((x) => x.id === 104)).toBe(false); // o limaumdoc saiu; o id não é reaproveitado
   });
-  it('árvore: a raiz e 5 ramos de 5 nós; custos 1 · 2 · 4 · 8 · 15 · 30; cada nó exige o anterior (o 1º, a raiz)', () => {
+  it('árvore: a raiz e 6 ramos de 5 nós; custos 1 · 2 · 4 · 8 · 15 · 30; cada nó exige o anterior (o 1º, a raiz)', () => {
     const a = catalogo.arvore;
-    expect(a).toHaveLength(26);
+    expect(a).toHaveLength(31);
     expect(a[0]).toMatchObject({ id: 1, ramo: 0, nome: 'Virou MEI', custo: 1, requer: null, tipo: 'producao', valor: 1.05 });
-    for (let r = 1; r <= 5; r++) {
+    for (let r = 1; r <= 6; r++) {
       const ramo = a.filter((n) => n.ramo === r);
       expect(ramo.map((n) => n.id)).toEqual([1, 2, 3, 4, 5].map((p) => r * 10 + p));
       expect(ramo.map((n) => n.custo)).toEqual([2, 4, 8, 15, 30]);
       expect(ramo.map((n) => n.requer)).toEqual([1, r * 10 + 1, r * 10 + 2, r * 10 + 3, r * 10 + 4]);
     }
-    expect(a.reduce((t, n) => t + n.custo, 0)).toBe(296);
-    expect(a.filter((n) => n.ramo === 4).map((n) => n.valor)).toEqual([12, 16, 24, 36, 48]);
+    expect(a.reduce((t, n) => t + n.custo, 0)).toBe(355);
+    expect(a.filter((n) => n.ramo === 4).map((n) => [n.tipo, n.valor])).toEqual([
+      ['dourado_freq', 1.5], ['dourado_tela', 24], ['dourado_investidor', 2], ['dourado_duracao', 2], ['dourado_freq', 2]]);
+    expect(a.filter((n) => n.ramo === 6).map((n) => [n.tipo, n.valor])).toEqual([
+      ['horta_amadurece', 0.75], ['horta_vida', 1.5], ['horta_cruza', 2], ['horta_mult', 1.5], ['morango_chance', 5]]);
+    expect(a.some((n) => (n.tipo as string) === 'teto')).toBe(false);
     for (const n of a) expect(n.nome.length, n.nome).toBeLessThanOrEqual(30);
   });
   it('montarCatalogo usa os parâmetros', () => {
@@ -123,7 +127,7 @@ describe('catálogo no banco (migração mais recente)', () => {
   });
   it('a árvore entra no SQL gerado', () => {
     expect(catalogoSql()).toContain('insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values');
-    expect(catalogoSql()).toContain("(41, 4, 1, 'Soneca pós-almoço', 'A empresa rende até 12h com o jogo fechado.', 2, 'teto', 12, 1)");
+    expect(catalogoSql()).toContain("(41, 4, 1, 'Pé de coelho', 'Eventos aparecem 50% mais vezes.', 2, 'dourado_freq', 1.5, 1)");
     expect(catalogoSql()).toContain(`(51, 5, 1, 'Placa de "Precisa-se"', 'Contratar custa 25% menos.', 2, 'contrato_preco', 0.75, 1)`);
   });
   it('frase da sinergia 2006 usa vírgula decimal (pt-BR)', () => {

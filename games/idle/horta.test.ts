@@ -71,6 +71,15 @@ describe('os bônus', () => {
     const muitos = Array.from({ length: 36 }, (_, i) => ({ canteiro: i, especie: 7, inicioMs: agora - 7 * H }));
     expect(bonusHorta(muitos, 6, agora).geradores).toBe(0.5);
   });
+  it('Agrotóxico liberado (×1,5): tudo cresce, o −1% do Coentro também, e os descontos seguem travados em 50%', () => {
+    const b = bonusHorta([madura(0, 1), madura(1, 1), madura(6, 5)], 2, agora, 1.5);
+    expect(b.producao).toBeCloseTo(0.015, 9);
+    expect(b.melhorias).toBeCloseTo(0.045, 9);
+    const muitos = Array.from({ length: 36 }, (_, i) => ({ canteiro: i, especie: 7, inicioMs: agora - 7 * H }));
+    expect(bonusHorta(muitos, 6, agora, 1.5).geradores).toBe(0.5);
+    const poucos = Array.from({ length: 10 }, (_, i) => ({ canteiro: i, especie: 2, inicioMs: agora - 2 * H }));
+    expect(bonusHorta(poucos, 6, agora, 1.5).geradores).toBeCloseTo(0.15, 9);
+  });
   it('resumo em texto', () => {
     expect(resumoBonus({ producao: 0.05, geradores: 0.03, melhorias: 0, oportunidades: 0.05 })).toBe('Produção +5% · Geradores 3% mais baratos · Oportunidades +5%');
     expect(resumoBonus({ producao: -0.01, geradores: 0, melhorias: 0.03, oportunidades: 0 })).toBe('Produção −1% · Melhorias 3% mais baratas');

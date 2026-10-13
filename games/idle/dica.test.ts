@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
-  dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
+  dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
   dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
 } from './dica';
 import { caderno } from './camisetaria';
@@ -135,11 +135,11 @@ describe('caixinha da produção (o F$/s do topo)', () => {
   it('Investidor e Viralizou valendo aparecem como "agora"', () => {
     const agora = Date.parse('2026-10-12T12:00:00.000Z');
     const s = comTaxa({
-      generators: gens({ 1: 1 }), boost_until: '2026-10-12T12:00:30.000Z',
+      generators: gens({ 1: 1 }), boost_until: '2026-10-12T12:00:40.000Z', boosts: ['2026-10-12T12:00:30.000Z', '2026-10-12T12:00:40.000Z'],
       viral: ['2026-10-12T12:00:40.000Z', '2026-10-12T12:00:50.000Z', '2026-10-12T11:59:00.000Z'],
     });
     const t = textos(dicaProducao(s, agora));
-    expect(t).toContain('Agora: ×5 do Investidor');
+    expect(t).toContain('Agora: ×25 das oportunidades');
     expect(t).toContain('Agora: ×100 do Viralizou');
   });
 });
@@ -241,5 +241,37 @@ describe('caixinhas da camisetaria (bancada e caderninho)', () => {
   it('relatório: o que mostra, o preço e quanto falta', () => {
     expect(dicaTeeRelatorio(4, 50, 80)).toBe('Mostra pra sempre o foco ideal do Grafite. Custa 50 cupons.');
     expect(dicaTeeRelatorio(4, 67.5, 30)).toBe('Mostra pra sempre o foco ideal do Grafite. Custa 68 cupons. Faltam 38.');
+  });
+});
+
+describe('caixinha da oportunidade (0062: tudo empilha)', () => {
+  const agora = Date.parse('2026-10-12T12:00:00.000Z');
+  const fim = '2026-10-12T12:00:30.000Z';
+  it('×5: sem nenhum no ar diz que empilha; com dois no ar, pegar agora deixa ×125', () => {
+    expect(textos(dicaOportunidade(estado(), 1, agora)!)).toEqual(['Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo']);
+    expect(textos(dicaOportunidade(estado({ boosts: [fim, fim] }), 1, agora)!)).toEqual(['Agora: ×25 no ar. Pegando esta, vira ×125']);
+  });
+  it('metade: sem nenhuma guardada diz que empilha; com uma, as próximas 2 compras', () => {
+    expect(textos(dicaOportunidade(estado(), 2, agora)!)).toEqual(['Empilha: cada uma guardada vale uma compra pela metade']);
+    expect(textos(dicaOportunidade(estado({ meias: 1, half_price: true }), 2, agora)!)).toEqual(['Você tem 1 guardada. Pegando esta, as próximas 2 compras saem pela metade']);
+    expect(textos(dicaOportunidade(estado({ meias: 3, half_price: true }), 2, agora)!)).toEqual(['Você tem 3 guardadas. Pegando esta, as próximas 4 compras saem pela metade']);
+  });
+  it('os 15 minutos de produção não têm caixinha (o texto da linha já diz tudo)', () => {
+    expect(dicaOportunidade(estado(), 0, agora)).toBeNull();
+  });
+});
+
+describe('caixinha da oportunidade com "rendem o dobro" (Viralizar / Xepa: conta como 2 pegas)', () => {
+  const agora = Date.parse('2026-10-12T12:00:00.000Z');
+  const g = Array(30).fill(0);
+  g[12] = 1;
+  const viralizar = (x: Partial<IdleState> = {}) => estado({ era: 3, generators: g, strategies: [0, 0, -1, -1], ...x });
+  it('×5: conta como 2 de uma vez (×25); com um no ar, pegar vira ×125', () => {
+    expect(textos(dicaOportunidade(viralizar(), 1, agora)!)).toEqual(['Rendem o dobro: conta como 2 de uma vez (×25)']);
+    expect(textos(dicaOportunidade(viralizar({ boosts: ['2026-10-12T12:00:30.000Z'] }), 1, agora)!)).toEqual(['Agora: ×5 no ar. Pegando esta, vira ×125']);
+  });
+  it('metade: guarda 2 de uma vez; com 1 guardada, as próximas 3', () => {
+    expect(textos(dicaOportunidade(viralizar(), 2, agora)!)).toEqual(['Rendem o dobro: guarda 2 compras pela metade de uma vez']);
+    expect(textos(dicaOportunidade(viralizar({ meias: 1, half_price: true }), 2, agora)!)).toEqual(['Você tem 1 guardada. Pegando esta, as próximas 3 compras saem pela metade']);
   });
 });

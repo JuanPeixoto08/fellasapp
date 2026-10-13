@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { douradoEm, douradosEntre, JANELA_S, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
+import { douradoEm, douradosEntre, ganhoInvestidor, JANELA_S, janelaS, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -69,6 +69,10 @@ describe('selos e textos', () => {
     expect(selosBonus({ promo_ate: null, viral: [em(15), em(55)] }, T)).toEqual([{ texto: '×100 · 0:15', ouro: true }]);
     expect(selosBonus({ promo_ate: null, viral: [em(5), em(15), em(55)] }, T)).toEqual([{ texto: '×1.000 · 0:05', ouro: true }]);
     expect(selosBonus({ promo_ate: em(21), viral: [em(-3)] }, T)).toEqual([{ texto: 'Metade · 0:21', ouro: false }]);
+    // os ×5 da oportunidade empilhados (0062): ×5, ×25…, até o primeiro acabar
+    expect(selosBonus({ promo_ate: null, viral: [], boosts: [em(42)] }, T)).toEqual([{ texto: '×5 · 0:42', ouro: false }]);
+    expect(selosBonus({ promo_ate: null, viral: [em(15)], boosts: [em(55), em(30), em(-1)] }, T)).toEqual([
+      { texto: '×10 · 0:15', ouro: false }, { texto: '×25 · 0:30', ouro: true }]);
   });
   it('o texto que sobe ao pegar', () => {
     expect(textoPegou(0, { ganho: 1_234_567, viral: 0 })).toBe('+F$ 1,23 mi');
@@ -76,6 +80,18 @@ describe('selos e textos', () => {
     expect(textoPegou(2, { ganho: 0, viral: 1 })).toBe('Viralizou! ×10 por 1 min');
     expect(textoPegou(3, { ganho: 0, viral: 2 })).toBe('×100!');
     expect(textoPegou(2, { ganho: 0, viral: 3 })).toBe('×1.000!');
+  });
+  it('o que o Investidor paga (igual a idle_dourado_pegar): 20 min da produção × Investidor anjo × (1 + oportunidades da horta)', () => {
+    expect(ganhoInvestidor(2, 1, 0)).toBe(2400);
+    expect(ganhoInvestidor(2, 2, 0)).toBe(4800);
+    expect(ganhoInvestidor(2, 2, 0.075)).toBeCloseTo(4800 * 1.075, 9); // Inhame (+5%) com o Agrotóxico (×1,5)
+  });
+  it('com o Hype (duração 2): Promoção por 1 min e Viralizou por 2 min; Olho de lince: 24 s na tela', () => {
+    expect(textoPegou(1, { ganho: 0, viral: 1, duracao: 2 })).toBe('Promoção! Tudo pela metade por 1 min');
+    expect(textoPegou(2, { ganho: 0, viral: 1, duracao: 2 })).toBe('Viralizou! ×10 por 2 min');
+    expect(janelaS(0, 24)).toBe(24);
+    expect(janelaS(1, 24)).toBe(12);
+    expect(janelaS(1)).toBe(6);
   });
 });
 

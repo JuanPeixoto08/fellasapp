@@ -31,6 +31,16 @@ describe('a sorte (paridade com dourados.ts)', () => {
       expect(sql).toEqual(ts);
     }
   });
+  it('com a árvore (freq 2) e o Gemaplys (0,5): os mesmos segundos que douradoEm(u, s, gema + freq − 1)', async () => {
+    const ini = 1_760_000_000;
+    const sql = await q<{ s: string }>(
+      `select s::text from generate_series($2::bigint, $3::bigint) s where public.idle_dourado($1::uuid, s, 1.5) is not null order by s`,
+      [A, ini, ini + 30_000 - 1]);
+    const ts: string[] = [];
+    for (let s = ini; s < ini + 30_000; s++) if (douradoEm(A, s, 1.5) !== null) ts.push(String(s));
+    expect(ts.length).toBeGreaterThan(90); // ~2,5/600 × 30 000 = 125
+    expect(sql.map((x) => x.s)).toEqual(ts);
+  });
 });
 
 // ---------- pegar e os efeitos (a sorte do teste vem de uma tabela) ----------
@@ -109,7 +119,7 @@ describe('pegar um evento', () => {
   it('Promoção: 30 s de compras pela metade; a meia-preço da Caixinha fica guardada', async () => {
     const seg = await agoraSeg();
     await evento(seg, 1);
-    await q('update public.idle_state set half_price = true where user_id = $1', [A]);
+    await q('update public.idle_state set meias = 1 where user_id = $1', [A]);
     const s = await pegar(seg);
     const dur = Date.parse(s.promo_ate!) - Date.parse((await q<{ n: string }>('select now()::text as n'))[0].n);
     expect(dur).toBeGreaterThan(25_000);
@@ -147,7 +157,8 @@ describe('pegar um evento', () => {
   it('a conta: ×10 por Viralizou ativo, sem teto (três = ×1000); ×50 com o ×5 da oportunidade', async () => {
     const r = await taxa();
     const ganho = async (viral: string, boost = 'null') => {
-      await q(`update public.idle_state set settled_at = now() - interval '100 seconds', viral_ate = ${viral}, boost_until = ${boost} where user_id = $1`, [A]);
+      const ate = boost === 'null' ? "'{}'" : `array[${boost}]`; // a lista dos ×5 (0062)
+      await q(`update public.idle_state set settled_at = now() - interval '100 seconds', viral_ate = ${viral}, boost_ate = ${ate} where user_id = $1`, [A]);
       return (await q<{ v: number }>('select (public.idle_settle(s, now())).valuation - s.valuation as v from public.idle_state s where user_id = $1', [A]))[0].v / r;
     };
     const perto = (v: number, alvo: number) => expect(Math.abs(v - alvo)).toBeLessThan(1);
@@ -171,6 +182,51 @@ describe('pegar um evento', () => {
     await q(`update public.idle_state set viral_ate = array[now() - interval '5 seconds', now() + interval '30 seconds'] where user_id = $1`, [A]);
     const s = await t.rpc<Json>('idle_open');
     expect(s.viral).toHaveLength(1);
+  });
+  // ---------- ramo Dourados da árvore (0061) ----------
+  const ter = (nos: number[]) => q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, nos]);
+  const agoraMs = async () => Date.parse((await q<{ n: string }>('select now()::text as n'))[0].n);
+  it('Investidor anjo: 40 minutos da produção', async () => {
+    await ter([1, 41, 42, 43]);
+    const seg = await agoraSeg();
+    await evento(seg, 0);
+    const r = await taxa();
+    const antes = (await linha()).valuation;
+    expect((await pegar(seg)).valuation - antes).toBeCloseTo(r * 2400, 3);
+  });
+  it('Olho de lince: pega aos 20 s; sem ele, aos 20 s já foi', async () => {
+    const seg = await agoraSeg();
+    await evento(seg - 20, 1);
+    await expect(pegar(seg - 20)).rejects.toThrow(/idle_dourado_gone/);
+    await ter([1, 41, 42]);
+    await expect(pegar(seg - 20)).resolves.toBeTruthy();
+    await evento(seg - 28, 1);
+    await expect(pegar(seg - 28)).rejects.toThrow(/idle_dourado_gone/); // 24 s + 3 de folga
+  });
+  it('Hype: Promoção de 60 s e Viralizou de 120 s', async () => {
+    await ter([1, 41, 42, 43, 44]);
+    const seg = await agoraSeg();
+    await evento(seg, 1);
+    const p = await pegar(seg);
+    const promo = Date.parse(p.promo_ate!) - (await agoraMs());
+    expect(promo).toBeGreaterThan(55_000);
+    expect(promo).toBeLessThan(65_000);
+    await evento(seg + 1, 2);
+    const v = await pegar(seg + 1);
+    const viral = Date.parse(v.viral.at(-1)!) - (await agoraMs());
+    expect(viral).toBeGreaterThan(115_000);
+    expect(viral).toBeLessThan(125_000);
+  });
+  it('Hype comprado com um Viralizou no ar não estica o que já foi pego nem refaz a conta pra trás', async () => {
+    const seg = await agoraSeg();
+    await evento(seg, 2);
+    await pegar(seg); // acaba em 60 s
+    await q('update public.idle_state set settled_at = now() where user_id = $1', [A]); // a conta fechada na hora de pegar
+    await ter([1, 41, 42, 43, 44]);
+    const r = await taxa();
+    const [{ v }] = await q<{ v: number }>(
+      `select (public.idle_settle(s, s.settled_at + interval '90 seconds')).valuation - s.valuation as v from public.idle_state s where user_id = $1`, [A]);
+    expect(Math.abs(v / r - (10 * 60 + 30))).toBeLessThan(2); // ×10 até o fim de antes (60 s), ×1 depois
   });
   it('só membro com sessão pega', async () => {
     const seg = await agoraSeg();

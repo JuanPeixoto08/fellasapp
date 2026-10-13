@@ -110,7 +110,7 @@ export function situacao(no: No, arvore: readonly number[]): SituacaoNo {
   return no.requer === null || arvore.includes(no.requer) ? 'disponivel' : 'trancado';
 }
 
-/** A raiz e os 5 ramos, na ordem, cada um com os seus nós. */
+/** A raiz e os 6 ramos, na ordem, cada um com os seus nós. */
 export const RAMOS_ARVORE: { ramo: number; nome: string; nos: No[] }[] = RAMOS.map((nome, ramo) => ({
   ramo, nome, nos: catalogo.arvore.filter((n) => n.ramo === ramo),
 }));
@@ -121,16 +121,17 @@ export function falta(no: No): string {
   return antes ? `Libera com ${antes.nome}` : '';
 }
 
-/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó. A raiz embaixo; cada ramo sobe abrindo, como a
- *  copa de uma árvore. Aprovado no mockup (layout-v2.html). Mudar aqui = conferir o teste de distância. */
-export const MUNDO_ARVORE = { largura: 400, altura: 540 } as const;
+/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó. A raiz embaixo; os 6 ramos sobem abrindo, 3 de
+ *  cada lado, como a copa de uma árvore (a Horta, de 13/10, é a da ponta direita). Mudar aqui = conferir o teste de distância. */
+export const MUNDO_ARVORE = { largura: 480, altura: 540 } as const;
 export const POSICOES_ARVORE: Readonly<Record<number, readonly [number, number]>> = {
-  1: [200, 510],
-  11: [80, 450], 12: [52, 372], 13: [44, 288], 14: [48, 204], 15: [64, 122],
-  21: [134, 406], 22: [120, 324], 23: [116, 242], 24: [122, 160], 25: [136, 80],
-  31: [200, 378], 32: [200, 302], 33: [200, 222], 34: [200, 142], 35: [200, 56],
-  41: [266, 406], 42: [280, 324], 43: [284, 242], 44: [278, 160], 45: [264, 80],
-  51: [320, 450], 52: [348, 372], 53: [356, 288], 54: [352, 204], 55: [336, 122],
+  1: [240, 510],
+  11: [92, 462], 12: [62, 388], 13: [48, 308], 14: [50, 226], 15: [62, 144],
+  21: [150, 432], 22: [128, 352], 23: [118, 270], 24: [118, 188], 25: [126, 106],
+  31: [206, 396], 32: [196, 316], 33: [190, 234], 34: [190, 152], 35: [190, 70],
+  41: [274, 396], 42: [284, 316], 43: [290, 234], 44: [290, 152], 45: [290, 70],
+  51: [330, 432], 52: [352, 352], 53: [362, 270], 54: [362, 188], 55: [354, 106],
+  61: [388, 462], 62: [418, 388], 63: [432, 308], 64: [430, 226], 65: [418, 144],
 };
 
 /** O nome de cada ramo, 44 unidades acima do 5º nó dele. */
@@ -141,10 +142,11 @@ export const ROTULOS_ARVORE: readonly { nome: string; x: number; y: number }[] =
     return { nome: r.nome, x, y: y - 44 };
   });
 
-/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,85 (abaixo disso arrasta) e 1,4. */
+/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,8 (abaixo disso arrasta; 480 × 0,8 cabe nos 390 do
+ *  celular) e 1,4. */
 export function escalaArvore(largura: number, altura: number): number {
   const s = Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura);
-  return Math.min(1.4, Math.max(0.85, s));
+  return Math.min(1.4, Math.max(0.8, s));
 }
 
 /** A situação de um nó na tela cheia: o "disponível" se divide em dá pra comprar agora e falta ponto. */

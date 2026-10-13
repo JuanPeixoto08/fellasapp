@@ -119,6 +119,9 @@ export type IdleState = {
   user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
+  /** Oportunidades que empilham (0062): os fins dos ×5 no ar e quantas compras pela metade estão guardadas. Faltam na
+   *  resposta do banco de antes da 0062 (aí valem boost_until e half_price). */
+  boosts?: string[]; meias?: number;
   /** Eventos na tela (0045): fim da Promoção relâmpago (null = não está valendo) e os fins dos Viralizou ativos. */
   promo_ate: string | null; viral: string[];
   /** Bônus da horta agora (0048); a página aplica nos preços. */
@@ -154,15 +157,20 @@ export type IdleBoardRow = {
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
   /** Pontos de prestígio ganhos na vida e quantas conquistas (0041). */
   pontos: number; conquistas: number;
+  /** Tem o gerador 30 (a cena 6, "Em órbita"; 0063). */
+  orbita: boolean;
 };
 /** Linha de idle_board como o banco devolve. */
 export type LinhaPlacar = {
   user_id: string; valuation: number; rate: number; era: number; strategies: number[];
   avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean; pontos: number; conquistas: number;
+  /** Falta na resposta de antes da 0063. */
+  orbita?: boolean;
 };
 export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
   userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
   avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired, pontos: r.pontos, conquistas: r.conquistas,
+  orbita: r.orbita ?? false,
 });
 
 // Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)

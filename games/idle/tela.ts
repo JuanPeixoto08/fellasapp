@@ -17,14 +17,14 @@ import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, S
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
-import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
+import { custoMult, efeitosDe, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
-import { dicaContratos, dicaGerador, dicaMelhoria, dicaProducao } from './dica';
+import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
 import { promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
@@ -33,7 +33,7 @@ import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
-import { caixa, estrategiaPendente, segundosOportunidade, type Fase } from './store';
+import { caixa, estrategiaPendente, rotuloEra, segundosOportunidade, type Fase } from './store';
 
 export type Aba = 'loja' | 'gente' | 'placar' | 'legado';
 export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
@@ -113,8 +113,6 @@ const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidd
 const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
 
-/** Oportunidade do tipo "próxima compra pela metade" (2) com uma já guardada: pegar não daria nada. */
-export const meiaPrecoRepetida = (tipo: 0 | 1 | 2, s: IdleState) => tipo === 2 && s.half_price;
 
 /** "Some em 3h12" / "Some em 40 min": quanto falta pra oportunidade guardada sumir. */
 export function prazo(ms: number) {
@@ -592,12 +590,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const texto = el('div', 'escolha-texto');
       const quando = el('span', 'sub prazo', '');
       texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+      dicas.ligar(li, `opp-${w}`, () => dicaOportunidade(s, k, agoraTela));
       prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
-      // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
-      const repetida = meiaPrecoRepetida(k, s);
-      if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
+      // desde a 0062 tudo empilha: outra meia-preço guardada vale mais uma compra pela metade
       const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
-      b.disabled = m.ocupado || s.opp_left <= 0 || repetida;
+      b.disabled = m.ocupado || s.opp_left <= 0;
       li.append(bonequinho, texto, b);
       lista.append(li);
     }
@@ -700,7 +697,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const [bom, ruim] = efeitosTexto(id, p);
         return [{ retrato: ativos.convidado(id), titulo: `${id === TERRY ? 'Terry' : 'Vini'} ${['na frente', 'no meio', 'no canto'][cad.cadeira.indexOf(id)]}`, bonus: bom, defeito: ruim }];
       });
-      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips);
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips, efeitosDe(catalogo, s).hortaMult);
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
@@ -721,13 +718,16 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     listaM.replaceChildren();
     if (s && jogando) {
       taxaTxt.textContent = formatarTaxa(s.rate);
-      info.replaceChildren(el('span', undefined, `Era ${s.era} · ${ERAS[s.era - 1]}`));
+      info.replaceChildren(el('span', undefined, rotuloEra(s.era, (s.generators[29] ?? 0) > 0)));
       if (s.equipe.length) info.append(el('span', undefined, s.equipe.length === 1 ? '1 contratado' : `${s.equipe.length} contratados`));
       if (s.bonus.conquistas > 0) info.append(el('span', undefined, `+${s.bonus.conquistas}% das conquistas`));
       const naFrente = s.convidados?.cadeira[0];
       if (naFrente && destrancada(0, s.generators[12] ?? 0)) info.append(el('span', undefined, `${CONVIDADOS.find((c) => c.id === naFrente)?.nome} na frente do PPP`));
-      const agoraBoost = s.boost_until && Date.parse(s.boost_until) > Date.parse(s.server_now);
-      bonus.textContent = agoraBoost ? 'Produção ×5 por alguns segundos' : s.half_price ? 'Próxima compra pela metade' : '';
+      const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > Date.parse(s.server_now)).length;
+      const meias = s.meias ?? (s.half_price ? 1 : 0);
+      bonus.textContent = cincos
+        ? `Produção ×${(5 ** cincos).toLocaleString('pt-BR')} por alguns segundos`
+        : meias > 1 ? `Próximas ${meias} compras pela metade` : meias === 1 ? 'Próxima compra pela metade' : '';
       for (let gid = 1; gid <= 30; gid++) {
         if (podeComprarGerador(s, gid)) listaG.append(linhaGerador(s, gid));
         else {
@@ -805,7 +805,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         for (const r of outros) {
           const carta = el('div', 'carta');
           const meio = el('div', 'meio');
-          meio.append(el('strong', undefined, r.name), el('span', 'sub', `${ERAS[r.era - 1]} · ${empresas(r.hiredCount)}`));
+          meio.append(el('strong', undefined, r.name), el('span', 'sub', `${rotuloEra(r.era, r.orbita, true)} · ${empresas(r.hiredCount)}`));
           carta.append(boneco(r.avatar, null), meio);
           // "já trabalha pra você" vem do estado (sempre fresco), não só do placar (recarrega a cada 60 s)
           const meu = s.equipe.find((e) => e.user_id === r.userId);
@@ -838,7 +838,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         // a era é a cena em que a pessoa está (cena 1 = era 1, cena 2 = era 2...)
         li.append(
           el('span', 'pos', `${i + 1}º`), boneco(r.avatar, null), el('span', 'nome', r.name),
-          el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)),
+          el('span', 'sub', rotuloEra(r.era, r.orbita)), el('span', 'v', formatarTaxa(r.rate)),
         );
         if (r.pontos > 0) li.append(el('span', 'pontos', `★ ${r.pontos}`));
         if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));

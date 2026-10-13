@@ -1,7 +1,9 @@
 // Convidados do PPP Podcast (minigame 3): o catálogo e as contas da página (puro). Quem decide é o banco (0051, mesmas
 // contas: teste de paridade); aqui só se mostra. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-convidados-design.md.
 import type { IdleVisual } from '../shared/types';
+import { catalogo } from './catalogo';
 import { douradoEm, janelaS, tipoDourado, type TipoDourado } from './dourados';
+import { efeitosArvore } from './economia';
 import { semente } from './oportunidades';
 
 export type Convidado = { id: number; nome: string; bordao: string; bonus: string; defeito: string };
@@ -65,7 +67,7 @@ export function kojimaMult(p: number, desdeMs: number, tMs: number): number {
   return 1 + p * (-0.1 + (0.5 * Math.min(24, h)) / 24);
 }
 
-/** Toby Fox ("Chapter 5 ano que vem"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
+/** Toby Fox ("já já sai o Chapter 6"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
 export function tobyMult(p: number, desdeMs: number, tMs: number): number {
   const h = Math.max(0, Math.floor((tMs - desdeMs) / H));
   return 1 + p * 0.02 * Math.min(20, h);
@@ -124,17 +126,19 @@ export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): Tip
   return tipoDourado(uid, seg);
 }
 
-type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras };
+type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras; bonus?: { arvore: number[] } };
 export const SEM_CADEIRAS: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
 const SEM = SEM_CADEIRAS;
 const ctx = (s: ComCadeiras) => ({ c: s.convidados ?? SEM, ppp: s.generators[12] ?? 0 });
 
-/** O evento do segundo `seg` pra esse estado (a sorte, com o Gemaplys, ou a faixa do MC V.V) e quanto fica na tela. */
+/** O evento do segundo `seg` pra esse estado (a sorte, com o Gemaplys e o ramo Dourados, ou a faixa do MC V.V) e quanto
+ *  fica na tela. A frequência da árvore entra como peso a mais no extra do Gemaplys (igual a idle_dourado_pegar na 0061). */
 export function eventoEm(s: ComCadeiras, seg: number): { tipo: TipoDourado; janelaS: number } | null {
   const { c, ppp } = ctx(s);
   const gema = peso(c, ppp, GEMAPLYS);
-  const tipo = douradoEm(s.user_id, seg, gema) ?? faixaEm(s.user_id, c, ppp, seg);
-  return tipo === null ? null : { tipo, janelaS: janelaS(gema) };
+  const ef = efeitosArvore(catalogo, s.bonus?.arvore ?? []);
+  const tipo = douradoEm(s.user_id, seg, gema + ef.douradoFreq - 1) ?? faixaEm(s.user_id, c, ppp, seg);
+  return tipo === null ? null : { tipo, janelaS: janelaS(gema, ef.douradoTela) };
 }
 /** Os eventos de [de, ate) (s), pra agendar o som com a aba escondida. */
 export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {
@@ -159,7 +163,7 @@ function efeitosCru(id: number, p: number): [string, string] {
   switch (id) {
     case CR: return [`produção +${pct(0.15 * p)}`, `melhorias ${pct(0.1 * p)} mais caras`];
     case VORCARO: return [`ações compradas agora: o ganho conta ${vz(1 + p)} na venda`, `a perda também conta ${vz(1 + p)}`];
-    case GEMAPLYS: return [`eventos dourados ${vz(1 + p)} mais frequentes`, `ficam ${(janelaS(p)).toLocaleString('pt-BR')} s na tela (eram 12)`];
+    case GEMAPLYS: return [`eventos dourados ${vz(1 + p)} mais frequentes`, `ficam ${pct(p / 2)} menos tempo na tela`];
     case LUVA: return [`+${Math.ceil(5 * p)} oportunidades por dia`, `produção −${pct(0.05 * p)}`];
     case KOJIMA: return [`produção sobe até +${pct(0.4 * p)} em 24 h sentado`, `começa em −${pct(0.1 * p)}; trocar zera`];
     case GABE: return [`geradores ${pct(0.1 * p)} mais baratos`, `−${Math.ceil(3 * p)} oportunidades por dia`];

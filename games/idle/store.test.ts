@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -20,13 +20,22 @@ describe('âncora no relógio do banco', () => {
     expect(agoraServidor(a, cliente + 10_000)).toBe(Date.parse('2026-10-12T12:00:10Z'));
     expect(valuationAgora(a, cliente + 10_000)).toBeCloseTo(120, 10);
   });
+  it('dois ×5 no ar (lista boosts da 0062) = ×25; sem a lista, o boost_until da página velha', () => {
+    const fim = new Date(Date.parse('2026-10-12T12:00:00.000Z') + 10_000).toISOString();
+    expect(valuationAgora(ancorar(base({ boosts: [fim, fim], boost_until: fim }), 0), 20_000)).toBeCloseTo(100 + 2 * (10 * 25 + 10), 6);
+    expect(valuationAgora(ancorar(base({ boost_until: fim }), 0), 20_000)).toBeCloseTo(100 + 2 * (10 * 5 + 10), 6);
+  });
   it('bônus ×5 conta só até boost_until', () => {
     const a = ancorar(base({ boost_until: '2026-10-12T12:00:05.000Z' }), 0);
     expect(valuationAgora(a, 10_000)).toBeCloseTo(100 + 2 * 10 + 2 * 4 * 5, 10);
   });
-  it('teto do offline: 8h, ou o do ramo Tempo da árvore', () => {
-    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 8 * 3600, 6);
-    expect(valuationAgora(ancorar(base({ bonus: { arvore: [1, 41], conquistas: 0 } }), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 12 * 3600, 6);
+  it('sem teto com o jogo fechado: 20h fora rendem as 20h', () => {
+    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 20 * 3600, 6);
+  });
+  it('Viralizou dura o dobro com o Hype (nó 44)', () => {
+    const viral = [new Date(Date.parse('2026-10-12T12:00:00.000Z') + 150_000).toISOString()];
+    expect(valuationAgora(ancorar(base({ viral }), 0), 200_000)).toBeCloseTo(100 + 2 * (200 + 9 * 60), 6);
+    expect(valuationAgora(ancorar(base({ viral, bonus: { arvore: [1, 41, 42, 43, 44], conquistas: 0 } }), 0), 200_000)).toBeCloseTo(100 + 2 * (200 + 9 * 120), 6);
   });
   it('caixinha: 3 por 4h, ou o tamanho que o ramo Oportunidades der (a validade é sempre 4h)', () => {
     expect(caixa(base())).toEqual({ tamanho: 3, validadeS: 4 * 3600 });
@@ -35,6 +44,16 @@ describe('âncora no relógio do banco', () => {
   });
   it('início da semana: segunda 00:00 de Brasília', () => {
     expect(inicioSemana(base({ week_start: '2026-10-12' }))).toBe(Date.parse('2026-10-12T03:00:00Z'));
+  });
+});
+
+describe('o nome da era', () => {
+  it('"Era 5 · Sede"; com o gerador 30 (a cena 6) vira "Era 6 · Em órbita"; o nome curto sem o número', () => {
+    expect(rotuloEra(5, false)).toBe('Era 5 · Sede');
+    expect(rotuloEra(5, true)).toBe('Era 6 · Em órbita');
+    expect(rotuloEra(1, false)).toBe('Era 1 · Quarto');
+    expect(rotuloEra(5, true, true)).toBe('Em órbita');
+    expect(rotuloEra(2, false, true)).toBe('Garagem');
   });
 });
 

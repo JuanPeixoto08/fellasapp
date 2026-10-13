@@ -206,6 +206,63 @@ describe('os bônus', () => {
   });
 });
 
+describe('o ramo Horta da árvore (0061)', () => {
+  const ter = (nos: number[]) => q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, nos]);
+  const sorte = (sql: string) =>
+    t.db.exec(`create or replace function public.idle_horta_sorte(u uuid, c int, t bigint, k int) returns double precision language sql immutable as '${sql}'`);
+  const tempos = async (c: number) =>
+    (await q<{ a: number; v: number }>('select amadurece_s as a, vida_s as v from public.idle_horta_plantas where user_id = $1 and canteiro = $2', [A, c]))[0];
+  const andar = () => q(`update public.idle_state set horta_passo = floor(extract(epoch from now()) / 300)::bigint - 3 where user_id = $1`, [A]);
+  it('Borra de café e Regador: plantar grava amadurece 25% mais rápido e vida 50% maior', async () => {
+    await ter([1, 61, 62]);
+    await plantar(0, 1);
+    expect(await tempos(0)).toEqual({ a: 3600 * 0.75, v: 28800 * 1.5 });
+  });
+  it('planta que já estava no chão quando o nó chega fica com os tempos dela', async () => {
+    await plantar(0, 1);
+    await ter([1, 61, 62]);
+    await horta();
+    expect(await tempos(0)).toEqual({ a: 3600, v: 28800 });
+  });
+  it('Abelha influencer: com sorte 0,07 cruza com o nó (10%) e não cruza sem ele (5%)', async () => {
+    await sorte('select 0.07::double precision');
+    await por(0, 1, 2 * 3600);
+    await por(1, 1, 2 * 3600);
+    await andar();
+    expect((await horta()).plantas).toHaveLength(2);
+    await ter([1, 61, 62, 63]);
+    await andar();
+    const novas = (await horta()).plantas.filter((p) => p.origem === 'cruzou');
+    expect(novas.length).toBeGreaterThan(0);
+    // o que brotou já nasce com os tempos da Borra de café e do Regador
+    expect(await tempos(novas[0].canteiro)).toEqual({ a: 3 * 3600 * 0.75, v: 12 * 3600 * 1.5 });
+  });
+  it('Morango do amor: com sorte 0,003 o Morango brota com o nó (0,5%) e não sem ele (0,1%)', async () => {
+    await sorte("select case when k = 3 then 0.003 else 0.99 end::double precision");
+    await por(7, 1, 9 * 3600 + 600);
+    await q(`update public.idle_state set horta_passo = floor(extract(epoch from now()) / 300)::bigint - 3, horta_visto = now() - interval '20 minutes' where user_id = $1`, [A]);
+    expect((await horta()).plantas).toHaveLength(0);
+    await ter([1, 61, 62, 63, 64, 65]);
+    await andar();
+    expect((await horta()).plantas).toMatchObject([{ canteiro: 7, especie: 8, origem: 'morango' }]);
+  });
+  it('Agrotóxico liberado: bônus ×1,5 na taxa e no estado; descontos seguem até 50%', async () => {
+    await por(0, 1, 2 * 3600);
+    const antes = await taxa();
+    await ter([1, 61, 62, 63, 64]);
+    expect((await taxa()) / antes).toBeCloseTo((1.05 * 1.015) / 1.01, 9); // a raiz (+5%) e o Pix ×1,5
+    expect((await t.rpc<Estado>('idle_open')).horta_bonus.producao).toBeCloseTo(0.015, 9);
+    await q('update public.idle_state set generators[11] = 200 where user_id = $1', [A]);
+    await q('delete from public.idle_horta_plantas where user_id = $1', [A]);
+    for (let c = 0; c < 36; c++) await por(c, 7, 7 * 3600);
+    expect((await t.rpc<Estado>('idle_open')).horta_bonus.geradores).toBe(0.5);
+  });
+  it('sem planta nenhuma, o bônus com o nó continua zero (uma linha de zeros)', async () => {
+    await ter([1, 61, 62, 63, 64]);
+    expect((await t.rpc<Estado>('idle_open')).horta_bonus).toEqual({ producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 });
+  });
+});
+
 describe('conquistas de estado e a venda', () => {
   it('Agro é pop (100 plantadas), Planta de plástico (10 mortas), Temos que plantar (as 8)', async () => {
     await q(`update public.idle_state set horta_plantou = 99, horta_morreu = 10 where user_id = $1`, [A]);

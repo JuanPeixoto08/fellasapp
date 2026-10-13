@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubadaAte, destrancada, GABE, kojimaMult,
+  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubadaAte, destrancada, efeitosTexto, eventoEm, GABE, GEMAPLYS, kojimaMult,
   LUVA, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
 } from './convidados';
 
@@ -103,5 +103,30 @@ describe('os textos', async () => {
     expect(aoVivo(10, 1, d, UID, d + 150 * 60_000)).toBe('Agora: produção +4% · sobe em 30 min');
     expect(aoVivo(10, 0.5, d, UID, d + 25 * H)).toBe('Agora: produção +20% (no máximo)');
     expect(efeitosTexto(10, 1)).toEqual(['Produção sobe +2% por hora sentado, até +40%', 'Melhorias 10% mais caras; trocar ou tirar zera']);
+  });
+});
+
+describe('eventos com o ramo Dourados da árvore', () => {
+  const est = (arvore: number[], c?: Cadeiras) => ({ user_id: UID, generators: Array(30).fill(0), convidados: c, bonus: { arvore } });
+  const contar = (s: ReturnType<typeof est>) => {
+    let n = 0;
+    for (let x = 1_760_000_000; x < 1_760_060_000; x++) if (eventoEm(s, x)) n++;
+    return n;
+  };
+  it('Dia de sorte: uns 2× mais eventos; Olho de lince: 24 s na tela', () => {
+    const sem = contar(est([]));
+    const com = contar(est([1, 41, 42, 43, 44, 45]));
+    expect(com / sem).toBeGreaterThan(1.6);
+    expect(com / sem).toBeLessThan(2.4);
+    const um = (s: ReturnType<typeof est>) => { for (let x = 1_760_000_000; ; x++) { const e = eventoEm(s, x); if (e) return e; } };
+    expect(um(est([1, 41, 42])).janelaS).toBe(24);
+    expect(um(est([])).janelaS).toBe(12);
+  });
+  it('com o Gemaplys na frente, metade do tempo na tela (24 vira 12)', () => {
+    const s = { ...est([1, 41, 42], cad([GEMAPLYS, null, null])), generators: [...Array(12).fill(0), 1, ...Array(17).fill(0)] };
+    for (let x = 1_760_000_000; ; x++) { const e = eventoEm(s, x); if (e) { expect(e.janelaS).toBe(12); break; } }
+  });
+  it('o texto do Gemaplys não fala mais "eram 12" (com o Olho de lince seriam 24)', () => {
+    expect(efeitosTexto(GEMAPLYS, 1)[1]).toBe('Ficam 50% menos tempo na tela');
   });
 });

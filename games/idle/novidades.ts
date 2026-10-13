@@ -4,6 +4,36 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-dobro',
+    titulo: 'O dobro dobra e a Era 6',
+    data: '2026-10-13',
+    itens: [
+      'Com Viralizar ou Xepa da feira ("rendem o dobro"), cada oportunidade conta como 2: o ×5 entra duas vezes (×25 de uma vez) e a metade guarda 2 compras. Com os dois juntos, conta como 4.',
+      'Quem comprou o gerador 30 e foi pra órbita agora aparece como Era 6 · Em órbita, do lado da cena e no placar.',
+    ],
+  },
+  {
+    id: '2026-10-13-empilha',
+    titulo: 'Oportunidades empilham',
+    data: '2026-10-13',
+    itens: [
+      'Produção ×5 agora empilha: pegou duas, ×25. Três, ×125. Cada uma acaba no seu tempo.',
+      'E multiplica com o Viralizou: ×5 com ×10 dá ×50. Dois de cada, ×2.500. Boa sorte pra quem tá olhando o placar.',
+      'Próxima compra pela metade também empilha: guardou duas, as próximas 2 compras saem pela metade.',
+    ],
+  },
+  {
+    id: '2026-10-13-arvore',
+    titulo: 'Árvore nova: Dourados e Horta',
+    data: '2026-10-13',
+    itens: [
+      'Fechou o jogo? A empresa rende o tempo todo, sem limite de 8h. Pode sumir uma semana que o dinheiro tá lá.',
+      'Por isso o ramo Tempo saiu e virou Dourados: eventos mais frequentes, mais tempo na tela, Investidor pagando o dobro e Viralizou durando mais.',
+      'Quem já tinha nó do Tempo ficou com o nó do Dourados no mesmo lugar. Ninguém perdeu ponto.',
+      'Ramo novo na ponta direita: Horta. Planta crescendo mais rápido, vivendo mais, cruzando mais, e o Morango com Pescoço aparecendo mais (ele tem pescoço sim).',
+    ],
+  },
+  {
     id: '2026-10-12-conquistas',
     titulo: 'Conquistas sem filtro',
     data: '2026-10-12',

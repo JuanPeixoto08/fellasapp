@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
 import {
-  abertura, acumular, acumularTrechos, TETO_SEGUNDOS, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
   pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
 } from './economia';
 
@@ -73,31 +73,53 @@ describe('contratos (multContratos)', () => {
 
 describe('Viralizou na conta (igual a idle_settle na 0045)', () => {
   it('×10 por Viralizou ativo, sem teto (três = ×1000); ×50 com o ×5 da oportunidade', () => {
-    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000])).toBeCloseTo(100 + 9 * 60, 9);
-    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
-    expect(acumular(0, 1, 0, 100_000, null, TETO_SEGUNDOS, [90_000, 90_000, 90_000])).toBeCloseTo(100 + 999 * 60, 9);
-    expect(acumular(0, 1, 0, 100_000, 60_000, TETO_SEGUNDOS, [90_000])).toBeCloseTo(1960, 9);
+    expect(acumular(0, 1, 0, 100_000, null, [90_000])).toBeCloseTo(100 + 9 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, null, [90_000, 90_000])).toBeCloseTo(100 + 99 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, null, [90_000, 90_000, 90_000])).toBeCloseTo(100 + 999 * 60, 9);
+    expect(acumular(0, 1, 0, 100_000, 60_000, [90_000])).toBeCloseTo(1960, 9);
   });
   it('trechos: o Viralizou atravessa a troca de taxa', () => {
     // taxa 1 até 50 s, 2 depois; Viralizou de 30 a 90 s
-    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, null, TETO_SEGUNDOS, [90_000]);
+    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, null, [90_000]);
     expect(v).toBeCloseTo(30 + 20 * 10 + 40 * 2 * 10 + 10 * 2, 9);
+  });
+});
+
+describe('o ×5 da oportunidade empilha (igual a idle_settle na 0062)', () => {
+  it('um = ×5; dois = ×25; com o Viralizou multiplica (×5 e ×10 = ×50)', () => {
+    expect(acumular(0, 1, 0, 100_000, [90_000])).toBeCloseTo(90 * 5 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [90_000, 90_000])).toBeCloseTo(90 * 25 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [60_000, 90_000])).toBeCloseTo(60 * 25 + 30 * 5 + 10, 9);
+    // ×5 até 90 s; Viralizou de 30 a 90 s: 30 s a ×5, 60 s a ×50, 10 s a ×1
+    expect(acumular(0, 1, 0, 100_000, [90_000], [90_000])).toBeCloseTo(30 * 5 + 60 * 50 + 10, 9);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, [90_000, 90_000])).toBeCloseTo(50 * 25 + 40 * 2 * 25 + 10 * 2, 9);
+  });
+});
+
+describe('rendem o dobro: quantas pegas uma oportunidade vale (igual a idle_claim_opportunity na 0063)', () => {
+  it('1 sem nada; 2 com o Viralizar ou a Xepa da feira; 4 com os dois', () => {
+    const era3 = (estrategia: number, arvore: number[] = []) => com([[13, 1]], { strategies: [0, estrategia, -1, -1], bonus: { arvore, conquistas: 0 } });
+    expect(copiasOportunidade(cat, vazio())).toBe(1);
+    expect(copiasOportunidade(cat, era3(1))).toBe(1);
+    expect(copiasOportunidade(cat, era3(0))).toBe(2);
+    expect(copiasOportunidade(cat, era3(1, [1, 31, 32, 33, 34]))).toBe(2);
+    expect(copiasOportunidade(cat, era3(0, [1, 31, 32, 33, 34]))).toBe(4);
   });
 });
 
 describe('acumularTrechos (contrato vencendo no meio)', () => {
   it('com um trecho só é o mesmo que acumular', () => {
     expect(acumularTrechos(10, [{ desdeMs: 0, r: 0.5 }], 0, 100_000, 60_000)).toBeCloseTo(acumular(10, 0.5, 0, 100_000, 60_000), 12);
-    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 10 * 3600_000, null)).toBeCloseTo(8 * 3600, 6);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 10 * 3600_000, null)).toBeCloseTo(10 * 3600, 6);
   });
   it('cada trecho rende com a sua taxa; o ×5 vale só até o fim do bônus', () => {
     // r = 1 até 100 s, r = 2 depois; bônus até 150 s; fecha em 300 s
     const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 100_000, r: 2 }], 0, 300_000, 150_000);
     expect(v).toBeCloseTo(1 * 100 + 4 * 1 * 100 + 2 * 200 + 4 * 2 * 50, 10);
   });
-  it('vencimento depois do teto de 8h não conta', () => {
-    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 9 * 3600_000, r: 100 }], 0, 10 * 3600_000, null);
-    expect(v).toBeCloseTo(8 * 3600, 6);
+  it('sem teto: vencimento depois de 8h conta inteiro', () => {
+    const v = acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 9 * 3600_000, r: 2 }], 0, 10 * 3600_000, null);
+    expect(v).toBeCloseTo(9 * 3600 + 2 * 3600, 6);
   });
 });
 
@@ -137,9 +159,12 @@ describe('preço e compra', () => {
 });
 
 describe('acumular', () => {
-  it('soma taxa × tempo, com teto de 8 horas', () => {
+  it('soma taxa × tempo sem limite: 3 dias fechado rendem os 3 dias', () => {
     expect(acumular(10, 0.5, 0, 100_000, null)).toBeCloseTo(60, 10);
-    expect(acumular(0, 1, 0, 10 * 3600_000, null)).toBeCloseTo(8 * 3600, 6);
+    expect(acumular(0, 1, 0, 3 * 86400_000, null)).toBeCloseTo(3 * 86400, 6);
+  });
+  it('Viralizou com duração dobrada (Hype): ×10 por 120 s', () => {
+    expect(acumular(0, 1, 0, 200_000, null, [150_000], 120_000)).toBeCloseTo(200 + 9 * 120, 9);
   });
   it('produção ×5 só dentro da janela do bônus', () => {
     expect(acumular(0, 1, 0, 100_000, 60_000)).toBeCloseTo(100 + 4 * 60, 10);
@@ -154,17 +179,20 @@ describe('árvore de habilidades e conquistas', () => {
   const comArvore = (s: Estado, arvore: number[], conquistas = 0): Estado => ({ ...s, bonus: { arvore, conquistas } });
   it('sem nó: o jogo de sempre', () => {
     expect(efeitosArvore(cat, [])).toEqual({
-      producao: 1, tetoS: 8 * 3600, caixinha: 3, oppSegundos: 10, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
+      producao: 1, caixinha: 3, oppSegundos: 10, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
       porContratado: 0.1, contratoDias: 7, empregoMult: 1, inicioValuation: 10, inicioNotebooks: 1, inicioEra1: false,
-      manterGerais: false,
+      manterGerais: false, douradoFreq: 1, douradoTela: 12, douradoInvestidor: 1, douradoDuracao: 1, hortaAmadurece: 1,
+      hortaVida: 1, hortaCruza: 1, hortaMult: 1, morangoChance: 1,
     });
   });
-  it('nós do mesmo tipo: produção multiplica, teto e caixinha ficam o maior, +por dia soma, preço do contrato fica o menor', () => {
+  it('nós do mesmo tipo: produção multiplica, caixinha e eventos ficam o maior, +por dia soma, preço do contrato fica o menor', () => {
     const e = efeitosArvore(cat, [1, 11, 12, 13, 14, 15, 31, 33, 35, 41, 43, 51, 55]);
     expect(e.producao).toBeCloseTo(1.05 * 1.1 * 1.25 * 1.5 * 2 * 2, 12);
-    expect(e).toMatchObject({ tetoS: 24 * 3600, caixinha: 5, oppExtra: 3, contratoPreco: 0.5 });
+    expect(e).toMatchObject({ douradoFreq: 1.5, caixinha: 5, oppExtra: 3, contratoPreco: 0.5 });
     expect(efeitosArvore(cat, [1, 31]).oppSegundos).toBe(10);
     expect(efeitosArvore(cat, [1, 31, 32]).oppSegundos).toBe(30);
+    expect(efeitosArvore(cat, [1, 41, 42, 43, 44, 45])).toMatchObject({ douradoFreq: 2, douradoTela: 24, douradoInvestidor: 2, douradoDuracao: 2 });
+    expect(efeitosArvore(cat, [1, 61, 62, 63, 64, 65])).toMatchObject({ hortaAmadurece: 0.75, hortaVida: 1.5, hortaCruza: 2, hortaMult: 1.5, morangoChance: 5 });
     expect(efeitosArvore(cat, [999]).producao).toBe(1); // nó que a página não conhece não faz nada
   });
   it('produção: nós de produção × (1 + 1% por conquista); ponto guardado não conta', () => {
@@ -200,9 +228,9 @@ describe('árvore de habilidades e conquistas', () => {
     expect(a.upgrades).toEqual([1001, 1003]);
     expect(abertura(cat, efeitosArvore(cat, [1, 21]), [1001]).upgrades).toEqual([]);
   });
-  it('teto do offline: 8h, ou o que o ramo Tempo der', () => {
-    expect(acumular(0, 1, 0, 30 * 3600_000, null, 12 * 3600)).toBeCloseTo(12 * 3600, 6);
-    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null, 24 * 3600)).toBeCloseTo(24 * 3600, 6);
+  it('sem teto do offline: 30h fora rendem as 30h', () => {
+    expect(acumular(0, 1, 0, 30 * 3600_000, null)).toBeCloseTo(30 * 3600, 6);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }], 0, 30 * 3600_000, null)).toBeCloseTo(30 * 3600, 6);
   });
   it('pontos totais: floor(cbrt(F$/s ÷ 1 milhão)), sem errar nos cubos', () => {
     for (const [r, n] of [[0, 0], [-1, 0], [NaN, 0], [Infinity, 0], [-Infinity, 0], [1e33, 1e9], [1e40, 1e9], [999_999, 0], [1e6, 1], [7_999_999, 1], [8e6, 2], [1e9, 10], [1e12, 100]]) {

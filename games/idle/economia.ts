@@ -22,7 +22,6 @@ export const K_PRESTIGIO = 1e6;
 const MAX_PONTOS = 1e9;
 
 export const CRESCIMENTO = 1.15;
-export const TETO_SEGUNDOS = 8 * 3600;
 const VALUATION_INICIAL = 10;
 /** Quanto uma oportunidade fica na cena (s) sem estratégia nem nó (igual ao padrão de opp_segundos do catálogo). */
 export const OPP_SEGUNDOS_PADRAO = 10;
@@ -33,13 +32,18 @@ export function era(cat: Catalogo, gens: number[]): number {
   return e;
 }
 
-/** O que os nós comprados fazem (igual a idle_arvore_efeitos na 0041). Sem nó: o jogo de sempre. Juntando nós do
- *  mesmo tipo: produção e bônus das oportunidades multiplicam, +por dia soma, preço do contrato fica o menor e o resto
- *  fica o maior. */
+/** Quanto um evento dourado fica na tela sem a árvore (igual a dourados.ts JANELA_S). */
+const JANELA_DOURADO_S = 12;
+
+/** O que os nós comprados fazem (igual a idle_arvore_efeitos na 0061). Sem nó: o jogo de sempre. Juntando nós do
+ *  mesmo tipo: produção, Investidor e bônus das oportunidades multiplicam; +por dia soma; preço do contrato e amadurecer
+ *  ficam o menor; o resto fica o maior. */
 export type EfeitosArvore = {
-  producao: number; tetoS: number; caixinha: number; oppSegundos: number; oppExtra: number; oppBonus: number;
+  producao: number; caixinha: number; oppSegundos: number; oppExtra: number; oppBonus: number;
   contratoPreco: number; porContratado: number; contratoDias: number; empregoMult: number;
   inicioValuation: number; inicioNotebooks: number; inicioEra1: boolean; manterGerais: boolean;
+  douradoFreq: number; douradoTela: number; douradoInvestidor: number; douradoDuracao: number;
+  hortaAmadurece: number; hortaVida: number; hortaCruza: number; hortaMult: number; morangoChance: number;
 };
 const porNo = new WeakMap<Catalogo, Map<number, No>>();
 export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArvore {
@@ -51,7 +55,6 @@ export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArv
   const max = (tipo: No['tipo'], padrao: number) => Math.max(padrao, ...valores(tipo));
   return {
     producao: mult('producao'),
-    tetoS: 3600 * max('teto', TETO_SEGUNDOS / 3600),
     caixinha: max('caixinha', CAIXA_PADRAO.tamanho),
     oppSegundos: max('segundos', OPP_SEGUNDOS_PADRAO),
     oppExtra: valores('opp_extra').reduce((a, v) => a + v, 0),
@@ -64,6 +67,15 @@ export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArv
     inicioNotebooks: max('inicio_notebooks', 1),
     inicioEra1: valores('inicio_era1').length > 0,
     manterGerais: valores('manter_gerais').length > 0,
+    douradoFreq: max('dourado_freq', 1),
+    douradoTela: max('dourado_tela', JANELA_DOURADO_S),
+    douradoInvestidor: mult('dourado_investidor'),
+    douradoDuracao: max('dourado_duracao', 1),
+    hortaAmadurece: Math.min(1, ...valores('horta_amadurece')),
+    hortaVida: max('horta_vida', 1),
+    hortaCruza: max('horta_cruza', 1),
+    hortaMult: max('horta_mult', 1),
+    morangoChance: max('morango_chance', 1),
   };
 }
 export const efeitosDe = (cat: Catalogo, s: Estado) => efeitosArvore(cat, s.bonus?.arvore ?? []);
@@ -101,6 +113,13 @@ export function precoContrato(cat: Catalogo, s: Estado, ativos: number): number 
 
 export function estrategiasAtivas(cat: Catalogo, s: Estado): Estrategia[] {
   return cat.estrategias.filter((e) => s.strategies[e.era - 2] === e.opcao);
+}
+
+/** Quantas pegas uma oportunidade vale (igual a idle_claim_opportunity na 0063): "rendem o dobro" do Viralizar e da Xepa
+ *  da feira multiplicam (2, ou 4 com os dois). O ×5 entra essa quantidade de vezes e a metade guarda essa quantidade. */
+export function copiasOportunidade(cat: Catalogo, s: Estado): number {
+  const m = estrategiasAtivas(cat, s).reduce((a, e) => a * e.oppBonusMult, efeitosDe(cat, s).oppBonus);
+  return Math.max(1, Math.round(m));
 }
 
 /**
@@ -198,18 +217,26 @@ export function liberada(cat: Catalogo, m: Melhoria, s: Estado): boolean {
   return s.generators[m.fonte - 1] >= m.requerFonte && s.generators[m.alvo - 1] >= m.requerAlvo;
 }
 
-/** Quanto dura um Viralizou (ms): a janela é [fim − 60 s, fim). */
+/** Quanto dura um Viralizou sem a árvore (ms): a janela é [fim − 60 s, fim); com o Hype, × douradoDuracao. */
 export const VIRAL_MS = 60_000;
 
+/** Os fins dos ×5 da oportunidade: uma lista (0062: cada um conta sozinho), um fim só ou nenhum (null). */
+export type Boosts = number | null | readonly number[];
+const listaBoosts = (b: Boosts): readonly number[] => (b === null ? [] : typeof b === 'number' ? [b] : b);
+
 /**
- * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 dentro do bônus da oportunidade e ×10 por Viralizou ativo
- * (sem teto); divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0045.
+ * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 por bônus da oportunidade no ar e ×10 por Viralizou ativo, tudo
+ * multiplicando e sem teto (×5 e ×10 = ×50; dois ×5 = ×25); divide nos pontos em que um começa ou acaba. Igual a
+ * idle_settle na 0062. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
  */
-export function produzido(r: number, a: number, b: number, boostAteMs: number | null, virais: readonly number[] = []): number {
+export function produzido(
+  r: number, a: number, b: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
+): number {
   if (b <= a) return 0;
+  const boosts = listaBoosts(boostAteMs);
   const pontos = [a, b];
-  if (boostAteMs !== null && boostAteMs > a && boostAteMs < b) pontos.push(boostAteMs);
-  for (const f of virais) for (const x of [f - VIRAL_MS, f]) if (x > a && x < b) pontos.push(x);
+  for (const f of boosts) if (f > a && f < b) pontos.push(f);
+  for (const f of virais) for (const x of [f - viralMs, f]) if (x > a && x < b) pontos.push(x);
   pontos.sort((x, y) => x - y);
   let total = 0;
   for (let i = 0; i + 1 < pontos.length; i++) {
@@ -217,35 +244,33 @@ export function produzido(r: number, a: number, b: number, boostAteMs: number | 
     const q = pontos[i + 1];
     if (q <= p) continue;
     const meio = (p + q) / 2;
-    const k = virais.filter((f) => f - VIRAL_MS <= meio && f > meio).length;
-    const m = (boostAteMs !== null && boostAteMs > meio ? 5 : 1) * 10 ** k; // sem teto: dois ×100, três ×1000
+    const k = virais.filter((f) => f - viralMs <= meio && f > meio).length;
+    const m = 5 ** boosts.filter((f) => f > meio).length * 10 ** k; // sem teto: dois ×100, três ×1000; ×5 e ×10 = ×50
     total += (r * m * (q - p)) / 1000;
   }
   return total;
 }
 
-/** Valuation depois de render de `desdeMs` até `ateMs` (teto de `tetoS`, 8h sem a árvore; ×5 dentro do bônus que vai
- *  até `boostAteMs`; ×10 por Viralizou ativo, `virais` = os fins). */
+/** Valuation depois de render de `desdeMs` até `ateMs`, sem limite (desde 13/10 o jogo fechado rende tudo); ×5 dentro
+ *  do bônus que vai até `boostAteMs`; ×10 por Viralizou ativo (`virais` = os fins, cada um dura `viralMs`). */
 export function acumular(
-  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null, tetoS = TETO_SEGUNDOS, virais: readonly number[] = [],
+  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
 ): number {
-  const dt = Math.min(Math.max((ateMs - desdeMs) / 1000, 0), tetoS);
-  return v + produzido(r, desdeMs, desdeMs + dt * 1000, boostAteMs, virais);
+  return v + produzido(r, desdeMs, Math.max(ateMs, desdeMs), boostAteMs, virais, viralMs);
 }
 
 /**
  * Como `acumular`, mas a taxa troca no meio (um contrato vencendo): `trechos` = [{ desdeMs, r }] em ordem, o primeiro
- * começando em `desdeMs`. Igual a idle_settle: teto de `tetoS` contado de `desdeMs`, ×5 e ×10 em cada trecho.
+ * começando em `desdeMs`. Igual a idle_settle: ×5 e ×10 em cada trecho.
  */
 export function acumularTrechos(
-  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
-  tetoS = TETO_SEGUNDOS, virais: readonly number[] = [],
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: Boosts,
+  virais: readonly number[] = [], viralMs = VIRAL_MS,
 ): number {
-  const fim = Math.min(ateMs, desdeMs + tetoS * 1000);
   for (let i = 0; i < trechos.length; i++) {
     const a = Math.max(trechos[i].desdeMs, desdeMs);
-    const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : fim, fim);
-    v += produzido(trechos[i].r, a, b, boostAteMs, virais);
+    const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : ateMs, ateMs);
+    v += produzido(trechos[i].r, a, b, boostAteMs, virais, viralMs);
   }
   return v;
 }

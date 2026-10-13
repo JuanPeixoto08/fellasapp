@@ -58,15 +58,16 @@ describe('ritmo do prestígio', () => {
   it('5 pontos não saem antes do dia 3 (a primeira venda não compensa cedo demais)', () => {
     expect(pontosTotais(m.amostras.filter((a) => a.t < 2 * DIA).at(-1)!.taxa)).toBeLessThan(5);
   });
-  it('a primeira semana rende uns 15 pontos', () => {
-    expect(pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa)).toBe(15);
+  // eram 15 com o teto de 8h fechado; sem teto (13/10) a noite rende inteira
+  it('a primeira semana rende uns 17 pontos', () => {
+    expect(pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa)).toBe(17);
   });
-  it('quem gasta compra o mais barato que acelera: com 11 pontos, a raiz e o 1º de quatro ramos', () => {
-    expect(gastar(catalogo, 11)).toEqual({ arvore: [1, 11, 21, 31, 41], sobra: 2 });
+  it('quem gasta compra o mais barato que acelera: com 11 pontos, a raiz, o 1º de três ramos e o 2º da Produção', () => {
+    expect(gastar(catalogo, 11)).toEqual({ arvore: [1, 11, 21, 31, 12], sobra: 0 });
   });
   it('depois de vender e gastar ~10 pontos, voltar à era em que estava é mais rápido que da primeira vez', () => {
     const r = volta(catalogo, 10)!;
-    expect(r).toMatchObject({ era: 5, gastos: 9 });
+    expect(r).toMatchObject({ era: 5, gastos: 7 }); // 9 com o nó do Tempo (2 pontos), que saiu em 13/10
     expect(r.segunda).toBeLessThan(r.primeira);
     expect(r.segunda / r.primeira).toBeLessThan(0.91); // 234000 / 259200 = 0,90
   });
