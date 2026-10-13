@@ -1,6 +1,6 @@
 -- fellasapp: Fellas Inc., Mapa do rolê, a moldura (spec 2026-10-12-fellas-inc-mapa-do-role-design.md).
 -- Os lugares de verdade (nome, frase, ícone, mapa, posição) NÃO estão aqui: entram por um SQL fora do repositório.
--- Depende da 0064 (estratégias Marca forte/Monopólio e as conquistas mapa_*).
+-- Depende da 0065 (estratégias Marca forte/Monopólio e as conquistas mapa_*).
 
 -- ===== catálogo (igual a games/idle/mapa.ts; teste de paridade em idleMapa.test.ts) =====
 create table if not exists public.idle_cat_place (
@@ -8,7 +8,7 @@ create table if not exists public.idle_cat_place (
   lancado boolean not null, custo_base double precision not null, moeda text, numero text,
   moeda_inicial double precision not null default 0
 );
--- (a tabela nasce aqui, na 0065 ainda não aplicada; moeda_inicial = a moeda com que o lugar abre)
+-- (a tabela nasce aqui, na 0066 ainda não aplicada; moeda_inicial = a moeda com que o lugar abre)
 create table if not exists public.idle_cat_place_marco (
   id int primary key, lugar int not null, tipo text not null check (tipo in ('nivel', 'lendario', 'fas', 'volume')),
   valor double precision, bonus double precision not null
@@ -708,7 +708,7 @@ begin
            where s.started and s.week_start < v_new
            order by 3 desc, 2 desc, 1
            limit 3) x;
-  -- Mapa do rolê: o 1º da semana em cada lugar vira o dono do pedaço da semana seguinte (0065)
+  -- Mapa do rolê: o 1º da semana em cada lugar vira o dono do pedaço da semana seguinte (0066)
   insert into public.idle_place_weeks (week_start, lugar, dono_id, numero)
   select v_old, c.id, (sem.x -> 0 ->> 'user_id')::uuid, (sem.x -> 0 ->> 'numero')::double precision
     from public.idle_cat_place c
@@ -757,7 +757,7 @@ begin
   on conflict (user_id) do update set user_id = excluded.user_id
   returning * into s;
   perform public.idle_horta_avancar(s); -- a horta anda até agora antes de qualquer conta
-  perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0065)
+  perform public.idle_place_avancar(s); -- os lugares do Mapa do rolê andam até agora (0066)
   -- só quando é a própria pessoa (travada por outro ou pelo cron não conta); o s devolvido fica com o visto_em antigo
   update public.idle_state set visto_em = now() where user_id = p_user and p_user = auth.uid();
   return s;

@@ -303,7 +303,7 @@ As frases saem no plano, no tom das conquistas novas (humor ácido), para o Juan
 
 ## 8. Banco (resumo técnico)
 
-- Migrações novas a partir da 0064: catálogo do mapa e do lote 1 (gerado pelo `catalogo.test.ts`, nunca editando as
+- Migrações novas a partir da 0065: catálogo do mapa e do lote 1 (gerado pelo `catalogo.test.ts`, nunca editando as
   antigas) e uma por parte (moldura, camisetaria, copão, jantar). Cada uma entra também em `games/test/db.ts` e
   `games/dev/mockDb.ts`.
 - Tabelas privadas: `idle_places` (id, nome, frase, ícone, x, y) e `idle_map` (png), só `select` para membros, vazias

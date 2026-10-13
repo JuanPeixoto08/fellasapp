@@ -34,10 +34,10 @@ import m61 from '../../supabase/migrations/0061_fellas_inc_arvore_dourados_horta
 import m62 from '../../supabase/migrations/0062_fellas_inc_oportunidades_empilham.sql?raw';
 import m63 from '../../supabase/migrations/0063_fellas_inc_dobro_e_orbita.sql?raw';
 import m64 from '../../supabase/migrations/0064_fellas_inc_cincos_somam.sql?raw';
-import m65 from '../../supabase/migrations/0064_fellas_inc_catalogo_mapa.sql?raw';
-import m66 from '../../supabase/migrations/0065_fellas_inc_mapa.sql?raw';
-import m67 from '../../supabase/migrations/0066_fellas_inc_camisetaria.sql?raw';
-import m68 from '../../supabase/migrations/0067_fellas_inc_copao.sql?raw';
+import m65 from '../../supabase/migrations/0065_fellas_inc_catalogo_mapa.sql?raw';
+import m66 from '../../supabase/migrations/0066_fellas_inc_mapa.sql?raw';
+import m67 from '../../supabase/migrations/0067_fellas_inc_camisetaria.sql?raw';
+import m68 from '../../supabase/migrations/0068_fellas_inc_copao.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 

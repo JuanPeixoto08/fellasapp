@@ -1,6 +1,6 @@
 # Fellas Inc.: Mapa do rolê, parte 1 (moldura) — Implementation Plan
 
-> **Renumeração (13/10):** as migrações deste plano viraram 0064 (catálogo, era 0056), 0065 (moldura, era 0057), 0066 (camisetaria, era 0058) e 0067 (copão, era 0059), depois da 0060–0063 da main. O texto abaixo é histórico e segue com os números antigos.
+> **Renumeração (13/10):** as migrações deste plano viraram 0065 (catálogo, era 0056), 0066 (moldura, era 0057), 0067 (camisetaria, era 0058) e 0068 (copão, era 0059), depois da 0060–0064 da main. O texto abaixo é histórico e segue com os números antigos.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

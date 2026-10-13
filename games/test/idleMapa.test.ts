@@ -1,4 +1,4 @@
-// Mapa do rolê, a moldura (0065): migrações reais no PGlite. Lugares de verdade não entram aqui: os testes põem
+// Mapa do rolê, a moldura (0066): migrações reais no PGlite. Lugares de verdade não entram aqui: os testes põem
 // lugares de mentira em idle_places quando precisam.
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -221,7 +221,7 @@ describe('produções e pódio', () => {
 
 describe('desafio da semana', () => {
   beforeEach(async () => {
-    // só o de teste no lugar 3 (os da camisetaria, da 0066, sairiam no sorteio da semana)
+    // só o de teste no lugar 3 (os da camisetaria, da 0067, sairiam no sorteio da semana)
     await q('delete from public.idle_cat_place_desafio where lugar = 3');
     await q(`insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values
              (9001, 3, 'teste', 5, 'desafio de teste', 'horas', 2)`);

@@ -2,7 +2,7 @@
 -- Parte A: o catálogo escondido, os desafios, o cardápio (pôr e tirar um copão), o DJ da sexta, as contas (espelho de
 -- games/idle/copao.ts, com teste de paridade em games/test/idleCopao.test.ts) e o JSON da tela. A parte B troca
 -- idle_cup_avancar e idle_cup_depois (as noites, as vendas, o PT, a galera, a revelação, o caderninho e os desafios).
--- Depende da 0065 (a moldura: idle_place_*, os stubs idle_cup_* e o contrato das partes 2 a 4).
+-- Depende da 0066 (a moldura: idle_place_*, os stubs idle_cup_* e o contrato das partes 2 a 4).
 
 -- ===== catálogo (igual a games/idle/copao.ts; escondido de quem joga: a tela usa o TS) =====
 create table if not exists public.idle_cup_cat_base (
@@ -568,7 +568,7 @@ begin
 end;
 $$;
 
--- ===== o JSON da tela (troca o stub da 0065; estável: só lê) =====
+-- ===== o JSON da tela (troca o stub da 0066; estável: só lê) =====
 
 -- um copão do cardápio: nota, partes, rótulos e chance de PT só quando p_revelado (a primeira noite dele começou)
 create or replace function public.idle_cup_copao_json(c public.idle_cup_copoes, p_revelado boolean)
