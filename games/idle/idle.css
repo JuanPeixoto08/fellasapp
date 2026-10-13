@@ -1491,6 +1491,8 @@ body:has(.idle) { background: #121212; }
 .idle .cup-pe-rot { font: 400 16px/1 var(--i-pixel); color: var(--i-mudo); }
 .idle .cup-pe-sub { font-size: 12px; color: var(--i-mudo); }
 .idle .cup-ontem { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.idle .cup-pe-dir { display: grid; gap: 4px; min-width: 0; }
+.idle .cup-fechada { margin: 0; }
 
 /* --- montar --- */
 .idle .cup-montar { display: flex; flex-direction: column; gap: 14px; }
@@ -1696,6 +1698,7 @@ body:has(.idle) { background: #121212; }
   .idle .cup-foto-vaga { width: calc(max(48px, round(down, min(100cqw - 12px, 100cqh - 8px, 192px) * var(--zoom, 1), 48px)) / var(--zoom, 1));
     height: calc(max(48px, round(down, min(100cqw - 12px, 100cqh - 8px, 192px) * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
   .idle .cup-pe { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+  .idle .cup-pe-dir { justify-items: end; }
   /* montar: a prévia, o nome, a força, o preço e o Pôr à esquerda; as escolhas à direita */
   .idle .cup-montar { display: grid; height: 100%; grid-template-columns: 318px minmax(0, 1fr); gap: 22px; }
   .idle .cup-lado { display: grid; grid-template-rows: minmax(0, 1fr) auto auto auto auto; gap: 10px; min-height: 0; }

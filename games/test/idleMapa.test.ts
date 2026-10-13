@@ -235,6 +235,19 @@ describe('desafio da semana', () => {
     expect(await v()).toBeCloseTo(2 * 3600 * r, 0);
     expect(await v()).toBe(0);
   });
+  // o prêmio "investidor" paga o mesmo que o Investidor apressado (idle_dourado_pegar): 20 min da produção, × 2 com o
+  // Investidor anjo (nó 43 da árvore)
+  it('investidor: 20 min da produção; com o Investidor anjo, 40 min', async () => {
+    await q(`update public.idle_cat_place_desafio set premio = 'investidor', premio_valor = 1 where id = 9001`);
+    const v = async () => (await q<{ v: number }>(
+      `select (public.idle_place_desafio(s, 3, 'teste', 6)).valuation - s.valuation as v from public.idle_state s where user_id = $1`, [A]))[0].v;
+    const r = await taxa();
+    expect(await v()).toBeCloseTo(1200 * r, 0);
+    await q('delete from public.idle_place_challenges where user_id = $1', [A]);
+    await q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, [1, 41, 42, 43]]);
+    const r2 = await taxa();
+    expect(await v()).toBeCloseTo(2400 * r2, 0);
+  });
   it('não paga com valor abaixo nem com outro tipo', async () => {
     const dif = async (tipo: string, valor: number) => (await q<{ v: number }>(
       `select (public.idle_place_desafio(s, 3, $2, $3)).valuation - s.valuation as v from public.idle_state s where user_id = $1`, [A, tipo, valor]))[0].v;

@@ -37,7 +37,7 @@ insert into public.idle_cat_place_marco (id, lugar, tipo, valor, bonus) values
   (31, 3, 'nivel', 5, 0.02), (32, 3, 'nivel', 10, 0.02), (33, 3, 'nivel', 15, 0.03), (34, 3, 'nivel', 20, 0.03),
   (35, 3, 'nivel', 25, 0.04), (36, 3, 'lendario', null, 0.03), (37, 3, 'fas', 100000, 0.03), (38, 3, 'volume', 50, 0.02),
   (41, 4, 'nivel', 5, 0.02), (42, 4, 'nivel', 10, 0.02), (43, 4, 'nivel', 15, 0.03), (44, 4, 'nivel', 20, 0.03),
-  (45, 4, 'nivel', 25, 0.04), (46, 4, 'lendario', null, 0.03), (47, 4, 'fas', 300, 0.03), (48, 4, 'volume', 30, 0.02),
+  (45, 4, 'nivel', 25, 0.04), (46, 4, 'lendario', null, 0.03), (47, 4, 'fas', 1000, 0.03), (48, 4, 'volume', 30, 0.02),
   (71, 7, 'nivel', 5, 0.02), (72, 7, 'nivel', 10, 0.02), (73, 7, 'nivel', 15, 0.03), (74, 7, 'nivel', 20, 0.03),
   (75, 7, 'nivel', 25, 0.04), (76, 7, 'lendario', null, 0.03), (77, 7, 'fas', 2000, 0.03), (78, 7, 'volume', 100, 0.02);
 
@@ -499,7 +499,10 @@ begin
   if d.premio = 'horas' then
     s.valuation := s.valuation + d.premio_valor * 3600 * public.idle_rate(s);
   elsif d.premio = 'investidor' then
-    s.valuation := s.valuation + 1200 * public.idle_rate(s);
+    -- o mesmo que o Investidor apressado paga (idle_dourado_pegar da 0061): 20 min da produção × o Investidor anjo da
+    -- árvore × (1 + o bônus de oportunidades da horta)
+    s.valuation := s.valuation + public.idle_rate(s) * 1200 * public.idle_arv(s.user_id, 'dourado_investidor', 'mult', 1)
+                   * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), now()) b));
   else -- legado: pontos pra gastar na árvore, sem mexer no que a próxima venda rende
     s.prestige_spent := s.prestige_spent - d.premio_valor::int;
   end if;

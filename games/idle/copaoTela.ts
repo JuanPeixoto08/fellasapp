@@ -1,11 +1,12 @@
 // O copão (lugar 4 do Mapa do rolê) na tela, no estilo do bar à noite: parede escura, neon vermelho, garrafas sem rótulo.
 // Estados:
 // * bar: a noite de hoje (relógio até as 18h ou até as 2h, o que já vendeu subindo, a sexta e o DJ), o cardápio (as vagas:
-//   foto, nome, nota ou "estreia hoje 18h", novidade, vendas, Tirar) e a última noite (Ver o chat);
+//   foto, nome, nota ou "estreia hoje 18h", novidade, vendas, Tirar), a última noite (Ver o chat) e a última noite que
+//   ninguém abriu;
 // * montar (numa vaga livre): base, mistura, extra, tamanho, força, preço, nome, a prévia e "Pôr no cardápio";
 // * djs: quem toca na sexta (os retratos, o som e as bases que vendem mais com cada um);
-// * revelação (uma vez por copão, guardada por pessoa): a nota subindo com as 4 partes (sabor, custo-benefício, moda,
-//   aguenta), os pares e quão longe do ponto a força ficou;
+// * revelação (uma vez por copão, guardada por pessoa, quando ele vendeu a primeira noite inteira): a nota subindo com as 4
+//   partes (sabor, custo-benefício, moda, aguenta), os pares e quão longe do ponto a força ficou;
 // * chat (uma vez por noite, por pessoa): o que a galera falou da última noite que fechou, as fichas e a galera.
 // O caderninho (a faixa da moldura) abre o completo no miolo: os pares testados e a força que aguenta por base.
 // Se a pessoa sai no meio da revelação ou do chat, ao voltar eles recomeçam. Quem decide é o banco (idle_cup_*).
@@ -14,7 +15,7 @@ import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
   aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
-  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS, vendasNoite,
+  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS,
   type CadernoCup, type CopaoCup, type EstadoCup, type TipoPar, type UltimaNoite,
 } from './copao';
 import { balao, canvasDe, COR_BASE, COR_MISTURA, extraImagem, fotoImagem, fundoBar, LADO_FOTO, recipiente } from './copaoArte';
@@ -58,6 +59,8 @@ const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sáb
 const quantia = (n: number) => formatarValor(n).replace('F$ ', '');
 const inteiro = (n: number) => Math.round(n).toLocaleString('pt-BR');
 const comSinal = (n: number) => (n >= 0 ? `+${quantia(n)}` : `−${quantia(-n)}`);
+/** Quanto a galera mudou: "+3", "−2"; o que arredonda pra 0 é "igual" (nunca "+0" nem "−0"). */
+const galeraMudou = (d: number) => (Math.round(Math.abs(d)) === 0 ? 'igual' : `${d > 0 ? '+' : '−'}${inteiro(Math.abs(d))}`);
 const minusc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 /** Fichas de uma venda: com uma casa abaixo de 10 ("0,4", "7,5"); acima, como o resto ("22", "1,2 mil"). */
 const fichasVenda = (n: number) => (n < 10 ? (Math.round(n * 10) / 10).toLocaleString('pt-BR') : quantia(n));
@@ -80,6 +83,12 @@ function quando(ini: number, agora: number): string {
   const d = diaBR(ini) - diaBR(agora);
   if (d === 0) return 'hoje';
   if (d === 1) return 'amanhã';
+  const dia = new Date(ini - 3 * H).getUTCDay();
+  return `${dia === 0 || dia === 6 ? 'no' : 'na'} ${DIAS[dia]}`;
+}
+/** "ontem" ou "na terça" / "no sábado": o dia (em Brasília) de uma noite que já passou. */
+function quandoFoi(ini: number, agora: number): string {
+  if (diaBR(agora) - diaBR(ini) <= 1) return 'ontem';
   const dia = new Date(ini - 3 * H).getUTCDay();
   return `${dia === 0 || dia === 6 ? 'no' : 'na'} ${DIAS[dia]}`;
 }
@@ -181,12 +190,14 @@ const listaBases = (ids: readonly number[]) => {
   return n.length > 1 ? `${n.slice(0, -1).join(', ')} e ${n.at(-1)}` : n.join('');
 };
 
-/** Quanto a noite de hoje já vendeu em `t`: a venda é linear nas 8 h, então segue a conta do banco (o que ele contou em
- *  `servidor`) na mesma reta, até o fim. Copão tirado no meio pode deixar um pouquinho acima; o próximo desenho acerta. */
-export function vendidoHoje(contado: number, ini: number, fim: number, servidor: number, t: number): number {
+/** Quanto a noite de hoje já vendeu (ou rendeu de fichas, que pode ser negativo) em `t`: a venda é linear nas 8 h, então
+ *  segue a conta do banco (o que ele contou em `servidor`) na mesma reta, até o fim. `parado` = o que já está no contado e
+ *  não anda mais (os copões que saíram no meio da noite). */
+export function vendidoHoje(contado: number, ini: number, fim: number, servidor: number, t: number, parado = 0): number {
   const ate = Math.min(servidor, fim) - ini;
-  if (ate <= 0 || contado <= 0) return Math.max(0, contado);
-  return (contado * (Math.min(Math.max(t, ini), fim) - ini)) / ate;
+  const anda = contado - parado;
+  if (ate <= 0 || anda === 0) return contado;
+  return parado + (anda * (Math.min(Math.max(t, ini), fim) - ini)) / ate;
 }
 
 function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): TelaMecanica {
@@ -256,18 +267,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   const djDaNoite = (m: EstadoCup) => (noiteComecou(m) ? m.hoje.dj : m.dj);
 
   // ===================== bar =====================
-  /** O que cada copão do cardápio de hoje vende, em fração do total da noite (a mesma conta do banco, com o que a tela
-   *  sabe: nível, galera, sexta e DJ). Só os que estrearam até o início da noite. */
-  function fracoesHoje(l: LugarEstado, m: EstadoCup): Map<number, number> {
-    const ini = Date.parse(m.hoje.inicio);
-    const lista = m.cardapio.filter((c) => c.revelado && c.nota !== null && Date.parse(c.primeira_noite) <= ini);
-    const v = vendasNoite(lista.map((c) => ({ base: c.base, mistura: c.mistura, tamanho: c.tamanho, forca: c.forca, preco: c.preco, nota: c.nota!, noites: c.noites })),
-      { nivel: l.nivel ?? 1, galera: l.fas ?? 0, sexta: m.hoje.sexta, dj: djDaNoite(m) });
-    const soma = v.reduce((s, x) => s + x, 0);
-    return new Map(lista.map((c, i) => [c.id, soma > 0 ? v[i] / soma : 0]));
-  }
-
-  function blocoNoite(l: LugarEstado, m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
+  function blocoNoite(m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
     const s = el('section', 'cup-noite');
     s.setAttribute('aria-label', 'Hoje à noite');
     const ini = Date.parse(m.hoje.inicio);
@@ -291,8 +291,10 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
         linha.textContent = `${quando(ini, t) === 'hoje' ? 'Hoje' : 'Amanhã'} das 18h às 2h. O que estiver no cardápio vende sozinho.`;
         vendas.textContent = '';
       } else if (rodando && m.hoje.aberta) {
-        const v = vendidoHoje(m.hoje.vendido_ate_agora, ini, fim, servidorMs, t);
-        const f = vendidoHoje(m.hoje.fichas_ate_agora, ini, fim, servidorMs, t);
+        // o que os copões que saíram no meio da noite venderam fica parado; o resto anda
+        const noCardapio = (k: 'vendido_hoje' | 'fichas_hoje') => m.cardapio.reduce((soma, c) => soma + (c[k] ?? 0), 0);
+        const v = vendidoHoje(m.hoje.vendido_ate_agora, ini, fim, servidorMs, t, m.hoje.vendido_ate_agora - noCardapio('vendido_hoje'));
+        const f = vendidoHoje(m.hoje.fichas_ate_agora, ini, fim, servidorMs, t, m.hoje.fichas_ate_agora - noCardapio('fichas_hoje'));
         status.textContent = 'Aberto';
         conta.textContent = `Fecha em ${tempo(fim - t)}`;
         linha.textContent = 'Até as 2h. A galera tá pedindo.';
@@ -308,9 +310,9 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
         linha.textContent = '';
         vendas.textContent = '';
       }
-      // a noite começou ou acabou: busca o lugar de novo (estreias, a linha da noite, o chat)
+      // a noite começou ou acabou: busca o lugar de novo (a linha da noite e o que cada copão vende, as revelações, o chat)
       if (t >= ini && t < fim && servidorMs < ini) {
-        pedir(`ini:${m.hoje.inicio}`, () => !!ultimo?.m.cardapio.some((c) => !c.revelado && Date.parse(c.primeira_noite) <= ini));
+        pedir(`ini:${m.hoje.inicio}`, () => !!ultimo?.m.cardapio.some((c) => c.vendido_hoje === null && Date.parse(c.primeira_noite) <= ini));
       }
       if (t >= fim && servidorMs < fim) pedir(`fim:${m.hoje.inicio}`, () => ultimo?.m.hoje.inicio === m.hoje.inicio);
     });
@@ -341,7 +343,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     return s;
   }
 
-  function cartaoVaga(c: CopaoCup, m: EstadoCup, ocupado: boolean, fr: Map<number, number>, atualizar: (() => void)[]): HTMLElement {
+  function cartaoVaga(c: CopaoCup, m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
     const li = el('li', 'cup-vaga');
     li.dataset.id = String(c.id);
     li.tabIndex = 0;
@@ -358,8 +360,11 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       n.append(el('b', undefined, String(c.nota)), el('span', undefined, 'nota'));
       li.append(n);
     } else {
+      // a nota sai quando ele vende a primeira noite inteira: estreando agora, às 2h
       const pn = Date.parse(c.primeira_noite);
-      li.append(el('p', 'cup-estreia', `Estreia ${quando(pn, agora())} às 18h`));
+      const t = agora();
+      li.append(el('p', 'cup-estreia', pn > t ? `Estreia ${quando(pn, t)} às 18h`
+        : c.vendido_hoje !== null && t < fim ? 'Estreando: nota às 2h' : 'Nota no fim da próxima noite'));
     }
     const nov = el('p', 'cup-vaga-linha', `Novidade ${Math.round(novidade(c.noites) * 100)}%`);
     const vendas = el('p', 'cup-vaga-linha cup-vaga-vendas');
@@ -367,15 +372,14 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const ult = m.ultima_noite?.copoes.find((x) => x.id === c.id);
     atualizar.push(() => {
       const t = agora();
-      const parte = fr.get(c.id);
-      if (t >= ini && t < fim && m.hoje.aberta && parte !== undefined) {
-        const v = vendidoHoje(m.hoje.vendido_ate_agora, ini, fim, servidorMs, t) * parte;
+      if (t >= ini && t < fim && m.hoje.aberta && c.vendido_hoje !== null) {
+        const v = vendidoHoje(c.vendido_hoje, ini, fim, servidorMs, t);
         vendas.textContent = `Hoje: ${inteiro(Math.floor(v))} vendidos`;
       } else if (ult) {
         const ontem = diaBR(t) - diaBR(Date.parse(m.ultima_noite!.inicio)) <= 1;
         vendas.textContent = `${ontem ? 'Ontem' : 'Última noite'}: ${inteiro(Math.floor(ult.vendidos))} vendidos`;
       }
-      else vendas.textContent = c.revelado ? 'Ainda não vendeu' : 'Vende a partir da estreia';
+      else vendas.textContent = Date.parse(c.primeira_noite) > t ? 'Vende a partir da estreia' : 'Ainda não vendeu';
     });
     dicas.ligar(li, `cup-vaga-${c.id}`, c.nome, () => dicaCupVaga(c));
 
@@ -414,15 +418,14 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   function desenharBar(l: LugarEstado, m: EstadoCup, ocupado: boolean) {
     const atualizar: (() => void)[] = [];
     const s = el('div', 'cup-bar');
-    s.append(blocoNoite(l, m, ocupado, atualizar));
+    s.append(blocoNoite(m, ocupado, atualizar));
 
     const card = el('section', 'cup-cardapio');
     const usadas = m.cardapio.length;
     const tit = el('h4', 'cup-rot');
     tit.append(el('span', undefined, 'Cardápio'), el('span', 'cup-rot-valor', `${usadas} de ${m.vagas} ${m.vagas === 1 ? 'vaga' : 'vagas'}`));
     const ol = el('ol', 'cup-vagas');
-    const fr = fracoesHoje(l, m);
-    for (const c of m.cardapio) ol.append(cartaoVaga(c, m, ocupado, fr, atualizar));
+    for (const c of m.cardapio) ol.append(cartaoVaga(c, m, ocupado, atualizar));
     for (let i = usadas; i < m.vagas; i++) {
       const li = el('li', 'cup-vaga livre');
       const bt = button('', 'cup-montar-vaga', () => abrirMontar());
@@ -450,19 +453,27 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       el('span', 'cup-pe-sub', 'vale pra quem entrar no cardápio esta semana'));
     pe.append(moda);
     const u = m.ultima_noite;
-    if (u) {
-      const ontem = el('div', 'cup-ontem');
-      const p = el('p', 'cup-ontem-num');
-      p.append(el('span', 'cup-pe-rot', tituloNoite(Date.parse(u.inicio), agora())),
-        `${inteiro(Math.floor(u.vendas))} vendidos · `, el('span', 'cup-fichas', `${comSinal(u.fichas)} fichas`),
-        ` · galera ${u.galera_delta >= 0 ? '+' : '−'}${inteiro(Math.abs(u.galera_delta))}${u.pt ? ' · deu PT' : ''}`);
-      const ver = button('Ver o chat', 'btn compacto cup-ver-chat', () => {
-        chatManual = true;
-        redesenhar();
-      });
-      ver.dataset.foco = 'cup-ver-chat';
-      ontem.append(p, ver);
-      pe.append(ontem);
+    const fechada = m.noite_fechada;
+    if (u || fechada) {
+      const dir = el('div', 'cup-pe-dir');
+      if (u) {
+        const ontem = el('div', 'cup-ontem');
+        const p = el('p', 'cup-ontem-num');
+        const g = galeraMudou(u.galera_delta);
+        p.append(el('span', 'cup-pe-rot', tituloNoite(Date.parse(u.inicio), agora())),
+          `${inteiro(Math.floor(u.vendas))} vendidos · `, el('span', 'cup-fichas', `${comSinal(u.fichas)} fichas`),
+          ` · galera ${g}${u.pt ? ' · deu PT' : ''}`);
+        const ver = button('Ver o chat', 'btn compacto cup-ver-chat', () => {
+          chatManual = true;
+          redesenhar();
+        });
+        ver.dataset.foco = 'cup-ver-chat';
+        ontem.append(p, ver);
+        dir.append(ontem);
+      }
+      // a noite que ninguém abriu (mais nova que a última aberta): uma linha embaixo
+      if (fechada) dir.append(el('p', 'cup-pe-sub cup-fechada', `Ninguém abriu o bar ${quandoFoi(Date.parse(fechada.inicio), agora())}`));
+      pe.append(dir);
     }
     s.append(pe);
 
@@ -692,7 +703,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     atualizarMontar();
   }
   function mudarPreco(d: number) {
-    const [lo, hi] = precoFaixa(sel.tamanho, sel.forca);
+    const [lo, hi] = precoFaixa(sel.base, sel.tamanho, sel.forca);
     sel.preco = Math.min(hi, Math.max(lo, sel.preco + d));
     sel.precoMexido = true;
     atualizarMontar();
@@ -760,9 +771,9 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       : ponto !== null ? `Ponto ${daBase(sel.base)}: força ${ponto}${sel.forca > ponto ? ` · na ${sel.forca}, PT ${(sel.forca - ponto) * 10}% por noite` : ''}.`
         : testes?.size ? `${nomeBase}: testou ${[...testes.keys()].sort((x, y) => x - y).join(', ')}. O ponto ainda não fechou.`
           : `Nunca testou ${aBase(sel.base)}. A estreia conta quão longe do ponto ficou.`;
-    // preço: a faixa válida pro tamanho e a força; a referência; o lucro de cada venda
-    const [lo, hi] = precoFaixa(sel.tamanho, sel.forca);
-    const ref = precoRef(sel.tamanho, sel.forca);
+    // preço: a faixa válida pra base, o tamanho e a força; a referência; o lucro de cada venda
+    const [lo, hi] = precoFaixa(sel.base, sel.tamanho, sel.forca);
+    const ref = precoRef(sel.base, sel.tamanho, sel.forca);
     if (!sel.precoMexido) sel.preco = Math.round(ref);
     sel.preco = Math.min(hi, Math.max(lo, sel.preco));
     b.precoRange.min = String(lo);
@@ -797,7 +808,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     }
     if (lucro < 0) avisos.push('Nesse preço cada venda dá prejuízo.');
     const estreia = proximaNoite(agora());
-    avisos.push(`Estreia ${quando(estreia, agora())} às 18h: aí sai a nota.`);
+    avisos.push(`Estreia ${quando(estreia, agora())} às 18h; a nota sai no fim da noite.`);
     avisosPor = avisos;
     aviso.textContent = avisos[0];
     aviso.classList.toggle('alerta', !pode && !ocupado);
@@ -914,7 +925,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const topo = el('div', 'cup-rev-topo');
     const nota = el('b', `cup-rev-nota ${nomeTier(c.nota!)}`, '0');
     nota.setAttribute('aria-label', `nota ${c.nota}`);
-    topo.append(el('p', 'sub', 'Estreou no cardápio. A galera deu a nota:'), nota, el('span', 'cup-rev-de', 'de 999'));
+    topo.append(el('p', 'sub', 'Vendeu a primeira noite. A galera deu a nota:'), nota, el('span', 'cup-rev-de', 'de 999'));
     const partes = el('ul', 'cup-partes');
     const linhas = PARTES.map(([rot, k, max]) => {
       const v = (c[k] as number | null) ?? 0;
@@ -998,7 +1009,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     };
     par('vendidos', inteiro(Math.floor(u.vendas)));
     par('fichas', comSinal(u.fichas), u.fichas < 0 ? 'ruim' : 'bom');
-    par('galera', `${u.galera_delta >= 0 ? '+' : '−'}${inteiro(Math.abs(u.galera_delta))}`, u.galera_delta < 0 ? 'ruim' : u.galera_delta > 0 ? 'bom' : '');
+    const g = galeraMudou(u.galera_delta);
+    par('galera', g, g === 'igual' ? '' : u.galera_delta < 0 ? 'ruim' : 'bom');
     lado.append(nums);
     if (u.pt) lado.append(el('p', 'cup-pt-aviso', 'Deu PT: a galera caiu 15%.'));
     const lista = el('ol', 'cup-chat-copoes');

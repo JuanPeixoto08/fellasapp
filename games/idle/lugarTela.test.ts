@@ -99,6 +99,9 @@ describe('moldura do lugar', () => {
     const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
     t.renderizar(lugar({ desafio: { id: 1, texto: 'x', premio: 'horas', premio_valor: 1.5, feito: false } }), false, 0, new Map());
     expect(t.elemento.querySelector('.desafio-premio')!.textContent).toBe('Prêmio: 1,5 h de produção em F$');
+    // o Investidor: quanto ele paga agora (ganhoInvestidor de quem joga), na faixa e na caixinha
+    t.renderizar(lugar({ desafio: { id: 1, texto: 'x', premio: 'investidor', premio_valor: 1, feito: false } }), false, 0, new Map(), 4800);
+    expect(t.elemento.querySelector('.desafio-premio')!.textContent).toBe('Prêmio: Investidor na hora (F$ 4,8 mil)');
   });
 });
 

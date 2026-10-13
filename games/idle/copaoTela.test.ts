@@ -23,7 +23,7 @@ const copao = (x: Partial<CopaoCup> = {}): CopaoCup => {
   return {
     id: proxId++, nome: 'Copão do Grau', base, mistura, extra, tamanho, forca, preco, nivel: 1, entrou_em: iso(INI - 30 * H), primeira_noite: iso(INI - 24 * H),
     saiu_em: null, revelado: true, noites: 1, vendido: 40, fichas: 400, nota: av.nota, sabor: av.sabor, cb: av.custoBeneficio, moda: av.moda,
-    aguenta: av.aguenta, rotulos: av.rotulos, chance_pt: av.chancePT, ...x,
+    aguenta: av.aguenta, rotulos: av.rotulos, chance_pt: av.chancePT, vendido_hoje: null, fichas_hoje: null, ...x,
   };
 };
 /** Posto agora: estreia hoje às 18h (sem nota ainda). */
@@ -43,7 +43,7 @@ const ultima = (cs: CopaoCup[], x: Partial<UltimaNoite> = {}): UltimaNoite => ({
   copoes: cs.map((c) => naNoite(c)), ...x,
 });
 const estado = (x: Partial<EstadoCup> = {}): EstadoCup => ({
-  moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, historico: [], ...x,
+  moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, noite_fechada: null, historico: [], ...x,
 });
 const lugar = (mec: EstadoCup | null, x: Partial<LugarEstado> = {}): LugarEstado => ({
   id: 4, moeda_nome: 'ficha', numero: 'nota', lancado: true, nome: null, frase: null, icone: null,
@@ -111,8 +111,8 @@ describe('bar: hoje à noite e o cardápio', () => {
     expect(vagas[1].querySelector('.cup-estreia')!.textContent).toBe('Estreia hoje às 18h');
     expect(vagas[1].textContent).toContain('Novidade 100%');
     expect(caixinha('cup-vaga-1')).toBe(`Nota ${a.nota}: sabor ${a.sabor} · custo-benefício ${a.cb} · moda ${a.moda} · aguenta ${a.aguenta}. `
-      + 'Novidade 90%: cai 10% por noite no cardápio, até 30%. No total: 40 vendidos, 400 fichas.');
-    expect(caixinha('cup-vaga-2')).toContain('Estreia na primeira noite');
+      + 'Novidade 90%: cai 10% por noite no cardápio, até 30%. É da receita: tirar e pôr de novo não zera. No total: 40 vendidos, 400 fichas.');
+    expect(caixinha('cup-vaga-2')).toContain('A nota sai quando ele vender a primeira noite inteira');
   });
   it('a sexta e o DJ: retrato, nome, som e as bases que vendem mais, na tela (o celular não tem caixinha)', () => {
     const { t, $ } = montar();
@@ -139,8 +139,8 @@ describe('bar: hoje à noite e o cardápio', () => {
     expect($('.cup-trocar-dj').textContent).toBe('Escolher DJ');
   });
   it('noite aberta: o relógio até as 2h e as vendas subindo (a conta do banco seguida na mesma reta)', () => {
-    const a = copao({ id: 3 });
-    const b = copao({ id: 4, base: 1, nome: 'Copão de Vodka' });
+    const a = copao({ id: 3, vendido_hoje: 12, fichas_hoje: 120 });
+    const b = copao({ id: 4, base: 1, nome: 'Copão de Vodka', vendido_hoje: 8, fichas_hoje: 80 });
     viu([3, 4]);
     vi.setSystemTime(INI + 2 * H);
     const { t, $, $$ } = montar();
@@ -148,11 +148,10 @@ describe('bar: hoje à noite e o cardápio', () => {
     expect($('.cup-status').textContent).toBe('Aberto');
     expect($('.cup-conta').textContent).toBe('Fecha em 6 h');
     expect($('.cup-vendas').textContent).toBe('20 vendidos · +200 fichas');
-    const somaCards = () => $$('.cup-vaga-vendas').reduce((s, v) => s + Number(v.textContent!.match(/(\d+) vendidos/)![1]), 0);
-    expect(somaCards()).toBeGreaterThanOrEqual(19); // as partes de cada copão somam o total (arredondando pra baixo)
+    expect($$('.cup-vaga-vendas').map((v) => v.textContent)).toEqual(['Hoje: 12 vendidos', 'Hoje: 8 vendidos']);
     vi.advanceTimersByTime(2 * H);
     expect($('.cup-vendas').textContent).toBe('40 vendidos · +400 fichas');
-    expect($$('.cup-vaga-vendas')[0].textContent).toMatch(/^Hoje: \d+ vendidos$/);
+    expect($$('.cup-vaga-vendas').map((v) => v.textContent)).toEqual(['Hoje: 24 vendidos', 'Hoje: 16 vendidos']);
     expect(recarregar).not.toHaveBeenCalled(); // o JSON já é de depois das 18h
   });
   it('chegou a hora: pede o lugar de novo (às 18h pras estreias, às 2h pro chat), uma vez cada', () => {
@@ -164,6 +163,30 @@ describe('bar: hoje à noite e o cardápio', () => {
     expect(recarregar).toHaveBeenCalledTimes(2);
     vi.advanceTimersByTime(8 * H); // às 2h, e mais uma tentativa (a noite veio igual)
     expect(recarregar).toHaveBeenCalledTimes(4);
+  });
+  it('noite aberta no prejuízo: as fichas descem; o que saiu no meio da noite fica parado no total', () => {
+    const a = copao({ id: 6, vendido_hoje: 10, fichas_hoje: -30 });
+    viu([6]);
+    vi.setSystemTime(INI + 2 * H);
+    const { t, $ } = montar();
+    // um copão que saiu às 19h vendeu 5 (−10 fichas) e parou: está no total, não no cardápio
+    t.renderizar(lugar(estado({ cardapio: [a], hoje: hoje({ vendido_ate_agora: 15, fichas_ate_agora: -40 }) }), { server_now: iso(INI + 2 * H) }),
+      false, INI + 2 * H);
+    expect($('.cup-vendas').textContent).toBe('15 vendidos · −40 fichas');
+    vi.advanceTimersByTime(2 * H);
+    expect($('.cup-vendas').textContent).toBe('25 vendidos · −70 fichas');
+    vi.advanceTimersByTime(3 * H); // 1h: 5 parados + 10 · 3,5
+    expect($('.cup-vendas').textContent).toBe('40 vendidos · −115 fichas');
+  });
+  it('estreando hoje: vende, mas a nota só sai quando a noite fechar', () => {
+    const c = novo({ id: 7, vendido_hoje: 6, fichas_hoje: 60 });
+    vi.setSystemTime(INI + 2 * H);
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ cardapio: [c], hoje: hoje({ vendido_ate_agora: 6, fichas_ate_agora: 60 }) }), { server_now: iso(INI + 2 * H) }),
+      false, INI + 2 * H);
+    expect(t.elemento.dataset.estado).toBe('bar');
+    expect($('.cup-estreia').textContent).toBe('Estreando: nota às 2h');
+    expect($('.cup-vaga-vendas').textContent).toBe('Hoje: 6 vendidos');
   });
   it('noite que ninguém abriu: diz por quê', () => {
     vi.setSystemTime(INI + H);
@@ -188,6 +211,28 @@ describe('bar: hoje à noite e o cardápio', () => {
     expect(acao).toHaveBeenCalledWith('idle_cup_tirar', { p_copao: 6 });
     expect(confirmar).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+  it('a última noite fechada sem ninguém: uma linha no pé com o dia ("ontem" ou o dia da semana)', () => {
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ noite_fechada: { inicio: iso(INI - 24 * H), fim: iso(INI - 16 * H) } })), false, AGORA);
+    expect($('.cup-fechada').textContent).toBe('Ninguém abriu o bar ontem');
+    t.renderizar(lugar(estado({ noite_fechada: { inicio: iso(INI - 3 * 24 * H), fim: iso(INI - 3 * 24 * H + 8 * H) } })), false, AGORA);
+    expect($('.cup-fechada').textContent).toBe('Ninguém abriu o bar no sábado');
+    t.renderizar(lugar(estado({ noite_fechada: { inicio: iso(INI - 2 * 24 * H), fim: iso(INI - 2 * 24 * H + 8 * H) } })), false, AGORA);
+    expect($('.cup-fechada').textContent).toBe('Ninguém abriu o bar no domingo');
+    t.renderizar(lugar(estado()), false, AGORA);
+    expect($('.cup-fechada')).toBeNull();
+  });
+  it('galera que não mudou (ou mudou menos de 0,5): "galera igual", nunca "+0" ou "−0"', () => {
+    const a = copao({ id: 9 });
+    viu([9], [280]);
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ cardapio: [a], ultima_noite: ultima([a], { galera_delta: -0.3 }) })), false, AGORA);
+    expect($('.cup-ontem-num').textContent).toBe('Ontem à noite40 vendidos · +400 fichas · galera igual');
+    t.renderizar(lugar(estado({ cardapio: [a], ultima_noite: ultima([a], { galera_delta: 0 }) })), false, AGORA);
+    expect($('.cup-ontem-num').textContent).toContain('galera igual');
+    $<HTMLButtonElement>('.cup-ver-chat').click();
+    expect([...t.elemento.querySelectorAll('.cup-chat-num dd')].map((d) => d.textContent)[2]).toBe('igual');
   });
   it('moda da semana à vista, dizendo que vale a semana em que o copão entra', () => {
     const { t, $ } = montar();
@@ -264,18 +309,22 @@ describe('montar (vaga livre)', () => {
   });
   it('preço: começa na referência, anda dentro da faixa, mostra faixa, referência e lucro', () => {
     const { $, $$ } = abrir();
-    const [lo, hi] = precoFaixa(2, 5);
+    // Copão de vodka força 5: referência 31,5
+    const [lo, hi] = precoFaixa(1, 2, 5);
     const range = $<HTMLInputElement>('.cup-preco-range');
-    expect(Number(range.value)).toBe(Math.round(precoRef(2, 5)));
+    expect(Number(range.value)).toBe(Math.round(precoRef(1, 2, 5)));
     expect([range.min, range.max]).toEqual([String(lo), String(hi)]);
-    expect($('.cup-preco-info').textContent).toMatch(new RegExp(`^De ${lo} a ${hi} · ref\\. 28 · lucro de`));
+    expect($('.cup-preco-info').textContent).toMatch(new RegExp(`^De ${lo} a ${hi} · ref\\. 32 · lucro de`));
     for (let i = 0; i < 80; i++) $<HTMLButtonElement>('.cup-preco-mais').click();
     expect(Number(range.value)).toBe(hi);
     expect($<HTMLButtonElement>('.cup-preco-mais').disabled).toBe(true);
     // trocar o tamanho pro copo prende o preço na faixa nova
     $$<HTMLButtonElement>('.cup-tamanho')[0].click();
-    expect(Number($<HTMLInputElement>('.cup-preco-range').value)).toBe(precoFaixa(1, 5)[1]);
-    expect(caixinha('cup-preco')).toContain(`Vai de ${precoFaixa(1, 5)[0]} a ${precoFaixa(1, 5)[1]} fichas`);
+    expect(Number($<HTMLInputElement>('.cup-preco-range').value)).toBe(precoFaixa(1, 1, 5)[1]);
+    expect(caixinha('cup-preco')).toContain(`Vai de ${precoFaixa(1, 1, 5)[0]} a ${precoFaixa(1, 1, 5)[1]} fichas`);
+    // a base pesa: a cachaça (mais barata) tem referência menor
+    $$<HTMLButtonElement>('.cup-base')[1].click();
+    expect(caixinha('cup-preco')).toContain(`referência ${precoRef(2, 1, 5).toLocaleString('pt-BR')}`);
   });
   it('o nome sugerido combina com o tamanho; o lucro de cada venda pequena tem uma casa', () => {
     const { $, $$ } = abrir();
@@ -283,11 +332,11 @@ describe('montar (vaga livre)', () => {
     expect($<HTMLInputElement>('.cup-nome').placeholder).not.toMatch(/^(Copão|Bald)/);
     expect($<HTMLInputElement>('.cup-nome').placeholder).toBe(nomeSugerido(1, 1, 1, 1, 0));
     $$<HTMLButtonElement>('.cup-base')[1].click(); // cachaça, custo 1
-    $$<HTMLButtonElement>('.cup-f')[5].click(); // força 6: referência 10,4 → 10 fichas, custo 1,1
-    expect($('.cup-preco-info').textContent).toContain('lucro de 8,9 por venda');
+    $$<HTMLButtonElement>('.cup-f')[5].click(); // força 6: custo 1,1, referência 1,1 · 1,5 + 7,5 = 9,15 → 9 fichas
+    expect($('.cup-preco-info').textContent).toContain('lucro de 7,9 por venda');
     $<HTMLButtonElement>('.cup-preco-menos').click();
     for (let i = 0; i < 10; i++) $<HTMLButtonElement>('.cup-preco-menos').click();
-    expect($('.cup-preco-info').textContent).toContain('lucro de 4,9 por venda'); // 6 fichas
+    expect($('.cup-preco-info').textContent).toContain('lucro de 3,9 por venda'); // 5 fichas
   });
   it('Pôr no cardápio manda tudo com os nomes p_*; nome em branco vai o sugerido; deu certo volta pro bar', () => {
     const { t, $, $$ } = abrir();
@@ -295,9 +344,9 @@ describe('montar (vaga livre)', () => {
     $$<HTMLButtonElement>('.cup-f')[5].click();
     const por = $<HTMLButtonElement>('.cup-por');
     expect(por.disabled).toBe(false);
-    expect($('.cup-aviso').textContent).toBe('Estreia hoje às 18h: aí sai a nota.');
+    expect($('.cup-aviso').textContent).toBe('Estreia hoje às 18h; a nota sai no fim da noite.');
     por.click();
-    const preco = Math.round(precoRef(2, 6));
+    const preco = Math.round(precoRef(3, 2, 6));
     expect(acao).toHaveBeenCalledWith('idle_cup_por', {
       p_base: 3, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 6, p_preco: preco, p_nome: nomeSugerido(3, 1, 1, 2, 0),
     });
@@ -336,7 +385,7 @@ describe('montar (vaga livre)', () => {
     const m = montar();
     m.t.renderizar(lugar(estado({ hoje: hoje({ vendido_ate_agora: 1 }) }), { server_now: iso(INI + H) }), false, INI + H);
     m.$<HTMLButtonElement>('.cup-montar-vaga').click();
-    expect(m.$('.cup-aviso').textContent).toBe('Estreia amanhã às 18h: aí sai a nota.');
+    expect(m.$('.cup-aviso').textContent).toBe('Estreia amanhã às 18h; a nota sai no fim da noite.');
     m.t.renderizar(lugar(estado({ hoje: hoje({ vendido_ate_agora: 1 }) }), { server_now: iso(INI + H) }), true, INI + H);
     expect(m.$<HTMLButtonElement>('.cup-por').disabled).toBe(true);
     m.$<HTMLButtonElement>('.cup-voltar').click();
@@ -357,7 +406,7 @@ describe('caixinhas do montar', () => {
     expect(caixinha('cup-base-2')).toBe('Ainda não testou com energético tradicional. Ainda não testou com limão. Ponto de força: ainda não testou.');
     expect(caixinha('cup-mistura-2')).toBe('Ainda não testou com Vodka. Ainda não testou com limão. Em alta esta semana: a nota sobe.');
     expect(caixinha('cup-extra-1')).toBe('Com Vodka: combinação ruim. Ainda não testou com energético tradicional.');
-    expect(caixinha('cup-tamanho-2')).toBe('3 doses. Preço de referência 27,5 fichas na força 5. Cada venda gasta 6 fichas de Vodka.');
+    expect(caixinha('cup-tamanho-2')).toBe('3 doses. Com Vodka na força 5: referência 31,5 fichas, cada venda gasta 6. Sai menos que o copo: vende 37% das unidades.');
   });
 });
 
@@ -555,11 +604,15 @@ describe('caderninho', () => {
 });
 
 describe('contas da tela e a mecânica registrada', () => {
-  it('vendidoHoje segue a reta do banco até o fim da noite', () => {
+  it('vendidoHoje segue a reta do banco até o fim da noite (prejuízo também); o parado não anda', () => {
     expect(vendidoHoje(20, INI, INI + 8 * H, INI + 2 * H, INI + 4 * H)).toBe(40);
     expect(vendidoHoje(20, INI, INI + 8 * H, INI + 2 * H, INI + 20 * H)).toBe(80);
     expect(vendidoHoje(0, INI, INI + 8 * H, INI + 2 * H, INI + 4 * H)).toBe(0);
     expect(vendidoHoje(5, INI, INI + 8 * H, INI - H, INI + 4 * H)).toBe(5);
+    expect(vendidoHoje(-20, INI, INI + 8 * H, INI + 2 * H, INI + 4 * H)).toBe(-40);
+    // 30 contados, 10 deles de um copão que já saiu: só os outros 20 andam
+    expect(vendidoHoje(30, INI, INI + 8 * H, INI + 2 * H, INI + 4 * H, 10)).toBe(50);
+    expect(vendidoHoje(-5, INI, INI + 8 * H, INI + 2 * H, INI + 4 * H, -15)).toBe(5);
   });
   it('MECANICAS[4] é o copão: libera, foto 48×48', () => {
     const m = MECANICAS[4]!;

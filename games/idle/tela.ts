@@ -26,7 +26,7 @@ import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
 import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
-import { promoAtiva, selosBonus } from './dourados';
+import { ganhoInvestidor, promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
@@ -676,7 +676,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     }
     if (gavetaAberta === 'mapa' && s) {
       if (noLugar) {
-        lugarTela.renderizar(m.lugar, m.ocupado, agoraTela, m.nomesLugar);
+        // o prêmio "Investidor na hora" do desafio paga o mesmo que o Investidor apressado (com o Investidor anjo e a horta)
+        const investidor = ganhoInvestidor(s.rate, efeitosDe(catalogo, s).douradoInvestidor, s.horta_bonus?.oportunidades ?? 0);
+        lugarTela.renderizar(m.lugar, m.ocupado, agoraTela, m.nomesLugar, investidor);
         noCorpo(lugarTela.elemento);
       } else {
         mapaTela.renderizar(m.mapa, s.valuation, s.era, m.ocupado);

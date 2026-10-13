@@ -9,9 +9,9 @@ import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import { CORES, custoLote, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, type Caderno } from './camisetaria';
 import {
-  aBase, BASES, chavePar, DJS, EXTRAS, forcaTestada, liberado as liberadoCup, lucroVenda as lucroVendaCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP,
-  novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup, precoRef as precoRefCup, TAMANHOS, type CadernoCup, type CopaoCup,
-  type TipoPar,
+  aBase, ALFA as ALFA_CUP, BASES, chavePar, custoVenda as custoVendaCup, DJS, EXTRAS, forcaTestada, liberado as liberadoCup,
+  lucroVenda as lucroVendaCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP, novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup,
+  precoRef as precoRefCup, TAMANHOS, type CadernoCup, type CopaoCup, type TipoPar,
 } from './copao';
 
 export type LinhaDica = { texto: string; tom?: 'bom' | 'ruim' | 'fraco' };
@@ -206,10 +206,12 @@ export function dicaMarco(m: Marco, l: LugarEstado): string {
   return l.marcos.includes(m.id) ? `${base} ${meta}. Já ganhou.` : `${base} ${meta} (${ondeEsta}).`;
 }
 
-export function dicaDesafio(d: NonNullable<LugarEstado['desafio']>): string {
+/** `investidor` = quanto o Investidor apressado paga agora (ganhoInvestidor, com o Investidor anjo e a horta); null = sem o
+ *  número. */
+export function dicaDesafio(d: NonNullable<LugarEstado['desafio']>, investidor: number | null = null): string {
   const premio = d.premio === 'horas' ? `${num(d.premio_valor)} h da sua produção em F$`
     : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado`
-      : 'um Investidor na hora (20 min de produção)';
+      : `um Investidor na hora${investidor === null ? '' : `, ${formatarValor(investidor)} agora`}`;
   return `Prêmio: ${premio}.${d.feito ? ' Já fez esta semana.' : ''}`;
 }
 
@@ -338,13 +340,13 @@ export function dicaCupExtra(extra: number, base: number, mistura: number, nivel
   return `${parTexto(cad, 1, base, extra, BASES[base - 1].nome)} ${parTexto(cad, 2, mistura, extra, minusc(MISTURAS[mistura - 1].nome))}`;
 }
 
-/** O tamanho: doses, a referência na força escolhida e o custo de cada venda com a base escolhida. */
+/** O tamanho: doses, a referência e o custo de cada venda com a base e a força escolhidas, e quanto menos ele sai. */
 export function dicaCupTamanho(tamanho: number, base: number, forca: number, nivel: number): string {
   const t = TAMANHOS[tamanho - 1];
   if (!liberadoCup('tamanho', tamanho, nivel)) return trancado(t.nivel);
-  const custo = t.doses * BASES[base - 1].custo * (0.5 + forca / 10);
-  return `${t.doses} ${t.doses === 1 ? 'dose' : 'doses'}. Preço de referência ${num(precoRefCup(tamanho, forca), 1)} fichas na força ${forca}. `
-    + `Cada venda gasta ${num(custo, 1)} fichas de ${BASES[base - 1].nome}.`;
+  const sai = t.doses === 1 ? '' : ` Sai menos que o copo: vende ${num(100 / t.doses ** ALFA_CUP, 0)}% das unidades.`;
+  return `${t.doses} ${t.doses === 1 ? 'dose' : 'doses'}. Com ${BASES[base - 1].nome} na força ${forca}: referência `
+    + `${num(precoRefCup(base, tamanho, forca), 1)} fichas, cada venda gasta ${num(custoVendaCup(base, tamanho, forca), 1)}.${sai}`;
 }
 
 /** A força na base escolhida: o que o caderninho sabe (a distância do ponto) e o risco de PT quando já dá pra saber. */
@@ -362,10 +364,10 @@ export function dicaCupForca(base: number, forca: number, cad: CadernoCup): stri
 
 /** O preço: a faixa, a referência e o lucro de cada venda. */
 export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; preco: number }): string {
-  const [lo, hi] = precoFaixaCup(c.tamanho, c.forca);
+  const [lo, hi] = precoFaixaCup(c.base, c.tamanho, c.forca);
   const lucro = lucroVendaCup(c);
   const ganho = lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`;
-  return `Vai de ${lo} a ${hi} fichas; referência ${num(precoRefCup(c.tamanho, c.forca), 1)}. Cada venda dá ${ganho}. `
+  return `Vai de ${lo} a ${hi} fichas; referência ${num(precoRefCup(c.base, c.tamanho, c.forca), 1)}. Cada venda dá ${ganho}. `
     + 'Mais caro que a referência vende menos e a nota cai; mais barato vende mais.';
 }
 
@@ -373,8 +375,8 @@ export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; 
 export function dicaCupVaga(c: CopaoCup): string {
   const nov = Math.round(novidadeCup(c.noites) * 100);
   const vendas = `No total: ${num(c.vendido, 0)} vendidos, ${num(c.fichas, 0)} fichas.`;
-  const novidade = `Novidade ${nov}%: cai 10% por noite no cardápio, até 30%.`;
-  if (!c.revelado || c.nota === null) return `Estreia na primeira noite, aí sai a nota. ${novidade}`;
+  const novidade = `Novidade ${nov}%: cai 10% por noite no cardápio, até 30%. É da receita: tirar e pôr de novo não zera.`;
+  if (!c.revelado || c.nota === null) return `A nota sai quando ele vender a primeira noite inteira; tirado antes, ela nunca sai. ${novidade}`;
   return `Nota ${c.nota}: sabor ${c.sabor} · custo-benefício ${c.cb} · moda ${c.moda} · aguenta ${c.aguenta}. ${novidade} ${vendas}`;
 }
 

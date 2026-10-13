@@ -167,7 +167,10 @@ describe('caixinhas do Mapa do rolê', () => {
   it('dica do desafio por prêmio', () => {
     expect(dicaDesafio({ id: 1, texto: 'x', premio: 'horas', premio_valor: 2, feito: false })).toBe('Prêmio: 2 h da sua produção em F$.');
     expect(dicaDesafio({ id: 1, texto: 'x', premio: 'legado', premio_valor: 3, feito: true })).toBe('Prêmio: 3 pontos do Legado. Já fez esta semana.');
-    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'investidor', premio_valor: 1, feito: false })).toBe('Prêmio: um Investidor na hora (20 min de produção).');
+    // o Investidor diz quanto paga agora (ganhoInvestidor: com o Investidor anjo e a horta); sem o número, só o nome
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'investidor', premio_valor: 1, feito: false }, 2400))
+      .toBe('Prêmio: um Investidor na hora, F$ 2,4 mil agora.');
+    expect(dicaDesafio({ id: 1, texto: 'x', premio: 'investidor', premio_valor: 1, feito: false })).toBe('Prêmio: um Investidor na hora.');
     expect(dicaDesafio({ id: 1, texto: 'x', premio: 'legado', premio_valor: 1, feito: false })).toBe('Prêmio: 1 ponto do Legado.');
   });
   const lugar = (x: Partial<LugarEstado> = {}): LugarEstado => ({

@@ -42,7 +42,8 @@ export const ativos = {
   mapa: (): string | null => portas.mapa ?? null,
   /** Retrato 32x32 do convidado do PPP Podcast (1 a 11). */
   convidado: (id: number): string | null => convidados[`convidado-${String(id).padStart(2, '0')}`] ?? null,
-  /** Retrato 64x64 do DJ do copão (1 a 10, na ordem de DJS em copao.ts). */
+  /** Retrato 64x64 do DJ do copão (1 a 10, na ordem de DJS em copao.ts). Os retratos 8 (Veigh) e 9 (Ferrugem) foram
+   *  feitos pelo Juan à mão: não regerar. Os outros saem do gerador de retratos. */
   dj: (id: number): string | null => djs[`dj-${String(id).padStart(2, '0')}`] ?? null,
   /** Ícone 16x16 da conquista (null = a arte ainda não chegou). */
   conquista: (id: number): string | null => conquistas[`conquista-${String(id).padStart(3, '0')}`] ?? null,

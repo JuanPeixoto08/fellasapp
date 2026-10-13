@@ -14,8 +14,10 @@ import { aplicarTema } from './temasLugar';
 /** Um número da moeda do lugar, resumido como o F$ ("1,2 mil"), sem o "F$". */
 const quantia = (n: number) => formatarValor(n).replace('F$ ', '');
 const ROTULO_MARCO = (m: Marco) => (m.tipo === 'nivel' ? `Nív. ${m.valor}` : m.tipo === 'lendario' ? 'Lenda' : m.tipo === 'fas' ? 'Fãs' : 'Volume');
-const PREMIO = (d: NonNullable<LugarEstado['desafio']>) => (d.premio === 'horas' ? `${num(d.premio_valor)} h de produção em F$`
-  : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado` : 'Investidor na hora');
+/** `investidor` = quanto o Investidor apressado paga agora (ganhoInvestidor); null = sem o número. */
+const PREMIO = (d: NonNullable<LugarEstado['desafio']>, investidor: number | null) => (d.premio === 'horas' ? `${num(d.premio_valor)} h de produção em F$`
+  : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado`
+    : `Investidor na hora${investidor === null ? '' : ` (${formatarValor(investidor)})`}`);
 
 export function criarLugarTela(
   a: { voltar(): void; nivel(id: number): void; acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void; usuario?(): string | null },
@@ -42,7 +44,8 @@ export function criarLugarTela(
     return q;
   };
 
-  function renderizar(l: LugarEstado | null, ocupado: boolean, agoraMs: number, nomes: Map<string, string>): void {
+  /** `investidor` = quanto o prêmio "Investidor na hora" paga agora (ganhoInvestidor de dourados.ts; null = sem o número). */
+  function renderizar(l: LugarEstado | null, ocupado: boolean, agoraMs: number, nomes: Map<string, string>, investidor: number | null = null): void {
     aplicarTema(raiz, l?.id ?? null); // as cores do ícone do lugar (sem tema: as de sempre)
     const chave = foco.guardar();
     if (!l) {
@@ -150,10 +153,10 @@ export function criarLugarTela(
       corpoD.dataset.foco = 'desafio';
       corpoD.append(el('p', 'desafio-texto', d.texto));
       const pe = el('p', 'desafio-premio');
-      pe.append(el('span', undefined, `Prêmio: ${PREMIO(d)}`));
+      pe.append(el('span', undefined, `Prêmio: ${PREMIO(d, investidor)}`));
       if (d.feito) pe.append(el('b', 'desafio-feito', '✓ Feito'));
       corpoD.append(pe);
-      dicas.ligar(corpoD, `desafio${l.id}`, 'Desafio da semana', () => dicaDesafio(d));
+      dicas.ligar(corpoD, `desafio${l.id}`, 'Desafio da semana', () => dicaDesafio(d, investidor));
       desafio.append(corpoD);
     } else desafio.append(el('p', 'sub', 'Sem desafio essa semana.'));
 
