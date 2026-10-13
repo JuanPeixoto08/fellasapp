@@ -2,7 +2,10 @@
 // segunda. Em cada visita: recebe o que o bar vendeu até agora (a noite das 18h às 2h vende linear), fecha as noites que
 // acabaram (galera, PT, noites no cardápio), vê a revelação dos copões que já estrearam, sobe de nível enquanto der (pôr
 // copão é de graça: a ficha só sai no custo de cada venda) e mexe no cardápio: fora da noite troca o copão cuja novidade
-// caiu abaixo de 50% (6 noites abertas) e enche as vagas livres (no meio da noite só enche; o novo estreia na noite seguinte).
+// caiu abaixo de 80% (3 noites abertas) e enche as vagas livres (no meio da noite só enche; o novo estreia na noite seguinte).
+// A novidade é da receita (base, mistura, extra e tamanho): um copão novo com a receita de um que já saiu começa com as
+// noites abertas que os de antes venderam. A revelação (nota, pares, "aguenta") sai quando a primeira noite aberta dele
+// fecha com ele no cardápio.
 // Estratégias:
 //  - "no chute": base, mistura, extra e tamanho aleatórios entre o liberado, força 5, preço = referência; DJ aleatório na sexta.
 //  - "com caderninho": lembra os rótulos dos pares e o "aguenta" que viu, sabe o copão da moda da semana (público) e monta o
@@ -13,16 +16,20 @@
 //    o "aguenta" em duas forças diferentes; até lá testa (5 primeiro, depois outra força perto do palpite); sabido, põe no
 //    ponto (ponto+1 em no máximo um copão do cardápio: o risco de PT que ela aceita). DJ: o que curte as bases do cardápio
 //    (as bases de cada DJ aparecem na caixinha dele). Nunca olha tabela escondida.
-//  - "no dobro" e "no barato": iguais ao caderninho, mas sempre cobram 2× a referência / 60% da referência (sem prejuízo).
+//  - "no dobro" e "no barato": iguais ao caderninho, mas sempre cobram 2× a referência / 60% da referência.
 //    Servem para conferir que o preço certo é o que mais rende.
+//  - "repõe toda manhã": igual ao caderninho, mas na visita das 9h tira cada copão e põe de novo o mesmo (o truque de
+//    tirar e repor pra zerar a novidade, que a novidade por receita desarma).
+//  - "monta de novo toda manhã": igual ao caderninho, mas na visita das 9h tira o cardápio inteiro e monta outro (só
+//    para comparar no log: girar as receitas é jogo, não truque).
 // Sem banco: as mesmas contas puras de copao.ts e o custoNivel de mapa.ts. Sementes fixas, determinística.
 //
 // O lugar abre sem ficha (`moedaInicial` 0): a primeira noite paga o primeiro nível.
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aguenta, avaliar, BASES, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
-  lucroVenda, MISTURAS, moda, NOITE_MS, noiteIdx, noitesEntre, novidade, PONTOS, precoFaixa, precoRef, TAMANHOS, vagas, vendasNoite,
+  abreNoite, aguenta, ALFA, avaliar, BASES, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
+  lucroVenda, MISTURAS, moda, NOITE_MS, noiteIdx, noitesEntre, novidade, PONTOS, precoFaixa, precoRef, sementePT, TAMANHOS, vagas, vendasNoite,
   type Copao, type Rotulo,
 } from './copao';
 import { custoNivel, LUGARES, MARCOS, NIVEL_MAX } from './mapa';
@@ -38,18 +45,23 @@ const COPAO = LUGARES[3];
 const PAR_NOVO = 80;
 /** "aguenta" esperado de uma base nunca testada (força 5). */
 const AGUENTA_NOVO = 150;
+/** Fora da noite, o caderninho troca o copão cuja novidade caiu abaixo disso. */
+const TROCA_NOVIDADE = 0.8;
 /** O dia em que se comparam as fichas das estratégias de preço. */
 const DIA_FICHAS = 28;
 
-type Estrategia = 'chute' | 'caderninho' | 'dobro' | 'barato';
-type NoBar = Copao & { id: number; nota: number; /** a nota que a pessoa esperava (até a revelação) */ esperada: number; primeira: number; noites: number; revelado: boolean };
+type Estrategia = 'chute' | 'caderninho' | 'dobro' | 'barato' | 'troca' | 'repoe';
+type NoBar = Copao & {
+  id: number; nota: number; /** a nota que a pessoa esperava (até a revelação) */ esperada: number; primeira: number; noites: number; revelado: boolean;
+  /** quando saiu do cardápio */ saiu?: number;
+};
 type NoiteSim = {
   inicio: number; aberta: boolean; sexta: boolean; nivel: number; cardapio: NoBar[]; lucro: number; creditado: number;
 };
 type Resultado = {
   nivelEm: Map<number, number>; nivelFinal: number;
-  /** cada copão posto: dia, nota, as partes (sabor, custo-benefício, moda, aguenta) e preço/referência */
-  notas: { dia: number; nota: number; partes: number[]; precoRel: number }[];
+  /** cada copão posto: dia, nota, as partes (sabor, custo-benefício, moda, aguenta), preço/referência, base e tamanho */
+  notas: { dia: number; nota: number; partes: number[]; precoRel: number; base: number; tamanho: number }[];
   galeraNoDia: { dia: number; galera: number }[];
   noites: { dia: number; aberta: boolean; lucro: number; pt: boolean; galeraAntes: number; galeraDepois: number }[];
   /** fichas ganhas (somando as vendas) até o dia DIA_FICHAS */
@@ -86,28 +98,36 @@ const FORCAS = Array.from({ length: 10 }, (_, k) => k + 1);
 /** O que a pessoa sabe dos copões que já estão no cardápio: atração esperada (nota sabida se já revelou, novidade de agora)
  *  e quanto cada pessoa que compra dele rende (o quanto o preço espanta × o lucro da venda). */
 type Outros = { atr: number; atrGanho: number };
-const rende = (c: Copao) => (precoRef(c.tamanho, c.forca) / c.preco) ** ELASTICIDADE * lucroVenda(c);
+const rende = (c: Copao) => ((precoRef(c.base, c.tamanho, c.forca) / c.preco) ** ELASTICIDADE / TAMANHOS[c.tamanho - 1].doses ** ALFA) * lucroVenda(c);
+const chaveReceita = (c: { base: number; mistura: number; extra: number; tamanho: number }) => `${c.base}-${c.mistura}-${c.extra}-${c.tamanho}`;
 
-/** O lucro esperado por pessoa do movimento, pela fatia da noite de cada copão (nota esperada) vezes o que ele rende:
- *  `cardapio` = do cardápio inteiro com o copão novo (o novo barato tira venda dos outros dela); senão só o do novo. */
-function lucroEsperado(n0: number, c: Copao, outros: Outros, canibal: number, cardapio: boolean): number {
-  const nota = Math.min(999, n0 + custoBeneficio(c.tamanho, c.forca, c.preco));
-  const atr = (nota / 999) ** 2 * canibal;
+/** O lucro esperado por pessoa do movimento, pela fatia da noite de cada copão (nota esperada × novidade da receita) vezes
+ *  o que ele rende: `cardapio` = do cardápio inteiro com o copão novo (o novo barato tira venda dos outros dela); senão só o
+ *  do novo. */
+function lucroEsperado(n0: number, c: Copao, outros: Outros, canibal: number, cardapio: boolean, nov = 1): number {
+  const nota = Math.min(999, n0 + custoBeneficio(c.base, c.tamanho, c.forca, c.preco));
+  const atr = (nota / 999) ** 2 * canibal * nov;
   const soma = atr + outros.atr;
   if (soma <= 0) return 0;
   return ((atr * rende(c) + (cardapio ? outros.atrGanho : 0)) / soma) * Math.min(1, soma);
 }
 
-/** O preço inteiro válido (sem prejuízo) que dá mais lucro esperado. */
-function melhorPreco(n0: number, c: Omit<Copao, 'preco'>, outros: Outros, canibal: number, cardapio: boolean): { preco: number; valor: number } {
-  const [lo, hi] = precoFaixa(c.tamanho, c.forca);
+/** O preço inteiro válido que dá mais lucro esperado. */
+function melhorPreco(n0: number, c: Omit<Copao, 'preco'>, outros: Outros, canibal: number, cardapio: boolean, nov = 1): { preco: number; valor: number } {
+  const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
   let melhor = { preco: hi, valor: -Infinity };
   for (let preco = lo; preco <= hi; preco++) {
-    if (lucroVenda({ ...c, preco }) <= 0) continue;
-    const valor = lucroEsperado(n0, { ...c, preco }, outros, canibal, cardapio);
+    const valor = lucroEsperado(n0, { ...c, preco }, outros, canibal, cardapio, nov);
     if (valor > melhor.valor) melhor = { preco, valor };
   }
   return melhor;
+}
+
+/** Quanto um copão sozinho rende por pessoa do movimento, por unidade de atração (a nota sem o custo-benefício = n0, força
+ *  no ponto da base), no preço que mais rende: o custo-benefício do preço entra na nota. Compara bases e tamanhos. */
+function rendePorAtracao(base: number, tamanho: number, n0: number): number {
+  const forca = BASES[base - 1].ponto;
+  return melhorPreco(n0, { base, mistura: 1, extra: 1, tamanho, forca }, { atr: 0, atrGanho: 0 }, 1, false).valor;
 }
 
 /** `pula(dia, hora)`: a visita que a pessoa não fez. */
@@ -132,6 +152,8 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
   // caderninho
   const pares = new Map<string, Rotulo>(); // "tipo-a-b" → rótulo
   const vistos = new Map<number, { forca: number; aguenta: number }[]>(); // base → "aguenta" revelado em cada força
+  /** receita → noites abertas em que um copão dela estava no cardápio (a novidade é da receita) */
+  const historia = new Map<string, number>();
 
   /** Pontos que batem com tudo o que viu da base. */
   const candidatos = (base: number) => FORCAS.filter((p) => (vistos.get(base) ?? []).every((o) => aguenta(o.forca, p) === o.aguenta));
@@ -143,13 +165,28 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
     return cs.length === 1 ? cs[0] : undefined;
   }
 
+  /** A revelação: rótulos e "aguenta" de quem fechou a primeira noite aberta no cardápio. */
+  function revelar(c: NoBar): void {
+    c.revelado = true;
+    const a = avaliar(c, semanaDe(c.primeira));
+    const [bm, be, me] = a.rotulos;
+    pares.set(`0-${c.base}-${c.mistura}`, bm);
+    pares.set(`1-${c.base}-${c.extra}`, be);
+    pares.set(`2-${c.mistura}-${c.extra}`, me);
+    const os = vistos.get(c.base) ?? [];
+    if (!os.some((o) => o.forca === c.forca)) vistos.set(c.base, [...os, { forca: c.forca, aguenta: a.aguenta }]);
+  }
+
   function fechar(n: NoiteSim): void {
     const antes = galera;
     let pt = false;
     if (n.aberta) {
-      pt = n.cardapio.some((c) => deuPT(c.id, noiteIdx(n.inicio), chancePT(c.forca, BASES[c.base - 1].ponto)));
+      pt = n.cardapio.some((c) => deuPT(sementePT(c.base, c.mistura, c.extra, c.tamanho), noiteIdx(n.inicio), chancePT(c.forca, BASES[c.base - 1].ponto)));
       galera = galeraNoite(galera, n.nivel, n.cardapio.map((c) => c.nota), pt);
-      for (const c of n.cardapio) c.noites += 1;
+      for (const c of n.cardapio) {
+        c.noites += 1;
+        if (!c.revelado && (c.saiu === undefined || c.saiu >= n.inicio + NOITE_MS)) revelar(c);
+      }
     }
     noites.push({ dia: (n.inicio - INICIO) / DIA, aberta: n.aberta, lucro: n.lucro, pt, galeraAntes: antes, galeraDepois: galera });
   }
@@ -172,24 +209,13 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
       const noCardapio = cardapio.filter((c) => c.primeira <= s);
       const sexta = ehSexta(s);
       const vendas = aberta ? vendasNoite(noCardapio, { nivel, galera, sexta, dj }) : noCardapio.map(() => 0);
+      if (aberta) for (const c of noCardapio) historia.set(chaveReceita(c), (historia.get(chaveReceita(c)) ?? 0) + 1);
       const lucro = vendas.reduce((soma, v, i) => soma + v * lucroVenda(noCardapio[i]), 0);
       pendentes.push({ inicio: s, aberta, sexta, nivel, cardapio: noCardapio, lucro, creditado: 0 });
       cursor = s + 1;
     }
     creditar(t);
     while (pendentes.length && pendentes[0].inicio + NOITE_MS <= t) fechar(pendentes.shift()!);
-    // a revelação: rótulos e "aguenta" de quem já estreou
-    for (const c of cardapio) {
-      if (c.revelado || c.primeira > t) continue;
-      c.revelado = true;
-      const a = avaliar(c, semanaDe(c.primeira));
-      const [bm, be, me] = a.rotulos;
-      pares.set(`0-${c.base}-${c.mistura}`, bm);
-      pares.set(`1-${c.base}-${c.extra}`, be);
-      pares.set(`2-${c.mistura}-${c.extra}`, me);
-      const os = vistos.get(c.base) ?? [];
-      if (!os.some((o) => o.forca === c.forca)) vistos.set(c.base, [...os, { forca: c.forca, aguenta: a.aguenta }]);
-    }
   }
 
   function subir(t: number): void {
@@ -243,7 +269,7 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
           escolhe(ids(BASES, 'base', nivel)), escolhe(ids(MISTURAS, 'mistura', nivel)), escolhe(ids(EXTRAS, 'extra', nivel)), escolhe(tamanhos),
         ];
         if (repetido(base, mistura, extra, tamanho)) continue;
-        return { copao: { base, mistura, extra, tamanho, forca: 5, preco: Math.round(precoRef(tamanho, 5)) }, esperada: 0 };
+        return { copao: { base, mistura, extra, tamanho, forca: 5, preco: Math.round(precoRef(base, tamanho, 5)) }, esperada: 0 };
       }
     }
     const semana = semanaDe(t);
@@ -281,25 +307,26 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
       }
       planos.set(base, melhor);
     }
-    // 3) a combinação que mais vende com lucro (nota boa e base que rende), e o preço que dá mais lucro ao cardápio inteiro
-    let escolhido: { c: Copao; n0: number; canibal: number } | null = null;
+    // 3) a combinação que mais vende com lucro (nota boa, base que rende e receita ainda nova), e o preço que dá mais lucro
+    //    ao cardápio inteiro
+    let escolhido: { c: Copao; n0: number; canibal: number; nov: number } | null = null;
     let melhorV = -Infinity;
     for (const { base, mistura, extra, n0 } of combos) {
       const { tamanho, preco } = planos.get(base)!;
       if (repetido(base, mistura, extra, tamanho)) continue;
       const canibal = cardapio.some((c) => c.base === base && c.mistura === mistura) ? 0.7 : 1;
       const c = { base, mistura, extra, tamanho, forca: forcas.get(base)!.forca, preco };
-      const v = lucroEsperado(n0, c, outros, canibal, false) * (1 + sorte() * 0.01);
-      if (v > melhorV) [escolhido, melhorV] = [{ c, n0, canibal }, v];
+      const nov = novidade(historia.get(chaveReceita(c)) ?? 0);
+      const v = lucroEsperado(n0, c, outros, canibal, false, nov) * (1 + sorte() * 0.01);
+      if (v > melhorV) [escolhido, melhorV] = [{ c, n0, canibal, nov }, v];
     }
     if (escolhido) {
-      const { c, n0, canibal } = escolhido;
-      const [lo, hi] = precoFaixa(c.tamanho, c.forca);
-      const custo = -lucroVenda({ ...c, preco: 0 });
+      const { c, n0, canibal, nov } = escolhido;
+      const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
       const preco = estrategia === 'dobro' ? hi
-        : estrategia === 'barato' ? Math.min(hi, Math.max(lo, Math.ceil(0.6 * precoRef(c.tamanho, c.forca)), Math.floor(custo) + 1))
-          : melhorPreco(n0, c, outros, canibal, true).preco;
-      return { copao: { ...c, preco }, esperada: Math.min(999, n0 + custoBeneficio(c.tamanho, c.forca, preco)) };
+        : estrategia === 'barato' ? Math.min(hi, Math.max(lo, Math.ceil(0.6 * precoRef(c.base, c.tamanho, c.forca))))
+          : melhorPreco(n0, c, outros, canibal, true, nov).preco;
+      return { copao: { ...c, preco }, esperada: Math.min(999, n0 + custoBeneficio(c.base, c.tamanho, c.forca, preco)) };
     }
     throw new Error('sem copão para pôr');
   }
@@ -308,9 +335,11 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
     const { copao: c, esperada } = montar(t);
     const primeira = primeiraNoite(t);
     const a = avaliar(c, semanaDe(t));
-    cardapio.push({ ...c, id: proximoId++, nota: a.nota, esperada, primeira, noites: 0, revelado: false });
+    // a novidade é da receita: começa com as noites abertas que os copões de antes com ela venderam
+    cardapio.push({ ...c, id: proximoId++, nota: a.nota, esperada, primeira, noites: historia.get(chaveReceita(c)) ?? 0, revelado: false });
     notas.push({
-      dia: (t - INICIO) / DIA, nota: a.nota, partes: [a.sabor, a.custoBeneficio, a.moda, a.aguenta], precoRel: c.preco / precoRef(c.tamanho, c.forca),
+      dia: (t - INICIO) / DIA, nota: a.nota, partes: [a.sabor, a.custoBeneficio, a.moda, a.aguenta], precoRel: c.preco / precoRef(c.base, c.tamanho, c.forca),
+      base: c.base, tamanho: c.tamanho,
     });
   }
 
@@ -329,7 +358,24 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
   function mexer(t: number): void {
     const noMeioDaNoite = pendentes.some((n) => t < n.inicio + NOITE_MS);
     if (!noMeioDaNoite) {
-      for (let i = cardapio.length - 1; i >= 0; i--) if (novidade(cardapio[i].noites) < 0.5) cardapio.splice(i, 1);
+      const manha = new Date(t - 3 * H).getUTCHours() === 9;
+      // "repõe toda manhã": tira cada copão e põe o mesmo de novo (a nota sai de novo, com a moda desta semana)
+      if (estrategia === 'repoe' && manha) {
+        for (const [i, c] of [...cardapio.entries()]) {
+          c.saiu = t;
+          const a = avaliar(c, semanaDe(t));
+          cardapio[i] = {
+            ...c, id: proximoId++, nota: a.nota, esperada: c.revelado ? a.nota : c.esperada, primeira: primeiraNoite(t),
+            noites: historia.get(chaveReceita(c)) ?? 0, revelado: false, saiu: undefined,
+          };
+        }
+      }
+      // "monta de novo toda manhã": tira tudo
+      const tudo = estrategia === 'troca' && manha;
+      for (let i = cardapio.length - 1; i >= 0; i--) {
+        // a idade da receita (fora da noite é igual às noites do copão; quem repõe decide pela receita, como o caderninho)
+        if (tudo || novidade(historia.get(chaveReceita(cardapio[i])) ?? 0) < TROCA_NOVIDADE) cardapio.splice(i, 1)[0].saiu = t;
+      }
     }
     while (cardapio.length < vagas(nivel)) por(t);
     if (!noMeioDaNoite) escolherDj(t);
@@ -356,14 +402,21 @@ const SEMENTES = Array.from({ length: 16 }, (_, k) => k + 1);
 const LIMIAR_GALERA = MARCOS.find((m) => m.id === 47)!.valor!;
 const diaDaGalera = (r: Resultado) => r.galeraNoDia.find((g) => g.galera >= LIMIAR_GALERA)?.dia ?? Infinity;
 
+/** Dia em que cada estratégia é comparada pelas escolhas (tamanho e base) do caderninho. */
+const DIA_ESCOLHAS = 14;
+/** A nota sem o custo-benefício de um copão típico do caderninho depois do dia 14 (sabor ~310, moda ~50, aguenta ~170). */
+const N0_TIPICO = 530;
+
 describe('balanceamento do copão (simulação)', () => {
   const caderninho = SEMENTES.map((s) => simular('caderninho', s));
   const chute = SEMENTES.map((s) => simular('chute', s));
   const dobro = SEMENTES.map((s) => simular('dobro', s));
   const barato = SEMENTES.map((s) => simular('barato', s));
+  const troca = SEMENTES.map((s) => simular('troca', s));
+  const repoe = SEMENTES.map((s) => simular('repoe', s));
 
   if (process.env.SIM_LOG) {
-    for (const [nome, rs] of [['caderninho', caderninho], ['chute', chute], ['dobro', dobro], ['barato', barato]] as const) {
+    for (const [nome, rs] of [['caderninho', caderninho], ['chute', chute], ['dobro', dobro], ['barato', barato], ['troca', troca], ['repoe', repoe]] as const) {
       for (const [k, r] of rs.entries()) {
         const semanas = Array.from({ length: 8 }, (_, w) => mediaEntre(r, 7 * w, 7 * w + 7).toFixed(0)).join(' ');
         const g = (d: number) => r.galeraNoDia.find((x) => x.dia >= d)?.galera.toFixed(0);
@@ -380,7 +433,19 @@ describe('balanceamento do copão (simulação)', () => {
     console.log(`resumo: caderninho n10 ${faixa(caderninho.map((r) => r.nivelEm.get(10)!))} n25 ${faixa(caderninho.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
       + ` nota 14+ ${media(caderninho.map((r) => mediaEntre(r, 14, 49))).toFixed(0)} marco de galera (mediana) dia ${((dias[7] + dias[8]) / 2).toFixed(1)}`
       + ` | chute nota ${media(chute.map((r) => mediaEntre(r, 0, 49))).toFixed(0)} n10 ${faixa(chute.map((r) => r.nivelEm.get(10) ?? Infinity))} n25 ${faixa(chute.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
-      + ` | fichas d${DIA_FICHAS}: caderninho ${fichas(caderninho)} dobro ${fichas(dobro)} barato ${fichas(barato)} chute ${fichas(chute)}`);
+      + ` | fichas d${DIA_FICHAS}: caderninho ${fichas(caderninho)} dobro ${fichas(dobro)} barato ${fichas(barato)} repõe ${fichas(repoe)} monta de novo ${fichas(troca)} chute ${fichas(chute)}`
+      + ` | barato perde em ${barato.filter((r, k) => r.fichasAte < caderninho[k].fichasAte).length}/16, repõe não ganha em ${repoe.filter((r, k) => r.fichasAte <= caderninho[k].fichasAte).length}/16`
+      + `, monta de novo não ganha em ${troca.filter((r, k) => r.fichasAte <= caderninho[k].fichasAte).length}/16`);
+    const escolhas = caderninho.flatMap((r) => r.notas.filter((n) => n.dia >= DIA_ESCOLHAS));
+    const pct = (f: (n: (typeof escolhas)[number]) => boolean) => `${((100 * escolhas.filter(f).length) / escolhas.length).toFixed(0)}%`;
+    console.log(`escolhas do caderninho depois do dia ${DIA_ESCOLHAS}: tamanhos ${TAMANHOS.map((t) => `${t.nome} ${pct((n) => n.tamanho === t.id)}`).join(' ')}`
+      + ` | bases ${BASES.map((b) => `${b.id}:${pct((n) => n.base === b.id)}`).join(' ')}`
+      + ` | preço/ref por base ${BASES.map((b) => `${b.id}:${media(escolhas.filter((n) => n.base === b.id).map((n) => n.precoRel)).toFixed(2)}`).join(' ')}`);
+    for (const t of TAMANHOS) {
+      const vs = BASES.map((b) => rendePorAtracao(b.id, t.id, N0_TIPICO));
+      console.log(`rende por atração (n0 ${N0_TIPICO}), ${t.nome}: ${vs.map((v, k) => `${k + 1}:${(v / Math.max(...vs)).toFixed(2)}`).join(' ')}`);
+    }
+    console.log(`tamanhos por atração (Vodka): ${TAMANHOS.map((t) => rendePorAtracao(1, t.id, N0_TIPICO).toFixed(2)).join('/')}`);
   }
 
   it('com caderninho: nível 10 entre o dia 5 e o 9', () => {
@@ -408,20 +473,58 @@ describe('balanceamento do copão (simulação)', () => {
     expect(media(caderninho.map((r) => mediaEntre(r, 14, 49)))).toBeGreaterThanOrEqual(700);
   });
 
-  it('com caderninho: nenhuma noite com lucro negativo', () => {
-    for (const r of caderninho) for (const n of r.noites) expect(n.lucro).toBeGreaterThanOrEqual(0);
-  });
-
   // O preço certo é o que mais rende: cobrar sempre o dobro (nota baixa e a galera foge do preço) rende bem menos fichas até
   // o dia 28 que o preço do caderninho, em cada semente.
   it('cobrar sempre o dobro da referência rende menos que o preço do caderninho até o dia 28', () => {
     for (const [k, r] of dobro.entries()) expect(r.fichasAte).toBeLessThanOrEqual(caderninho[k].fichasAte);
   });
 
-  // 60% fica perto do topo (o lucro por pessoa é chato entre 50% e 80% da referência nas bases baratas): rende menos na
-  // média das sementes, não em cada uma (empata em ±0,5%).
-  it('cobrar sempre 60% da referência rende menos que o preço do caderninho até o dia 28 (média das sementes)', () => {
-    expect(media(barato.map((r) => r.fichasAte))).toBeLessThan(media(caderninho.map((r) => r.fichasAte)));
+  // 60% fica perto do topo nas bases baratas (o melhor preço delas é ~0,6× a referência): rende menos na maioria das
+  // sementes, não em todas.
+  it('cobrar sempre 60% da referência rende menos que o preço do caderninho até o dia 28 (na maioria das sementes)', () => {
+    expect(barato.filter((r, k) => r.fichasAte < caderninho[k].fichasAte).length).toBeGreaterThan(SEMENTES.length / 2);
+  });
+
+  // Tirar e repor pra zerar a novidade não funciona: a novidade é da receita (com a novidade por copão, repor toda manhã
+  // deixava a novidade sempre em 100%).
+  it('tirar e repor o mesmo copão toda manhã não rende mais que o caderninho até o dia 28', () => {
+    expect(repoe.filter((r, k) => r.fichasAte <= caderninho[k].fichasAte).length).toBeGreaterThan(SEMENTES.length / 2);
+    expect(media(repoe.map((r) => r.fichasAte))).toBeLessThanOrEqual(media(caderninho.map((r) => r.fichasAte)));
+  });
+
+  // Nenhum tamanho é sempre pior: ou o caderninho escolhe ele em 10% das vezes depois do dia 14, ou ele rende pelo menos 70%
+  // do melhor tamanho por unidade de atração, com cada base no preço que mais rende.
+  it('nenhum tamanho dominado', () => {
+    const escolhas = caderninho.flatMap((r) => r.notas.filter((n) => n.dia >= DIA_ESCOLHAS));
+    for (const t of TAMANHOS) {
+      if (escolhas.filter((n) => n.tamanho === t.id).length >= 0.1 * escolhas.length) continue;
+      for (const b of BASES) {
+        const vs = TAMANHOS.map((x) => rendePorAtracao(b.id, x.id, N0_TIPICO));
+        expect(vs[t.id - 1], `${t.nome} de ${b.nome}`).toBeGreaterThanOrEqual(0.7 * Math.max(...vs));
+      }
+    }
+  });
+
+  // Nenhuma base é sempre pior: em cada tamanho, toda base rende pelo menos 60% da melhor por unidade de atração (no ponto
+  // dela, no preço que mais rende; base cara tem referência maior). Vale para copão fraco, típico e bom.
+  it('nenhuma base dominada', () => {
+    for (const n0 of [400, N0_TIPICO, 650]) {
+      for (const t of TAMANHOS) {
+        const vs = BASES.map((b) => rendePorAtracao(b.id, t.id, n0));
+        for (const [k, v] of vs.entries()) expect(v, `${BASES[k].nome} em ${t.nome}, n0 ${n0}`).toBeGreaterThanOrEqual(0.6 * Math.max(...vs));
+      }
+    }
+  });
+
+  // O preço que mais rende fica perto da referência em toda base (nenhuma pede o dobro).
+  it('o melhor preço de cada base fica entre 0,5× e 1,3× a referência', () => {
+    for (const b of BASES) for (const t of TAMANHOS) {
+      const forca = b.ponto;
+      const { preco } = melhorPreco(N0_TIPICO, { base: b.id, mistura: 1, extra: 1, tamanho: t.id, forca }, { atr: 0, atrGanho: 0 }, 1, false);
+      const rel = preco / precoRef(b.id, t.id, forca);
+      expect(rel, `${t.nome} de ${b.nome}`).toBeGreaterThanOrEqual(0.5);
+      expect(rel, `${t.nome} de ${b.nome}`).toBeLessThanOrEqual(1.3);
+    }
   });
 
   // Marco de galera do copão (id 47): calibrado para a mediana do caderninho chegar por volta do dia 28.

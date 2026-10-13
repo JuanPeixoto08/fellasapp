@@ -141,7 +141,7 @@ export function chatDaNoite(n: UltimaNoite, usuario: string | null): MensagemCha
     const melhor = rs.indexOf(Math.max(...rs) as never);
     if (rs[pior] <= 1) soltas.push([preencher(tpl(PAR_RUIM), c, { a: nomes[pior][0], b: nomes[pior][1] }), 'galera']);
     else if (rs[melhor] === 4) soltas.push([preencher(tpl(PAR_BOM), c, { a: nomes[melhor][0], b: nomes[melhor][1] }), 'galera']);
-    const cb = custoBeneficio(c.tamanho, c.forca, c.preco);
+    const cb = custoBeneficio(c.base, c.tamanho, c.forca, c.preco);
     if (cb <= 60) soltas.push([preencher(tpl(CARO), c), 'galera']);
     else if (cb >= 220) soltas.push([preencher(tpl(BARATO), c), 'galera']);
     const d = c.forca - BASES[c.base - 1].ponto;

@@ -10,17 +10,17 @@ create table if not exists public.idle_cup_cat_base (
 );
 create table if not exists public.idle_cup_cat_mistura (id int primary key, nome text not null, sabores text[] not null, nivel int not null);
 create table if not exists public.idle_cup_cat_extra (id int primary key, nome text not null, sabores text[] not null, nivel int not null);
-create table if not exists public.idle_cup_cat_tamanho (
-  id int primary key, nome text not null, doses int not null, ref int not null, nivel int not null
-);
+create table if not exists public.idle_cup_cat_tamanho (id int primary key, nome text not null, doses int not null, nivel int not null);
 create table if not exists public.idle_cup_cat_dj (id int primary key, nome text not null, estilo text not null, bases int[] not null, nivel int not null);
 -- a n-ésima vaga do cardápio chega no nível dado (as 3 primeiras já vêm no nível 1)
 create table if not exists public.idle_cup_cat_vaga (vaga int primary key, nivel int not null);
 create table if not exists public.idle_cup_cat_conflito (a text not null, b text not null, primary key (a, b));
--- as constantes ajustadas na simulação (copaoSim.test.ts) e os pontos de sabor por rótulo (péssima a ótima)
+-- as constantes ajustadas na simulação (copaoSim.test.ts) e os pontos de sabor por rótulo (péssima a ótima). markup com uma
+-- casa decimal e taxa com duas, no máximo (100 × o preço de referência fica inteiro: o custo-benefício sai em inteiros)
 create table if not exists public.idle_cup_const (
   id int primary key default 1 check (id = 1), publico_base double precision not null, cresce double precision not null,
-  elasticidade double precision not null, galera_teto double precision not null, pontos int[] not null
+  elasticidade double precision not null, galera_teto double precision not null, pontos int[] not null,
+  markup double precision not null, taxa double precision not null, alfa double precision not null
 );
 alter table public.idle_cup_cat_base enable row level security;
 alter table public.idle_cup_cat_mistura enable row level security;
@@ -83,10 +83,10 @@ insert into public.idle_cup_cat_extra (id, nome, sabores, nivel) values
   (10, 'Sal na borda', '{salgado}', 16),
   (11, 'Açúcar na borda', '{doce}', 18),
   (12, 'Fruta vermelha', '{frutado}', 21);
-insert into public.idle_cup_cat_tamanho (id, nome, doses, ref, nivel) values
-  (1, 'Copo', 1, 8, 1),
-  (2, 'Copão', 3, 22, 1),
-  (3, 'Balde', 10, 60, 7);
+insert into public.idle_cup_cat_tamanho (id, nome, doses, nivel) values
+  (1, 'Copo', 1, 1),
+  (2, 'Copão', 3, 1),
+  (3, 'Balde', 10, 7);
 insert into public.idle_cup_cat_dj (id, nome, estilo, bases, nivel) values
   (1, 'DJ Vaqueiro', 'piseiro', '{2,3,12}', 1),
   (2, 'DJ Ramemes', 'funk', '{1,6,8}', 1),
@@ -101,7 +101,8 @@ insert into public.idle_cup_cat_dj (id, nome, estilo, bases, nivel) values
 insert into public.idle_cup_cat_vaga (vaga, nivel) values (4, 12), (5, 20);
 insert into public.idle_cup_cat_conflito (a, b) values
   ('cremoso', 'citrico'), ('herbal', 'doce'), ('energia', 'cremoso'), ('leve', 'forte'), ('salgado', 'doce');
-insert into public.idle_cup_const (id, publico_base, cresce, elasticidade, galera_teto, pontos) values (1, 25, 1.25, 1.25, 3, '{0,40,75,105,133}');
+insert into public.idle_cup_const (id, publico_base, cresce, elasticidade, galera_teto, pontos, markup, taxa, alfa)
+values (1, 35, 1.35, 1.25, 3, '{0,40,75,105,133}', 1.5, 7.5, 0.9);
 
 -- os desafios da semana do copão (um por semana, sorteado pela moldura; pagos no idle_cup_depois da parte B)
 delete from public.idle_cat_place_desafio where lugar = 4;
@@ -121,9 +122,11 @@ insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio
 
 -- ===== o estado do bar (só pelas funções) =====
 -- Os copões: tudo o que é determinístico sai na hora de pôr (rótulos, partes da nota, nota, chance de PT, com a moda da
--- semana em que entrou) e só aparece na tela a partir da primeira noite. primeira_noite = o início da primeira noite que
--- começa depois de entrar (às 18h em ponto conta a de agora); saiu_em = tirado do cardápio (null = está nele).
--- revelado, noites, vendido e fichas: a parte B (revelação no depois; noites no cardápio, copões vendidos e fichas no avancar).
+-- semana em que entrou) e só aparece na tela depois que ele vendeu uma noite aberta inteira (revelado). primeira_noite = o
+-- início da primeira noite que começa depois de entrar (às 18h em ponto conta a de agora); saiu_em = tirado do cardápio
+-- (null = está nele). noites = as noites abertas da receita (base, mistura, extra e tamanho): começa com as que os copões
+-- de antes com a mesma receita venderam (a novidade é da receita: tirar e repor não zera). revelado, vendido e fichas: a
+-- parte B (revelação no depois; noites, copões vendidos e fichas no avancar).
 create table if not exists public.idle_cup_copoes (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
@@ -139,18 +142,20 @@ create index if not exists idle_cup_copoes_user on public.idle_cup_copoes (user_
 -- As noites do bar de cada pessoa (a parte B grava uma linha por noite, uma vez: a chave impede contar duas vezes).
 -- aberta = a pessoa passou desde a noite anterior; dj = o escolhido quando a noite foi contada; vendas e fichas = o que a
 -- noite já rendeu; fechada = o fim da noite já foi contado (galera, noites += 1), galera_delta = quanto a galera mudou;
--- vagas = as vagas do cardápio no início da noite (o "cardápio cheio" dos desafios); conferida = o idle_cup_depois já tratou
--- a noite fechada (conquista do PT e desafios: uma vez).
+-- vagas = as vagas do cardápio no início da noite (o "cardápio cheio" dos desafios); nivel e galera = os do lugar no início
+-- da noite (as vendas saíram deles; o fim da noite usa os mesmos); conferida = o idle_cup_depois já tratou a noite fechada
+-- (conquista do PT e desafios: uma vez).
 create table if not exists public.idle_cup_noites (
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
   inicio timestamptz not null, aberta boolean not null, sexta boolean not null, dj int,
   vendas double precision not null default 0, fichas double precision not null default 0, pt boolean not null default false,
   galera_delta double precision not null default 0, fechada boolean not null default false,
-  vagas int not null default 3, conferida boolean not null default false,
+  vagas int not null default 3, nivel int not null default 1, galera double precision not null default 0,
+  conferida boolean not null default false,
   primary key (user_id, inicio)
 );
 -- o que cada copão fez numa noite: total = o que ele venderia na noite inteira (fixado no início da noite), vendidos e
--- fichas = até agora (para em saiu_em), pt = deu PT nele
+-- fichas = até agora (para em saiu_em), pt = deu PT nele (o fim da noite apaga o de quem saiu com menos de 1 h de noite)
 create table if not exists public.idle_cup_noite_copoes (
   user_id uuid not null, inicio timestamptz not null,
   copao bigint not null references public.idle_cup_copoes (id) on delete cascade,
@@ -159,6 +164,8 @@ create table if not exists public.idle_cup_noite_copoes (
   primary key (user_id, inicio, copao),
   foreign key (user_id, inicio) references public.idle_cup_noites (user_id, inicio) on delete cascade
 );
+-- a chave estrangeira do copão (apagar um copão e a novidade da receita procuram por ela)
+create index if not exists idle_cup_noite_copoes_copao on public.idle_cup_noite_copoes (copao);
 -- o DJ escolhido pra sexta (null = nenhum). As vagas não ficam aqui: saem do nível do lugar (idle_cup_vagas).
 create table if not exists public.idle_cup_estado (
   user_id uuid primary key references public.idle_state (user_id) on delete cascade,
@@ -219,26 +226,33 @@ returns int language sql stable set search_path = public as $$
     from public.idle_cup_const k, (select public.idle_cup_rotulos(p_base, p_mistura, p_extra) as r) x
 $$;
 
--- preço de referência (fichas; decimal): ref do tamanho · (20 + força) / 20
-create or replace function public.idle_cup_preco_ref(p_tamanho int, p_forca int)
+-- preço de referência (fichas; decimal), como precoRef do TS e na mesma ordem: doses · custo da base · (0,5 + força/10) ·
+-- markup + doses · taxa
+create or replace function public.idle_cup_preco_ref(p_base int, p_tamanho int, p_forca int)
 returns double precision language sql stable set search_path = public as $$
-  select (t.ref * (20 + p_forca))::double precision / 20 from public.idle_cup_cat_tamanho t where t.id = p_tamanho
+  select t.doses * b.custo * (0.5::double precision + p_forca::double precision / 10) * k.markup + t.doses * k.taxa
+    from public.idle_cup_cat_base b, public.idle_cup_cat_tamanho t, public.idle_cup_const k
+   where b.id = p_base and t.id = p_tamanho
 $$;
 
 -- preço válido: inteiro de ceil(0,5 · referência) a floor(2 · referência)
-create or replace function public.idle_cup_preco_valido(p_tamanho int, p_forca int, p_preco int)
+create or replace function public.idle_cup_preco_valido(p_base int, p_tamanho int, p_forca int, p_preco int)
 returns boolean language sql stable set search_path = public as $$
   select coalesce(p_preco >= ceil(0.5::double precision * x.r) and p_preco <= floor(2::double precision * x.r), false)
-    from (select public.idle_cup_preco_ref(p_tamanho, p_forca) as r) x
+    from (select public.idle_cup_preco_ref(p_base, p_tamanho, p_forca) as r) x
 $$;
 
--- custo-benefício (0–250) em inteiros, igual ao TS: D = ref · (20 + força), num = 4D − 40·preço, den = 3D;
--- 0 se num ≤ 0, 250 se num ≥ den, senão floor((500·num + den) / (2·den)) (num > 0: a divisão inteira já é o floor)
-create or replace function public.idle_cup_custo_beneficio(p_tamanho int, p_forca int, p_preco int)
+-- custo-benefício (0–250) em inteiros, igual ao TS: D = 100 · referência = doses · (custo · (5 + força) · 10·markup +
+-- 100·taxa), num = 4D − 200·preço, den = 3D; 0 se num ≤ 0, 250 se num ≥ den, senão floor((500·num + den) / (2·den))
+-- (num > 0: a divisão inteira já é o floor)
+create or replace function public.idle_cup_custo_beneficio(p_base int, p_tamanho int, p_forca int, p_preco int)
 returns int language sql stable set search_path = public as $$
   select case when x.num <= 0 then 0 when x.num >= x.den then 250 else ((500 * x.num + x.den) / (2 * x.den))::int end
-    from (select 4 * y.d - 40 * p_preco::bigint as num, 3 * y.d as den
-            from (select t.ref::bigint * (20 + p_forca) as d from public.idle_cup_cat_tamanho t where t.id = p_tamanho) y) x
+    from (select 4 * y.d - 200 * p_preco::bigint as num, 3 * y.d as den
+            from (select t.doses::bigint * (b.custo::bigint * (5 + p_forca) * round(k.markup * 10)::bigint
+                                            + round(k.taxa * 100)::bigint) as d
+                    from public.idle_cup_cat_base b, public.idle_cup_cat_tamanho t, public.idle_cup_const k
+                   where b.id = p_base and t.id = p_tamanho) y) x
 $$;
 
 -- o copão da moda da semana (segunda de Brasília): a mesma base e a mesma mistura para todo mundo
@@ -272,10 +286,16 @@ returns int language sql immutable set search_path = public as $$
   select greatest(0, p_forca - p_ponto) * 10
 $$;
 
--- deu PT? sorte fixa por (copão, noite) (noite = idle_cup_noite_idx do início): reabrir dá o mesmo
-create or replace function public.idle_cup_deu_pt(p_copao bigint, p_noite int, p_chance int)
+-- a semente do PT: a receita (base, mistura, extra e tamanho), não o copão (tirar e pôr de novo não muda a sorte)
+create or replace function public.idle_cup_semente_pt(p_base int, p_mistura int, p_extra int, p_tamanho int)
+returns bigint language sql immutable set search_path = public as $$
+  select p_base::bigint * 4096 + p_mistura * 256 + p_extra * 16 + p_tamanho
+$$;
+
+-- deu PT? sorte fixa por (semente, noite) (noite = idle_cup_noite_idx do início): reabrir dá o mesmo
+create or replace function public.idle_cup_deu_pt(p_semente bigint, p_noite int, p_chance int)
 returns boolean language sql immutable set search_path = public as $$
-  select (p_copao * 7919 + p_noite::bigint * 104729 + 4) % 100 < p_chance
+  select (p_semente * 7919 + p_noite::bigint * 104729 + 4) % 100 < p_chance
 $$;
 
 -- a nota e as partes, como avaliar() do TS: {rot_bm, rot_be, rot_me, sabor, custo-benefício, moda, aguenta, nota, chance de PT}
@@ -287,7 +307,7 @@ declare
   v_rot   int[] := public.idle_cup_rotulos(p_base, p_mistura, p_extra);
   v_ponto int := (select b.ponto from public.idle_cup_cat_base b where b.id = p_base);
   v_sabor int := public.idle_cup_sabor(p_base, p_mistura, p_extra);
-  v_cb    int := public.idle_cup_custo_beneficio(p_tamanho, p_forca, p_preco);
+  v_cb    int := public.idle_cup_custo_beneficio(p_base, p_tamanho, p_forca, p_preco);
   v_moda  int := public.idle_cup_moda(p_base, p_mistura, p_semana);
   v_ag    int := public.idle_cup_aguenta(p_forca, v_ponto);
 begin
@@ -374,9 +394,9 @@ returns double precision language sql immutable set search_path = public as $$
 $$;
 
 -- quantos copões cada um do cardápio vende na noite inteira (na ordem dos arrays), como vendasNoite do TS e na mesma ordem
--- das contas: ((mov · atr_i) / Σatr) · participação · (ref_i / preço_i)^ELASTICIDADE · (sexta ? 2 : 1) · (curte ? 1,2 : 1),
--- com atr = (nota/999)² · novidade · canibal (0,7 se outro tem a mesma base e mistura) e participação = min(1, Σatr).
--- O DJ só conta na sexta. Σatr = 0: tudo 0.
+-- das contas: ((mov · atr_i) / Σatr) · participação · ((ref_i / preço_i)^ELASTICIDADE / doses_i^ALFA) · (sexta ? 2 : 1) ·
+-- (curte ? 1,2 : 1), com atr = (nota/999)² · novidade · canibal (0,7 se outro tem a mesma base e mistura) e participação =
+-- min(1, Σatr). O DJ só conta na sexta. Σatr = 0: tudo 0.
 create or replace function public.idle_cup_vendas_noite(p_bases int[], p_misturas int[], p_tamanhos int[], p_forcas int[],
                                                         p_precos int[], p_notas int[], p_noites int[], p_nivel int,
                                                         p_galera double precision, p_sexta boolean, p_dj int)
@@ -390,6 +410,7 @@ declare
   v_part   double precision;
   v_curte  int[];
   v_elast  double precision := (select k.elasticidade from public.idle_cup_const k);
+  v_alfa   double precision := (select k.alfa from public.idle_cup_const k);
   v_out    double precision[] := '{}';
 begin
   for i in 1..v_n loop
@@ -415,7 +436,9 @@ begin
   end if;
   for i in 1..v_n loop
     v_out := v_out || (((v_mov * v_atr[i]) / v_soma) * v_part
-                       * power(public.idle_cup_preco_ref(p_tamanhos[i], p_forcas[i]) / p_precos[i], v_elast)
+                       * (power(public.idle_cup_preco_ref(p_bases[i], p_tamanhos[i], p_forcas[i]) / p_precos[i], v_elast)
+                          / power((select t.doses from public.idle_cup_cat_tamanho t where t.id = p_tamanhos[i])::double precision,
+                                  v_alfa))
                        * case when p_sexta then 2 else 1 end::double precision
                        * case when p_bases[i] = any (coalesce(v_curte, '{}')) then 1.2 else 1 end::double precision);
   end loop;
@@ -423,7 +446,7 @@ begin
 end;
 $$;
 
--- lucro de cada venda (fichas): preço − doses · custo da base · (0,5 + força/10); pode ser negativo
+-- lucro de cada venda (fichas): preço − doses · custo da base · (0,5 + força/10) (custoVenda do TS); pode ser negativo
 create or replace function public.idle_cup_lucro_venda(p_base int, p_tamanho int, p_forca int, p_preco int)
 returns double precision language sql stable set search_path = public as $$
   select p_preco - t.doses * b.custo * (0.5::double precision + p_forca::double precision / 10)
@@ -456,7 +479,9 @@ $$;
 -- ===== pôr, tirar, DJ =====
 
 -- Põe um copão no cardápio (de graça). Calcula agora a nota e as partes (com a moda desta semana) e grava; a tela só mostra
--- a partir da primeira noite dele. Repetido = mesma base, mistura, extra e tamanho de um que está no cardápio.
+-- depois que ele vender uma noite aberta inteira. Repetido = mesma base, mistura, extra e tamanho de um que está no
+-- cardápio. A novidade é da receita: noites começa com as noites abertas em que os copões de antes com a mesma receita
+-- estavam no cardápio (as que já fecharam e a que está em andamento).
 create or replace function public.idle_cup_por(p_base int, p_mistura int, p_extra int, p_tamanho int, p_forca int,
                                                p_preco int, p_nome text)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
@@ -489,7 +514,7 @@ begin
   if p_forca is null or p_forca not between 1 and 10 then
     raise exception 'idle_cup_forca' using errcode = 'P0001';
   end if;
-  if p_preco is null or not public.idle_cup_preco_valido(p_tamanho, p_forca, p_preco) then
+  if p_preco is null or not public.idle_cup_preco_valido(p_base, p_tamanho, p_forca, p_preco) then
     raise exception 'idle_cup_preco' using errcode = 'P0001';
   end if;
   v_nome := public.idle_place_nome(p_nome);
@@ -506,10 +531,13 @@ begin
   v_id := nextval(pg_get_serial_sequence('public.idle_cup_copoes', 'id'));
   v_av := public.idle_cup_avaliar(p_base, p_mistura, p_extra, p_tamanho, p_forca, p_preco, public.games_week_start());
   insert into public.idle_cup_copoes (id, user_id, nome, base, mistura, extra, tamanho, forca, preco, nivel, nota, sabor, cb, moda,
-                                      aguenta, rot_bm, rot_be, rot_me, chance_pt, entrou_em, primeira_noite)
+                                      aguenta, rot_bm, rot_be, rot_me, chance_pt, entrou_em, primeira_noite, noites)
   overriding system value
   values (v_id, s.user_id, v_nome, p_base, p_mistura, p_extra, p_tamanho, p_forca, p_preco, st.nivel, v_av[8], v_av[4], v_av[5],
-          v_av[6], v_av[7], v_av[1], v_av[2], v_av[3], v_av[9], now(), public.idle_cup_proxima_noite(now()));
+          v_av[6], v_av[7], v_av[1], v_av[2], v_av[3], v_av[9], now(), public.idle_cup_proxima_noite(now()),
+          (select count(*)::int from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+            where c.user_id = s.user_id and c.base = p_base and c.mistura = p_mistura and c.extra = p_extra
+              and c.tamanho = p_tamanho));
   return public.idle_place_responder(s, 4);
 end;
 $$;
@@ -570,7 +598,7 @@ $$;
 
 -- ===== o JSON da tela (troca o stub da 0066; estável: só lê) =====
 
--- um copão do cardápio: nota, partes, rótulos e chance de PT só quando p_revelado (a primeira noite dele começou)
+-- um copão do cardápio: nota, partes, rótulos e chance de PT só quando p_revelado (vendeu uma noite aberta inteira)
 create or replace function public.idle_cup_copao_json(c public.idle_cup_copoes, p_revelado boolean)
 returns jsonb language sql stable set search_path = public as $$
   select jsonb_build_object(
@@ -587,11 +615,14 @@ returns jsonb language sql stable set search_path = public as $$
 $$;
 
 -- moda = o copão da moda desta semana; dj = o escolhido; vagas = as do nível; cardapio = os copões no cardápio (na ordem em
--- que entraram); hoje = a noite em andamento ou a próxima (aberta: a linha da noite diz; a que ainda não começou abre, a
--- pessoa está aqui; a parte B grava a linha assim que a noite passa do início, então às 18h em ponto ainda vale "abre";
--- vendido/fichas até agora = o que a parte B já contou); ultima_noite = a última noite aberta que fechou,
--- com o que cada copão fez e a semente do chat (o número da noite): a tela mostra o que aconteceu com a pessoa longe;
--- historico = os últimos 10 revelados (mesmo os que já saíram). Lugar fechado: null.
+-- que entraram; vendido_hoje/fichas_hoje = o que ele já vendeu na noite de hoje, null se não está nela); hoje = a noite em
+-- andamento ou a próxima (aberta: a linha da noite diz; a que ainda não começou abre, a pessoa está aqui; a parte B grava a
+-- linha assim que a noite passa do início, então às 18h em ponto ainda vale "abre"; vendido/fichas até agora = o que a
+-- parte B já contou, com os copões que já saíram); ultima_noite = a última noite aberta que fechou, com o que cada copão
+-- revelado fez (quem saiu antes do fim da primeira noite não aparece: a nota dele nunca sai) e a semente do chat (o número
+-- da noite): a tela mostra o que aconteceu com a pessoa longe; noite_fechada = a última noite que fechou sem ninguém abrir
+-- o bar, se é mais nova que a ultima_noite (null se não); historico = os últimos 10 revelados (mesmo os que já saíram).
+-- Lugar fechado: null.
 create or replace function public.idle_cup_json(s public.idle_state)
 returns jsonb language sql stable set search_path = public as $$
   select jsonb_build_object(
@@ -599,8 +630,13 @@ returns jsonb language sql stable set search_path = public as $$
                                'mistura', public.idle_cup_moda_mistura(public.games_week_start())),
     'dj', (select e.dj from public.idle_cup_estado e where e.user_id = s.user_id),
     'vagas', public.idle_cup_vagas(st.nivel),
-    'cardapio', coalesce((select jsonb_agg(public.idle_cup_copao_json(c, now() >= c.primeira_noite) order by c.entrou_em, c.id)
-                            from public.idle_cup_copoes c where c.user_id = s.user_id and c.saiu_em is null), '[]'::jsonb),
+    'cardapio', coalesce((select jsonb_agg(public.idle_cup_copao_json(c, c.revelado)
+                                           || jsonb_build_object('vendido_hoje', k.vendidos, 'fichas_hoje', k.fichas)
+                                           order by c.entrou_em, c.id)
+                            from public.idle_cup_copoes c
+                            left join public.idle_cup_noite_copoes k
+                              on k.user_id = c.user_id and k.copao = c.id and k.inicio = public.idle_cup_noite_de(now())
+                           where c.user_id = s.user_id and c.saiu_em is null), '[]'::jsonb),
     'hoje', (select jsonb_build_object('inicio', h.ini, 'fim', h.ini + interval '8 hours', 'sexta', public.idle_cup_eh_sexta(h.ini),
                                        'aberta', coalesce(n.aberta, now() <= h.ini), 'dj', n.dj,
                                        'vendido_ate_agora', coalesce(n.vendas, 0), 'fichas_ate_agora', coalesce(n.fichas, 0))
@@ -616,11 +652,18 @@ returns jsonb language sql stable set search_path = public as $$
                                                  'vendidos', x.vendidos, 'fichas', x.fichas, 'pt', x.pt)
                                                order by c.entrou_em, c.id)
                                               from public.idle_cup_noite_copoes x join public.idle_cup_copoes c on c.id = x.copao
-                                             where x.user_id = n.user_id and x.inicio = n.inicio), '[]'::jsonb))
+                                             where x.user_id = n.user_id and x.inicio = n.inicio and c.revelado), '[]'::jsonb))
                        from public.idle_cup_noites n
                       where n.user_id = s.user_id and n.aberta and n.fechada
                       order by n.inicio desc
                       limit 1),
+    'noite_fechada', (select jsonb_build_object('inicio', n.inicio, 'fim', n.inicio + interval '8 hours')
+                        from public.idle_cup_noites n
+                       where n.user_id = s.user_id and not n.aberta and n.fechada
+                         and n.inicio > coalesce((select max(m.inicio) from public.idle_cup_noites m
+                                                   where m.user_id = s.user_id and m.aberta and m.fechada), '-infinity')
+                       order by n.inicio desc
+                       limit 1),
     'historico', coalesce((select jsonb_agg(jsonb_build_object(
                                'id', h.id, 'nome', h.nome, 'base', h.base, 'mistura', h.mistura, 'extra', h.extra, 'tamanho', h.tamanho,
                                'forca', h.forca, 'preco', h.preco, 'nota', h.nota, 'sabor', h.sabor, 'cb', h.cb, 'moda', h.moda,
@@ -639,14 +682,15 @@ revoke all on function public.idle_cup_vagas(int) from public, anon, authenticat
 revoke all on function public.idle_cup_rotulo_par(text[], text[], int, int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_rotulos(int, int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_sabor(int, int, int) from public, anon, authenticated;
-revoke all on function public.idle_cup_preco_ref(int, int) from public, anon, authenticated;
-revoke all on function public.idle_cup_preco_valido(int, int, int) from public, anon, authenticated;
-revoke all on function public.idle_cup_custo_beneficio(int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_cup_preco_ref(int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_cup_preco_valido(int, int, int, int) from public, anon, authenticated;
+revoke all on function public.idle_cup_custo_beneficio(int, int, int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_moda_base(date) from public, anon, authenticated;
 revoke all on function public.idle_cup_moda_mistura(date) from public, anon, authenticated;
 revoke all on function public.idle_cup_moda(int, int, date) from public, anon, authenticated;
 revoke all on function public.idle_cup_aguenta(int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_chance_pt(int, int) from public, anon, authenticated;
+revoke all on function public.idle_cup_semente_pt(int, int, int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_deu_pt(bigint, int, int) from public, anon, authenticated;
 revoke all on function public.idle_cup_avaliar(int, int, int, int, int, int, date) from public, anon, authenticated;
 revoke all on function public.idle_cup_inicio_noite(date) from public, anon, authenticated;
@@ -679,8 +723,9 @@ grant execute on function public.idle_cup_dj(int) to authenticated;
 -- idle_lock passa). O cardápio da noite é o do início dela: copões que estrearam até o início e não saíram antes dele. O
 -- total de cada um (o que ele venderia na noite inteira, igual a vendasNoite do TS) sai agora com o nível, a galera e o DJ
 -- de agora, que são os do início: toda RPC trava e anda o bar antes de mudar qualquer um deles, e as noites são abertas e
--- fechadas em ordem (a galera e as noites no cardápio da noite anterior já entraram). O PT de cada copão é sorteado agora
--- pela semente (copão, noite): recarregar dá o mesmo. Noite que ninguém abriu: só a linha.
+-- fechadas em ordem (a galera e as noites no cardápio da noite anterior já entraram). O nível e a galera ficam gravados na
+-- linha (o fim da noite usa os mesmos). O PT de cada copão é sorteado agora pela semente (receita, noite): recarregar,
+-- ou tirar e pôr a mesma receita, dá o mesmo. Noite que ninguém abriu: só a linha.
 create or replace function public.idle_cup_noite_abrir(p_user uuid, p_inicio timestamptz, p_aberta boolean)
 returns void language plpgsql volatile set search_path = public as $$
 declare
@@ -690,6 +735,7 @@ declare
   v_ids    bigint[];
   v_bases  int[];
   v_mist   int[];
+  v_extras int[];
   v_tams   int[];
   v_forcas int[];
   v_precos int[];
@@ -699,18 +745,19 @@ declare
   v_tot    double precision[];
 begin
   select * into st from public.idle_place_state where user_id = p_user and lugar = 4;
-  insert into public.idle_cup_noites (user_id, inicio, aberta, sexta, dj, vagas)
-  values (p_user, p_inicio, p_aberta, v_sexta, v_dj, public.idle_cup_vagas(st.nivel))
+  insert into public.idle_cup_noites (user_id, inicio, aberta, sexta, dj, vagas, nivel, galera)
+  values (p_user, p_inicio, p_aberta, v_sexta, v_dj, public.idle_cup_vagas(st.nivel), st.nivel, st.fas)
   on conflict do nothing;
   if not found or not p_aberta then
     return;
   end if;
   select array_agg(c.id order by c.entrou_em, c.id), array_agg(c.base order by c.entrou_em, c.id),
-         array_agg(c.mistura order by c.entrou_em, c.id), array_agg(c.tamanho order by c.entrou_em, c.id),
+         array_agg(c.mistura order by c.entrou_em, c.id), array_agg(c.extra order by c.entrou_em, c.id),
+         array_agg(c.tamanho order by c.entrou_em, c.id),
          array_agg(c.forca order by c.entrou_em, c.id), array_agg(c.preco order by c.entrou_em, c.id),
          array_agg(c.nota order by c.entrou_em, c.id), array_agg(c.noites order by c.entrou_em, c.id),
          array_agg(c.chance_pt order by c.entrou_em, c.id)
-    into v_ids, v_bases, v_mist, v_tams, v_forcas, v_precos, v_notas, v_noites, v_chance
+    into v_ids, v_bases, v_mist, v_extras, v_tams, v_forcas, v_precos, v_notas, v_noites, v_chance
     from public.idle_cup_copoes c
    where c.user_id = p_user and c.primeira_noite <= p_inicio and (c.saiu_em is null or c.saiu_em > p_inicio);
   if v_ids is null then
@@ -718,16 +765,19 @@ begin
   end if;
   v_tot := public.idle_cup_vendas_noite(v_bases, v_mist, v_tams, v_forcas, v_precos, v_notas, v_noites, st.nivel, st.fas, v_sexta, v_dj);
   insert into public.idle_cup_noite_copoes (user_id, inicio, copao, total, pt)
-  select p_user, p_inicio, v_ids[i], v_tot[i], public.idle_cup_deu_pt(v_ids[i], public.idle_cup_noite_idx(p_inicio), v_chance[i])
+  select p_user, p_inicio, v_ids[i], v_tot[i],
+         public.idle_cup_deu_pt(public.idle_cup_semente_pt(v_bases[i], v_mist[i], v_extras[i], v_tams[i]),
+                                public.idle_cup_noite_idx(p_inicio), v_chance[i])
     from generate_subscripts(v_ids, 1) i;
 end;
 $$;
 
 -- Anda uma noite até agora: cada copão do cardápio dela vendeu o proporcional do total até min(agora, fim, saiu_em)
 -- (vendidoNaNoite do TS); as fichas (vendidos × lucro de cada venda; pode ser negativo) entram na moeda do lugar, pela
--- diferença do que já tinha entrado. No fim da noite, uma vez (fechada): a galera (galeraNoite do TS com as notas do
--- cardápio; −15% uma vez só, por mais copões em PT) e noites += 1 de cada copão do cardápio. Noite que ninguém abriu: só
--- fecha. Nada de marcos, conquistas, pódio, caderninho ou desafio aqui (isso é do idle_cup_depois).
+-- diferença do que já tinha entrado. No fim da noite, uma vez (fechada): o PT de quem saiu com menos de 1 h de noite não
+-- conta (ptConta do TS: apaga); a galera (galeraNoite do TS com a galera e o nível gravados no início da noite e as notas
+-- do cardápio; −15% uma vez só, por mais copões em PT) e noites += 1 de cada copão do cardápio. Noite que ninguém abriu:
+-- só fecha. Nada de marcos, conquistas, pódio, caderninho ou desafio aqui (isso é do idle_cup_depois).
 create or replace function public.idle_cup_noite_andar(p_user uuid, p_inicio timestamptz)
 returns void language plpgsql volatile set search_path = public as $$
 declare
@@ -739,7 +789,6 @@ declare
   v_df    double precision := 0;
   v_notas int[];
   v_pt    boolean := false;
-  v_antes double precision;
   v_g     double precision;
 begin
   select * into n from public.idle_cup_noites where user_id = p_user and inicio = p_inicio for update;
@@ -772,17 +821,20 @@ begin
     return;
   end if;
   if n.aberta then
+    update public.idle_cup_noite_copoes k set pt = false
+      from public.idle_cup_copoes c
+     where k.user_id = p_user and k.inicio = p_inicio and k.pt and c.id = k.copao
+       and c.saiu_em < p_inicio + interval '1 hour';
     select coalesce(array_agg(c.nota order by c.entrou_em, c.id), '{}'), coalesce(bool_or(k.pt), false)
       into v_notas, v_pt
       from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
      where k.user_id = p_user and k.inicio = p_inicio;
-    select st.fas, public.idle_cup_galera_noite(st.fas, st.nivel, v_notas, v_pt) into v_antes, v_g
-      from public.idle_place_state st where st.user_id = p_user and st.lugar = 4 for update;
+    v_g := public.idle_cup_galera_noite(n.galera, n.nivel, v_notas, v_pt);
     update public.idle_place_state set fas = v_g where user_id = p_user and lugar = 4;
     update public.idle_cup_copoes c set noites = c.noites + 1
       from public.idle_cup_noite_copoes k
      where k.user_id = p_user and k.inicio = p_inicio and c.id = k.copao;
-    update public.idle_cup_noites set fechada = true, pt = v_pt, galera_delta = v_g - v_antes
+    update public.idle_cup_noites set fechada = true, pt = v_pt, galera_delta = v_g - n.galera
      where user_id = p_user and inicio = p_inicio;
   else
     update public.idle_cup_noites set fechada = true where user_id = p_user and inicio = p_inicio;
@@ -824,9 +876,10 @@ end;
 $$;
 
 -- Depois da conta fechada e salva, na ordem em que aconteceu (uma marca por linha: rodar de novo não paga de novo):
--- * copão que estreou (primeira_noite ≤ agora; não conta o que saiu antes de estrear): revelado; pódio e placar com a hora
---   da estreia; caderninho (os 3 pares com o rótulo e o "aguenta" da base na força); volume + 1; lendário com nota 900+;
---   conquista da nota; desafios da nota, do sabor, da moda e do "aguenta";
+-- * copão que vendeu uma noite aberta inteira (a primeira noite aberta dele fechou com ele no cardápio; o que saiu antes
+--   nunca é revelado e não conta): revelado; pódio e placar com a hora do fim dessa noite; caderninho (os 3 pares com o
+--   rótulo e o "aguenta" da base na força); volume + 1; lendário com nota 900+; conquista da nota; desafios da nota, do
+--   sabor, da moda e do "aguenta";
 -- * noite aberta que fechou: conferida; conquista do PT; desafios da galera ganha, do cardápio cheio (a menor nota), do
 --   lucro com cardápio cheio e do copão 700+ sem PT na semana (a maior nota do cardápio, se nenhuma noite da semana deu PT
 --   até ela);
@@ -850,10 +903,13 @@ declare
   v_pt_sem  boolean;
 begin
   for e in select x.quando, x.copao, x.inicio
-             from (select k.primeira_noite as quando, k.id as copao, null::timestamptz as inicio
+             from (select min(m.inicio) + interval '8 hours' as quando, k.id as copao, null::timestamptz as inicio
                      from public.idle_cup_copoes k
-                    where k.user_id = s.user_id and not k.revelado and k.primeira_noite <= now()
-                      and (k.saiu_em is null or k.saiu_em > k.primeira_noite)
+                     join public.idle_cup_noite_copoes j on j.copao = k.id
+                     join public.idle_cup_noites m on m.user_id = j.user_id and m.inicio = j.inicio
+                    where k.user_id = s.user_id and not k.revelado and m.aberta and m.fechada
+                      and (k.saiu_em is null or k.saiu_em >= m.inicio + interval '8 hours')
+                    group by k.id
                    union all
                    select m.inicio + interval '8 hours', null::bigint, m.inicio
                      from public.idle_cup_noites m
@@ -863,7 +919,7 @@ begin
       update public.idle_cup_copoes set revelado = true where id = e.copao and not revelado returning * into c;
       continue when not found;
       perform public.idle_place_registrar(s.user_id, 4, c.nome, array[c.base, c.mistura, c.extra, c.tamanho, c.forca], c.nota,
-                                          c.primeira_noite, 0);
+                                          e.quando, 0);
       perform public.idle_place_nota(s.user_id, 4, 'par', c.base * 100 + c.mistura, 0, c.rot_bm);
       perform public.idle_place_nota(s.user_id, 4, 'par', 10000 + c.base * 100 + c.extra, 0, c.rot_be);
       perform public.idle_place_nota(s.user_id, 4, 'par', 20000 + c.mistura * 100 + c.extra, 0, c.rot_me);

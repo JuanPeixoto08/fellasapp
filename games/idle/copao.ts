@@ -9,20 +9,25 @@ export type Sabor =
 export type Base = { id: number; nome: string; sabores: readonly Sabor[]; /** força ideal */ ponto: number; /** fichas por dose */ custo: number; nivel: number };
 export type Mistura = { id: number; nome: string; sabores: readonly Sabor[]; nivel: number };
 export type Extra = { id: number; nome: string; sabores: readonly Sabor[]; nivel: number };
-export type Tamanho = { id: number; nome: string; doses: number; /** preço de referência em fichas (força 0) */ ref: number; nivel: number };
+export type Tamanho = { id: number; nome: string; doses: number; nivel: number };
 export type Dj = { id: number; nome: string; estilo: string; /** bases que combinam com o som dele */ bases: readonly number[]; nivel: number };
 export type Rotulo = 0 | 1 | 2 | 3 | 4; // péssima, ruim, ok, boa, ótima
 /** 0 = base × mistura, 1 = base × extra, 2 = mistura × extra */
 export type TipoPar = 0 | 1 | 2;
 
 /** Ajustados na simulação (copaoSim.test.ts): nível 10 entre o dia 5 e o 9, nível 25 entre o dia 35 e o 49, para quem cobra o
- *  preço que dá mais lucro ao cardápio (com a elasticidade abaixo dá uns 70% da referência no balde das bases baratas;
- *  cobrar a referência rende ~12% menos, o dobro ~80% menos). */
-export const PUBLICO_BASE = 25;
-export const CRESCE = 1.25;
-/** Quanto o preço espanta a galera: cada copão vende × (referência / preço)^ELASTICIDADE. Com 1,25 o lucro
- *  (preço − custo)·preço^−1,25 é máximo em 5 × o custo da venda. */
+ *  preço que dá mais lucro ao cardápio (perto da referência: de ~0,6× nas bases baratas a ~1× nas caras). */
+export const PUBLICO_BASE = 35;
+export const CRESCE = 1.35;
+/** Quanto o preço espanta a galera: cada copão vende × (referência / preço)^ELASTICIDADE. */
 export const ELASTICIDADE = 1.25;
+/** O preço de referência = o custo da venda × MARKUP + TAXA por dose (precoRef). MARKUP com uma casa decimal e TAXA com
+ *  duas, no máximo: 100 × a referência fica inteiro e o custo-benefício sai em inteiros (igual no banco). */
+export const MARKUP = 1.5;
+export const TAXA = 7.5;
+/** Recipiente maior vende menos unidades: as vendas de um copão são divididas por doses^ALFA (o balde rende mais por
+ *  venda, mas sai menos). */
+export const ALFA = 0.9;
 /** Teto do bônus da galera no movimento (√galera/30 para de crescer aqui: no máximo 4× o público). */
 export const GALERA_TETO = 3;
 
@@ -70,8 +75,8 @@ const extras: [string, Sabor[]][] = [
 ];
 export const EXTRAS: readonly Extra[] = extras.map(([nome, sabores], k) => ({ id: k + 1, nome, sabores, nivel: nivelDe('extra', k + 1) }));
 
-const tamanhos: [string, number, number][] = [['Copo', 1, 8], ['Copão', 3, 22], ['Balde', 10, 60]];
-export const TAMANHOS: readonly Tamanho[] = tamanhos.map(([nome, doses, ref], k) => ({ id: k + 1, nome, doses, ref, nivel: nivelDe('tamanho', k + 1) }));
+const tamanhos: [string, number][] = [['Copo', 1], ['Copão', 3], ['Balde', 10]];
+export const TAMANHOS: readonly Tamanho[] = tamanhos.map(([nome, doses], k) => ({ id: k + 1, nome, doses, nivel: nivelDe('tamanho', k + 1) }));
 
 const djs: [string, string, number[]][] = [
   ['DJ Vaqueiro', 'piseiro', [2, 3, 12]], ['DJ Ramemes', 'funk', [1, 6, 8]], ['Neiff', 'brega-funk', [8, 3, 9]],
@@ -143,28 +148,40 @@ export function sabor(base: number, mistura: number, extra: number): number {
   return rotulos(base, mistura, extra).reduce<number>((s, r) => s + PONTOS[r], 0);
 }
 
-/** Preço de referência (fichas; decimal): ref do tamanho · (20 + força) / 20. */
-export function precoRef(tamanho: number, forca: number): number {
-  return (TAMANHOS[tamanho - 1].ref * (20 + forca)) / 20;
+/** O que cada venda gasta de base (fichas; decimal): doses · custo da base · (0,5 + força/10). */
+export function custoVenda(base: number, tamanho: number, forca: number): number {
+  return TAMANHOS[tamanho - 1].doses * BASES[base - 1].custo * (0.5 + forca / 10);
+}
+
+/** Preço de referência (fichas; decimal): doses · custo da base · (0,5 + força/10) · MARKUP + doses · TAXA (nessa ordem; o
+ *  banco faz igual). Base cara e força alta pedem mais; o tamanho multiplica pelas doses. */
+export function precoRef(base: number, tamanho: number, forca: number): number {
+  const doses = TAMANHOS[tamanho - 1].doses;
+  return doses * BASES[base - 1].custo * (0.5 + forca / 10) * MARKUP + doses * TAXA;
+}
+
+/** 100 × a referência, em inteiros: doses · (custo · (5 + força) · 10·MARKUP + 100·TAXA). */
+function refCentesimos(base: number, tamanho: number, forca: number): number {
+  return TAMANHOS[tamanho - 1].doses * (BASES[base - 1].custo * (5 + forca) * Math.round(MARKUP * 10) + Math.round(TAXA * 100));
 }
 
 /** Faixa do preço (inteiro): de ceil(0,5 · referência) a floor(2 · referência). */
-export function precoFaixa(tamanho: number, forca: number): [number, number] {
-  const ref = precoRef(tamanho, forca);
+export function precoFaixa(base: number, tamanho: number, forca: number): [number, number] {
+  const ref = precoRef(base, tamanho, forca);
   return [Math.ceil(0.5 * ref), Math.floor(2 * ref)];
 }
 
-export function precoValido(tamanho: number, forca: number, preco: number): boolean {
-  const [lo, hi] = precoFaixa(tamanho, forca);
+export function precoValido(base: number, tamanho: number, forca: number, preco: number): boolean {
+  const [lo, hi] = precoFaixa(base, tamanho, forca);
   return Number.isInteger(preco) && preco >= lo && preco <= hi;
 }
 
 /** round(250 · clamp((2 − preço/ref) / 1,5, 0, 1)) com round = floor(x + 0,5), feita em inteiros para bater com o banco:
- *  com D = ref do tamanho · (20 + força), preço/ref = 20·preço/D e (2 − 20·preço/D)/1,5 = (4D − 40·preço)/(3D) = num/den;
- *  250·num/den + 0,5 = (500·num + den)/(2·den). Bate com a conta em double em todo preço válido (teste). */
-export function custoBeneficio(tamanho: number, forca: number, preco: number): number {
-  const d = TAMANHOS[tamanho - 1].ref * (20 + forca);
-  const num = 4 * d - 40 * preco;
+ *  com D = 100 · ref (inteiro, refCentesimos), preço/ref = 100·preço/D e (2 − 100·preço/D)/1,5 = (4D − 200·preço)/(3D) =
+ *  num/den; 250·num/den + 0,5 = (500·num + den)/(2·den). Bate com a conta em double em todo preço válido (teste). */
+export function custoBeneficio(base: number, tamanho: number, forca: number, preco: number): number {
+  const d = refCentesimos(base, tamanho, forca);
+  const num = 4 * d - 200 * preco;
   const den = 3 * d;
   if (num <= 0) return 0;
   if (num >= den) return 250;
@@ -198,9 +215,16 @@ export function chancePT(forca: number, ponto: number): number {
   return Math.max(0, forca - ponto) * 10;
 }
 
-/** Deu PT na noite? Sorte fixa por (copão, noite): reabrir dá o mesmo. `noite` = noiteIdx do início da noite. */
-export function deuPT(copaoId: number, noite: number, chance: number): boolean {
-  return (copaoId * 7919 + noite * 104729 + 4) % 100 < chance;
+/** A semente do PT de um copão: a receita (base, mistura, extra e tamanho), não o copão. Tirar e pôr de novo a mesma
+ *  receita não muda a sorte da noite (como a novidade, que também é da receita). */
+export function sementePT(base: number, mistura: number, extra: number, tamanho: number): number {
+  return base * 4096 + mistura * 256 + extra * 16 + tamanho;
+}
+
+/** Deu PT na noite? Sorte fixa por (semente, noite): reabrir dá o mesmo. `semente` = sementePT da receita; `noite` =
+ *  noiteIdx do início da noite. */
+export function deuPT(semente: number, noite: number, chance: number): boolean {
+  return (semente * 7919 + noite * 104729 + 4) % 100 < chance;
 }
 
 export type Copao = { base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number };
@@ -213,7 +237,7 @@ export function avaliar(c: Copao, semana: string): Avaliacao {
   const rs = rotulos(c.base, c.mistura, c.extra);
   const ponto = BASES[c.base - 1].ponto;
   const s = rs.reduce<number>((t, r) => t + PONTOS[r], 0);
-  const cb = custoBeneficio(c.tamanho, c.forca, c.preco);
+  const cb = custoBeneficio(c.base, c.tamanho, c.forca, c.preco);
   const m = moda(c.base, c.mistura, semana);
   const a = aguenta(c.forca, ponto);
   return { rotulos: rs, sabor: s, custoBeneficio: cb, moda: m, aguenta: a, nota: s + cb + m + a, chancePT: chancePT(c.forca, ponto) };
@@ -263,6 +287,13 @@ export function ehSexta(inicioMs: number): boolean {
   return new Date(inicioMs - 3 * H).getUTCDay() === 5;
 }
 
+/** O PT de um copão só conta se ele ficou no cardápio pelo menos PT_MIN_MS da noite (tirado antes não derruba a galera). */
+export const PT_MIN_MS = H;
+/** O PT do copão conta nessa noite? `saiuMs` = quando saiu do cardápio (null = ficou). */
+export function ptConta(inicioMs: number, saiuMs: number | null): boolean {
+  return saiuMs === null || saiuMs - inicioMs >= PT_MIN_MS;
+}
+
 /** Quanto do total da noite já vendeu em `tMs`: linear nas 8 h, preso nas pontas. */
 export function vendidoNaNoite(total: number, inicioMs: number, tMs: number): number {
   const t = Math.min(Math.max(tMs - inicioMs, 0), NOITE_MS);
@@ -293,9 +324,10 @@ export type Noite = { nivel: number; galera: number; sexta: boolean; /** DJ esco
 
 /** Quantos copões cada um do cardápio vende na noite inteira (na ordem do cardápio): movimento · atração_i / Σ atração ·
  *  participação · preço_i, com atração = (nota/999)² · novidade · canibal (0,7 se outro do cardápio tem a mesma base e
- *  mistura), participação = min(1, Σ atração) e preço_i = (precoRef(tamanho, força) / preço)^ELASTICIDADE. Sexta ×2, e na
- *  sexta o DJ escolhido dá ×1,2 nos copões das bases que ele curte. Ordem das contas (o banco faz igual):
- *  ((mov · atr_i) / Σatr) · participação · preço_i · (sexta ? 2 : 1) · (curte ? 1,2 : 1). */
+ *  mistura), participação = min(1, Σ atração) e preço_i = (precoRef(base, tamanho, força) / preço)^ELASTICIDADE /
+ *  doses^ALFA (o recipiente maior sai menos). Sexta ×2, e na sexta o DJ escolhido dá ×1,2 nos copões das bases que ele
+ *  curte. Ordem das contas (o banco faz igual):
+ *  ((mov · atr_i) / Σatr) · participação · ((ref_i / preço_i)^ELASTICIDADE / doses_i^ALFA) · (sexta ? 2 : 1) · (curte ? 1,2 : 1). */
 export function vendasNoite(cardapio: readonly NoCardapio[], n: Noite): number[] {
   const atracao = cardapio.map((c, i) => {
     const canibal = cardapio.some((o, j) => j !== i && o.base === c.base && o.mistura === c.mistura) ? 0.7 : 1;
@@ -308,14 +340,14 @@ export function vendasNoite(cardapio: readonly NoCardapio[], n: Noite): number[]
   const dj = n.sexta && n.dj !== null ? DJS[n.dj - 1] : null;
   return cardapio.map((c, i) => {
     const curte = dj !== null && dj.bases.includes(c.base) ? 1.2 : 1;
-    const preco = (precoRef(c.tamanho, c.forca) / c.preco) ** ELASTICIDADE;
+    const preco = (precoRef(c.base, c.tamanho, c.forca) / c.preco) ** ELASTICIDADE / TAMANHOS[c.tamanho - 1].doses ** ALFA;
     return ((mov * atracao[i]) / soma) * participacao * preco * (n.sexta ? 2 : 1) * curte;
   });
 }
 
-/** Lucro de cada venda (fichas): preço − doses · custo da base · (0,5 + força/10). Pode ser negativo e soma assim. */
+/** Lucro de cada venda (fichas): preço − custoVenda (doses · custo da base · (0,5 + força/10)). Pode ser negativo e soma assim. */
 export function lucroVenda(c: Pick<Copao, 'base' | 'tamanho' | 'forca' | 'preco'>): number {
-  return c.preco - TAMANHOS[c.tamanho - 1].doses * BASES[c.base - 1].custo * (0.5 + c.forca / 10);
+  return c.preco - custoVenda(c.base, c.tamanho, c.forca);
 }
 
 /** A galera no fim de uma noite aberta: + round(público do nível · 0,02 · média/999) com a média das notas do cardápio
@@ -351,16 +383,18 @@ export function nomeSugerido(base: number, mistura: number, extra: number, taman
 
 // ===== o que a tela do copão (copaoTela.ts) recebe e usa =====
 
-/** Um copão do cardápio (idle_cup_json → cardapio). Nota, partes, rótulos e chance de PT só depois que a primeira noite
- *  dele começou (`revelado`; antes, null). Horários em ISO. vendido e fichas = o que ele fez em todas as noites. */
+/** Um copão do cardápio (idle_cup_json → cardapio). Nota, partes, rótulos e chance de PT só depois que ele vendeu uma noite
+ *  aberta inteira (`revelado`; antes, null). Horários em ISO. vendido e fichas = o que ele fez em todas as noites;
+ *  vendido_hoje e fichas_hoje = o que já fez na noite de hoje (null = não está nela). noites = as noites da receita. */
 export type CopaoCup = {
   id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nivel: number;
   entrou_em: string; primeira_noite: string; saiu_em: string | null; revelado: boolean; noites: number; vendido: number; fichas: number;
   nota: number | null; sabor: number | null; cb: number | null; moda: number | null; aguenta: number | null;
-  rotulos: number[] | null; chance_pt: number | null;
+  rotulos: number[] | null; chance_pt: number | null; vendido_hoje: number | null; fichas_hoje: number | null;
 };
 /** A noite em andamento ou a próxima. aberta: a linha da noite diz (antes de começar, true: a pessoa está aqui); dj = o
- *  gravado quando a noite foi contada (só vale na sexta); vendido/fichas = o que o banco já contou até agora. */
+ *  gravado quando a noite foi contada (só vale na sexta); vendido/fichas = o que o banco já contou até agora (com o que
+ *  os copões que já saíram venderam antes de sair). */
 export type HojeCup = {
   inicio: string; fim: string; sexta: boolean; aberta: boolean; dj: number | null; vendido_ate_agora: number; fichas_ate_agora: number;
 };
@@ -369,7 +403,8 @@ export type CopaoNaNoite = {
   id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number;
   vendidos: number; fichas: number; pt: boolean;
 };
-/** A última noite aberta que fechou (a tela mostra o chat dela uma vez). chat_seed = o número da noite. */
+/** A última noite aberta que fechou (a tela mostra o chat dela uma vez). chat_seed = o número da noite; copoes = os
+ *  revelados (quem saiu antes do fim da primeira noite não aparece). */
 export type UltimaNoite = {
   inicio: string; fim: string; sexta: boolean; dj: number | null; vendas: number; fichas: number; pt: boolean; galera_delta: number;
   chat_seed: number; copoes: CopaoNaNoite[];
@@ -379,10 +414,11 @@ export type HistoricoCup = {
   id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number;
   sabor: number; cb: number; moda: number; aguenta: number; primeira_noite: string; saiu_em: string | null; noites: number; vendido: number; fichas: number;
 };
-/** `LugarEstado.mecanica` do lugar 4 (idle_cup_json). moda = o copão da moda desta semana; dj = o DJ escolhido pra sexta. */
+/** `LugarEstado.mecanica` do lugar 4 (idle_cup_json). moda = o copão da moda desta semana; dj = o DJ escolhido pra sexta;
+ *  noite_fechada = a última noite que fechou sem ninguém abrir o bar, se é mais nova que a ultima_noite. */
 export type EstadoCup = {
   moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: CopaoCup[]; hoje: HojeCup;
-  ultima_noite: UltimaNoite | null; historico: HistoricoCup[];
+  ultima_noite: UltimaNoite | null; noite_fechada: { inicio: string; fim: string } | null; historico: HistoricoCup[];
 };
 
 export const NOME_ROTULO: readonly string[] = ['péssima', 'ruim', 'ok', 'boa', 'ótima'];

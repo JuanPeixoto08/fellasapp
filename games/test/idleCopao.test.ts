@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LugarEstado } from '../shared/types';
 import {
-  abreNoite, aguenta, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS,
-  fimNoite, GALERA_TETO, galeraNoite, inicioNoite, liberado, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, noiteIdx,
-  noitesEntre, novidade, PONTOS, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor, TAMANHOS, vagas,
-  vendasNoite, vendidoNaNoite, type Copao, type NoCardapio, type Noite, type Sabor, type TipoPar,
+  abreNoite, aguenta, ALFA, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS,
+  fimNoite, GALERA_TETO, galeraNoite, inicioNoite, liberado, lucroVenda, MARKUP, MISTURAS, moda, modaDaSemana, movimento, noiteIdx,
+  noitesEntre, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor, sementePT,
+  TAMANHOS, TAXA, vagas, vendasNoite, vendidoNaNoite, type Copao, type NoCardapio, type Noite, type Sabor, type TipoPar,
 } from '../idle/copao';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
@@ -35,17 +35,20 @@ type CopaoLinha = {
   nota: number; sabor: number; cb: number; moda: number; aguenta: number; rot_bm: number; rot_be: number; rot_me: number; chance_pt: number;
   entrou_em: Date; primeira_noite: Date; saiu_em: Date | null; revelado: boolean; noites: number; vendido: number; fichas: number;
 };
-type NoCardapioJson = Record<string, unknown> & { id: number; nome: string; revelado: boolean; nota: number | null };
+type NoCardapioJson = Record<string, unknown> & {
+  id: number; nome: string; revelado: boolean; nota: number | null; vendido_hoje: number | null; fichas_hoje: number | null;
+};
 type Cup = {
   moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: NoCardapioJson[];
   hoje: { aberta: boolean; inicio: string; fim: string; sexta: boolean; dj: number | null; vendido_ate_agora: number; fichas_ate_agora: number };
   ultima_noite: (Record<string, unknown> & { copoes: Record<string, unknown>[] }) | null;
+  noite_fechada: { inicio: string; fim: string } | null;
   historico: (Record<string, unknown> & { id: number; nome: string })[];
 };
 type Resp = { lugar: LugarEstado & { mecanica: Cup }; marcos_novos: number[] };
 
 type Opcoes = { base: number; mistura: number; extra: number; tamanho: number; forca: number | null; preco: number | null; nome: string };
-// Vodka + Energético tradicional + Limão no Copão, força 5, 22 fichas (referência 27,5)
+// Vodka + Energético tradicional + Limão no Copão, força 5, 22 fichas (referência 31,5)
 const PADRAO: Opcoes = { base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 5, preco: 22, nome: 'Copão da Casa' };
 const por = (o: Partial<Opcoes> = {}) => {
   const x = { ...PADRAO, ...o };
@@ -91,15 +94,16 @@ describe('catálogo', () => {
     expect(misturas).toEqual(MISTURAS.map((x) => ({ ...x, sabores: [...x.sabores] })));
     const extras = await q<Record<string, unknown>>('select id, nome, sabores, nivel from public.idle_cup_cat_extra order by id');
     expect(extras).toEqual(EXTRAS.map((x) => ({ ...x, sabores: [...x.sabores] })));
-    const tamanhos = await q<Record<string, unknown>>('select id, nome, doses, ref, nivel from public.idle_cup_cat_tamanho order by id');
+    const tamanhos = await q<Record<string, unknown>>('select id, nome, doses, nivel from public.idle_cup_cat_tamanho order by id');
     expect(tamanhos).toEqual(TAMANHOS.map((x) => ({ ...x })));
     const djs = await q<Record<string, unknown>>('select id, nome, estilo, bases, nivel from public.idle_cup_cat_dj order by id');
     expect(djs).toEqual(DJS.map((x) => ({ ...x, bases: [...x.bases] })));
     const conflitos = await q<{ a: string; b: string }>('select a, b from public.idle_cup_cat_conflito order by a, b');
     expect(conflitos.map((c) => [c.a, c.b])).toEqual(
       CONFLITOS.map(([a, b]) => [a, b]).sort((x, y) => (x[0] + ' ' + x[1]).localeCompare(y[0] + ' ' + y[1])));
-    expect(await q('select publico_base, cresce, elasticidade, galera_teto, pontos from public.idle_cup_const')).toEqual([
-      { publico_base: PUBLICO_BASE, cresce: CRESCE, elasticidade: ELASTICIDADE, galera_teto: GALERA_TETO, pontos: [...PONTOS] },
+    expect(await q('select publico_base, cresce, elasticidade, galera_teto, pontos, markup, taxa, alfa from public.idle_cup_const')).toEqual([
+      { publico_base: PUBLICO_BASE, cresce: CRESCE, elasticidade: ELASTICIDADE, galera_teto: GALERA_TETO, pontos: [...PONTOS], markup: MARKUP,
+        taxa: TAXA, alfa: ALFA },
     ]);
   });
   it('vagas e o que libera em cada nível iguais a copao.ts', async () => {
@@ -144,9 +148,10 @@ describe('catálogo', () => {
     }
     const ajudantes = [
       `public.idle_cup_liberado('base', 1, 1)`, 'public.idle_cup_vagas(1)', `public.idle_cup_rotulo_par('{doce}', '{doce}', 1, 1, 0)`,
-      'public.idle_cup_rotulos(1, 1, 1)', 'public.idle_cup_sabor(1, 1, 1)', 'public.idle_cup_preco_ref(1, 5)', 'public.idle_cup_preco_valido(1, 5, 8)',
-      'public.idle_cup_custo_beneficio(1, 5, 8)', 'public.idle_cup_moda_base(current_date)', 'public.idle_cup_moda_mistura(current_date)',
-      'public.idle_cup_moda(1, 1, current_date)', 'public.idle_cup_aguenta(5, 5)', 'public.idle_cup_chance_pt(5, 5)', 'public.idle_cup_deu_pt(1, 1, 50)',
+      'public.idle_cup_rotulos(1, 1, 1)', 'public.idle_cup_sabor(1, 1, 1)', 'public.idle_cup_preco_ref(1, 1, 5)',
+      'public.idle_cup_preco_valido(1, 1, 5, 8)', 'public.idle_cup_custo_beneficio(1, 1, 5, 8)', 'public.idle_cup_moda_base(current_date)',
+      'public.idle_cup_moda_mistura(current_date)', 'public.idle_cup_moda(1, 1, current_date)', 'public.idle_cup_aguenta(5, 5)',
+      'public.idle_cup_chance_pt(5, 5)', 'public.idle_cup_semente_pt(1, 1, 1, 1)', 'public.idle_cup_deu_pt(1, 1, 50)',
       'public.idle_cup_avaliar(1, 1, 1, 1, 5, 8, current_date)', 'public.idle_cup_inicio_noite(current_date)', 'public.idle_cup_noite_idx(now())',
       'public.idle_cup_noites_entre(now(), now())', 'public.idle_cup_proxima_noite(now())', 'public.idle_cup_noite_de(now())',
       'public.idle_cup_abre_noite(now(), now())', 'public.idle_cup_eh_sexta(now())', 'public.idle_cup_vendido_noite(1, now(), now())',
@@ -209,20 +214,28 @@ describe('paridade TS × SQL', () => {
       expect(x.v, JSON.stringify([a, b, ia, ib, tipo])).toBe(rotuloPar(a, b, ia, ib, tipo));
     }
   });
-  it('preço de referência, preço válido e custo-benefício de todo tamanho, força e preço', async () => {
-    const rows = await q<{ t: number; f: number; p: number; ref: number; ok: boolean; cb: number }>(
-      `select t, f, p, public.idle_cup_preco_ref(t, f) as ref, public.idle_cup_preco_valido(t, f, p) as ok,
-              public.idle_cup_custo_beneficio(t, f, p) as cb
-         from generate_series(1, 3) t cross join generate_series(1, 10) f cross join generate_series(0, 185) p`);
+  it('preço de referência, preço válido e custo-benefício de toda base, tamanho, força e preço (e 2 a mais de cada lado)', async () => {
+    const rows = await q<{ b: number; t: number; f: number; p: number; ref: number; ok: boolean; cb: number }>(
+      `select b, t, f, p, public.idle_cup_preco_ref(b, t, f) as ref, public.idle_cup_preco_valido(b, t, f, p) as ok,
+              public.idle_cup_custo_beneficio(b, t, f, p) as cb
+         from generate_series(1, 12) b cross join generate_series(1, 3) t cross join generate_series(1, 10) f
+        cross join lateral generate_series(floor(0.5 * public.idle_cup_preco_ref(b, t, f))::int - 2,
+                                           floor(2 * public.idle_cup_preco_ref(b, t, f))::int + 2) p`);
     let validos = 0;
+    let esperados = 0;
+    for (const b of BASES) for (const tm of TAMANHOS) for (let f = 1; f <= 10; f++) {
+      const [lo, hi] = precoFaixa(b.id, tm.id, f);
+      esperados += hi - lo + 1;
+    }
     for (const x of rows) {
-      const caso = `${x.t}/${x.f}/${x.p}`;
-      expect(x.ref, caso).toBe(precoRef(x.t, x.f));
-      expect(x.ok, caso).toBe(precoValido(x.t, x.f, x.p));
-      expect(x.cb, caso).toBe(custoBeneficio(x.t, x.f, x.p));
+      const caso = `${x.b}/${x.t}/${x.f}/${x.p}`;
+      expect(x.ref, caso).toBe(precoRef(x.b, x.t, x.f));
+      expect(x.ok, caso).toBe(precoValido(x.b, x.t, x.f, x.p));
+      expect(x.cb, caso).toBe(custoBeneficio(x.b, x.t, x.f, x.p));
       if (x.ok) validos++;
     }
-    expect(validos).toBe(1732);
+    expect(validos).toBe(esperados);
+    expect(rows.length).toBeGreaterThan(validos);
   });
   it('aguenta e chance de PT de toda força contra todo ponto', async () => {
     const rows = await q<{ f: number; p: number; a: number; c: number }>(
@@ -260,7 +273,7 @@ describe('paridade TS × SQL', () => {
       const tamanho = ent(r, 1, 3);
       const ponto = BASES[base - 1].ponto;
       const forca = r() < 0.3 ? Math.min(10, Math.max(1, ponto + ent(r, -1, 1))) : ent(r, 1, 10);
-      const ref = precoRef(tamanho, forca);
+      const ref = precoRef(base, tamanho, forca);
       const lo = Math.ceil(0.5 * ref);
       const hi = Math.floor(2 * ref);
       const preco = r() < 0.15 ? lo : r() < 0.15 ? hi : ent(r, lo, hi);
@@ -279,11 +292,19 @@ describe('paridade TS × SQL', () => {
     }
     for (const [ramo, n] of Object.entries(visto)) expect(n, ramo).toBeGreaterThan(3);
   });
+  it('a semente do PT de toda receita igual a copao.ts', async () => {
+    const rows = await q<{ b: number; m: number; e: number; t: number; s: string }>(
+      `select b.id as b, m.id as m, e.id as e, t.id as t, public.idle_cup_semente_pt(b.id, m.id, e.id, t.id)::text as s
+         from public.idle_cup_cat_base b cross join public.idle_cup_cat_mistura m cross join public.idle_cup_cat_extra e
+        cross join public.idle_cup_cat_tamanho t`);
+    expect(rows).toHaveLength(12 * 15 * 12 * 3);
+    for (const x of rows) expect(Number(x.s), `${x.b}/${x.m}/${x.e}/${x.t}`).toBe(sementePT(x.b, x.m, x.e, x.t));
+  });
   it('deuPT em 200 casos (e reabrir dá o mesmo)', async () => {
     const r = rng(7919);
     let deu = 0;
     for (let i = 0; i < 200; i++) {
-      const id = ent(r, 1, 50_000_000);
+      const id = ent(r, 1, 60_000);
       const noite = ent(r, 0, 2000);
       const chance = ent(r, 0, 10) * 10;
       const [x] = await q<{ v: boolean; w: boolean }>('select public.idle_cup_deu_pt($1, $2, $3) as v, public.idle_cup_deu_pt($1, $2, $3) as w', [id, noite, chance]);
@@ -367,19 +388,20 @@ describe('paridade TS × SQL', () => {
          from generate_series(1, 12) b cross join generate_series(1, 3) t cross join generate_series(1, 10) f cross join (values (4), (22), (61)) v(p)`);
     for (const x of lucros) expect(x.l, `${x.b}/${x.t}/${x.f}/${x.p}`).toBe(lucroVenda({ base: x.b, tamanho: x.t, forca: x.f, preco: x.p }));
   });
-  it('vendas da noite em 200 cardápios (canibal, sexta, DJ, elasticidade, nota 0)', async () => {
+  it('vendas da noite em 200 cardápios (canibal, sexta, DJ, elasticidade, tamanho, nota 0)', async () => {
     const r = rng(1999);
-    const visto = { canibal: 0, sextaDj: 0, curte: 0, vazio: 0, zero: 0, cheia: 0 };
+    const visto = { canibal: 0, sextaDj: 0, curte: 0, vazio: 0, zero: 0, cheia: 0, balde: 0 };
     for (let i = 0; i < 200; i++) {
       const n = ent(r, 0, 5);
       const cardapio: NoCardapio[] = [];
       for (let k = 0; k < n; k++) {
         const repete = k > 0 && r() < 0.2 ? cardapio[ent(r, 0, k - 1)] : null;
+        const base = repete ? repete.base : ent(r, 1, 12);
         const tamanho = ent(r, 1, 3);
         const forca = ent(r, 1, 10);
-        const ref = precoRef(tamanho, forca);
+        const ref = precoRef(base, tamanho, forca);
         cardapio.push({
-          base: repete ? repete.base : ent(r, 1, 12), mistura: repete ? repete.mistura : ent(r, 1, 15), tamanho, forca,
+          base, mistura: repete ? repete.mistura : ent(r, 1, 15), tamanho, forca,
           preco: ent(r, Math.ceil(0.5 * ref), Math.floor(2 * ref)), nota: r() < 0.05 ? 0 : ent(r, 0, 999), noites: ent(r, 0, 9),
         });
       }
@@ -389,6 +411,7 @@ describe('paridade TS × SQL', () => {
       if (n === 0) visto.vazio++;
       if (n > 0 && esperado.every((v) => v === 0)) visto.zero++;
       if (somaAtr > 1) visto.cheia++;
+      if (cardapio.some((c) => c.tamanho === 3)) visto.balde++;
       if (cardapio.some((c, k) => cardapio.some((o, j) => j !== k && o.base === c.base && o.mistura === c.mistura))) visto.canibal++;
       if (noite.sexta && noite.dj !== null) {
         visto.sextaDj++;
@@ -469,6 +492,13 @@ describe('pôr um copão no cardápio', () => {
     let [c] = await copoes();
     expect(c.nome).toBe('Bomba');
     expect(c.primeira_noite.getTime()).toBe(ini + DIA);
+    // posto no meio da noite: não entra na noite de hoje (nem vende, nem aparece nela)
+    andar(H);
+    const m = (await lugar()).mecanica;
+    expect((await noitesDb()).map((n) => n.inicio.getTime())).toEqual([ini]);
+    expect(await noiteCopoes(ini)).toEqual([]);
+    expect(m.hoje.vendido_ate_agora).toBe(0);
+    expect(m.cardapio[0]).toMatchObject({ id: c.id, vendido_hoje: null, fichas_hoje: null });
     agora = ini + DIA; // quinta 18h em ponto
     vi.setSystemTime(agora);
     await por({ extra: 2 });
@@ -481,22 +511,27 @@ describe('pôr um copão no cardápio', () => {
       expect(await copoes()).toHaveLength(0);
       expect(await fichas()).toBe(0);
     };
-    // Copão força 5: referência 27,5, preço de 14 a 55
+    // Copão de vodka força 5: referência 3 · 2 · 1 · 1,5 + 3 · 7,5 = 31,5, preço de 16 a 63
     for (const [o, erro] of [
       [{ base: 4 }, /idle_cup_trancado/], [{ mistura: 5 }, /idle_cup_trancado/], [{ extra: 4 }, /idle_cup_trancado/],
       [{ tamanho: 3, preco: 75 }, /idle_cup_trancado/],
       [{ base: 13 }, /idle_bad_choice/], [{ mistura: 0 }, /idle_bad_choice/], [{ extra: 13 }, /idle_bad_choice/], [{ tamanho: 4 }, /idle_bad_choice/],
       [{ forca: 0 }, /idle_cup_forca/], [{ forca: 11 }, /idle_cup_forca/], [{ forca: null }, /idle_cup_forca/],
-      [{ preco: 13 }, /idle_cup_preco/], [{ preco: 56 }, /idle_cup_preco/], [{ preco: null }, /idle_cup_preco/], [{ preco: 0 }, /idle_cup_preco/],
+      [{ preco: 15 }, /idle_cup_preco/], [{ preco: 64 }, /idle_cup_preco/], [{ preco: null }, /idle_cup_preco/], [{ preco: 0 }, /idle_cup_preco/],
+      // a base pesa: a cachaça (custo 1) no copão força 5 vai de 3 · 1 · 1 · 1,5 + 22,5 = 27 → 14 a 54
+      [{ base: 2, preco: 55 }, /idle_cup_preco/],
       [{ nome: '   ' }, /idle_lugar_nome/], [{ nome: 'x'.repeat(31) }, /idle_lugar_nome/], [{ nome: 'a\nb' }, /idle_lugar_nome/],
     ] as [Partial<Opcoes>, RegExp][]) {
       await expect(por(o), JSON.stringify(o)).rejects.toThrow(erro);
       await nada();
     }
     // os limites da faixa passam
-    await por({ preco: 14 });
-    await por({ preco: 55, extra: 2 });
-    expect((await copoes()).map((c) => c.preco)).toEqual([14, 55]);
+    expect(precoFaixa(1, 2, 5)).toEqual([16, 63]);
+    expect(precoFaixa(2, 2, 5)).toEqual([14, 54]);
+    await por({ preco: 16 });
+    await por({ preco: 63, extra: 2 });
+    await por({ base: 2, preco: 14, extra: 3 });
+    expect((await copoes()).map((c) => c.preco)).toEqual([16, 63, 14]);
   });
   it('Review Focus 5: vaga cheia e copão repetido (mesma base, mistura, extra e tamanho)', async () => {
     await bar();
@@ -596,7 +631,9 @@ describe('o JSON do copão', () => {
     await bar();
     const m = (await lugar()).mecanica;
     const ini = inicioNoite(iso(agora).slice(0, 10));
-    expect(m).toMatchObject({ moda: modaDaSemana(await semana()), dj: null, vagas: 3, cardapio: [], ultima_noite: null, historico: [] });
+    expect(m).toMatchObject({
+      moda: modaDaSemana(await semana()), dj: null, vagas: 3, cardapio: [], ultima_noite: null, noite_fechada: null, historico: [],
+    });
     expect(m.hoje).toMatchObject({ aberta: true, sexta: false, dj: null, vendido_ate_agora: 0, fichas_ate_agora: 0 });
     expect(Date.parse(m.hoje.inicio)).toBe(ini);
     expect(Date.parse(m.hoje.fim)).toBe(ini + 8 * H);
@@ -623,20 +660,62 @@ describe('o JSON do copão', () => {
     h = (await lugar()).mecanica.hoje;
     expect(h).toMatchObject({ aberta: false, sexta: true });
   });
-  it('esconde nota, partes, rótulos e chance de PT até a primeira noite começar', async () => {
+  it('esconde nota, partes, rótulos e chance de PT até ele vender a primeira noite aberta inteira', async () => {
     await bar();
     await por();
     const [c] = await copoes();
     let k = (await lugar()).mecanica.cardapio[0];
     expect(k).toMatchObject({ id: c.id, nome: 'Copão da Casa', base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 5, preco: 22, revelado: false,
-      nota: null, sabor: null, cb: null, moda: null, aguenta: null, rotulos: null, chance_pt: null, noites: 0, vendido: 0, fichas: 0 });
+      nota: null, sabor: null, cb: null, moda: null, aguenta: null, rotulos: null, chance_pt: null, noites: 0, vendido: 0, fichas: 0,
+      vendido_hoje: null, fichas_hoje: null });
     expect(Date.parse(k.primeira_noite as string)).toBe(c.primeira_noite.getTime());
-    andar(3 * H - 1);
+    andar(3 * H + 60_000); // 18h01: a primeira noite começou, ele vende, mas a nota ainda não saiu
+    k = (await lugar()).mecanica.cardapio[0];
+    expect(k).toMatchObject({ revelado: false, nota: null, rotulos: null });
+    expect(k.vendido_hoje).toBeGreaterThan(0);
+    andar(8 * H - 2 * 60_000); // 1h59
     expect((await lugar()).mecanica.cardapio[0].nota).toBeNull();
-    andar(1);
+    andar(2 * 60_000); // 2h01: a noite fechou com ele no cardápio
     k = (await lugar()).mecanica.cardapio[0];
     expect(k).toMatchObject({ revelado: true, nota: c.nota, sabor: c.sabor, cb: c.cb, moda: c.moda, aguenta: c.aguenta,
-      rotulos: [c.rot_bm, c.rot_be, c.rot_me], chance_pt: c.chance_pt });
+      rotulos: [c.rot_bm, c.rot_be, c.rot_me], chance_pt: c.chance_pt, vendido_hoje: null });
+  });
+  it('vendido_hoje e fichas_hoje: o que cada copão do cardápio já vendeu na noite de hoje (o que saiu fica só no total)', async () => {
+    await bar();
+    await por({ nome: 'Fica' });
+    await por({ extra: 2, nome: 'Sai' });
+    const [c1, c2] = await copoes();
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 2 * H);
+    await tirar(c2.id);
+    ir(ini + 4 * H);
+    const m = (await lugar()).mecanica;
+    const ks = await noiteCopoes(ini);
+    expect(m.cardapio.map((c) => c.id)).toEqual([c1.id]);
+    expect(m.cardapio[0].vendido_hoje).toBe(ks[0].vendidos);
+    expect(m.cardapio[0].fichas_hoje).toBe(ks[0].fichas);
+    expect(rel(m.hoje.vendido_ate_agora, ks[0].vendidos + ks[1].vendidos)).toBeLessThan(1e-12);
+    expect(rel(m.hoje.fichas_ate_agora, ks[0].fichas + ks[1].fichas)).toBeLessThan(1e-12);
+  });
+  it('noite_fechada: a última noite que fechou sem ninguém abrir o bar, se é mais nova que a ultima_noite', async () => {
+    await bar();
+    await por();
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    ir(ini + 3 * DIA + 9 * H); // domingo 3h: quarta abriu; quinta e sexta sem linha; sábado ninguém abriu e já fechou
+    let m = (await lugar()).mecanica;
+    expect(Date.parse(m.ultima_noite!.inicio as string)).toBe(ini);
+    expect(Date.parse(m.noite_fechada!.inicio)).toBe(ini + 3 * DIA);
+    expect(Date.parse(m.noite_fechada!.fim)).toBe(ini + 3 * DIA + 8 * H);
+    // a de domingo abre (passou agora) e fecha: a última noite é ela, nenhuma fechada mais nova
+    ir(ini + 4 * DIA + 9 * H);
+    m = (await lugar()).mecanica;
+    expect(Date.parse(m.ultima_noite!.inicio as string)).toBe(ini + 4 * DIA);
+    expect(m.noite_fechada).toBeNull();
+    // a que ninguém abriu e ainda não acabou não conta
+    ir(ini + 6 * DIA + 2 * H); // terça 20h: a de segunda abriu (passou segunda 3h); a de terça ninguém abriu e está em andamento
+    m = (await lugar()).mecanica;
+    expect(m.hoje.aberta).toBe(false);
+    expect(m.noite_fechada).toBeNull();
   });
   it('ultima_noite: a última noite aberta que fechou, com o que cada copão vendeu e a semente do chat', async () => {
     await bar();
@@ -659,6 +738,7 @@ describe('o JSON do copão', () => {
     expect(Date.parse(u.inicio as string)).toBe(ini + DIA);
     expect(Date.parse(u.fim as string)).toBe(ini + DIA + 8 * H);
     expect(u).toMatchObject({ sexta: false, dj: 2, vendas: 40, fichas: 260, pt: true, galera_delta: -3.5, chat_seed: noiteIdx(ini + DIA) });
+    // o depois revelou os dois (a primeira noite aberta deles fechou com eles no cardápio)
     expect(u.copoes).toEqual([
       { id: c1.id, nome: 'Um', base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 5, preco: 22, nota: c1.nota, vendidos: 25, fichas: 150, pt: true },
       { id: c2.id, nome: 'Dois', base: 1, mistura: 1, extra: 2, tamanho: 2, forca: 5, preco: 22, nota: c2.nota, vendidos: 15, fichas: 110, pt: false },
@@ -696,13 +776,13 @@ describe('o JSON do copão', () => {
 
 type NoiteLinha = {
   inicio: Date; aberta: boolean; sexta: boolean; dj: number | null; vendas: number; fichas: number; pt: boolean; galera_delta: number;
-  fechada: boolean; vagas: number; conferida: boolean;
+  fechada: boolean; vagas: number; nivel: number; galera: number; conferida: boolean;
 };
 type NoiteCopao = { inicio: Date; copao: number; total: number; vendidos: number; fichas: number; pt: boolean };
 type EstadoBar = { moeda: number; fas: number; volume: number; lendario: boolean; marcos: number[] };
 const ir = (ms: number) => { agora = ms; vi.setSystemTime(agora); };
 const noitesDb = () => q<NoiteLinha>(
-  `select inicio, aberta, sexta, dj, vendas, fichas, pt, galera_delta, fechada, vagas, conferida
+  `select inicio, aberta, sexta, dj, vendas, fichas, pt, galera_delta, fechada, vagas, nivel, galera, conferida
      from public.idle_cup_noites where user_id = $1 order by inicio`, [A]);
 const ultimaDb = async () => (await noitesDb()).at(-1)!;
 const noiteCopoes = (inicio: number) => q<NoiteCopao>(
@@ -729,6 +809,8 @@ async function ajustar(id: number, campos: Ajuste) {
 /** O que o cardápio (na ordem) venderia na noite inteira, pelo copao.ts. */
 const totaisTs = (cs: CopaoLinha[], n: Noite) => vendasNoite(
   cs.map((c) => ({ base: c.base, mistura: c.mistura, tamanho: c.tamanho, forca: c.forca, preco: c.preco, nota: c.nota, noites: c.noites })), n);
+/** A sorte do PT de um copão numa noite, pela receita (copao.ts). */
+const ptTs = (c: CopaoLinha, inicio: number) => deuPT(sementePT(c.base, c.mistura, c.extra, c.tamanho), noiteIdx(inicio), c.chance_pt);
 const juntos = (xs: number[], ys: number[]) => {
   expect(xs).toHaveLength(ys.length);
   xs.forEach((x, i) => expect(rel(x, ys[i]), `${i}: ${x} × ${ys[i]}`).toBeLessThan(1e-12));
@@ -746,7 +828,7 @@ describe('as noites do bar (avancar)', () => {
     let m = (await lugar()).mecanica;
     let ns = await noitesDb();
     expect(ns).toHaveLength(1);
-    expect(ns[0]).toMatchObject({ aberta: true, sexta: false, dj: null, fechada: false, vagas: 3, conferida: false, pt: false });
+    expect(ns[0]).toMatchObject({ aberta: true, sexta: false, dj: null, fechada: false, vagas: 3, nivel: 1, galera: 50, conferida: false, pt: false });
     expect(ns[0].inicio.getTime()).toBe(ini);
     const tot = totaisTs(cs, { nivel: 1, galera: 50, sexta: false, dj: null });
     const lucros = cs.map((c) => lucroVenda(c));
@@ -767,7 +849,7 @@ describe('as noites do bar (avancar)', () => {
     m = (await lugar()).mecanica;
     ks = await noiteCopoes(ini);
     juntos(ks.map((k) => k.vendidos), tot);
-    const pts = cs.map((c) => deuPT(c.id, noiteIdx(ini), c.chance_pt));
+    const pts = cs.map((c) => ptTs(c, ini));
     expect(ks.map((k) => k.pt)).toEqual(pts);
     const g = galeraNoite(50, 1, cs.map((c) => c.nota), pts.some(Boolean));
     const e1 = await estadoBar();
@@ -815,14 +897,14 @@ describe('as noites do bar (avancar)', () => {
     expect(await prods()).toEqual([]);
     expect(await notasCad()).toEqual([]);
     expect((await estadoBar()).volume).toBe(0);
-    // a próxima visita revela, com a hora da estreia
+    // a próxima visita revela, com a hora do fim da primeira noite (quando ela vendeu a noite inteira)
     let m = (await lugar()).mecanica;
     expect(m.hoje).toMatchObject({ aberta: false, vendido_ate_agora: 0 });
     expect(Date.parse(m.ultima_noite!.inicio as string)).toBe(ini);
     const ps = await prods();
     expect(ps).toHaveLength(1);
     expect(ps[0]).toMatchObject({ nome: 'Sumiu', partes: [1, 1, 1, 2, 5], numero: c.nota });
-    expect(ps[0].criado_em.getTime()).toBe(ini);
+    expect(ps[0].criado_em.getTime()).toBe(ini + 8 * H);
     expect(await notasCad()).toEqual([
       { tipo: 'aguenta', a: 1, b: 5, rotulo: c.aguenta },
       { tipo: 'par', a: 101, b: 0, rotulo: c.rot_bm },
@@ -946,7 +1028,7 @@ describe('as noites do bar (avancar)', () => {
       totaisTs(await copoes(), { nivel: 1, galera: (await estadoBar()).fas, sexta: false, dj: null }));
   });
 
-  it('Review Focus 3: PT pela semente (copão, noite), igual ao TS; recarregar dá o mesmo', async () => {
+  it('Review Focus 3: PT pela semente (receita, noite), igual ao TS; recarregar dá o mesmo', async () => {
     await bar();
     await por({ forca: 10, preco: 33, nome: 'Forte' }); // vodka força 10: 50% de PT por noite
     await por({ extra: 2, forca: 8, preco: 30, nome: 'Médio' }); // 30%
@@ -958,7 +1040,7 @@ describe('as noites do bar (avancar)', () => {
       ir(ini + d * DIA + H);
       await lugar();
       await lugar();
-      const esperado = cs.map((c) => deuPT(c.id, noiteIdx(ini + d * DIA), c.chance_pt));
+      const esperado = cs.map((c) => ptTs(c, ini + d * DIA));
       expect((await noiteCopoes(ini + d * DIA)).map((k) => k.pt), `noite ${d}`).toEqual(esperado);
       vistos.push(...esperado);
     }
@@ -966,7 +1048,35 @@ describe('as noites do bar (avancar)', () => {
     expect(vistos).toContain(false);
     const fechadas = (await noitesDb()).filter((n) => n.fechada);
     expect(fechadas).toHaveLength(7);
-    for (const n of fechadas) expect(n.pt).toBe(cs.some((c) => deuPT(c.id, noiteIdx(n.inicio.getTime()), c.chance_pt)));
+    for (const n of fechadas) expect(n.pt).toBe(cs.some((c) => ptTs(c, n.inicio.getTime())));
+  });
+
+  it('tirar e pôr de novo a mesma receita não muda a sorte do PT nem zera a novidade', async () => {
+    await bar();
+    await por({ forca: 10, preco: 33, nome: 'Forte' });
+    const [c] = await copoes();
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 9 * H); // a de quarta fechou: 1 noite
+    await lugar();
+    ir(ini + 20 * H); // quinta 14h: tira e põe de novo a mesma receita (com outro preço e nome)
+    await tirar(c.id);
+    await por({ forca: 10, preco: 40, nome: 'Forte de novo' });
+    const c2 = (await copoes())[1];
+    expect(c2.noites).toBe(1); // a novidade continua de onde a receita parou
+    ir(ini + DIA + H);
+    await lugar();
+    const [k] = await noiteCopoes(ini + DIA);
+    expect(k.copao).toBe(c2.id);
+    expect(k.pt).toBe(ptTs(c, ini + DIA)); // a mesma sorte da receita
+    const [tot] = totaisTs([c2], { nivel: 1, galera: (await estadoBar()).fas, sexta: false, dj: null });
+    expect(rel(k.total, tot)).toBeLessThan(1e-12);
+    // tirar e pôr no meio da noite: a noite em andamento também conta (2 = a de quarta e a de quinta)
+    await tirar(c2.id);
+    await por({ forca: 10, preco: 41, nome: 'Terceiro' });
+    expect((await copoes())[2].noites).toBe(2);
+    // outra receita (outro tamanho) começa do zero
+    await por({ tamanho: 1, preco: 10, nome: 'Copinho' });
+    expect((await copoes())[3].noites).toBe(0);
   });
 
   it('Review Focus 3: dois copões em PT tiram 15% da galera uma vez só na noite; a conquista sai no depois', async () => {
@@ -1020,33 +1130,94 @@ describe('as noites do bar (avancar)', () => {
     juntos(ks.map((k) => k.vendidos), [(tot[0] * 3) / 8, tot[1]]);
     const lucros = ativos.map((c) => lucroVenda(c));
     expect(rel(await fichas(), ((tot[0] * 3) / 8) * lucros[0] + tot[1] * lucros[1])).toBeLessThan(1e-12);
-    expect((await copoes()).map((c) => [c.revelado, c.noites])).toEqual([[true, 1], [true, 1], [false, 0]]);
-    expect((await prods()).map((p) => p.nome)).toEqual(['Sai', 'Fica']);
+    // o que saiu no meio da primeira noite nunca é revelado (nem pódio, nem caderninho, nem volume); o que ficou, sim
+    expect((await copoes()).map((c) => [c.revelado, c.noites])).toEqual([[false, 1], [true, 1], [false, 0]]);
+    expect((await prods()).map((p) => p.nome)).toEqual(['Fica']);
+    expect((await estadoBar()).volume).toBe(1);
+    expect(await notasCad()).toHaveLength(4); // os 3 pares e o "aguenta" do 'Fica'
+    const u = (await lugar()).mecanica.ultima_noite!;
+    expect(u.copoes.map((x) => x.id)).toEqual([cs[1].id]);
+    expect(rel(u.vendas as number, ks[0].vendidos + ks[1].vendidos)).toBeLessThan(1e-12);
     // a noite de quinta: só o que ficou
     ir(ini + DIA + H);
     await lugar();
     expect((await noiteCopoes(ini + DIA)).map((k) => k.copao)).toEqual([cs[1].id]);
     expect((await copoes())[2].revelado).toBe(false);
+    ir(ini + DIA + 9 * H);
+    await lugar();
+    expect((await copoes()).map((c) => c.revelado)).toEqual([false, true, false]);
+    expect((await estadoBar()).volume).toBe(1);
+  });
+
+  it('o PT de quem saiu com menos de 1 h de noite não conta (nem a galera, nem a conquista); com 1 h, conta', async () => {
+    await bar();
+    await por({ nome: 'Sai cedo' });
+    await por({ extra: 2, nome: 'Fica' });
+    const cs = await copoes();
+    await ajustar(cs[0].id, { chance_pt: 100 });
+    await setFas(1000);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 59 * 60_000); // 18h59
+    await tirar(cs[0].id);
+    ir(ini + 9 * H);
+    await lugar();
+    expect((await noiteCopoes(ini)).map((k) => k.pt)).toEqual([false, false]);
+    expect(await ultimaDb()).toMatchObject({ pt: false, fechada: true });
+    expect(rel((await estadoBar()).fas, galeraNoite(1000, 1, cs.map((c) => c.nota), false))).toBeLessThan(1e-12);
+    expect(await conquistas()).not.toContain(115);
+    // na noite seguinte, um que sai com 1 h em ponto: conta
+    await por({ extra: 3, nome: 'Sai com 1 h' });
+    const c3 = (await copoes())[2];
+    await ajustar(c3.id, { chance_pt: 100 });
+    const fas = (await estadoBar()).fas;
+    ir(ini + DIA + H);
+    await lugar();
+    await tirar(c3.id);
+    ir(ini + DIA + 9 * H);
+    await lugar();
+    expect((await noiteCopoes(ini + DIA)).map((k) => [k.copao, k.pt])).toEqual([[cs[1].id, false], [c3.id, true]]);
+    expect(await ultimaDb()).toMatchObject({ pt: true });
+    expect(rel((await estadoBar()).fas, galeraNoite(fas, 1, [cs[1].nota, c3.nota], true))).toBeLessThan(1e-12);
+    expect(await conquistas()).toContain(115);
+  });
+
+  it('o fim da noite usa o nível e a galera do começo dela (gravados na linha), mesmo que mudem no meio', async () => {
+    await bar(5);
+    await por();
+    const [c] = await copoes();
+    await ajustar(c.id, { nota: 900, chance_pt: 0 });
+    await setFas(400);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + H);
+    await lugar();
+    expect(await ultimaDb()).toMatchObject({ nivel: 5, galera: 400 });
+    await setNivel(20); // subiu de nível no meio da noite
+    ir(ini + 9 * H);
+    await lugar();
+    const g = galeraNoite(400, 5, [900], false);
+    expect(g).not.toBe(galeraNoite(400, 20, [900], false));
+    expect(rel((await estadoBar()).fas, g)).toBeLessThan(1e-12);
+    expect(rel((await ultimaDb()).galera_delta, g - 400)).toBeLessThan(1e-12);
   });
 });
 
 describe('o depois do copão', () => {
   it('marcos de volume, galera e lendário e a conquista da nota só saem no depois', async () => {
     await bar();
-    await setFas(299);
+    await setFas(999);
     await q('update public.idle_place_state set volume = 29 where user_id = $1 and lugar = 4', [A]);
     await por();
     const [c] = await copoes();
     await ajustar(c.id, { nota: 999, chance_pt: 0 });
     const ini = inicioNoite(iso(agora).slice(0, 10));
     ir(ini + 9 * H);
-    await abrirJogo(); // a noite fechou: a galera subiu (round(25 · 0,02 · 1) = 1), mas nada de marco
+    await abrirJogo(); // a noite fechou: a galera subiu (round(35 · 0,02 · 1) = 1), mas nada de marco
     let e = await estadoBar();
-    expect(e).toMatchObject({ fas: 300, volume: 29, lendario: false, marcos: [] });
+    expect(e).toMatchObject({ fas: 1000, volume: 29, lendario: false, marcos: [] });
     expect(await conquistas()).not.toContain(89);
     const resp = await lugar();
     e = await estadoBar();
-    expect(e).toMatchObject({ fas: 300, volume: 30, lendario: true });
+    expect(e).toMatchObject({ fas: 1000, volume: 30, lendario: true });
     expect([...e.marcos].sort()).toEqual([46, 47, 48]);
     expect([...resp.marcos_novos!].sort()).toEqual([46, 47, 48]);
     expect(await conquistas()).toContain(89);
@@ -1060,8 +1231,9 @@ describe('o depois do copão', () => {
     await por();
     const [c] = await copoes();
     await ajustar(c.id, { nota: 899 });
-    ir(c.primeira_noite.getTime() + H);
+    ir(c.primeira_noite.getTime() + 9 * H);
     await lugar();
+    expect((await copoes())[0].revelado).toBe(true);
     expect((await estadoBar()).lendario).toBe(false);
     expect(await conquistas()).not.toContain(89);
     expect(await conquistas()).not.toContain(115);
@@ -1087,8 +1259,8 @@ describe('desafios do copão', () => {
     await setFas(0);
   };
   type Copo = { o?: Partial<Opcoes>; aj?: Ajuste };
-  /** Põe os copões (ajustados antes de estrear), passa no começo da primeira noite deles e, com `fechar`, no fim dela;
-   *  tira todos e vai pro dia seguinte às 16h. */
+  /** Põe os copões (ajustados antes de estrear), passa no começo da primeira noite deles e, com `fechar`, no fim dela (a
+   *  revelação sai aí); tira todos e vai pro dia seguinte às 16h. */
   async function noite(copos: Copo[], fechar: boolean) {
     for (const [k, x] of copos.entries()) {
       await por({ extra: k + 1, ...x.o });
@@ -1105,12 +1277,13 @@ describe('desafios do copão', () => {
     ir(ini + 22 * H);
   }
   const CASOS: [number, Copo[][], Copo[], boolean][] = [
-    [401, [[{ aj: { nota: 699 } }]], [{ aj: { nota: 700 } }], false],
-    [412, [[{ aj: { nota: 849 } }]], [{ aj: { nota: 850 } }], false],
-    [407, [[{ aj: { sabor: 299 } }]], [{ aj: { sabor: 300 } }], false],
-    [408, [[{ aj: { moda: 75 } }]], [{ aj: { moda: 150 } }], false],
-    [410, [[{ aj: { aguenta: 170 } }]], [{ aj: { aguenta: 199 } }], false],
-    // a galera: média 500 não mexe; 999 soma round(25 · 0,02) = 1
+    // os da nota e das partes: pagam na revelação, no fim da primeira noite
+    [401, [[{ aj: { nota: 699 } }]], [{ aj: { nota: 700 } }], true],
+    [412, [[{ aj: { nota: 849 } }]], [{ aj: { nota: 850 } }], true],
+    [407, [[{ aj: { sabor: 299 } }]], [{ aj: { sabor: 300 } }], true],
+    [408, [[{ aj: { moda: 75 } }]], [{ aj: { moda: 150 } }], true],
+    [410, [[{ aj: { aguenta: 170 } }]], [{ aj: { aguenta: 199 } }], true],
+    // a galera: média 500 não mexe; 999 soma round(35 · 0,02) = 1
     [403, [[{ aj: { nota: 500, chance_pt: 0 } }]], [{ aj: { nota: 999, chance_pt: 0 } }], true],
     // cardápio cheio (3 vagas no nível 1)
     [405, [[{ aj: { nota: 900 } }, { aj: { nota: 900 } }], [{ aj: { nota: 599 } }, { aj: { nota: 900 } }, { aj: { nota: 900 } }]],
@@ -1227,8 +1400,8 @@ describe('desafios do copão', () => {
       await por({ extra: k + 1 });
       const c = (await copoes()).at(-1)!;
       await ajustar(c.id, { nota: 800 });
-      ir(c.primeira_noite.getTime() + 60_000);
-      await abrirJogo(); // fecha a conta até agora (sem o depois)
+      ir(c.primeira_noite.getTime() + 9 * H);
+      await abrirJogo(); // fecha a conta e a noite até agora (sem o depois)
       const v0 = await valuation();
       await lugar(); // revela: paga (ou não) sem passar tempo
       const dv = (await valuation()) - v0;

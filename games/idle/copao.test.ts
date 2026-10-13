@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aBase, aguenta, distanciaCurta, vagasFuturas, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
+  abreNoite, aBase, aguenta, ALFA, custoVenda, MARKUP, ptConta, sementePT, TAXA, distanciaCurta, vagasFuturas, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
   GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
   noitesEntre, nomeSugerido, nota, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor,
   SABORES, TAMANHOS, vagas, vendasNoite, vendidoNaNoite,
@@ -25,7 +25,7 @@ describe('o catálogo do copão', () => {
     expect(MISTURAS[7]).toMatchObject({ nome: 'Energético de açaí', sabores: ['frutado', 'energia', 'cremoso'] });
     expect(MISTURAS[12]).toMatchObject({ nome: 'Isotônico', sabores: ['leve', 'neutro'] });
     expect(EXTRAS[9]).toMatchObject({ nome: 'Sal na borda', sabores: ['salgado'] });
-    expect(TAMANHOS.map((t) => [t.nome, t.doses, t.ref])).toEqual([['Copo', 1, 8], ['Copão', 3, 22], ['Balde', 10, 60]]);
+    expect(TAMANHOS.map((t) => [t.nome, t.doses])).toEqual([['Copo', 1], ['Copão', 3], ['Balde', 10]]);
     expect(DJS.map((d) => d.nome)).toEqual([
       'DJ Vaqueiro', 'DJ Ramemes', 'Neiff', 'DJ Robson Caetano', 'Ana Castela', 'Kannário', 'Wesley Safadão', 'Veigh', 'Ferrugem', 'Jane Remover',
     ]);
@@ -125,39 +125,74 @@ describe('rótulos e sabor', () => {
 });
 
 describe('preço e custo-benefício', () => {
-  it('precoRef = ref · (20 + força) / 20; faixa de ceil(0,5·ref) a floor(2·ref); preço inteiro', () => {
-    expect(precoRef(1, 10)).toBe(12);
-    expect(precoRef(2, 6)).toBeCloseTo(28.6, 12);
-    expect(precoRef(3, 1)).toBeCloseTo(63, 12);
-    expect(precoFaixa(1, 10)).toEqual([6, 24]);
-    expect(precoFaixa(2, 6)).toEqual([15, 57]); // 14,3 -> 15; 57,2 -> 57
-    expect(precoFaixa(1, 1)).toEqual([5, 16]); // 8,4: 4,2 -> 5; 16,8 -> 16
-    expect(precoValido(2, 6, 15)).toBe(true);
-    expect(precoValido(2, 6, 14)).toBe(false);
-    expect(precoValido(2, 6, 57)).toBe(true);
-    expect(precoValido(2, 6, 58)).toBe(false);
-    expect(precoValido(2, 6, 20.5)).toBe(false);
+  it('MARKUP com uma casa e TAXA com duas (100 × a referência inteiro)', () => {
+    expect(Math.abs(MARKUP * 10 - Math.round(MARKUP * 10))).toBeLessThan(1e-9);
+    expect(Math.abs(TAXA * 100 - Math.round(TAXA * 100))).toBeLessThan(1e-9);
+  });
+
+  it('precoRef = doses · custo da base · (0,5 + força/10) · MARKUP + doses · TAXA; faixa de ceil(0,5·ref) a floor(2·ref)', () => {
+    // Copo (1 dose) de Vodka (custo 2) força 5: custo da venda 2 · 1 = 2
+    expect(custoVenda(1, 1, 5)).toBe(2);
+    expect(precoRef(1, 1, 5)).toBeCloseTo(2 * MARKUP + TAXA, 12);
+    // Copão (3) de Cachaça (custo 1) força 6: 3 · 1 · 1,1 = 3,3
+    expect(precoRef(2, 2, 6)).toBeCloseTo(3.3 * MARKUP + 3 * TAXA, 12);
+    // Balde (10) de Absinto (custo 4) força 10: 10 · 4 · 1,5 = 60
+    expect(precoRef(11, 3, 10)).toBeCloseTo(60 * MARKUP + 10 * TAXA, 12);
+    // a base pesa: a mesma receita com base mais cara tem referência maior; o tamanho multiplica
+    expect(precoRef(10, 1, 5)).toBeGreaterThan(precoRef(2, 1, 5));
+    expect(precoRef(1, 3, 5)).toBeCloseTo(10 * precoRef(1, 1, 5), 9);
+    for (const [b, t, f] of [[1, 1, 5], [2, 2, 6], [11, 3, 10], [8, 2, 1]]) {
+      const ref = precoRef(b, t, f);
+      const [lo, hi] = precoFaixa(b, t, f);
+      expect([lo, hi]).toEqual([Math.ceil(0.5 * ref), Math.floor(2 * ref)]);
+      expect(precoValido(b, t, f, lo)).toBe(true);
+      expect(precoValido(b, t, f, lo - 1)).toBe(false);
+      expect(precoValido(b, t, f, hi)).toBe(true);
+      expect(precoValido(b, t, f, hi + 1)).toBe(false);
+      expect(precoValido(b, t, f, lo + 0.5)).toBe(false);
+    }
+  });
+
+  // Com MARKUP 1,5 e TAXA 7,5 a metade da referência já cobre o custo da venda (0,5·(1,5c + 7,5) ≥ c até c = 15 por dose; o
+  // mais caro é 4 · 1,5 = 6): nenhum preço válido dá prejuízo.
+  it('nenhum preço válido dá prejuízo', () => {
+    for (const b of BASES) for (const t of TAMANHOS) for (let f = 1; f <= 10; f++) {
+      const [lo] = precoFaixa(b.id, t.id, f);
+      expect(lucroVenda({ base: b.id, tamanho: t.id, forca: f, preco: lo }), `${b.nome}/${t.nome}/${f}`).toBeGreaterThan(0);
+    }
   });
 
   it('custoBeneficio: 250 a 0,5× a referência, 167 a 1×, 0 a 2×', () => {
-    // Copo (ref 8) força 10: precoRef = 8·30/20 = 12.
-    // 6 (0,5×): (2 - 0,5)/1,5 = 1 -> 250. 12 (1×): 250·(1/1,5) = 166,67 -> 167. 24 (2×): (2 - 2)/1,5 = 0 -> 0.
-    expect(custoBeneficio(1, 10, 6)).toBe(250);
-    expect(custoBeneficio(1, 10, 12)).toBe(167);
-    expect(custoBeneficio(1, 10, 24)).toBe(0);
-    // Copão força 6, preço 30: 250·(2 - 30/28,6)/1,5 = 158,508 -> 159
-    expect(custoBeneficio(2, 6, 30)).toBe(159);
+    // um copão com a referência inteira e par (o meio, o 1× e o 2× são preços válidos)
+    let achou = 0;
+    for (const b of BASES) for (const t of TAMANHOS) for (let f = 1; f <= 10; f++) {
+      const ref = precoRef(b.id, t.id, f);
+      const r = Math.round(ref);
+      if (Math.abs(ref - r) > 1e-9 || r % 2) continue;
+      achou++;
+      expect(custoBeneficio(b.id, t.id, f, r / 2)).toBe(250);
+      expect(custoBeneficio(b.id, t.id, f, r)).toBe(167);
+      expect(custoBeneficio(b.id, t.id, f, 2 * r)).toBe(0);
+    }
+    expect(achou).toBeGreaterThan(0);
   });
 
+  // Em double, um x,5 exato pode sair x,4999…: a conta em inteiros arredonda o valor exato pra cima (por isso é em inteiros).
   it('custoBeneficio em inteiros bate com a conta em double em todo preço válido (round = floor(x + 0,5))', () => {
-    for (const t of TAMANHOS) for (let f = 1; f <= 10; f++) {
-      const ref = precoRef(t.id, f);
-      const [lo, hi] = precoFaixa(t.id, f);
+    let meios = 0;
+    for (const b of BASES) for (const t of TAMANHOS) for (let f = 1; f <= 10; f++) {
+      const ref = precoRef(b.id, t.id, f);
+      const [lo, hi] = precoFaixa(b.id, t.id, f);
       for (let p = lo; p <= hi; p++) {
-        const dbl = Math.floor(250 * Math.min(1, Math.max(0, (2 - p / ref) / 1.5)) + 0.5);
-        expect(custoBeneficio(t.id, f, p)).toBe(dbl);
+        const x = 250 * Math.min(1, Math.max(0, (2 - p / ref) / 1.5));
+        const cb = custoBeneficio(b.id, t.id, f, p);
+        if (Math.abs(x - Math.floor(x) - 0.5) < 1e-9) {
+          meios++;
+          expect(cb).toBe(Math.floor(x) + 1);
+        } else expect(cb).toBe(Math.floor(x + 0.5));
       }
     }
+    expect(meios).toBeLessThan(100);
   });
 });
 
@@ -190,31 +225,32 @@ describe('moda e aguenta', () => {
 
 describe('a nota', () => {
   it('caso feito à mão', () => {
-    // Vodka(1, ponto 5) + Energético tradicional(1) + Limão(1), Copão (ref 22), força 6, preço 30, semana 2026-10-12.
+    // Vodka(1, ponto 5, custo 2) + Energético tradicional(1) + Limão(1), Copão (3 doses), força 6, preço 30, semana 2026-10-12.
     // Rótulos: base×mistura s = 0 - 0 + ((31+17+0) mod 3) - 1 = -1 -> ruim (40);
     //          base×extra  s = ((31+17+7) mod 3) - 1 = (55 mod 3) - 1 = 0 -> ok (75);
     //          mistura×extra s = ((31+17+14) mod 3) - 1 = (62 mod 3) - 1 = 1 -> ok (75).  sabor = 40 + 75 + 75 = 190.
-    // precoRef = 22·26/20 = 28,6; custo-benefício = floor(250·(2 - 30/28,6)/1,5 + 0,5) = floor(158,508 + 0,5) = 159.
+    // precoRef = 3·2·1,1·1,5 + 3·7,5 = 9,9 + 22,5 = 32,4; custo-benefício = floor(250·(2 - 30/32,4)/1,5 + 0,5) = floor(179,01 + 0,5) = 179.
     // Moda da semana: Tequila (7) e Suco de maracujá (6); nenhuma bate -> 0.
     // aguenta: f = 6 - 5 = 1 -> 199.
-    // nota = 190 + 159 + 0 + 199 = 548. Chance de PT: (6 - 5)·10 = 10%.
+    // nota = 190 + 179 + 0 + 199 = 568. Chance de PT: (6 - 5)·10 = 10%.
     const c = { base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 6, preco: 30 };
-    expect(avaliar(c, '2026-10-12')).toEqual({ rotulos: [1, 2, 2], sabor: 190, custoBeneficio: 159, moda: 0, aguenta: 199, nota: 548, chancePT: 10 });
-    expect(nota(c, '2026-10-12')).toBe(548);
-    // Com a Tequila da moda: Tequila(7, ponto 4) + Suco de maracujá(6) + Maracujá(4), Copo (ref 8), força 4, preço 8.
+    expect(precoRef(1, 2, 6)).toBeCloseTo(32.4, 12);
+    expect(avaliar(c, '2026-10-12')).toEqual({ rotulos: [1, 2, 2], sabor: 190, custoBeneficio: 179, moda: 0, aguenta: 199, nota: 568, chancePT: 10 });
+    expect(nota(c, '2026-10-12')).toBe(568);
+    // Com a Tequila da moda: Tequila(7, ponto 4, custo 3) + Suco de maracujá(6) + Maracujá(4), Copo (1 dose), força 4, preço 8.
     //   base×mistura: Tequila [citrico, forte] × [citrico, tropical]: comum 1 -> 2; v = ((217+102) mod 3) - 1 = (319 mod 3 = 1) - 1 = 0 -> s 2 -> boa (105)
     //   base×extra: × Maracujá [tropical, citrico]: comum 1 -> 2; v = ((217+68+7) mod 3) - 1 = (292 mod 3 = 1) - 1 = 0 -> boa (105)
     //   mistura×extra: [citrico, tropical] × [tropical, citrico]: comum 2 -> 4; v = ((186+68+14) mod 3) - 1 = (268 mod 3 = 1) - 1 = 0 -> ótima (133)
-    //   sabor 343; precoRef = 8·24/20 = 9,6; cb = floor(250·(2 - 8/9,6)/1,5 + 0,5) = floor(194,44 + 0,5) = 194; moda 150; aguenta f = 0 -> 170.
-    //   nota = 343 + 194 + 150 + 170 = 857.
+    //   sabor 343; precoRef = 1·3·0,9·1,5 + 7,5 = 11,55; cb = floor(250·(2 - 8/11,55)/1,5 + 0,5) = floor(217,89 + 0,5) = 218;
+    //   moda 150; aguenta f = 0 -> 170. nota = 343 + 218 + 150 + 170 = 881.
     expect(avaliar({ base: 7, mistura: 6, extra: 4, tamanho: 1, forca: 4, preco: 8 }, '2026-10-12'))
-      .toEqual({ rotulos: [3, 3, 4], sabor: 343, custoBeneficio: 194, moda: 150, aguenta: 170, nota: 857, chancePT: 0 });
+      .toEqual({ rotulos: [3, 3, 4], sabor: 343, custoBeneficio: 218, moda: 150, aguenta: 170, nota: 881, chancePT: 0 });
   });
 
   it('nota sempre inteira entre 0 e 999', () => {
     for (let k = 0; k < 600; k++) {
       const c = { base: 1 + (k % 12), mistura: 1 + ((k * 7) % 15), extra: 1 + ((k * 5) % 12), tamanho: 1 + (k % 3), forca: 1 + ((k * 3) % 10), preco: 0 };
-      const [lo, hi] = precoFaixa(c.tamanho, c.forca);
+      const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
       for (const preco of [lo, hi, Math.round((lo + hi) / 2)]) {
         const n = nota({ ...c, preco }, '2026-10-12');
         expect(Number.isInteger(n)).toBe(true);
@@ -233,8 +269,8 @@ describe('PT', () => {
     expect(chancePT(10, 3)).toBe(70);
   });
 
-  it('deuPT: sorte (copão·7919 + noite·104729 + 4) mod 100 < chance; estável', () => {
-    // copão 1, noite 0: 7923 mod 100 = 23. copão 1, noite 1: 112652 mod 100 = 52.
+  it('deuPT: sorte (semente·7919 + noite·104729 + 4) mod 100 < chance; estável', () => {
+    // semente 1, noite 0: 7923 mod 100 = 23. semente 1, noite 1: 112652 mod 100 = 52.
     expect(deuPT(1, 0, 23)).toBe(false);
     expect(deuPT(1, 0, 24)).toBe(true);
     expect(deuPT(1, 1, 50)).toBe(false);
@@ -246,6 +282,30 @@ describe('PT', () => {
     const noites = Array.from({ length: 30 }, (_, n) => deuPT(7, 280 + n, 30));
     expect(noites.some(Boolean)).toBe(true);
     expect(noites.every(Boolean)).toBe(false);
+  });
+
+  it('a semente do PT é da receita (base, mistura, extra e tamanho): pôr de novo a mesma dá a mesma sorte', () => {
+    expect(sementePT(1, 1, 1, 2)).toBe(4096 + 256 + 16 + 2);
+    expect(sementePT(12, 15, 12, 3)).toBe(12 * 4096 + 15 * 256 + 12 * 16 + 3);
+    // receitas diferentes, sementes diferentes; e a sorte de uma noite (o resto por 100) se espalha entre as receitas
+    const sementes = new Set<number>();
+    const restos = new Set<number>();
+    for (const b of BASES) for (const m of MISTURAS) for (const e of EXTRAS) for (const t of TAMANHOS) {
+      const x = sementePT(b.id, m.id, e.id, t.id);
+      sementes.add(x);
+      restos.add((x * 7919) % 100);
+    }
+    expect(sementes.size).toBe(12 * 15 * 12 * 3);
+    expect(restos.size).toBeGreaterThanOrEqual(50);
+  });
+
+  it('o PT de um copão só conta se ele ficou no cardápio pelo menos 1 h da noite', () => {
+    const ini = inicioNoite('2026-10-16');
+    expect(ptConta(ini, null)).toBe(true);
+    expect(ptConta(ini, ini + H)).toBe(true);
+    expect(ptConta(ini, ini + H - 1)).toBe(false);
+    expect(ptConta(ini, ini + 5 * 60_000)).toBe(false);
+    expect(ptConta(ini, ini + 8 * H)).toBe(true);
   });
 });
 
@@ -303,29 +363,39 @@ describe('as noites', () => {
 });
 
 describe('movimento, vendas, lucro e galera', () => {
-  /** Copo força 10 a 12 fichas: exatamente o preço de referência (8 · 30/20), o preço não mexe na venda. */
-  const NA_REF = { tamanho: 1, forca: 10, preco: 12 };
+  /** Um copo força 5 cobrado exatamente na referência da base dele: o preço não mexe na venda (e o copo tem 1 dose). */
+  const naRef = (base: number, mistura: number, nota: number, noites: number) =>
+    ({ base, mistura, tamanho: 1, forca: 5, preco: precoRef(base, 1, 5), nota, noites });
 
   it('constantes (ajustadas na simulação, copaoSim.test.ts)', () => {
-    expect([PUBLICO_BASE, CRESCE, GALERA_TETO, ELASTICIDADE]).toEqual([25, 1.25, 3, 1.25]);
-    expect(precoRef(NA_REF.tamanho, NA_REF.forca)).toBe(NA_REF.preco);
+    expect([PUBLICO_BASE, CRESCE, GALERA_TETO, ELASTICIDADE, MARKUP, TAXA, ALFA]).toEqual([35, 1.35, 3, 1.25, 1.5, 7.5, 0.9]);
   });
 
   it('vendasNoite: o preço espanta: o dobro da referência vende (1/2)^1,25 do mesmo copão na referência', () => {
     const noite = { nivel: 3, galera: 400, sexta: false, dj: null };
-    const copao = { base: 1, mistura: 1, tamanho: 2, forca: 4, nota: 700, noites: 1 }; // Copão força 4: ref 22·24/20 = 26,4
-    const ref = precoRef(2, 4);
+    const copao = { base: 1, mistura: 1, tamanho: 2, forca: 4, nota: 700, noites: 1 };
+    const ref = precoRef(1, 2, 4);
     const caro = vendasNoite([{ ...copao, preco: Math.floor(2 * ref) }], noite)[0];
     const certo = vendasNoite([{ ...copao, preco: ref }], noite)[0];
     expect(caro / certo).toBeCloseTo((ref / Math.floor(2 * ref)) ** 1.25, 12);
-    // Balde força 6 (ref 78): preço 156 = 2× a referência, exato
-    const balde = { base: 2, mistura: 3, tamanho: 3, forca: 6, preco: 78, nota: 650, noites: 0 };
+    const balde = { base: 2, mistura: 3, tamanho: 3, forca: 6, preco: precoRef(2, 3, 6), nota: 650, noites: 0 };
     const b1 = vendasNoite([balde], noite)[0];
-    const b2 = vendasNoite([{ ...balde, preco: 156 }], noite)[0];
+    const b2 = vendasNoite([{ ...balde, preco: 2 * balde.preco }], noite)[0];
     expect(b2 / b1).toBeCloseTo(0.5 ** 1.25, 12);
     // e só no copão dele: o outro do cardápio vende o mesmo
-    const outro = { base: 4, mistura: 5, ...NA_REF, nota: 800, noites: 2 };
-    expect(vendasNoite([{ ...balde, preco: 156 }, outro], noite)[1]).toBeCloseTo(vendasNoite([balde, outro], noite)[1], 9);
+    const outro = naRef(4, 5, 800, 2);
+    expect(vendasNoite([{ ...balde, preco: 2 * balde.preco }, outro], noite)[1]).toBeCloseTo(vendasNoite([balde, outro], noite)[1], 9);
+  });
+
+  it('vendasNoite: o recipiente maior sai menos: as vendas são divididas por doses^ALFA', () => {
+    const noite = { nivel: 1, galera: 0, sexta: false, dj: null };
+    const v = (tamanho: number) => vendasNoite([{ base: 1, mistura: 1, tamanho, forca: 5, preco: precoRef(1, tamanho, 5), nota: 999, noites: 0 }], noite)[0];
+    expect(v(1)).toBeCloseTo(PUBLICO_BASE, 9);
+    expect(v(2)).toBeCloseTo(PUBLICO_BASE / 3 ** ALFA, 9);
+    expect(v(3)).toBeCloseTo(PUBLICO_BASE / 10 ** ALFA, 9);
+    // e cada venda do balde rende 10× a do copo na referência: o balde rende 10^(1 − ALFA)× mais por noite
+    const lucro = (t: number) => v(t) * lucroVenda({ base: 1, tamanho: t, forca: 5, preco: precoRef(1, t, 5) });
+    expect(lucro(3) / lucro(1)).toBeCloseTo(10 ** (1 - ALFA), 9);
   });
 
   it('publico(nivel) cresce com o nível; movimento soma a galera (√galera/30, até 3)', () => {
@@ -345,14 +415,14 @@ describe('movimento, vendas, lucro e galera', () => {
   });
 
   it('vendasNoite: um copão só vende movimento · atração (a participação é a própria atração abaixo de 1)', () => {
-    const v = vendasNoite([{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null });
+    const v = vendasNoite([naRef(1, 1, 999, 0)], { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(v[0]).toBeCloseTo(PUBLICO_BASE, 9);
-    const meio = vendasNoite([{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 5 }], { nivel: 1, galera: 0, sexta: false, dj: null });
+    const meio = vendasNoite([naRef(1, 1, 999, 5)], { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(meio[0]).toBeCloseTo(PUBLICO_BASE / 2, 9); // novidade 0,5
   });
 
   it('vendasNoite: reparte pela atração; com a soma acima de 1 vende o movimento inteiro', () => {
-    const c = [{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }, { base: 2, mistura: 2, ...NA_REF, nota: 999, noites: 0 }];
+    const c = [naRef(1, 1, 999, 0), naRef(2, 2, 999, 0)];
     const v = vendasNoite(c, { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(v[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     expect(v[1]).toBeCloseTo(PUBLICO_BASE / 2, 9);
@@ -365,10 +435,10 @@ describe('movimento, vendas, lucro e galera', () => {
 
   it('vendasNoite: mesma base e mistura perdem 30% cada; sexta ×2; DJ da sexta ×1,2 nos copões das bases dele', () => {
     // dois Vodka+Energético nota 999 novos: atração 0,7 cada, soma 1,4 -> cada um vende público·0,7/1,4·1 = metade
-    const gemeos = [{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }, { base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }];
+    const gemeos = [naRef(1, 1, 999, 0), naRef(1, 1, 999, 0)];
     expect(vendasNoite(gemeos, { nivel: 1, galera: 0, sexta: false, dj: null })[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     // sozinho com nota 500: atração (500/999)² = 0,2505 -> e o canibal só com outro no cardápio
-    const um = [{ base: 1, mistura: 1, ...NA_REF, nota: 500, noites: 0 }];
+    const um = [naRef(1, 1, 500, 0)];
     const a = vendasNoite(um, { nivel: 1, galera: 0, sexta: false, dj: null })[0];
     expect(a).toBeCloseTo(PUBLICO_BASE * (500 / 999) ** 2, 9);
     expect(vendasNoite(um, { nivel: 1, galera: 0, sexta: true, dj: null })[0]).toBeCloseTo(2 * a, 9);
@@ -386,11 +456,12 @@ describe('movimento, vendas, lucro e galera', () => {
   });
 
   it('galeraNoite: sobe com média ≥ 600, cai 5% abaixo de 300, cai 15% com PT (uma vez), piso 0', () => {
-    // nível 5 (público 25·1,25⁴ = 61,04), média 800: + round(61,04·0,02·800/999) = round(0,978) = 1; média 600 conta:
-    // round(0,733) = 1; no nível 1 (público 25) a média 800 dá round(0,4) = 0
-    expect(galeraNoite(100, 5, [800, 800], false)).toBe(101);
+    // nível 5 (público 35·1,35⁴ = 116,25), média 800: + round(116,25·0,02·800/999) = round(1,862) = 2; média 600 conta:
+    // round(1,396) = 1; no nível 1 (público 35) a média 800 dá round(0,561) = 1 e a média 600, round(0,42) = 0
+    expect(galeraNoite(100, 5, [800, 800], false)).toBe(102);
     expect(galeraNoite(100, 5, [599, 601], false)).toBe(101);
-    expect(galeraNoite(100, 1, [800, 800], false)).toBe(100);
+    expect(galeraNoite(100, 1, [800, 800], false)).toBe(101);
+    expect(galeraNoite(100, 1, [600], false)).toBe(100);
     expect(galeraNoite(100, 1, [599], false)).toBe(100);
     expect(galeraNoite(100, 1, [200, 300], false)).toBeCloseTo(95, 9);
     expect(galeraNoite(100, 1, [300], false)).toBe(100);

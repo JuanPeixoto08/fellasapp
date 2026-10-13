@@ -239,12 +239,29 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 ### 5.4 Ajustes da implementação (parte 3)
 
 - **O preço espanta a galera**: as vendas de cada copão são multiplicadas por `(preço de referência / preço)^1,25`
-  (sem isso, cobrar o dobro rendia ~9× mais que caprichar na nota). Com isso o lucro fica parecido entre 0,5× e 0,8× da
-  referência e cobrar o dobro perde. Constantes: público 25, cresce 1,25; meta de nota com caderninho ≥ 700 (era 750 na
-  conta de rascunho), no chute 350–550.
+  (sem isso, cobrar o dobro rendia ~9× mais que caprichar na nota). Cobrar o dobro perde. Meta de nota com caderninho
+  ≥ 700 (era 750 na conta de rascunho), no chute 350–550.
+- **O preço de referência leva a base**: `ref = doses · custo da base · (0,5 + força/10) · MARKUP + doses · TAXA`
+  (MARKUP 1,5, TAXA 7,5; MARKUP com uma casa e TAXA com duas, pra 100 × ref ser inteiro e o custo-benefício sair em
+  inteiros). O preço vai de 50% a 200% da referência. O melhor preço fica perto da referência em toda base (~0,55× nas
+  baratas, ~1,15× nas caras) e nenhuma base fica muito atrás (todas rendem 92% ou mais da melhor por atração). Com essas
+  constantes nenhum preço válido dá prejuízo.
+- **Recipiente maior sai menos**: as vendas de um copão são divididas por `doses^0,9` (ALFA), junto com a elasticidade:
+  `((mov · atr) / Σatr) · participação · ((ref / preço)^1,25 / doses^0,9) · sexta · DJ`. O balde rende 10^0,1 ≈ 1,26× o copo
+  por atração; o copo rende 79% do balde e o copão 89%.
+- Constantes: público 35, cresce 1,35. Marco de galera do copão: 1.000 (a mediana do caderninho chega no dia ~28).
+- **A novidade é da receita** (base, mistura, extra e tamanho): um copão começa com as noites abertas que os copões de
+  antes com a mesma receita venderam (a que está em andamento conta). Tirar e repor não zera. A sorte do PT também é da
+  receita (tirar e pôr de novo não muda o PT da noite).
+- **A revelação sai no fim da primeira noite aberta** em que o copão ficou no cardápio até as 2h: aí saem a nota, o pódio,
+  o placar (com a hora do fim da noite), o caderninho, o volume +1, as conquistas e os desafios do copão. Tirado antes, ele
+  nunca é revelado e não conta (as vendas dele contam). O chat da noite só mostra os revelados.
+- O PT de um copão só conta se ele ficou pelo menos 1 h no cardápio naquela noite.
+- A noite grava o nível e a galera do começo dela; o fim da noite (a galera) usa os mesmos.
+- A tela diz "Ninguém abriu o bar ontem" (ou o dia da semana) quando a última noite que fechou foi sem ninguém.
 - O DJ só dá +20% na noite de sexta (e a galera ×2 também); a noite guarda o DJ escolhido quando ela começou.
 - A galera muda só nas noites abertas: ganha `round(público × 0,02 × média/999)` com média ≥ 600, perde 5% abaixo de
-  300 e 15% numa noite de PT (uma vez por noite). Marco de galera do copão: 300.
+  300 e 15% numa noite de PT (uma vez por noite).
 - Uma noite só abre se a pessoa passou pelo jogo nas 24 h antes das 18h; quem some vários dias só tem a primeira noite
   aberta. A tela mostra "Ontem à noite" (o chat da galera) uma vez por noite, mesmo que tenha acontecido com a pessoa fora.
 - Os 10 DJs são artistas reais escolhidos pelo Juan (nome e estilo); o chat nunca põe fala ou fato na boca deles.
