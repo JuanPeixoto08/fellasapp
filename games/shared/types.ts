@@ -119,6 +119,9 @@ export type IdleState = {
   user_id: string; week_start: string; started: boolean; valuation: number; rate: number;
   generators: number[]; upgrades: number[]; strategies: number[]; era: number;
   boost_until: string | null; half_price: boolean; opp_claimed: number[]; opp_left: number; server_now: string;
+  /** Oportunidades que empilham (0062): os fins dos ×5 no ar e quantas compras pela metade estão guardadas. Faltam na
+   *  resposta do banco de antes da 0062 (aí valem boost_until e half_price). */
+  boosts?: string[]; meias?: number;
   /** Eventos na tela (0045): fim da Promoção relâmpago (null = não está valendo) e os fins dos Viralizou ativos. */
   promo_ate: string | null; viral: string[];
   /** Bônus da horta agora (0048); a página aplica nos preços. */

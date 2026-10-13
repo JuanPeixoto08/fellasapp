@@ -120,11 +120,30 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   mult('Conquistas e árvore', legado);
   mult('Horta', 1 + hortaProd(s));
   mult('Convidados', multGerador(s, 0, agoraMs));
-  if (s.boost_until && Date.parse(s.boost_until) > agoraMs) linhas.push({ texto: 'Agora: ×5 do Investidor', tom: 'bom' });
+  const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
+  if (cincos) linhas.push({ texto: `Agora: ×${num(5 ** cincos, 0)} ${cincos === 1 ? 'da oportunidade' : 'das oportunidades'}`, tom: 'bom' });
   const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
   return { titulo: 'De onde vem sua produção', linhas };
+}
+
+/** A caixinha de uma oportunidade da Caixinha (0062: tudo empilha), com o que a pessoa tem agora. Os 15 minutos de
+ *  produção não têm (a linha já diz tudo). */
+export function dicaOportunidade(s: IdleState, tipo: 0 | 1 | 2, agoraMs: number): Dica | null {
+  if (tipo === 0) return null;
+  if (tipo === 1) {
+    const n = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
+    const texto = n
+      ? `Agora: ×${num(5 ** n, 0)} no ar. Pegando esta, vira ×${num(5 ** (n + 1), 0)}`
+      : 'Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo';
+    return { titulo: 'Produção ×5 por 1 minuto', linhas: [{ texto }] };
+  }
+  const n = s.meias ?? (s.half_price ? 1 : 0);
+  const texto = n
+    ? `Você tem ${n} ${n === 1 ? 'guardada' : 'guardadas'}. Pegando esta, as próximas ${n + 1} compras saem pela metade`
+    : 'Empilha: cada uma guardada vale uma compra pela metade';
+  return { titulo: 'Próxima compra pela metade', linhas: [{ texto }] };
 }
 
 export function dicaContratos(s: IdleState): Dica {

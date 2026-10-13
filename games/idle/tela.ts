@@ -20,7 +20,7 @@ import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
-import { dicaContratos, dicaGerador, dicaMelhoria, dicaProducao } from './dica';
+import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
 import { promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
@@ -95,8 +95,6 @@ const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidd
 const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
 const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
 
-/** Oportunidade do tipo "próxima compra pela metade" (2) com uma já guardada: pegar não daria nada. */
-export const meiaPrecoRepetida = (tipo: 0 | 1 | 2, s: IdleState) => tipo === 2 && s.half_price;
 
 /** "Some em 3h12" / "Some em 40 min": quanto falta pra oportunidade guardada sumir. */
 export function prazo(ms: number) {
@@ -563,12 +561,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const texto = el('div', 'escolha-texto');
       const quando = el('span', 'sub prazo', '');
       texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+      dicas.ligar(li, `opp-${w}`, () => dicaOportunidade(s, k, agoraTela));
       prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
-      // meia-preço não acumula: pegar outra antes de usar a guardada só gastaria uma pega do dia
-      const repetida = meiaPrecoRepetida(k, s);
-      if (repetida) texto.append(el('span', 'sub', 'Usa a que você já tem primeiro'));
+      // desde a 0062 tudo empilha: outra meia-preço guardada vale mais uma compra pela metade
       const b = button('Pegar', 'btn main compacto', () => a.pegar(w));
-      b.disabled = m.ocupado || s.opp_left <= 0 || repetida;
+      b.disabled = m.ocupado || s.opp_left <= 0;
       li.append(bonequinho, texto, b);
       lista.append(li);
     }
@@ -671,8 +668,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       if (s.bonus.conquistas > 0) info.append(el('span', undefined, `+${s.bonus.conquistas}% das conquistas`));
       const naFrente = s.convidados?.cadeira[0];
       if (naFrente && destrancada(0, s.generators[12] ?? 0)) info.append(el('span', undefined, `${CONVIDADOS.find((c) => c.id === naFrente)?.nome} na frente do PPP`));
-      const agoraBoost = s.boost_until && Date.parse(s.boost_until) > Date.parse(s.server_now);
-      bonus.textContent = agoraBoost ? 'Produção ×5 por alguns segundos' : s.half_price ? 'Próxima compra pela metade' : '';
+      const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > Date.parse(s.server_now)).length;
+      const meias = s.meias ?? (s.half_price ? 1 : 0);
+      bonus.textContent = cincos
+        ? `Produção ×${(5 ** cincos).toLocaleString('pt-BR')} por alguns segundos`
+        : meias > 1 ? `Próximas ${meias} compras pela metade` : meias === 1 ? 'Próxima compra pela metade' : '';
       for (let gid = 1; gid <= 30; gid++) {
         if (podeComprarGerador(s, gid)) listaG.append(linhaGerador(s, gid));
         else {

@@ -140,7 +140,7 @@ describe('idle_buy', () => {
   });
   it('meia-preço vale só na próxima compra unitária e depois some', async () => {
     await dar(A, 100);
-    await q('update public.idle_state set half_price = true where user_id = $1', [A]);
+    await q('update public.idle_state set meias = 1 where user_id = $1', [A]);
     const s = await buy('gerador', 1);
     expect(s.valuation).toBeCloseTo(100 - 17.25 / 2, 1);
     expect(s.half_price).toBe(false);
@@ -223,6 +223,16 @@ describe('oportunidades no banco', () => {
       await expect(claim(w)).rejects.toThrow(/idle_opp_gone/);
     }
     expect(s.opp_left).toBe(7);
+  });
+  it('pegar ×5 com outro ×5 no ar fica com os dois (×25); meia-preço com uma guardada vira duas', async () => {
+    const s0 = await t.rpc<Estado>('idle_open');
+    await parar();
+    await q(`update public.idle_state set boost_ate = array[now() + interval '30 seconds'], meias = 1 where user_id = $1`, [A]);
+    const lista = pendentes(A, Date.parse(s0.server_now), [], semana(s0));
+    const cinco = await claim(lista.find((w) => tipo(A, w) === 1)!);
+    expect((cinco as Estado & { boosts: string[] }).boosts).toHaveLength(2);
+    const meia = await claim(lista.find((w) => tipo(A, w) === 2)!);
+    expect((meia as Estado & { meias: number }).meias).toBe(2);
   });
   it('pegas as 3, a 4ª mais recente não entra na caixinha', async () => {
     const s = await t.rpc<Estado>('idle_open');

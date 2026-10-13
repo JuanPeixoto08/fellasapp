@@ -21,7 +21,8 @@ export const efeitos = (estado: IdleState) => efeitosDe(catalogo, estado);
 export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).caixinha, validadeS: CAIXA_PADRAO.validadeS });
 
 export function valuationAgora(a: Ancora, clienteMs: number): number {
-  const boost = a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
+  // os ×5 no ar (0062: cada um conta); a resposta de antes da 0062 só tem o boost_until
+  const boost = a.estado.boosts ? a.estado.boosts.map(Date.parse) : a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
   const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
   return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais, VIRAL_MS * efeitos(a.estado).douradoDuracao);
 }

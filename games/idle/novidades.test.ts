@@ -22,8 +22,8 @@ describe('patch notes', () => {
   it('a nota da Bolsa explica a ligação com os geradores', () => {
     expect(NOVIDADES.find((n) => n.id === '2026-10-11-bolsa')!.itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
   });
-  it('a mais nova é a árvore com Dourados e Horta; antes, as conquistas, o Toby Fox, o celular arrumado e as telas cheias', () => {
-    expect(NOVIDADES.slice(0, 5).map((n) => n.id)).toEqual(['2026-10-13-arvore', '2026-10-12-conquistas', '2026-10-12-toby-fox', '2026-10-12-celular', '2026-10-12-telas-cheias']);
+  it('a mais nova são as oportunidades que empilham; antes, a árvore com Dourados e Horta, as conquistas, o Toby Fox e o celular', () => {
+    expect(NOVIDADES.slice(0, 5).map((n) => n.id)).toEqual(['2026-10-13-empilha', '2026-10-13-arvore', '2026-10-12-conquistas', '2026-10-12-toby-fox', '2026-10-12-celular']);
   });
   it('data em pt-BR curta', () => {
     expect(dataNovidade('2026-10-11')).toBe('11/10/2026');

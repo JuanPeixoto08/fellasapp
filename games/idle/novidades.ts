@@ -4,6 +4,16 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-empilha',
+    titulo: 'Oportunidades empilham',
+    data: '2026-10-13',
+    itens: [
+      'Produção ×5 agora empilha: pegou duas, ×25. Três, ×125. Cada uma acaba no seu tempo.',
+      'E multiplica com o Viralizou: ×5 com ×10 dá ×50. Dois de cada, ×2.500. Boa sorte pra quem tá olhando o placar.',
+      'Próxima compra pela metade também empilha: guardou duas, as próximas 2 compras saem pela metade.',
+    ],
+  },
+  {
     id: '2026-10-13-arvore',
     titulo: 'Árvore nova: Dourados e Horta',
     data: '2026-10-13',

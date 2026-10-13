@@ -213,16 +213,22 @@ export function liberada(cat: Catalogo, m: Melhoria, s: Estado): boolean {
 /** Quanto dura um Viralizou sem a árvore (ms): a janela é [fim − 60 s, fim); com o Hype, × douradoDuracao. */
 export const VIRAL_MS = 60_000;
 
+/** Os fins dos ×5 da oportunidade: uma lista (0062: cada um conta sozinho), um fim só ou nenhum (null). */
+export type Boosts = number | null | readonly number[];
+const listaBoosts = (b: Boosts): readonly number[] => (b === null ? [] : typeof b === 'number' ? [b] : b);
+
 /**
- * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 dentro do bônus da oportunidade e ×10 por Viralizou ativo
- * (sem teto); divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0045.
+ * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 por bônus da oportunidade no ar e ×10 por Viralizou ativo, tudo
+ * multiplicando e sem teto (×5 e ×10 = ×50; dois ×5 = ×25); divide nos pontos em que um começa ou acaba. Igual a
+ * idle_settle na 0062. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
  */
 export function produzido(
-  r: number, a: number, b: number, boostAteMs: number | null, virais: readonly number[] = [], viralMs = VIRAL_MS,
+  r: number, a: number, b: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
 ): number {
   if (b <= a) return 0;
+  const boosts = listaBoosts(boostAteMs);
   const pontos = [a, b];
-  if (boostAteMs !== null && boostAteMs > a && boostAteMs < b) pontos.push(boostAteMs);
+  for (const f of boosts) if (f > a && f < b) pontos.push(f);
   for (const f of virais) for (const x of [f - viralMs, f]) if (x > a && x < b) pontos.push(x);
   pontos.sort((x, y) => x - y);
   let total = 0;
@@ -232,7 +238,7 @@ export function produzido(
     if (q <= p) continue;
     const meio = (p + q) / 2;
     const k = virais.filter((f) => f - viralMs <= meio && f > meio).length;
-    const m = (boostAteMs !== null && boostAteMs > meio ? 5 : 1) * 10 ** k; // sem teto: dois ×100, três ×1000
+    const m = 5 ** boosts.filter((f) => f > meio).length * 10 ** k; // sem teto: dois ×100, três ×1000; ×5 e ×10 = ×50
     total += (r * m * (q - p)) / 1000;
   }
   return total;
@@ -241,7 +247,7 @@ export function produzido(
 /** Valuation depois de render de `desdeMs` até `ateMs`, sem limite (desde 13/10 o jogo fechado rende tudo); ×5 dentro
  *  do bônus que vai até `boostAteMs`; ×10 por Viralizou ativo (`virais` = os fins, cada um dura `viralMs`). */
 export function acumular(
-  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: number | null, virais: readonly number[] = [], viralMs = VIRAL_MS,
+  v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
 ): number {
   return v + produzido(r, desdeMs, Math.max(ateMs, desdeMs), boostAteMs, virais, viralMs);
 }
@@ -251,7 +257,7 @@ export function acumular(
  * começando em `desdeMs`. Igual a idle_settle: ×5 e ×10 em cada trecho.
  */
 export function acumularTrechos(
-  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: number | null,
+  v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: Boosts,
   virais: readonly number[] = [], viralMs = VIRAL_MS,
 ): number {
   for (let i = 0; i < trechos.length; i++) {

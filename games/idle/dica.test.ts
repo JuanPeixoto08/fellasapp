@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
-import { dicaContratos, dicaGerador, dicaMelhoria, dicaProducao, tempoDeProducao } from './dica';
+import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao, tempoDeProducao } from './dica';
 import { fatores, multContratos, taxa } from './economia';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
@@ -124,11 +124,11 @@ describe('caixinha da produção (o F$/s do topo)', () => {
   it('Investidor e Viralizou valendo aparecem como "agora"', () => {
     const agora = Date.parse('2026-10-12T12:00:00.000Z');
     const s = comTaxa({
-      generators: gens({ 1: 1 }), boost_until: '2026-10-12T12:00:30.000Z',
+      generators: gens({ 1: 1 }), boost_until: '2026-10-12T12:00:40.000Z', boosts: ['2026-10-12T12:00:30.000Z', '2026-10-12T12:00:40.000Z'],
       viral: ['2026-10-12T12:00:40.000Z', '2026-10-12T12:00:50.000Z', '2026-10-12T11:59:00.000Z'],
     });
     const t = textos(dicaProducao(s, agora));
-    expect(t).toContain('Agora: ×5 do Investidor');
+    expect(t).toContain('Agora: ×25 das oportunidades');
     expect(t).toContain('Agora: ×100 do Viralizou');
   });
 });
@@ -144,3 +144,21 @@ describe('caixinha dos contratos', () => {
     expect(t).toContain('Trabalha em 2 empresas: +4%');
   });
 });
+
+describe('caixinha da oportunidade (0062: tudo empilha)', () => {
+  const agora = Date.parse('2026-10-12T12:00:00.000Z');
+  const fim = '2026-10-12T12:00:30.000Z';
+  it('×5: sem nenhum no ar diz que empilha; com dois no ar, pegar agora deixa ×125', () => {
+    expect(textos(dicaOportunidade(estado(), 1, agora)!)).toEqual(['Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo']);
+    expect(textos(dicaOportunidade(estado({ boosts: [fim, fim] }), 1, agora)!)).toEqual(['Agora: ×25 no ar. Pegando esta, vira ×125']);
+  });
+  it('metade: sem nenhuma guardada diz que empilha; com uma, as próximas 2 compras', () => {
+    expect(textos(dicaOportunidade(estado(), 2, agora)!)).toEqual(['Empilha: cada uma guardada vale uma compra pela metade']);
+    expect(textos(dicaOportunidade(estado({ meias: 1, half_price: true }), 2, agora)!)).toEqual(['Você tem 1 guardada. Pegando esta, as próximas 2 compras saem pela metade']);
+    expect(textos(dicaOportunidade(estado({ meias: 3, half_price: true }), 2, agora)!)).toEqual(['Você tem 3 guardadas. Pegando esta, as próximas 4 compras saem pela metade']);
+  });
+  it('os 15 minutos de produção não têm caixinha (o texto da linha já diz tudo)', () => {
+    expect(dicaOportunidade(estado(), 0, agora)).toBeNull();
+  });
+});
+
