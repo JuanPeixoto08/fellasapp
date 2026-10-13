@@ -4,6 +4,17 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-arvore',
+    titulo: 'Árvore nova: Dourados e Horta',
+    data: '2026-10-13',
+    itens: [
+      'Fechou o jogo? A empresa rende o tempo todo, sem limite de 8h. Pode sumir uma semana que o dinheiro tá lá.',
+      'Por isso o ramo Tempo saiu e virou Dourados: eventos mais frequentes, mais tempo na tela, Investidor pagando o dobro e Viralizou durando mais.',
+      'Quem já tinha nó do Tempo ficou com o nó do Dourados no mesmo lugar. Ninguém perdeu ponto.',
+      'Ramo novo na ponta direita: Horta. Planta crescendo mais rápido, vivendo mais, cruzando mais, e o Morango com Pescoço aparecendo mais (ele tem pescoço sim).',
+    ],
+  },
+  {
     id: '2026-10-12-conquistas',
     titulo: 'Conquistas sem filtro',
     data: '2026-10-12',
