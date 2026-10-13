@@ -4,11 +4,20 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-somam',
+    titulo: 'Os ×5 somam',
+    data: '2026-10-13',
+    itens: [
+      'Ficou roubado demais: os ×5 das oportunidades agora somam em vez de multiplicar. Dois dão ×10, três dão ×15 (antes era ×25 e ×125).',
+      'O Viralizou continua multiplicando por cima: dois Viralizou (×100) com dois ×5 (×10) dá ×1.000.',
+    ],
+  },
+  {
     id: '2026-10-13-dobro',
     titulo: 'O dobro dobra e a Era 6',
     data: '2026-10-13',
     itens: [
-      'Com Viralizar ou Xepa da feira ("rendem o dobro"), cada oportunidade conta como 2: o ×5 entra duas vezes (×25 de uma vez) e a metade guarda 2 compras. Com os dois juntos, conta como 4.',
+      'Com Viralizar ou Xepa da feira ("rendem o dobro"), cada oportunidade conta como 2: o ×5 entra duas vezes (×10 de uma vez) e a metade guarda 2 compras. Com os dois juntos, conta como 4.',
       'Quem comprou o gerador 30 e foi pra órbita agora aparece como Era 6 · Em órbita, do lado da cena e no placar.',
     ],
   },
@@ -17,8 +26,8 @@ export const NOVIDADES: readonly Novidade[] = [
     titulo: 'Oportunidades empilham',
     data: '2026-10-13',
     itens: [
-      'Produção ×5 agora empilha: pegou duas, ×25. Três, ×125. Cada uma acaba no seu tempo.',
-      'E multiplica com o Viralizou: ×5 com ×10 dá ×50. Dois de cada, ×2.500. Boa sorte pra quem tá olhando o placar.',
+      'Produção ×5 agora empilha: pegou duas, ×10. Três, ×15. Cada uma acaba no seu tempo.',
+      'E o Viralizou multiplica por cima: ×5 com ×10 dá ×50. Dois de cada, ×1.000.',
       'Próxima compra pela metade também empilha: guardou duas, as próximas 2 compras saem pela metade.',
     ],
   },

@@ -671,7 +671,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > Date.parse(s.server_now)).length;
       const meias = s.meias ?? (s.half_price ? 1 : 0);
       bonus.textContent = cincos
-        ? `Produção ×${(5 ** cincos).toLocaleString('pt-BR')} por alguns segundos`
+        ? `Produção ×${(5 * cincos).toLocaleString('pt-BR')} por alguns segundos`
         : meias > 1 ? `Próximas ${meias} compras pela metade` : meias === 1 ? 'Próxima compra pela metade' : '';
       for (let gid = 1; gid <= 30; gid++) {
         if (podeComprarGerador(s, gid)) listaG.append(linhaGerador(s, gid));

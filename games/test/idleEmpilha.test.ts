@@ -1,4 +1,5 @@
-// Oportunidades que empilham (0062): cada ×5 da Caixinha conta sozinho (dois = ×25, e com o Viralizou multiplica de novo)
+// Oportunidades que empilham (0062; somam desde a 0064): os ×5 da Caixinha somam (dois = ×10, três = ×15) e o total
+// multiplica com o Viralizou (×10 de oportunidade com dois Viralizou = ×1.000)
 // e cada "próxima compra pela metade" guardada vale uma compra (duas = as próximas 2 compras pela metade).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -30,16 +31,16 @@ describe('o ×5 da oportunidade empilha', () => {
   };
   const perto = (v: number, alvo: number) => expect(Math.abs(v - alvo)).toBeLessThan(1);
   const dez = "now() - interval '10 seconds'";
-  it('um = ×5; dois = ×25; três = ×125 (cada um até o seu fim)', async () => {
+  it('somam: um = ×5; dois = ×10; três = ×15 (cada um até o seu fim)', async () => {
     perto(await ganho(`array[${dez}]::timestamptz[]`), 90 * 5 + 10);
-    perto(await ganho(`array[${dez}, ${dez}]::timestamptz[]`), 90 * 25 + 10);
-    perto(await ganho(`array[${dez}, ${dez}, ${dez}]::timestamptz[]`), 90 * 125 + 10);
-    // um acaba 40 s atrás e o outro 10 s atrás: 60 s a ×25, 30 s a ×5, 10 s a ×1
-    perto(await ganho(`array[now() - interval '40 seconds', ${dez}]::timestamptz[]`), 60 * 25 + 30 * 5 + 10);
+    perto(await ganho(`array[${dez}, ${dez}]::timestamptz[]`), 90 * 10 + 10);
+    perto(await ganho(`array[${dez}, ${dez}, ${dez}]::timestamptz[]`), 90 * 15 + 10);
+    // um acaba 40 s atrás e o outro 10 s atrás: 60 s a ×10, 30 s a ×5, 10 s a ×1
+    perto(await ganho(`array[now() - interval '40 seconds', ${dez}]::timestamptz[]`), 60 * 10 + 30 * 5 + 10);
   });
-  it('com o Viralizou multiplica: ×5 e ×10 = ×50; dois de cada = ×2.500', async () => {
+  it('o total dos ×5 multiplica com o Viralizou: ×5 e ×10 = ×50; dois de cada = ×10 × ×100 = ×1.000', async () => {
     perto(await ganho(`array[${dez}]::timestamptz[]`, `array[${dez}]::timestamptz[]`), 60 * 50 + 30 * 5 + 10);
-    perto(await ganho(`array[${dez}, ${dez}]::timestamptz[]`, `array[${dez}, ${dez}]::timestamptz[]`), 60 * 2500 + 30 * 25 + 10);
+    perto(await ganho(`array[${dez}, ${dez}]::timestamptz[]`, `array[${dez}, ${dez}]::timestamptz[]`), 60 * 1000 + 30 * 10 + 10);
   });
   it('o estado devolve os ×5 no ar (e o boost_until = o último fim, pra página velha)', async () => {
     await q(`update public.idle_state set boost_ate = array[now() - interval '5 seconds', now() + interval '20 seconds', now() + interval '50 seconds'] where user_id = $1`, [A]);

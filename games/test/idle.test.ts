@@ -224,7 +224,7 @@ describe('oportunidades no banco', () => {
     }
     expect(s.opp_left).toBe(7);
   });
-  it('pegar ×5 com outro ×5 no ar fica com os dois (×25); meia-preço com uma guardada vira duas', async () => {
+  it('pegar ×5 com outro ×5 no ar fica com os dois (somam: ×10); meia-preço com uma guardada vira duas', async () => {
     const s0 = await t.rpc<Estado>('idle_open');
     await parar();
     await q(`update public.idle_state set boost_ate = array[now() + interval '30 seconds'], meias = 1 where user_id = $1`, [A]);
@@ -243,7 +243,7 @@ describe('oportunidades no banco', () => {
     expect(instante(A, apareceram[3])).toBeGreaterThan(agora - 4 * 3600_000);
     await expect(claim(apareceram[3])).rejects.toThrow(/idle_opp_gone/);
   });
-  it('Viralizar (rendem o dobro): o ×5 conta como 2 pegas (×25 de uma vez, 1 min cada) e a metade guarda 2 compras', async () => {
+  it('Viralizar (rendem o dobro): o ×5 conta como 2 pegas (×10 de uma vez, 1 min cada) e a metade guarda 2 compras', async () => {
     await q(`update public.idle_state set generators[13] = 1, strategies = '{0,0,-1,-1}' where user_id = $1`, [A]);
     const s0 = await t.rpc<Estado>('idle_open');
     await parar();
