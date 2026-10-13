@@ -115,6 +115,13 @@ export function estrategiasAtivas(cat: Catalogo, s: Estado): Estrategia[] {
   return cat.estrategias.filter((e) => s.strategies[e.era - 2] === e.opcao);
 }
 
+/** Quantas pegas uma oportunidade vale (igual a idle_claim_opportunity na 0063): "rendem o dobro" do Viralizar e da Xepa
+ *  da feira multiplicam (2, ou 4 com os dois). O ×5 entra essa quantidade de vezes e a metade guarda essa quantidade. */
+export function copiasOportunidade(cat: Catalogo, s: Estado): number {
+  const m = estrategiasAtivas(cat, s).reduce((a, e) => a * e.oppBonusMult, efeitosDe(cat, s).oppBonus);
+  return Math.max(1, Math.round(m));
+}
+
 /**
  * Multiplicador dos contratos ativos (igual a idle_social_mult na 0041):
  * 1 + efeito × (porContratado × contratei + Σ 2% × o que cada empresa paga × emprego). Ninguém te contratou = piso de

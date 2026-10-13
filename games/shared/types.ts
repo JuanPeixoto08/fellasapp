@@ -153,15 +153,20 @@ export type IdleBoardRow = {
   avatar: IdleVisual | null; hiredCount: number; byMe: boolean; mostHired: boolean;
   /** Pontos de prestígio ganhos na vida e quantas conquistas (0041). */
   pontos: number; conquistas: number;
+  /** Tem o gerador 30 (a cena 6, "Em órbita"; 0063). */
+  orbita: boolean;
 };
 /** Linha de idle_board como o banco devolve. */
 export type LinhaPlacar = {
   user_id: string; valuation: number; rate: number; era: number; strategies: number[];
   avatar: IdleVisual | null; hired_count: number; by_me: boolean; most_hired: boolean; pontos: number; conquistas: number;
+  /** Falta na resposta de antes da 0063. */
+  orbita?: boolean;
 };
 export const linhaPlacar = (r: LinhaPlacar, name: string): IdleBoardRow => ({
   userId: r.user_id, name, valuation: r.valuation, rate: r.rate, era: r.era, strategies: r.strategies,
   avatar: r.avatar, hiredCount: r.hired_count, byMe: r.by_me, mostHired: r.most_hired, pontos: r.pontos, conquistas: r.conquistas,
+  orbita: r.orbita ?? false,
 });
 
 // Fellas Inc., entrega 2 (0038): o visual do personagem como o banco guarda (índices das opções do editor)

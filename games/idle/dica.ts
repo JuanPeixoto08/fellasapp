@@ -3,7 +3,7 @@
 // (ver CLAUDE.md, "Fellas Inc.").
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
-import { estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
+import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 
@@ -132,17 +132,21 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
  *  produção não têm (a linha já diz tudo). */
 export function dicaOportunidade(s: IdleState, tipo: 0 | 1 | 2, agoraMs: number): Dica | null {
   if (tipo === 0) return null;
+  const c = copiasOportunidade(catalogo, s); // "rendem o dobro" (Viralizar / Xepa da feira): conta como 2 pegas
+  const rende = (k: number) => (k === 2 ? 'Rendem o dobro' : `Rendem ${k}×`);
   if (tipo === 1) {
     const n = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
     const texto = n
-      ? `Agora: ×${num(5 ** n, 0)} no ar. Pegando esta, vira ×${num(5 ** (n + 1), 0)}`
-      : 'Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo';
+      ? `Agora: ×${num(5 ** n, 0)} no ar. Pegando esta, vira ×${num(5 ** (n + c), 0)}`
+      : c > 1 ? `${rende(c)}: conta como ${c} de uma vez (×${num(5 ** c, 0)})`
+        : 'Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo';
     return { titulo: 'Produção ×5 por 1 minuto', linhas: [{ texto }] };
   }
   const n = s.meias ?? (s.half_price ? 1 : 0);
   const texto = n
-    ? `Você tem ${n} ${n === 1 ? 'guardada' : 'guardadas'}. Pegando esta, as próximas ${n + 1} compras saem pela metade`
-    : 'Empilha: cada uma guardada vale uma compra pela metade';
+    ? `Você tem ${n} ${n === 1 ? 'guardada' : 'guardadas'}. Pegando esta, as próximas ${n + c} compras saem pela metade`
+    : c > 1 ? `${rende(c)}: guarda ${c} compras pela metade de uma vez`
+      : 'Empilha: cada uma guardada vale uma compra pela metade';
   return { titulo: 'Próxima compra pela metade', linhas: [{ texto }] };
 }
 

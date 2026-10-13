@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
 import {
-  abertura, acumular, acumularTrechos, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
   pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
 } from './economia';
 
@@ -93,6 +93,17 @@ describe('o ×5 da oportunidade empilha (igual a idle_settle na 0062)', () => {
     // ×5 até 90 s; Viralizou de 30 a 90 s: 30 s a ×5, 60 s a ×50, 10 s a ×1
     expect(acumular(0, 1, 0, 100_000, [90_000], [90_000])).toBeCloseTo(30 * 5 + 60 * 50 + 10, 9);
     expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, [90_000, 90_000])).toBeCloseTo(50 * 25 + 40 * 2 * 25 + 10 * 2, 9);
+  });
+});
+
+describe('rendem o dobro: quantas pegas uma oportunidade vale (igual a idle_claim_opportunity na 0063)', () => {
+  it('1 sem nada; 2 com o Viralizar ou a Xepa da feira; 4 com os dois', () => {
+    const era3 = (estrategia: number, arvore: number[] = []) => com([[13, 1]], { strategies: [0, estrategia, -1, -1], bonus: { arvore, conquistas: 0 } });
+    expect(copiasOportunidade(cat, vazio())).toBe(1);
+    expect(copiasOportunidade(cat, era3(1))).toBe(1);
+    expect(copiasOportunidade(cat, era3(0))).toBe(2);
+    expect(copiasOportunidade(cat, era3(1, [1, 31, 32, 33, 34]))).toBe(2);
+    expect(copiasOportunidade(cat, era3(0, [1, 31, 32, 33, 34]))).toBe(4);
   });
 });
 

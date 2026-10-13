@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -44,6 +44,16 @@ describe('âncora no relógio do banco', () => {
   });
   it('início da semana: segunda 00:00 de Brasília', () => {
     expect(inicioSemana(base({ week_start: '2026-10-12' }))).toBe(Date.parse('2026-10-12T03:00:00Z'));
+  });
+});
+
+describe('o nome da era', () => {
+  it('"Era 5 · Sede"; com o gerador 30 (a cena 6) vira "Era 6 · Em órbita"; o nome curto sem o número', () => {
+    expect(rotuloEra(5, false)).toBe('Era 5 · Sede');
+    expect(rotuloEra(5, true)).toBe('Era 6 · Em órbita');
+    expect(rotuloEra(1, false)).toBe('Era 1 · Quarto');
+    expect(rotuloEra(5, true, true)).toBe('Em órbita');
+    expect(rotuloEra(2, false, true)).toBe('Garagem');
   });
 });
 

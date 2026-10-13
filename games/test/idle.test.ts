@@ -243,6 +243,21 @@ describe('oportunidades no banco', () => {
     expect(instante(A, apareceram[3])).toBeGreaterThan(agora - 4 * 3600_000);
     await expect(claim(apareceram[3])).rejects.toThrow(/idle_opp_gone/);
   });
+  it('Viralizar (rendem o dobro): o ×5 conta como 2 pegas (×25 de uma vez, 1 min cada) e a metade guarda 2 compras', async () => {
+    await q(`update public.idle_state set generators[13] = 1, strategies = '{0,0,-1,-1}' where user_id = $1`, [A]);
+    const s0 = await t.rpc<Estado>('idle_open');
+    await parar();
+    const lista = pendentes(A, Date.parse(s0.server_now), [], semana(s0));
+    const cinco = (await claim(lista.find((w) => tipo(A, w) === 1)!)) as Estado & { boosts: string[] };
+    expect(cinco.boosts).toHaveLength(2);
+    for (const b of cinco.boosts) {
+      const dur = Date.parse(b) - Date.parse(cinco.server_now);
+      expect(dur).toBeGreaterThan(55_000);
+      expect(dur).toBeLessThan(65_000);
+    }
+    const meia = (await claim(lista.find((w) => tipo(A, w) === 2)!)) as Estado & { meias: number };
+    expect(meia.meias).toBe(2);
+  });
   it('Viralizar: tipo 0 rende o dobro e o limite do dia vai a 13', async () => {
     await q(`update public.idle_state set generators[13] = 1, strategies = '{0,0,-1,-1}' where user_id = $1`, [A]);
     const s0 = await t.rpc<Estado>('idle_open');

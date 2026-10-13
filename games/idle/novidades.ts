@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-dobro',
+    titulo: 'O dobro dobra e a Era 6',
+    data: '2026-10-13',
+    itens: [
+      'Com Viralizar ou Xepa da feira ("rendem o dobro"), cada oportunidade conta como 2: o ×5 entra duas vezes (×25 de uma vez) e a metade guarda 2 compras. Com os dois juntos, conta como 4.',
+      'Quem comprou o gerador 30 e foi pra órbita agora aparece como Era 6 · Em órbita, do lado da cena e no placar.',
+    ],
+  },
+  {
     id: '2026-10-13-empilha',
     titulo: 'Oportunidades empilham',
     data: '2026-10-13',

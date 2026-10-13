@@ -162,3 +162,18 @@ describe('caixinha da oportunidade (0062: tudo empilha)', () => {
   });
 });
 
+describe('caixinha da oportunidade com "rendem o dobro" (Viralizar / Xepa: conta como 2 pegas)', () => {
+  const agora = Date.parse('2026-10-12T12:00:00.000Z');
+  const g = Array(30).fill(0);
+  g[12] = 1;
+  const viralizar = (x: Partial<IdleState> = {}) => estado({ era: 3, generators: g, strategies: [0, 0, -1, -1], ...x });
+  it('×5: conta como 2 de uma vez (×25); com um no ar, pegar vira ×125', () => {
+    expect(textos(dicaOportunidade(viralizar(), 1, agora)!)).toEqual(['Rendem o dobro: conta como 2 de uma vez (×25)']);
+    expect(textos(dicaOportunidade(viralizar({ boosts: ['2026-10-12T12:00:30.000Z'] }), 1, agora)!)).toEqual(['Agora: ×5 no ar. Pegando esta, vira ×125']);
+  });
+  it('metade: guarda 2 de uma vez; com 1 guardada, as próximas 3', () => {
+    expect(textos(dicaOportunidade(viralizar(), 2, agora)!)).toEqual(['Rendem o dobro: guarda 2 compras pela metade de uma vez']);
+    expect(textos(dicaOportunidade(viralizar({ meias: 1, half_price: true }), 2, agora)!)).toEqual(['Você tem 1 guardada. Pegando esta, as próximas 3 compras saem pela metade']);
+  });
+});
+

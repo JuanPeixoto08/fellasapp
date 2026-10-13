@@ -5,6 +5,7 @@ import { catalogo } from './catalogo';
 import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas, VIRAL_MS } from './economia';
 import { CAIXA_PADRAO, type Caixa } from './oportunidades';
 import type { NomeCena } from './palco';
+import { ERAS } from './nomes';
 
 export type Fase = 'carregando' | 'sem_sessao' | 'antes' | 'abrindo' | 'jogando';
 export type Ancora = { estado: IdleState; clienteMs: number; servidorMs: number };
@@ -58,3 +59,11 @@ export function segundosOportunidade(estado: IdleState, arvore: readonly number[
 /** Um contrato seu venceu (o relógio do servidor passou de muda_em): a taxa mudou e a tela precisa bater o ponto. */
 export const vencido = (estado: IdleState, agoraServidorMs: number): boolean =>
   estado.muda_em !== null && agoraServidorMs >= Date.parse(estado.muda_em);
+
+/** O nome da era: "Era 5 · Sede". Com o gerador 30 a cena vira a 6 ("em órbita") e o nome acompanha: "Era 6 · Em órbita"
+ *  (no jogo continua a era 5: estratégias e conquistas não mudam). `curto` = só o nome ("Sede", "Em órbita"). */
+export function rotuloEra(era: number, orbita: boolean, curto = false): string {
+  const [n, nome] = orbita ? [6, 'Em órbita'] : [era, ERAS[era - 1]];
+  return curto ? nome : `Era ${n} · ${nome}`;
+}
+
