@@ -225,9 +225,9 @@ export type Boosts = number | null | readonly number[];
 const listaBoosts = (b: Boosts): readonly number[] => (b === null ? [] : typeof b === 'number' ? [b] : b);
 
 /**
- * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): ×5 por bônus da oportunidade no ar e ×10 por Viralizou ativo, tudo
- * multiplicando e sem teto (×5 e ×10 = ×50; dois ×5 = ×25); divide nos pontos em que um começa ou acaba. Igual a
- * idle_settle na 0062. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
+ * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): os ×5 das oportunidades no ar SOMAM entre si (dois = ×10, três =
+ * ×15) e o total multiplica com os Viralizou (×10 cada, dois = ×100), sem teto (dois ×5 com dois Viralizou = ×1.000);
+ * divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0064. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
  */
 export function produzido(
   r: number, a: number, b: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
@@ -245,7 +245,8 @@ export function produzido(
     if (q <= p) continue;
     const meio = (p + q) / 2;
     const k = virais.filter((f) => f - viralMs <= meio && f > meio).length;
-    const m = 5 ** boosts.filter((f) => f > meio).length * 10 ** k; // sem teto: dois ×100, três ×1000; ×5 e ×10 = ×50
+    const kb = boosts.filter((f) => f > meio).length;
+    const m = (kb ? 5 * kb : 1) * 10 ** k; // ×5 somam (×10, ×15); Viralizou multiplica (×100, ×1000); ×5 e ×10 = ×50
     total += (r * m * (q - p)) / 1000;
   }
   return total;

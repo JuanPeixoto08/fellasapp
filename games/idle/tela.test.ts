@@ -157,11 +157,11 @@ describe('tela da Fellas Inc.', () => {
     expect(preco1()).toBe(metade);
     expect(preco1()).not.toBe(cheio);
   });
-  it('o aviso do bônus diz quantos ×5 e quantas meias: "Produção ×25 por alguns segundos", "Próximas 2 compras pela metade"', () => {
+  it('o aviso do bônus diz quanto os ×5 somam e quantas meias: "Produção ×10 por alguns segundos", "Próximas 2 compras pela metade"', () => {
     const tela = criarTela(root, acoes);
     const fim = new Date(Date.parse('2026-10-12T12:00:00.000Z') + 30_000).toISOString();
     tela.renderizar(modelo({ estado: estado({ boosts: [fim, fim], boost_until: fim }) }));
-    expect(root.querySelector('.bonus')!.textContent).toBe('Produção ×25 por alguns segundos');
+    expect(root.querySelector('.bonus')!.textContent).toBe('Produção ×10 por alguns segundos');
     tela.renderizar(modelo({ estado: estado({ meias: 2, half_price: true }) }));
     expect(root.querySelector('.bonus')!.textContent).toBe('Próximas 2 compras pela metade');
     tela.renderizar(modelo({ estado: estado({ meias: 1, half_price: true }) }));

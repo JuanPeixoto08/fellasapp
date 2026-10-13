@@ -86,13 +86,15 @@ describe('Viralizou na conta (igual a idle_settle na 0045)', () => {
 });
 
 describe('o ×5 da oportunidade empilha (igual a idle_settle na 0062)', () => {
-  it('um = ×5; dois = ×25; com o Viralizou multiplica (×5 e ×10 = ×50)', () => {
+  it('somam: um = ×5; dois = ×10; o total multiplica com o Viralizou (×5 e ×10 = ×50)', () => {
     expect(acumular(0, 1, 0, 100_000, [90_000])).toBeCloseTo(90 * 5 + 10, 9);
-    expect(acumular(0, 1, 0, 100_000, [90_000, 90_000])).toBeCloseTo(90 * 25 + 10, 9);
-    expect(acumular(0, 1, 0, 100_000, [60_000, 90_000])).toBeCloseTo(60 * 25 + 30 * 5 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [90_000, 90_000])).toBeCloseTo(90 * 10 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [60_000, 90_000])).toBeCloseTo(60 * 10 + 30 * 5 + 10, 9);
+    // dois ×5 (×10) com dois Viralizou (×100) de 30 a 90 s: 30 s a ×10, 60 s a ×1.000, 10 s a ×1
+    expect(acumular(0, 1, 0, 100_000, [90_000, 90_000], [90_000, 90_000])).toBeCloseTo(30 * 10 + 60 * 1000 + 10, 9);
     // ×5 até 90 s; Viralizou de 30 a 90 s: 30 s a ×5, 60 s a ×50, 10 s a ×1
     expect(acumular(0, 1, 0, 100_000, [90_000], [90_000])).toBeCloseTo(30 * 5 + 60 * 50 + 10, 9);
-    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, [90_000, 90_000])).toBeCloseTo(50 * 25 + 40 * 2 * 25 + 10 * 2, 9);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, [90_000, 90_000])).toBeCloseTo(50 * 10 + 40 * 2 * 10 + 10 * 2, 9);
   });
 });
 

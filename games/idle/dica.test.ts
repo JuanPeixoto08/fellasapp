@@ -128,7 +128,7 @@ describe('caixinha da produção (o F$/s do topo)', () => {
       viral: ['2026-10-12T12:00:40.000Z', '2026-10-12T12:00:50.000Z', '2026-10-12T11:59:00.000Z'],
     });
     const t = textos(dicaProducao(s, agora));
-    expect(t).toContain('Agora: ×25 das oportunidades');
+    expect(t).toContain('Agora: ×10 das oportunidades');
     expect(t).toContain('Agora: ×100 do Viralizou');
   });
 });
@@ -148,9 +148,9 @@ describe('caixinha dos contratos', () => {
 describe('caixinha da oportunidade (0062: tudo empilha)', () => {
   const agora = Date.parse('2026-10-12T12:00:00.000Z');
   const fim = '2026-10-12T12:00:30.000Z';
-  it('×5: sem nenhum no ar diz que empilha; com dois no ar, pegar agora deixa ×125', () => {
-    expect(textos(dicaOportunidade(estado(), 1, agora)!)).toEqual(['Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo']);
-    expect(textos(dicaOportunidade(estado({ boosts: [fim, fim] }), 1, agora)!)).toEqual(['Agora: ×25 no ar. Pegando esta, vira ×125']);
+  it('×5: sem nenhum no ar diz que soma; com dois no ar, pegar agora deixa ×15', () => {
+    expect(textos(dicaOportunidade(estado(), 1, agora)!)).toEqual(['Soma: pegar outra com esta no ar dá ×10, e o Viralizou multiplica por cima']);
+    expect(textos(dicaOportunidade(estado({ boosts: [fim, fim] }), 1, agora)!)).toEqual(['Agora: ×10 no ar. Pegando esta, vira ×15']);
   });
   it('metade: sem nenhuma guardada diz que empilha; com uma, as próximas 2 compras', () => {
     expect(textos(dicaOportunidade(estado(), 2, agora)!)).toEqual(['Empilha: cada uma guardada vale uma compra pela metade']);
@@ -167,9 +167,9 @@ describe('caixinha da oportunidade com "rendem o dobro" (Viralizar / Xepa: conta
   const g = Array(30).fill(0);
   g[12] = 1;
   const viralizar = (x: Partial<IdleState> = {}) => estado({ era: 3, generators: g, strategies: [0, 0, -1, -1], ...x });
-  it('×5: conta como 2 de uma vez (×25); com um no ar, pegar vira ×125', () => {
-    expect(textos(dicaOportunidade(viralizar(), 1, agora)!)).toEqual(['Rendem o dobro: conta como 2 de uma vez (×25)']);
-    expect(textos(dicaOportunidade(viralizar({ boosts: ['2026-10-12T12:00:30.000Z'] }), 1, agora)!)).toEqual(['Agora: ×5 no ar. Pegando esta, vira ×125']);
+  it('×5: conta como 2 de uma vez (×10); com um no ar, pegar vira ×15', () => {
+    expect(textos(dicaOportunidade(viralizar(), 1, agora)!)).toEqual(['Rendem o dobro: conta como 2 de uma vez (×10)']);
+    expect(textos(dicaOportunidade(viralizar({ boosts: ['2026-10-12T12:00:30.000Z'] }), 1, agora)!)).toEqual(['Agora: ×5 no ar. Pegando esta, vira ×15']);
   });
   it('metade: guarda 2 de uma vez; com 1 guardada, as próximas 3', () => {
     expect(textos(dicaOportunidade(viralizar(), 2, agora)!)).toEqual(['Rendem o dobro: guarda 2 compras pela metade de uma vez']);

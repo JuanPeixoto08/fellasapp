@@ -75,9 +75,9 @@ export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro:
   const out: { texto: string; ouro: boolean }[] = [];
   const v = viraisAtivos(s, agoraMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
-  // os ×5 da oportunidade (0062: empilham): ×5, ×25, ×125… até o primeiro acabar
+  // os ×5 da oportunidade empilhados somam (0064): ×5, ×10, ×15… até o primeiro acabar
   const b = (s.boosts ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((x, y) => x - y);
-  if (b.length) out.push({ texto: `×${(5 ** b.length).toLocaleString('pt-BR')} · ${mmss(b[0] - agoraMs)}`, ouro: b.length >= 2 });
+  if (b.length) out.push({ texto: `×${(5 * b.length).toLocaleString('pt-BR')} · ${mmss(b[0] - agoraMs)}`, ouro: b.length >= 2 });
   if (promoAtiva(s, agoraMs)) out.push({ texto: `Metade · ${mmss(Date.parse(s.promo_ate!) - agoraMs)}`, ouro: false });
   return out;
 }
