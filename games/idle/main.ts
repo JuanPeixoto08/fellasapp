@@ -424,7 +424,7 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS
 // dev (?mock): __dourado(tipo) força um evento agora
 if (import.meta.env.DEV) {
   (window as unknown as { __mostrarDourado: (seg: number, tipo: TipoDourado) => void }).__mostrarDourado = (seg, tipo) =>
-    mostrarDourado(seg, tipo, agoraSrv());
+    mostrarDourado(seg, tipo, agoraSrv(), ancora ? efeitos(ancora.estado).douradoTela : JANELA_S);
 }
 
 function render() {
@@ -543,7 +543,8 @@ setInterval(() => {
   tela.relogioBonus(ancora.estado, agoraMs);
   const seg = Math.floor(agoraMs / 1000);
   if (fase === 'jogando' && ancora.estado.started && seg !== segVisto) {
-    for (let x = Math.max(segVisto + 1, seg - (JANELA_S - 1)); x <= seg; x++) {
+    const tela0 = efeitos(ancora.estado).douradoTela; // 12 s, 24 com o Olho de lince: olha pra trás o tanto que fica na tela
+    for (let x = Math.max(segVisto + 1, seg - (tela0 - 1)); x <= seg; x++) {
       const e = eventoEm(ancora.estado, x);
       if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS);
     }

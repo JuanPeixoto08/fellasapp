@@ -198,6 +198,13 @@ describe('árvore em tela cheia: a copa', () => {
     expect(escalaArvore(390, 900)).toBeCloseTo(0.8125, 10);
     expect(MUNDO_ARVORE.largura * escalaArvore(390, 900)).toBeLessThanOrEqual(390);
   });
+  it('rótulos na mesma altura não encostam no celular: o texto não encolhe, então 100 de mundo (80 px a 0,8) entre eles', () => {
+    for (const r of ROTULOS_ARVORE) {
+      for (const o of ROTULOS_ARVORE) {
+        if (o !== r && Math.abs(o.y - r.y) < 20) expect(Math.abs(o.x - r.x), `${r.nome} × ${o.nome}`).toBeGreaterThanOrEqual(100);
+      }
+    }
+  });
   it('a Horta é o ramo mais à direita e a raiz fica no meio', () => {
     const primeiros = [11, 21, 31, 41, 51].map((id) => POSICOES_ARVORE[id][0]);
     for (const x of primeiros) expect(POSICOES_ARVORE[61][0]).toBeGreaterThan(x);
