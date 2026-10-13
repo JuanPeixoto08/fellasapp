@@ -482,7 +482,7 @@ describe('legado: prestígio, árvore e conquistas', () => {
     tela.renderizar(modelo({ aba: 'legado', estado: estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }) }));
     const quadro = root.querySelector('.arvore-quadro')!;
     expect(quadro.querySelector('svg.arvore-mini')).not.toBeNull();
-    expect(quadro.textContent).toContain(`2 de ${catalogo.arvore.length} comprados · 4 dá pra comprar agora`);
+    expect(quadro.textContent).toContain(`2 de ${catalogo.arvore.length} comprados · 5 dá pra comprar agora`); // o 1º de cada um dos outros 5 ramos (2 pontos cada; o 12 custa 4)
     expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(true);
     quadro.querySelector<HTMLButtonElement>('.arvore-abrir')!.click();
     expect(root.querySelector('.arvore-tela')!.hasAttribute('hidden')).toBe(false);

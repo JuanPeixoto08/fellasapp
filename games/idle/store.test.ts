@@ -24,9 +24,13 @@ describe('âncora no relógio do banco', () => {
     const a = ancorar(base({ boost_until: '2026-10-12T12:00:05.000Z' }), 0);
     expect(valuationAgora(a, 10_000)).toBeCloseTo(100 + 2 * 10 + 2 * 4 * 5, 10);
   });
-  it('teto do offline: 8h, ou o do ramo Tempo da árvore', () => {
-    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 8 * 3600, 6);
-    expect(valuationAgora(ancorar(base({ bonus: { arvore: [1, 41], conquistas: 0 } }), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 12 * 3600, 6);
+  it('sem teto com o jogo fechado: 20h fora rendem as 20h', () => {
+    expect(valuationAgora(ancorar(base(), 0), 20 * 3600_000)).toBeCloseTo(100 + 2 * 20 * 3600, 6);
+  });
+  it('Viralizou dura o dobro com o Hype (nó 44)', () => {
+    const viral = [new Date(Date.parse('2026-10-12T12:00:00.000Z') + 150_000).toISOString()];
+    expect(valuationAgora(ancorar(base({ viral }), 0), 200_000)).toBeCloseTo(100 + 2 * (200 + 9 * 60), 6);
+    expect(valuationAgora(ancorar(base({ viral, bonus: { arvore: [1, 41, 42, 43, 44], conquistas: 0 } }), 0), 200_000)).toBeCloseTo(100 + 2 * (200 + 9 * 120), 6);
   });
   it('caixinha: 3 por 4h, ou o tamanho que o ramo Oportunidades der (a validade é sempre 4h)', () => {
     expect(caixa(base())).toEqual({ tamanho: 3, validadeS: 4 * 3600 });

@@ -25,8 +25,9 @@ function tempo(ms: number): string {
   const resto = min % 60;
   return resto ? `${h} h ${resto} min` : `${h} h`;
 }
-/** O bônus de uma espécie em texto curto ("Produção +2% · Geradores 2% mais baratos"). */
-const efeitos = (e: Especie) => resumoBonus(e);
+/** O bônus de uma espécie em texto curto ("Produção +2% · Geradores 2% mais baratos"), × o Agrotóxico liberado (`mult`). */
+const efeitos = (e: Especie, mult: number) =>
+  resumoBonus({ producao: e.producao * mult, geradores: e.geradores * mult, melhorias: e.melhorias * mult, oportunidades: e.oportunidades * mult });
 const pct = (x: number) => `${(Math.round(Math.abs(x) * 1000) / 10).toLocaleString('pt-BR')}%`;
 
 function barra(fracao: number): HTMLElement {
@@ -43,8 +44,11 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
   let ultimo: Parameters<typeof renderizar> | null = null;
   let atuais: Precos[] = [];
 
-  function renderizar(h: HortaEstado | null, taxa: number, valuation: number, ocupado: boolean, agoraMs: number, chips: readonly ChipHorta[] = []): void {
-    ultimo = [h, taxa, valuation, ocupado, agoraMs, chips];
+  /** `mult` = o Agrotóxico liberado da árvore (1,5): os bônus de cada espécie aparecem já multiplicados. */
+  function renderizar(
+    h: HortaEstado | null, taxa: number, valuation: number, ocupado: boolean, agoraMs: number, chips: readonly ChipHorta[] = [], mult = 1,
+  ): void {
+    ultimo = [h, taxa, valuation, ocupado, agoraMs, chips, mult];
     raiz.replaceChildren();
     atuais = [];
     if (!h) {
@@ -166,7 +170,7 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
       const cab = el('div', 'cab');
       const meio = el('span', 'meio');
       const quanto = f === 'morta' ? 'Morta · arranca pra plantar de novo' : `${NOME_FASE[f]} · ${r.ate === 'amadurecer' ? 'amadurece em' : 'morre em'} ${tempo(r.ms)}`;
-      meio.append(el('strong', undefined, e.nome), el('span', 'bom', efeitos(e)), el('span', 'sub', quanto),
+      meio.append(el('strong', undefined, e.nome), el('span', 'bom', efeitos(e, mult)), el('span', 'sub', quanto),
         barra(r.ate === 'amadurecer' ? 1 - r.ms / (e.amadureceS * 1000) : r.ms / (e.vidaS * 1000)));
       cab.append(iconePlanta(p.especie, f), meio);
       const bts = el('div', 'bts-horta');
@@ -193,7 +197,7 @@ export function criarHortaTela(a: { plantar(canteiro: number, especie: number): 
       const bt = button('', 'btn semente', () => { if (alvo !== null) a.plantar(alvo, e.id); });
       bt.dataset.especie = String(e.id);
       const meio = el('span', 'meio');
-      meio.append(el('strong', undefined, e.nome), el('span', 'bom', efeitos(e)));
+      meio.append(el('strong', undefined, e.nome), el('span', 'bom', efeitos(e, mult)));
       bt.append(iconePlanta(e.id), meio, el('span', 'preco-semente', formatarValor(preco)));
       bt.disabled = ocupado || alvo === null || preco > valuation;
       if (!ocupado && alvo !== null) precos.push({ botao: bt, preco });

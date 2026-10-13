@@ -64,8 +64,9 @@ export const precoSemente = (e: Especie, taxa: number) => e.custoS * taxa;
 
 export type BonusHorta = { producao: number; geradores: number; melhorias: number; oportunidades: number };
 export type PlantaNaTela = { canteiro: number; especie: number; inicioMs: number };
-/** Soma dos bônus das plantas maduras destrancadas (descontos com teto de 50%). Igual a idle_horta_bonus. */
-export function bonusHorta(plantas: readonly PlantaNaTela[], lado: number, agoraMs: number): BonusHorta {
+/** Soma dos bônus das plantas maduras destrancadas × `mult` (Agrotóxico liberado: 1,5), descontos com teto de 50%.
+ *  Igual a idle_horta_bonus. */
+export function bonusHorta(plantas: readonly PlantaNaTela[], lado: number, agoraMs: number, mult = 1): BonusHorta {
   const b: BonusHorta = { producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 };
   for (const p of plantas) {
     const e = especie(p.especie);
@@ -75,7 +76,10 @@ export function bonusHorta(plantas: readonly PlantaNaTela[], lado: number, agora
     b.melhorias += e.melhorias;
     b.oportunidades += e.oportunidades;
   }
-  return { ...b, geradores: Math.min(0.5, b.geradores), melhorias: Math.min(0.5, b.melhorias) };
+  return {
+    producao: b.producao * mult, geradores: Math.min(0.5, b.geradores * mult), melhorias: Math.min(0.5, b.melhorias * mult),
+    oportunidades: b.oportunidades * mult,
+  };
 }
 
 const pctAbs = (x: number) => `${Math.round(Math.abs(x) * 1000) / 10}`.replace('.', ',');

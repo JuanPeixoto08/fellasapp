@@ -32,14 +32,14 @@ const no = (id: number) => document.querySelector<HTMLButtonElement>(`.no-arvore
 const cartao = () => document.querySelector('.arvore-cartao')!;
 
 describe('árvore em tela cheia', () => {
-  it('fechada até abrir; abre com os 26 nós, as situações nas classes e os pontos no topo', () => {
+  it('fechada até abrir; abre com os 31 nós, as situações nas classes e os pontos no topo', () => {
     const t = criarArvoreTela(comprar);
     document.body.append(t.elemento);
     expect(t.aberta()).toBe(false);
     expect(t.elemento.hasAttribute('hidden')).toBe(true);
     t.abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }), false, () => volta);
     expect(t.aberta()).toBe(true);
-    expect(document.querySelectorAll('.no-arvore')).toHaveLength(26);
+    expect(document.querySelectorAll('.no-arvore')).toHaveLength(31);
     expect(no(11).classList.contains('comprado')).toBe(true);
     expect(no(21).classList.contains('pode')).toBe(true);
     expect(no(12).classList.contains('falta')).toBe(true);
@@ -47,10 +47,10 @@ describe('árvore em tela cheia', () => {
     expect(no(12).getAttribute('aria-label')).toBe('Ô loco, bicho!, falta 1 ★');
     expect(no(12).querySelector('.no-custo')!.textContent).toBe('4 ★');
     expect(no(11).querySelector('.no-custo')).toBeNull();
-    expect(document.querySelectorAll('.ligacao')).toHaveLength(25);
+    expect(document.querySelectorAll('.ligacao')).toHaveLength(30);
     expect(document.querySelectorAll('.ligacao.comprado')).toHaveLength(1); // 1 → 11
     expect(document.querySelector('.arvore-pontos')!.textContent).toBe('★ 3');
-    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente']);
+    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta']);
   });
   it('abre com o nó mais barato que dá pra comprar escolhido; Comprar chama comprar(id)', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
@@ -153,11 +153,11 @@ describe('árvore em tela cheia', () => {
     expect([...document.querySelectorAll('.arvore-legenda li')].map((x) => x.textContent))
       .toEqual(['Comprado', 'Dá pra comprar', 'Falta ponto', 'Trancado']);
   });
-  it('miniatura: 26 quadradinhos e 25 linhas, decorativa', () => {
+  it('miniatura: 31 quadradinhos e 30 linhas, decorativa', () => {
     const svg = miniArvore(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
     expect(svg.getAttribute('aria-hidden')).toBe('true');
-    expect(svg.querySelectorAll('rect.mini-no')).toHaveLength(26);
-    expect(svg.querySelectorAll('line.ligacao')).toHaveLength(25);
+    expect(svg.querySelectorAll('rect.mini-no')).toHaveLength(31);
+    expect(svg.querySelectorAll('line.ligacao')).toHaveLength(30);
     expect(svg.querySelectorAll('rect.mini-no.comprado')).toHaveLength(2);
   });
 });

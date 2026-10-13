@@ -8,7 +8,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual } fr
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
@@ -19,7 +19,7 @@ import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
 import { gravarChave, gravarVolumeMusica, lerChave, lerVista, lerVolumeMusica, marcarVista, type ChaveSom } from './preferencias';
 import {
-  agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+  agoraServidor, ancorar, caixa, cenaDoEstado, efeitos, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba, type TelaConfig } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -201,7 +201,11 @@ const tela = criarTela(document.getElementById('app')!, {
       const s = await api.idleDouradoPegar(seg, lado);
       aplicar(s);
       audio.tocar('douradoPego');
-      if (chaves.avisos) tela.dourados.subirTexto(textoPegou(tipo, { ganho: s0.rate * 1200, viral: s.viral.length }), p.x, p.y);
+      const ef = efeitos(s0); // Investidor anjo e Hype mudam o que o texto diz
+      if (chaves.avisos) {
+        const ganho = ganhoInvestidor(s0.rate, ef.douradoInvestidor, s0.horta_bonus?.oportunidades ?? 0);
+        tela.dourados.subirTexto(textoPegou(tipo, { ganho, viral: s.viral.length, duracao: ef.douradoDuracao }), p.x, p.y);
+      }
     } catch (e) {
       const err = toGameError(e);
       if (err.code === 'no_session') fase = 'sem_sessao';
@@ -421,7 +425,7 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS
 // dev (?mock): __dourado(tipo) força um evento agora
 if (import.meta.env.DEV) {
   (window as unknown as { __mostrarDourado: (seg: number, tipo: TipoDourado) => void }).__mostrarDourado = (seg, tipo) =>
-    mostrarDourado(seg, tipo, agoraSrv());
+    mostrarDourado(seg, tipo, agoraSrv(), ancora ? efeitos(ancora.estado).douradoTela : JANELA_S);
 }
 
 function render() {
@@ -540,7 +544,8 @@ setInterval(() => {
   tela.relogioBonus(ancora.estado, agoraMs);
   const seg = Math.floor(agoraMs / 1000);
   if (fase === 'jogando' && ancora.estado.started && seg !== segVisto) {
-    for (let x = Math.max(segVisto + 1, seg - (JANELA_S - 1)); x <= seg; x++) {
+    const tela0 = efeitos(ancora.estado).douradoTela; // 12 s, 24 com o Olho de lince: olha pra trás o tanto que fica na tela
+    for (let x = Math.max(segVisto + 1, seg - (tela0 - 1)); x <= seg; x++) {
       const e = eventoEm(ancora.estado, x);
       if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS);
     }
