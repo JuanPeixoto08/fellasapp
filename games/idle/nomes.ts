@@ -169,7 +169,8 @@ export type TipoConquista =
   // Mapa do rolê: lugares abertos (estado) e dono/pódio da semana (evento)
   | 'mapa_abriu' | 'mapa_dono' | 'mapa_podio'
   // camisetaria (evento): procura da coleção, nota 10 dos 4 influencers, coleção encalhada
-  | 'tee_pct' | 'tee_quatro_dez' | 'tee_encalhe';
+  | 'tee_pct' | 'tee_quatro_dez' | 'tee_encalhe'
+  | 'cup_nota' | 'cup_pt';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -274,6 +275,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 86, tipo: 'mapa_podio', nome: 'Tá no pódio', frase: 'Foto na parede. Ninguém olha, mas tá lá.', condicao: 'Entrar no pódio de algum lugar' },
   { id: 87, tipo: 'tee_pct', valor: 200, nome: 'Esgotou', frase: 'Esgotou. O fornecedor já subiu o preço.', condicao: 'Coleção com 200% de procura' },
   { id: 88, tipo: 'tee_quatro_dez', nome: 'Quatro dez', frase: 'Até o @luisviton deu dez. Print e emoldura.', condicao: 'Coleção com nota 10 dos 4 influencers' },
+  { id: 89, tipo: 'cup_nota', valor: 900, nome: 'Nota mil (quase)', frase: 'Faltou 99 pra perfeição. Faltou a dignidade também.', condicao: 'Copão com nota 900 ou mais' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -287,6 +289,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 112, escondida: true, tipo: 'horta_morango', nome: 'Ele tem pescoço sim', frase: 'Você viu com seus próprios olhos.', condicao: 'Ver um Morango com Pescoço brotar' },
   { id: 113, escondida: true, tipo: 'conv_mesma', nome: 'São a mesma pessoa?', frase: 'Nunca foram vistos juntos.', condicao: 'Tentar sentar o Gemaplys e o MC V.V juntos' },
   { id: 114, escondida: true, tipo: 'tee_encalhe', nome: 'Coleção encalhada', frase: 'Vai virar pano de chão de luxo.', condicao: 'Coleção com menos de 20% de procura' },
+  { id: 115, escondida: true, tipo: 'cup_pt', nome: 'Deu PT', frase: 'A galera foi embora carregada. Literalmente.', condicao: 'Ter PT numa noite' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
