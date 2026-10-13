@@ -7,7 +7,7 @@ const copao = (x: Partial<CopaoNaNoite> = {}): CopaoNaNoite => ({
 });
 const noite = (x: Partial<UltimaNoite> = {}): UltimaNoite => ({
   inicio: '2026-10-12T21:00:00Z', fim: '2026-10-13T05:00:00Z', sexta: false, dj: null, vendas: 30, fichas: 300, pt: false, galera_delta: 2,
-  chat_seed: 280, copoes: [copao()], ...x,
+  chat_seed: 280, copoes: [copao()], saiu_antes: 0, ...x,
 });
 
 describe('o chat da galera', () => {
@@ -23,6 +23,17 @@ describe('o chat da galera', () => {
         expect(m.texto).not.toMatch(/\{\w+\}/);
         expect(m.texto.charAt(0)).toBe(m.texto.charAt(0).toUpperCase());
       });
+    }
+  });
+  it('cardápio vazio só quando ninguém esteve nele; se os copões saíram antes da nota, a galera fala disso', () => {
+    const vazio = /vazio|não tinha copão/;
+    const saiu = /saiu do cardápio|sumido do cardápio|tiraram/i;
+    for (let seed = 0; seed < 30; seed++) {
+      const nada = chatDaNoite(noite({ chat_seed: seed, copoes: [], vendas: 0, fichas: 0 }), 'u1').map((m) => m.texto).join(' ');
+      expect(nada).toMatch(vazio);
+      const tirados = chatDaNoite(noite({ chat_seed: seed, copoes: [], saiu_antes: 2, vendas: 40, fichas: 300 }), 'u1').map((m) => m.texto).join(' ');
+      expect(tirados).not.toMatch(vazio);
+      expect(tirados).toMatch(saiu);
     }
   });
   it('a mesma noite e a mesma pessoa dão o mesmo chat; outra noite muda', () => {

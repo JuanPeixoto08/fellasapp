@@ -40,7 +40,7 @@ const naNoite = (c: CopaoCup, x: Partial<CopaoNaNoite> = {}): CopaoNaNoite => ({
 });
 const ultima = (cs: CopaoCup[], x: Partial<UltimaNoite> = {}): UltimaNoite => ({
   inicio: iso(INI - 24 * H), fim: iso(INI - 16 * H), sexta: false, dj: null, vendas: 40, fichas: 400, pt: false, galera_delta: 3, chat_seed: 280,
-  copoes: cs.map((c) => naNoite(c)), ...x,
+  copoes: cs.map((c) => naNoite(c)), saiu_antes: 0, ...x,
 });
 const estado = (x: Partial<EstadoCup> = {}): EstadoCup => ({
   moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, noite_fechada: null, historico: [], ...x,
@@ -533,6 +533,33 @@ describe('ontem à noite (o chat, uma vez por noite)', () => {
     $<HTMLButtonElement>('.cup-chat-ver').click();
     t.renderizar(lugar(estado({ cardapio: [a], ultima_noite: u })), false, AGORA + 1000);
     expect(t.elemento.dataset.estado).toBe('bar');
+  });
+  it('copões que saíram antes da nota: nada de "cardápio vazio"; a lista mostra o que eles venderam (bate com os números)', () => {
+    const a = copao({ id: 82, nome: 'Fica' });
+    viu([82]);
+    {
+      const { t, $, $$ } = montar();
+      t.renderizar(lugar(estado({ cardapio: [], ultima_noite: ultima([], { saiu_antes: 2, vendas: 40.2, fichas: 120, chat_seed: 304 }) })), false, AGORA);
+      expect($('.cup-chat-lado .sub').textContent).toBe('Das 18h às 2h.');
+      expect($('.cup-chat-copoes').textContent).toBe('2 copões saíram antes da nota: 40 vendidos · +120 fichas');
+      expect($$('.cup-msg').map((m) => m.textContent).join(' ')).not.toMatch(/vazio|não tinha copão/);
+      t.elemento.remove();
+    }
+    {
+      const { t, $, $$ } = montar();
+      const u = ultima([a], { saiu_antes: 1, vendas: 50, fichas: 450, chat_seed: 305 });
+      t.renderizar(lugar(estado({ cardapio: [a], ultima_noite: u })), false, AGORA);
+      const linhas = $$('.cup-chat-copoes li').map((li) => li.textContent);
+      expect(linhas).toHaveLength(2);
+      expect(linhas[1]).toBe('1 copão saiu antes da nota: 10 vendidos · +50 fichas');
+      t.elemento.remove();
+    }
+    {
+      const { t, $ } = montar();
+      t.renderizar(lugar(estado({ cardapio: [], ultima_noite: ultima([], { vendas: 0, fichas: 0, chat_seed: 306 }) })), false, AGORA);
+      expect($('.cup-chat-lado .sub').textContent).toBe('Das 18h às 2h, com o cardápio vazio.');
+      t.elemento.remove();
+    }
   });
   it('PT e sexta com DJ: o aviso do PT; o DJ só aparece como "tocou"', () => {
     const a = copao({ id: 81, base: 2, forca: 9 });

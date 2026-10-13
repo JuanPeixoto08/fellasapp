@@ -30,7 +30,7 @@ insert into public.idle_cat_place (id, faixa, horas, era, lote, lancado, custo_b
   (4, 'medio', 6, 3, 1, true, 150, 'ficha', 'nota', 0),
   (5, 'medio', 6, 3, 2, false, 150, null, null, 0),
   (6, 'medio', 6, 3, 3, false, 150, null, null, 0),
-  (7, 'caro', 16, 4, 1, true, 250, 'gorjeta', 'estrelas', 0),
+  (7, 'caro', 16, 4, 2, false, 250, 'gorjeta', 'estrelas', 0), -- o jantar: lote 2 ("Em breve" no mapa)
   (8, 'caro', 16, 4, 3, false, 250, null, null, 0),
   (9, 'caro', 16, 4, 3, false, 250, null, null, 0);
 insert into public.idle_cat_place_marco (id, lugar, tipo, valor, bonus) values
@@ -108,7 +108,9 @@ returns jsonb language sql stable set search_path = public as $$
         'id', c.id, 'faixa', c.faixa, 'lote', c.lote, 'lancado', c.lancado, 'horas', c.horas, 'era', c.era,
         'moeda', c.moeda, 'numero', c.numero,
         'preco', case when s.started then c.horas * 3600 * public.idle_rate(s) else 0 end,
-        'nome', p.nome, 'frase', p.frase, 'icone', p.icone, 'x', p.x, 'y', p.y,
+        -- lugar em breve não conta o que é: sem nome, frase nem ícone (só a posição do pino)
+        'nome', case when c.lancado then p.nome end, 'frase', case when c.lancado then p.frase end,
+        'icone', case when c.lancado then p.icone end, 'x', p.x, 'y', p.y,
         'aberto', st.lugar is not null, 'nivel', st.nivel, 'moeda_qtd', st.moeda, 'fas', st.fas,
         'dono', (select jsonb_build_object('user_id', w.dono_id, 'avatar', public.idle_avatar_json(w.dono_id))
                    from public.idle_place_weeks w
@@ -613,7 +615,8 @@ create or replace function public.idle_lugar_json(s public.idle_state, p_lugar i
 returns jsonb language sql stable set search_path = public as $$
   select jsonb_build_object(
     'id', c.id, 'moeda_nome', c.moeda, 'numero', c.numero, 'lancado', c.lancado,
-    'nome', p.nome, 'frase', p.frase, 'icone', p.icone,
+    'nome', case when c.lancado then p.nome end, 'frase', case when c.lancado then p.frase end,
+    'icone', case when c.lancado then p.icone end,
     'aberto', st.lugar is not null, 'nivel', st.nivel, 'moeda', st.moeda, 'fas', st.fas, 'volume', st.volume,
     'lendario', st.lendario, 'marcos', to_jsonb(coalesce(st.marcos, '{}')),
     'preco_nivel', case when st.nivel < 25 then c.custo_base * power(1.55, st.nivel - 1) end,

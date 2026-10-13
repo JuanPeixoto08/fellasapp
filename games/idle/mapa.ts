@@ -21,14 +21,15 @@ export const LUGARES: readonly Lugar[] = [
   { id: 4, apelido: 'o copão', faixa: 'medio', horas: 6, era: 3, lote: 1, custoBase: 150, moeda: 'ficha', moedaInicial: 0, numero: 'nota' },
   { id: 5, apelido: 'a loja 24h', faixa: 'medio', horas: 6, era: 3, lote: 2, custoBase: 150, moeda: null, moedaInicial: 0, numero: null },
   { id: 6, apelido: 'a sinuca', faixa: 'medio', horas: 6, era: 3, lote: 3, custoBase: 150, moeda: null, moedaInicial: 0, numero: null },
-  { id: 7, apelido: 'o jantar', faixa: 'caro', horas: 16, era: 4, lote: 1, custoBase: 250, moeda: 'gorjeta', moedaInicial: 0, numero: 'estrelas' },
+  { id: 7, apelido: 'o jantar', faixa: 'caro', horas: 16, era: 4, lote: 2, custoBase: 250, moeda: 'gorjeta', moedaInicial: 0, numero: 'estrelas' },
   { id: 8, apelido: 'a massa-mãe', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, moedaInicial: 0, numero: null },
   { id: 9, apelido: 'o corredor', faixa: 'caro', horas: 16, era: 4, lote: 3, custoBase: 250, moeda: null, moedaInicial: 0, numero: null },
 ];
 
 const BONUS = [0.02, 0.02, 0.03, 0.03, 0.04, 0.03, 0.03, 0.02];
 const LIMIARES: Record<number, { fas: number; volume: number }> = { 3: { fas: 100_000, volume: 50 }, 4: { fas: 1_000, volume: 30 }, 7: { fas: 2_000, volume: 100 } };
-/** Oito marcos por lugar do lote 1: cinco de nível, um lendário, o de fãs e o de volume. */
+/** Oito marcos por lugar com mecânica (camisetaria e copão no lote 1; o jantar, no lote 2, já com os dele): cinco de
+ *  nível, um lendário, o de fãs e o de volume. */
 export const MARCOS: readonly Marco[] = Object.entries(LIMIARES).flatMap(([lugarTxt, lim]) => {
   const lugar = Number(lugarTxt);
   const tipos: [TipoMarco, number | null][] = [['nivel', 5], ['nivel', 10], ['nivel', 15], ['nivel', 20], ['nivel', 25], ['lendario', null], ['fas', lim.fas], ['volume', lim.volume]];

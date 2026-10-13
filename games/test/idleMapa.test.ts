@@ -18,6 +18,8 @@ type Mapa = { mapa: string | null; lugares: Pino[]; mult: number };
 const mapa = () => t.rpc<Mapa>('idle_mapa');
 const abrir = (l: number) => t.rpc<{ valuation: number; mapa: Mapa; conquistas: { id: number }[] }>('idle_place_abrir', { p_lugar: l });
 const taxa = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+/** O jantar (lugar 7) ainda não saiu (lote 2): os testes de três lugares abertos o lançam como no dia em que ele sair. */
+const lancarJantar = () => q(`update public.idle_cat_place set lancado = true, lote = 1 where id = 7`);
 const parar = () => q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
 /** A com a empresa na era `era` (geradores 1 e o primeiro da era), estratégias escolhidas e F$ `v`. */
 async function empresa(era: number, v = 1e15) {
@@ -94,7 +96,24 @@ describe('abrir', () => {
     await expect(abrir(3)).rejects.toThrow(/idle_lugar_aberto/);
     await expect(abrir(99)).rejects.toThrow(/idle_bad_choice/);
     await empresa(4, 0);
-    await expect(abrir(7)).rejects.toThrow(/idle_cant_afford/);
+    await expect(abrir(4)).rejects.toThrow(/idle_cant_afford/);
+  });
+  it('o jantar (7) está em breve: lote 2, não lançado, não abre', async () => {
+    expect(await q('select lote, lancado from public.idle_cat_place where id = 7')).toEqual([{ lote: 2, lancado: false }]);
+    expect((await q<{ id: number }>('select id from public.idle_cat_place where lancado order by id')).map((r) => r.id)).toEqual([3, 4]);
+    await empresa(4);
+    await expect(abrir(7)).rejects.toThrow(/idle_locked/);
+  });
+  it('lugar em breve não manda nome, frase nem ícone (mapa e tela do lugar); o lançado manda', async () => {
+    await q(`insert into public.idle_places (id, nome, frase, icone, x, y) values
+      (3, 'Lugar de teste', 'frase', 'ic3', 40, 50), (7, 'Segredo', 'frase secreta', 'ic7', 90, 60)`);
+    const m = await mapa();
+    expect(m.lugares.find((x) => x.id === 3)).toMatchObject({ nome: 'Lugar de teste', frase: 'frase', icone: 'ic3' });
+    expect(m.lugares.find((x) => x.id === 7)).toMatchObject({ nome: null, frase: null, icone: null, x: 90, y: 60 });
+    expect(JSON.stringify(m)).not.toContain('Segredo');
+    const l7 = await t.rpc<Record<string, unknown>>('idle_lugar', { p_lugar: 7 });
+    expect(l7).toMatchObject({ nome: null, frase: null, icone: null, lancado: false });
+    expect(JSON.stringify(l7)).not.toContain('Segredo');
   });
   it('sem empresa aberta: idle_not_started', async () => {
     await t.as(B);
@@ -107,7 +126,8 @@ describe('abrir', () => {
     await parar();
     await expect(abrir(3)).resolves.toBeTruthy();
   });
-  it('três abertos dão "Conhece a cidade"; vender a startup não fecha nada', async () => {
+  it('três abertos (com o jantar lançado) dão "Conhece a cidade"; vender a startup não fecha nada', async () => {
+    await lancarJantar();
     await empresa(4);
     for (const l of [3, 4, 7]) await abrir(l);
     const ids = (await q<{ id: number }>('select conquista_id as id from public.idle_conquistas where user_id = $1', [A])).map((x) => x.id);
@@ -164,6 +184,7 @@ describe('nível e marcos', () => {
     expect(await q<{ m: number[] }>('select public.idle_place_marcos($1, 3) as m', [A])).toEqual([{ m: [] }]);
   });
   it('paridade do mult com mapa.ts: Monopólio dobra, Marca forte soma por lugar', async () => {
+    await lancarJantar();
     await empresa(4);
     for (const l of [3, 4, 7]) await abrir(l);
     await q(`update public.idle_place_state set marcos = '{31,32,41}' where user_id = $1 and lugar in (3, 4)`, [A]);
@@ -373,6 +394,7 @@ describe('nome com emoji e separadores do Unicode', () => {
 
 describe('a produção na tela conta o Mapa do rolê', () => {
   it('idle_json manda mapa_mult; por unidade × geradores (dica.ts) bate com a taxa do banco e a caixinha mostra a linha', async () => {
+    await lancarJantar();
     await empresa(4);
     for (const l of [3, 4, 7]) await abrir(l);
     await q(`update public.idle_place_state set marcos = '{31,32,41}' where user_id = $1 and lugar in (3, 4)`, [A]);

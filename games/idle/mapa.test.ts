@@ -8,9 +8,10 @@ const SEMANA_FIXOS: [number, number, number, string, number][] = [
 ];
 
 describe('lugares', () => {
-  it('9 lugares, 3 lançados no lote 1 (camisetaria, copão, jantar)', () => {
+  it('9 lugares, 2 lançados no lote 1 (camisetaria, copão); o jantar fica pro lote 2', () => {
     expect(LUGARES.map((l) => l.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(LUGARES.filter(lancado).map((l) => l.id)).toEqual([3, 4, 7]);
+    expect(LUGARES.filter(lancado).map((l) => l.id)).toEqual([3, 4]);
+    expect(LUGARES[6]).toMatchObject({ id: 7, lote: 2 });
   });
   it('faixas: barato 2 h era 2, médio 6 h era 3, caro 16 h era 4', () => {
     for (const l of LUGARES) expect([l.horas, l.era]).toEqual({ barato: [2, 2], medio: [6, 3], caro: [16, 4] }[l.faixa]);
@@ -28,7 +29,7 @@ describe('nível e marcos', () => {
     expect(custoNivel(LUGARES[2], 24)).toBeCloseTo(100 * 1.55 ** 23);
     expect(custoNivel(LUGARES[2], 25)).toBeNull();
   });
-  it('8 marcos por lugar do lote 1, somando 22%', () => {
+  it('8 marcos por lugar com mecânica (o jantar já com os dele), somando 22%', () => {
     for (const id of [3, 4, 7]) {
       const ms = MARCOS.filter((m) => m.lugar === id);
       expect(ms.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((k) => id * 10 + k));

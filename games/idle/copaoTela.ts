@@ -806,7 +806,6 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     } else if (m.cardapio.some((c) => c.base === sel.base && c.mistura === sel.mistura)) {
       avisos.push(`${nomeBase} com ${minusc(MISTURAS[sel.mistura - 1].nome)} já tá no cardápio: os dois vendem 30% menos.`);
     }
-    if (lucro < 0) avisos.push('Nesse preço cada venda dá prejuízo.');
     const estreia = proximaNoite(agora());
     avisos.push(`Estreia ${quando(estreia, agora())} às 18h; a nota sai no fim da noite.`);
     avisosPor = avisos;
@@ -1000,7 +999,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const ini = Date.parse(u.inicio);
     const dj = u.sexta && u.dj ? DJS[u.dj - 1] : null;
     lado.append(el('h3', 'cup-titulo', tituloNoite(ini, agora())),
-      el('p', 'sub', u.sexta ? (dj ? `Sexta, ${dj.nome} tocou ${dj.estilo}.` : 'Sexta, sem DJ.') : `Das 18h às 2h${u.copoes.length ? '' : ', com o cardápio vazio'}.`));
+      el('p', 'sub', u.sexta ? (dj ? `Sexta, ${dj.nome} tocou ${dj.estilo}.` : 'Sexta, sem DJ.')
+        : `Das 18h às 2h${u.copoes.length || u.saiu_antes ? '' : ', com o cardápio vazio'}.`));
     const nums = el('dl', 'cup-chat-num');
     const par = (rot: string, valor: string, cls = '') => {
       const d = el('div', cls);
@@ -1020,6 +1020,13 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       meio.append(el('strong', undefined, c.nome), el('span', undefined, `${inteiro(Math.floor(c.vendidos))} vendidos · ${comSinal(c.fichas)} fichas${c.pt ? ' · PT' : ''}`));
       li.append(fotoCanvas('cup-foto-mini', partesDe(c), null), meio, el('b', `cup-mini-nota ${nomeTier(c.nota)}`, String(c.nota)));
       lista.append(li);
+    }
+    // os que saíram antes da nota: sem nome nem nota, só o que venderam (o resto dos números da noite)
+    if (u.saiu_antes > 0) {
+      const vendidos = Math.max(0, Math.floor(u.vendas) - u.copoes.reduce((s2, c) => s2 + Math.floor(c.vendidos), 0));
+      const fichas = u.fichas - u.copoes.reduce((s2, c) => s2 + c.fichas, 0);
+      const quem = u.saiu_antes === 1 ? '1 copão saiu' : `${u.saiu_antes} copões saíram`;
+      lista.append(el('li', 'cup-chat-saiu', `${quem} antes da nota: ${inteiro(vendidos)} vendidos · ${comSinal(fichas)} fichas`));
     }
     lado.append(lista);
     const ver = button('Abrir o bar', 'btn main cup-chat-ver', () => {

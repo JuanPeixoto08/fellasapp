@@ -117,7 +117,7 @@ insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio
   (408, 4, 'cup_moda', 150, 'Acerta o copão da moda em cheio', 'legado', 2),
   (409, 4, 'cup_noites', 5, 'Abre o bar 5 noites na semana', 'horas', 3),
   (410, 4, 'cup_aguenta', 199, 'Acerta a força no limite', 'investidor', 1),
-  (411, 4, 'cup_fichas', 1, 'Fecha uma noite no lucro com o cardápio cheio', 'horas', 2),
+  (411, 4, 'cup_galera_cheio', 1, 'Ganha galera numa noite com o cardápio cheio', 'horas', 2),
   (412, 4, 'cup_nota', 850, 'Copão com nota 850 ou mais', 'legado', 3);
 
 -- ===== o estado do bar (só pelas funções) =====
@@ -646,6 +646,10 @@ returns jsonb language sql stable set search_path = public as $$
                          'inicio', n.inicio, 'fim', n.inicio + interval '8 hours', 'sexta', n.sexta, 'dj', n.dj,
                          'vendas', n.vendas, 'fichas', n.fichas, 'pt', n.pt, 'galera_delta', n.galera_delta,
                          'chat_seed', public.idle_cup_noite_idx(n.inicio),
+                         -- os copões da noite que saíram antes da nota (não aparecem, mas as vendas da noite contam as deles)
+                         'saiu_antes', (select count(*)::int
+                                          from public.idle_cup_noite_copoes x join public.idle_cup_copoes c on c.id = x.copao
+                                         where x.user_id = n.user_id and x.inicio = n.inicio and not c.revelado),
                          'copoes', coalesce((select jsonb_agg(jsonb_build_object(
                                                  'id', c.id, 'nome', c.nome, 'base', c.base, 'mistura', c.mistura, 'extra', c.extra,
                                                  'tamanho', c.tamanho, 'forca', c.forca, 'preco', c.preco, 'nota', c.nota,
@@ -880,9 +884,10 @@ $$;
 --   nunca é revelado e não conta): revelado; pódio e placar com a hora do fim dessa noite; caderninho (os 3 pares com o
 --   rótulo e o "aguenta" da base na força); volume + 1; lendário com nota 900+; conquista da nota; desafios da nota, do
 --   sabor, da moda e do "aguenta";
--- * noite aberta que fechou: conferida; conquista do PT; desafios da galera ganha, do cardápio cheio (a menor nota), do
---   lucro com cardápio cheio e do copão 700+ sem PT na semana (a maior nota do cardápio, se nenhuma noite da semana deu PT
---   até ela);
+-- * noite aberta que fechou: conferida; conquista do PT; desafios da galera ganha, do cardápio cheio (a menor nota), da
+--   galera ganha com o cardápio cheio e do copão 700+ sem PT na semana (a maior nota do cardápio, se nenhuma noite da
+--   semana deu PT até ela). Cheio = o cardápio do início da noite ocupava as vagas; a menor e a maior nota só olham os
+--   copões que contam (revelados: o que saiu antes de vender uma noite inteira não mostra a nota, nem aqui);
 -- * e o que vale assim que acontece, nesta semana (segunda 0h de Brasília): o balde posto no cardápio, as noites que o
 --   bar abriu com copão no cardápio e a sexta que abriu com o DJ que combina com 2 copões do cardápio dela (sem esperar a
 --   noite acabar: a de domingo acaba na semana seguinte).
@@ -935,7 +940,8 @@ begin
       update public.idle_cup_noites set conferida = true
        where user_id = s.user_id and inicio = e.inicio and not conferida returning * into n;
       continue when not found;
-      select count(*)::int, min(k2.nota), max(k2.nota) into v_qtd, v_menor, v_maior
+      select count(*)::int, min(k2.nota) filter (where k2.revelado), max(k2.nota) filter (where k2.revelado)
+        into v_qtd, v_menor, v_maior
         from public.idle_cup_noite_copoes k join public.idle_cup_copoes k2 on k2.id = k.copao
        where k.user_id = s.user_id and k.inicio = n.inicio;
       v_cheio := v_qtd > 0 and v_qtd >= n.vagas;
@@ -947,7 +953,7 @@ begin
       end if;
       s := public.idle_place_desafio(s, 4, 'cup_galera', case when n.galera_delta > 0 then 1 else 0 end);
       s := public.idle_place_desafio(s, 4, 'cup_cardapio', case when v_cheio then v_menor end);
-      s := public.idle_place_desafio(s, 4, 'cup_fichas', case when v_cheio and n.fichas > 0 then 1 else 0 end);
+      s := public.idle_place_desafio(s, 4, 'cup_galera_cheio', case when v_cheio and n.galera_delta > 0 then 1 else 0 end);
       s := public.idle_place_desafio(s, 4, 'cup_sem_pt', case when not v_pt_sem then v_maior end);
     end if;
   end loop;

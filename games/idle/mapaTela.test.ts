@@ -25,7 +25,7 @@ describe('mapa', () => {
   });
   it('sem nome no banco mostra "Lugar N"; com nome mostra o nome', () => {
     const t = criarMapaTela({ entrar: vi.fn(), abrir: vi.fn() }, dicas);
-    t.renderizar(estado([pino(3), pino(4, { nome: 'Outro' })]), 0, 1, false);
+    t.renderizar(estado([pino(3), pino(4, { lancado: true, nome: 'Outro' })]), 0, 1, false);
     expect(t.elemento.textContent).toContain('Lugar 3');
     expect(t.elemento.textContent).toContain('Outro');
   });
@@ -70,6 +70,24 @@ describe('mapa', () => {
     const [p3, p5] = t.elemento.querySelectorAll<HTMLButtonElement>('.pino');
     expect(p3.dataset.tema).toBe('3');
     expect(p5.dataset.tema).toBeUndefined();
+  });
+  it('"Em breve" não conta o que é: sem nome, frase, ícone, tema nem caixinha; só "Em breve" (pino, linha e leitor de tela)', () => {
+    const d = { ligar: vi.fn() };
+    const t = criarMapaTela({ entrar: vi.fn(), abrir: vi.fn() }, d);
+    const segredo = { nome: 'Lugar Secreto', frase: 'a frase secreta', icone: 'data:image/png;base64,SEGREDO' };
+    t.renderizar(estado([pino(7, segredo), pino(1, segredo)]), 1e9, 4, false);
+    for (const bt of t.elemento.querySelectorAll<HTMLButtonElement>('.pino, .lugar-linha')) {
+      expect(bt.classList.contains('breve')).toBe(true);
+      expect(bt.disabled).toBe(true);
+      expect(bt.textContent).toBe('Em breve');
+      expect(bt.getAttribute('aria-label')).toBe('Em breve');
+      expect(bt.outerHTML).not.toContain('Secret');
+      expect(bt.outerHTML).not.toContain('SEGREDO');
+      expect(bt.outerHTML).not.toMatch(/Lugar [17]/);
+      expect(bt.dataset.tema).toBeUndefined();
+      expect(bt.querySelector('.pino-icone.breve-icone')).not.toBeNull(); // o cadeado genérico apagado
+    }
+    expect(d.ligar).not.toHaveBeenCalled();
   });
   it('carregando: sem estado ainda, avisa', () => {
     const t = criarMapaTela({ entrar: vi.fn(), abrir: vi.fn() }, dicas);

@@ -30,11 +30,14 @@ O repositório e o site são públicos. Os lugares são reais e o grupo frequent
 | 4 | o copão | médio | **1** | montar o copão (Game Dev Tycoon) | nota 0 a 999 |
 | 5 | a loja 24h | médio | 2 | promoção por faixa do relógio | a definir no lote 2 |
 | 6 | a sinuca | médio | 3 | rei da mesa | popularidade |
-| 7 | o jantar | caro | **1** | primeiro encontro + crítico (Game Dev Tycoon) | estrelas 0,0 a 5,0 |
+| 7 | o jantar | caro | 2 (adiado) | primeiro encontro + crítico (Game Dev Tycoon) | estrelas 0,0 a 5,0 |
 | 8 | a massa-mãe | caro | 3 | cuidar da massa-mãe | a definir no lote 3 |
 | 9 | o corredor | caro | 3 | planejar o corredor do shopping | a definir no lote 3 |
 
 Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado aparece no mapa como "Em breve".
+
+**Decisão do Juan (13/10):** o lote 1 sai com a moldura, a camisetaria e o copão; o jantar fica "Em breve" (catálogo
+com lote 2, `lancado` false) até a parte 4 ficar pronta. A seção 6 continua valendo para quando ele sair.
 
 ## 3. A moldura (comum aos 9)
 
@@ -112,7 +115,9 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 - A porta "Mapa do rolê" (hoje "Em breve") abre em tela cheia (`.minigame-tela`) com o mapa noturno 160×96 em escala
   inteira e os 9 pinos nos lotes do mapa.
 - Pino: fechado (cadeado + preço em F$, era exigida se ainda não chegou), aberto (ícone + nível + dono do pedaço) ou
-  "Em breve" (lote não lançado).
+  "Em breve" (lote não lançado): só "Em breve" e um cadeado apagado, sem nome, frase, ícone, cores ou caixinha do
+  lugar (no pino, na lista do lado e no leitor de tela); o banco nem manda o nome, a frase e o ícone de lugar não
+  lançado.
 - Tocar num lugar aberto abre a tela dele, também em tela cheia, com: cabeçalho (ícone, nome, moeda, nível, fãs),
   a área da mecânica, e uma faixa com pódio, desafio da semana, marcos e caderninho.
 - Tudo cabe sem rolar no PC (conferir em 1280×720 e 2000×961) e o celular rola inteiro (iframe de 390 px).

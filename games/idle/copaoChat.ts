@@ -73,6 +73,8 @@ const GALERA_MENOS = ['Metade da galera foi pro bar da frente.', 'Saí no meio d
 const GALERA_PT = ['Depois do PT, o grupo do rolê ficou em silêncio.'];
 const PREJUIZO = ['O bar vendeu a noite toda e ainda tá no prejuízo. Talento.'];
 const VAZIO = ['Bar aberto e cardápio vazio. Bebi água da pia.', 'Cheguei, não tinha copão, fui embora. Cinco estrelas pro banheiro.'];
+const SAIU = ['O copão que eu tava tomando saiu do cardápio no meio da noite. Fiquei segurando o gelo.',
+  'Tiraram meu copão do cardápio sem aviso. Nem deu tempo de dar nota.', 'Pedi o mesmo de antes e o copão tinha sumido do cardápio.'];
 const POUCO = ['Bar vazio, só eu e o gelo.'];
 const ENCHE = ['Quem levou meu isqueiro devolve.', 'Alguém viu a tampa do isopor?', 'Fila do banheiro maior que a do bar.',
   'Meu uber cancelou três vezes. Fico mais um.', 'O gelo acabou às 23h. Tragédia nacional.', 'Jurei que ia embora cedo. Mentira.',
@@ -125,8 +127,10 @@ export function chatDaNoite(n: UltimaNoite, usuario: string | null): MensagemCha
   // a galera
   if (!emPT.length && n.galera_delta >= 1) fixas.push([tpl(GALERA_MAIS), 'galera']);
   else if (!emPT.length && n.galera_delta <= -1) fixas.push([tpl(GALERA_MENOS), 'galera']);
-  if (!copoes.length) fixas.push([tpl(VAZIO), 'galera']);
+  // vazio só quando não teve copão nenhum; os que saíram antes da nota venderam (e a galera reparou)
+  if (!copoes.length) fixas.push([tpl(n.saiu_antes > 0 ? SAIU : VAZIO), 'galera']);
   else if (n.vendas < 1) fixas.push([tpl(POUCO), 'galera']);
+  if (copoes.length && n.saiu_antes > 0) soltas.push([tpl(SAIU), 'galera']);
   if (n.fichas < 0) soltas.push([tpl(PREJUIZO), 'galera']);
 
   // as partes da nota de cada copão

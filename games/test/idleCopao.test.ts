@@ -135,7 +135,7 @@ describe('catálogo', () => {
       [408, 'cup_moda', 150, 'Acerta o copão da moda em cheio', 'legado', 2],
       [409, 'cup_noites', 5, 'Abre o bar 5 noites na semana', 'horas', 3],
       [410, 'cup_aguenta', 199, 'Acerta a força no limite', 'investidor', 1],
-      [411, 'cup_fichas', 1, 'Fecha uma noite no lucro com o cardápio cheio', 'horas', 2],
+      [411, 'cup_galera_cheio', 1, 'Ganha galera numa noite com o cardápio cheio', 'horas', 2],
       [412, 'cup_nota', 850, 'Copão com nota 850 ou mais', 'legado', 3],
     ]);
   });
@@ -737,7 +737,7 @@ describe('o JSON do copão', () => {
     const u = (await lugar()).mecanica.ultima_noite!;
     expect(Date.parse(u.inicio as string)).toBe(ini + DIA);
     expect(Date.parse(u.fim as string)).toBe(ini + DIA + 8 * H);
-    expect(u).toMatchObject({ sexta: false, dj: 2, vendas: 40, fichas: 260, pt: true, galera_delta: -3.5, chat_seed: noiteIdx(ini + DIA) });
+    expect(u).toMatchObject({ sexta: false, dj: 2, vendas: 40, fichas: 260, pt: true, galera_delta: -3.5, chat_seed: noiteIdx(ini + DIA), saiu_antes: 0 });
     // o depois revelou os dois (a primeira noite aberta deles fechou com eles no cardápio)
     expect(u.copoes).toEqual([
       { id: c1.id, nome: 'Um', base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 5, preco: 22, nota: c1.nota, vendidos: 25, fichas: 150, pt: true },
@@ -746,6 +746,21 @@ describe('o JSON do copão', () => {
     // uma noite aberta que ainda não fechou não conta
     await noite(ini + 3 * DIA, true, false, { vendas: 5 });
     expect(Date.parse((await lugar()).mecanica.ultima_noite!.inicio as string)).toBe(ini + DIA);
+  });
+  it('ultima_noite: os copões que saíram antes da nota não aparecem, mas a noite conta quantos foram (as vendas são deles)', async () => {
+    await bar();
+    await por({ nome: 'Um' });
+    await por({ extra: 2, nome: 'Dois' });
+    const ini = (await copoes())[0].primeira_noite.getTime();
+    ir(ini + 2 * H);
+    await lugar();
+    for (const c of await copoes()) await tirar(c.id);
+    ir(ini + 9 * H);
+    const u = (await lugar()).mecanica.ultima_noite!;
+    expect(Date.parse(u.inicio as string)).toBe(ini);
+    expect(u.copoes).toEqual([]);
+    expect(u.saiu_antes).toBe(2);
+    expect(u.vendas as number).toBeGreaterThan(0);
   });
   it('histórico: os revelados, o mais recente primeiro (até 10), mesmo os que já saíram', async () => {
     await bar(25);
@@ -1288,8 +1303,10 @@ describe('desafios do copão', () => {
     // cardápio cheio (3 vagas no nível 1)
     [405, [[{ aj: { nota: 900 } }, { aj: { nota: 900 } }], [{ aj: { nota: 599 } }, { aj: { nota: 900 } }, { aj: { nota: 900 } }]],
       [{ aj: { nota: 600 } }, { aj: { nota: 700 } }, { aj: { nota: 800 } }], true],
-    // lucro com cardápio cheio: 2 copões não enchem; a 1 ficha cada venda dá prejuízo
-    [411, [[{}, {}], [{ aj: { preco: 1 } }, { aj: { preco: 1 } }, { aj: { preco: 1 } }]], [{}, {}, {}], true],
+    // galera com cardápio cheio: 2 copões bons ganham galera mas não enchem; 3 de nota 500 enchem e não mexem
+    [411, [[{ aj: { nota: 999, chance_pt: 0 } }, { aj: { nota: 999, chance_pt: 0 } }],
+      [{ aj: { nota: 500, chance_pt: 0 } }, { aj: { nota: 500, chance_pt: 0 } }, { aj: { nota: 500, chance_pt: 0 } }]],
+      [{ aj: { nota: 999, chance_pt: 0 } }, { aj: { nota: 999, chance_pt: 0 } }, { aj: { nota: 999, chance_pt: 0 } }], true],
     [402, [[{ aj: { nota: 699, chance_pt: 0 } }]], [{ aj: { nota: 700, chance_pt: 0 } }], true],
   ];
   it('cada tipo com o valor dele: o que não alcança não paga, o que alcança paga', async () => {
@@ -1304,6 +1321,31 @@ describe('desafios do copão', () => {
       await noite(sim, fechar);
       expect(await feitos(), `${id}`).toEqual([id]);
     }
+  });
+  /** 3 copões com as notas dadas (sem PT) estreiam; o `tirado` sai no meio da primeira noite (nunca é revelado). */
+  async function noiteComTirado(notas: number[], tirado: number) {
+    for (const [k, nota] of notas.entries()) {
+      await por({ extra: k + 1 });
+      await ajustar((await copoes()).at(-1)!.id, { nota, chance_pt: 0 });
+    }
+    const ini = (await copoes()).at(-1)!.primeira_noite.getTime();
+    ir(ini + H);
+    await lugar();
+    await tirar((await copoes())[tirado].id);
+    ir(ini + 9 * H);
+    await lugar();
+    expect((await copoes()).map((c) => c.revelado)).toEqual(notas.map((_, k) => k !== tirado));
+  }
+  it('cardápio cheio e 700+ sem PT só olham os copões que contam: a nota escondida de quem saiu antes não entra', async () => {
+    await bar();
+    await soDesafio(405);
+    await limpar();
+    await noiteComTirado([900, 100, 900], 1); // o 100 escondido não derruba o "todas 600 ou mais"
+    expect(await feitos()).toEqual([405]);
+    await soDesafio(402);
+    await limpar();
+    await noiteComTirado([500, 900, 500], 1); // o 900 escondido não vale o 700+
+    expect(await feitos()).toEqual([]);
   });
   it('balde no cardápio: paga na hora de pôr; o copo não', async () => {
     await bar();

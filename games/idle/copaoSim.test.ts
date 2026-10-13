@@ -516,13 +516,13 @@ describe('balanceamento do copão (simulação)', () => {
     }
   });
 
-  // O preço que mais rende fica perto da referência em toda base (nenhuma pede o dobro).
-  it('o melhor preço de cada base fica entre 0,5× e 1,3× a referência', () => {
+  // O preço que mais rende fica perto da referência em toda base (nenhuma pede o dobro). Embaixo não precisa de trava: a
+  // faixa válida já começa em 0,5× a referência.
+  it('o melhor preço de cada base fica até 1,3× a referência', () => {
     for (const b of BASES) for (const t of TAMANHOS) {
       const forca = b.ponto;
       const { preco } = melhorPreco(N0_TIPICO, { base: b.id, mistura: 1, extra: 1, tamanho: t.id, forca }, { atr: 0, atrGanho: 0 }, 1, false);
       const rel = preco / precoRef(b.id, t.id, forca);
-      expect(rel, `${t.nome} de ${b.nome}`).toBeGreaterThanOrEqual(0.5);
       expect(rel, `${t.nome} de ${b.nome}`).toBeLessThanOrEqual(1.3);
     }
   });

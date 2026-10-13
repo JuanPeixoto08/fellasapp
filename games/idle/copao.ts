@@ -404,10 +404,11 @@ export type CopaoNaNoite = {
   vendidos: number; fichas: number; pt: boolean;
 };
 /** A última noite aberta que fechou (a tela mostra o chat dela uma vez). chat_seed = o número da noite; copoes = os
- *  revelados (quem saiu antes do fim da primeira noite não aparece). */
+ *  revelados (quem saiu antes do fim da primeira noite não aparece); saiu_antes = quantos copões da noite saíram antes
+ *  da nota (as vendas e as fichas da noite contam as deles). */
 export type UltimaNoite = {
   inicio: string; fim: string; sexta: boolean; dj: number | null; vendas: number; fichas: number; pt: boolean; galera_delta: number;
-  chat_seed: number; copoes: CopaoNaNoite[];
+  chat_seed: number; copoes: CopaoNaNoite[]; saiu_antes: number;
 };
 /** Um dos últimos 10 copões revelados (o mais novo primeiro), mesmo os que já saíram do cardápio. */
 export type HistoricoCup = {

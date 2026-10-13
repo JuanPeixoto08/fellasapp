@@ -163,7 +163,7 @@ Regerar a 0056 no mesmo nome; ícones provisórios 089 e 115 (trocados na Task 6
   "Cardápio cheio com todas as notas 600 ou mais" legado 3 · 406 `cup_balde` 1 "Bota um balde no cardápio" horas 2 ·
   407 `cup_sabor` 300 "Copão com 300 ou mais de sabor" horas 3 · 408 `cup_moda` 150 "Acerta o copão da moda em cheio" legado 2 ·
   409 `cup_noites` 5 "Abre o bar 5 noites na semana" horas 3 · 410 `cup_aguenta` 199 "Acerta a força no limite" investidor 1 ·
-  411 `cup_fichas` 1 "Fecha uma noite no lucro com o cardápio cheio" horas 2 · 412 `cup_nota` 850 "Copão com nota 850 ou mais" legado 3.
+  411 `cup_galera_cheio` 1 "Ganha galera numa noite com o cardápio cheio" horas 2 · 412 `cup_nota` 850 "Copão com nota 850 ou mais" legado 3.
 - `idle_cup_copoes(id identity, user_id, nome, base, mistura, extra, tamanho, forca, preco, nivel, nota, sabor, cb, moda, aguenta,
   rot_bm, rot_be, rot_me, chance_pt, entrou_em, primeira_noite (início da 1ª noite depois de entrar), saiu_em, revelado bool,
   noites int default 0, vendido double default 0, fichas double default 0)`; `idle_cup_noites(user_id, inicio, aberta bool,

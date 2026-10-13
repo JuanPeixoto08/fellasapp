@@ -1,5 +1,6 @@
 // Mapa do rolê em tela cheia (DOM): o mapa noturno 160 × 96 em escala inteira (a maior que cabe, como a cena) e os 9
-// pinos por cima, em % do mapa. Pino fechado = cadeado + preço (compra), aberto = nível (entra), "Em breve" = apagado.
+// pinos por cima, em % do mapa. Pino fechado = cadeado + preço (compra), aberto = nível (entra), "Em breve" = um
+// cadeado apagado e só "Em breve" (nada do lugar: nem nome, frase, ícone, cores ou caixinha).
 // Quem decide abrir é o banco; aqui só mostra e chama. Nome e imagens dos lugares vêm do banco (nada no código).
 import { button, el } from '../shared/hud/hud';
 import type { IdleVisual, MapaEstado, PinoMapa } from '../shared/types';
@@ -66,9 +67,10 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
     return { estado, semEra, disabled, soDinheiro } as const;
   }
 
-  function icone(p: PinoMapa, cls: string) {
-    const i = el('span', cls);
-    const img = p.icone ?? ativos.mapa();
+  function icone(p: PinoMapa, cls: string, breve: boolean) {
+    // em breve: o cadeado genérico (o ícone do lugar contaria o que ele é)
+    const i = el('span', breve ? `${cls} breve-icone` : cls);
+    const img = breve ? ativos.estudio('cadeado') : p.icone ?? ativos.mapa();
     if (img) i.style.backgroundImage = `url(${img})`;
     i.setAttribute('aria-hidden', 'true');
     return i;
@@ -86,16 +88,17 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
     const nome = nomeLugar(p);
     if (estado === 'aberto') return `${nome}: aberto, nível ${p.nivel ?? 1}. Entrar`;
     if (estado === 'fechado') return `${nome}: fechado, abre por ${formatarValor(p.preco)}${semEra ? `, precisa da era ${p.era}` : ''}`;
-    return `${nome}: em breve`;
+    return 'Em breve';
   }
 
   function pino(p: PinoMapa, valuation: number, era: number, ocupado: boolean, precos: Precos[]): HTMLButtonElement {
     const nome = nomeLugar(p);
     const { estado, semEra, disabled, soDinheiro } = situacao(p, valuation, era, ocupado);
+    const breve = estado === 'breve';
     const bt = button('', `pino ${estado}`, () => (p.aberto ? a.entrar(p.id) : a.abrir(p.id)));
     bt.dataset.lugar = String(p.id);
     bt.dataset.foco = `pino${p.id}`;
-    aplicarTema(bt, p.id); // o destaque do pino com as cores do lugar
+    if (!breve) aplicarTema(bt, p.id); // o destaque do pino com as cores do lugar
     const pos = p.x !== null && p.y !== null ? { x: p.x, y: p.y } : posicaoGenerica(p.id);
     bt.style.left = `${(pos.x / MAPA_W) * 100}%`;
     bt.style.top = `${(pos.y / MAPA_H) * 100}%`;
@@ -107,7 +110,8 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
     if (soDinheiro) precos.push({ botao: bt, preco: p.preco });
     bt.setAttribute('aria-label', rotulo(p, estado, semEra));
     if (estado === 'fechado') dicas.ligar(bt, `pino${p.id}`, nome, () => dicaPino(p, valorAgora, era));
-    bt.append(icone(p, 'pino-icone'), el('span', 'pino-nome', nome), selo);
+    if (breve) bt.append(icone(p, 'pino-icone', true), selo);
+    else bt.append(icone(p, 'pino-icone', false), el('span', 'pino-nome', nome), selo);
     if (semEra) bt.append(el('span', 'pino-era', `Era ${p.era}`));
     if (p.dono) {
       const dono = boneco(p.dono.avatar);
@@ -120,25 +124,27 @@ export function criarMapaTela(a: { entrar(id: number): void; abrir(id: number): 
   /** A lista dos lugares: do lado do mapa no PC; embaixo dele no celular, onde o mapa fica pequeno (alvos grandes, nome inteiro). */
   function linha(p: PinoMapa, valuation: number, era: number, ocupado: boolean, precos: Precos[]): HTMLLIElement {
     const { estado, semEra, disabled, soDinheiro } = situacao(p, valuation, era, ocupado);
+    const breve = estado === 'breve';
     const bt = button('', `lugar-linha ${estado}`, () => (p.aberto ? a.entrar(p.id) : a.abrir(p.id)));
     bt.dataset.lugar = String(p.id);
     bt.dataset.foco = `linha${p.id}`;
-    aplicarTema(bt, p.id);
+    if (!breve) aplicarTema(bt, p.id);
     bt.disabled = disabled;
     if (soDinheiro) precos.push({ botao: bt, preco: p.preco });
     bt.setAttribute('aria-label', rotulo(p, estado, semEra));
     // a mesma caixinha do pino (no PC a lista fica do lado do mapa), com a chave dela
     if (estado === 'fechado') dicas.ligar(bt, `linha${p.id}`, nomeLugar(p), () => dicaPino(p, valorAgora, era));
     const meio = el('span', 'meio');
-    meio.append(el('strong', undefined, nomeLugar(p)));
-    if (p.frase) meio.append(el('span', 'sub', p.frase));
+    // em breve: só "Em breve", no lugar do nome
+    meio.append(el('strong', undefined, breve ? 'Em breve' : nomeLugar(p)));
+    if (p.frase && !breve) meio.append(el('span', 'sub', p.frase));
     const fim = el('span', 'lugar-linha-fim');
     if (estado === 'aberto') fim.textContent = `Nível ${p.nivel ?? 1}`;
     else if (estado === 'fechado') {
       fim.append(cadeado(), el('span', undefined, formatarValor(p.preco)));
       if (semEra) fim.append(el('span', 'pino-era', `Era ${p.era}`));
-    } else fim.textContent = 'Em breve';
-    bt.append(icone(p, 'pino-icone'), meio, fim);
+    }
+    bt.append(icone(p, 'pino-icone', breve), meio, fim);
     const li = el('li');
     li.append(bt);
     return li;

@@ -1024,6 +1024,8 @@ body:has(.idle) { background: #121212; }
 .idle .pino.fechado:disabled .pino-selo { color: color-mix(in srgb, var(--gold) 60%, var(--i-mudo)); }
 .idle .pino.breve { --c: var(--i-borda); background: color-mix(in srgb, var(--i-fundo2) 80%, transparent); }
 .idle .pino.breve .pino-icone { filter: grayscale(1) brightness(0.55); }
+/* o cadeado genérico do "Em breve" (o ícone do lugar contaria o que ele é): menor, no meio do espaço do ícone */
+.idle .pino-icone.breve-icone { background-position: center; background-size: 50% 50%; }
 .idle .pino.breve .pino-selo, .idle .pino.breve .pino-nome { color: var(--i-mudo); }
 .idle .pino-era { display: none; }
 .idle .pino .pino-dono { position: absolute; top: -12px; right: -12px; width: 18px; height: 26px; }
@@ -1043,6 +1045,7 @@ body:has(.idle) { background: #121212; }
 .idle .lugar-linha.aberto { --c: var(--i-roxo-borda); }
 .idle .lugar-linha:disabled { cursor: default; }
 .idle .lugar-linha.breve { opacity: 0.5; }
+.idle .lugar-linha.breve .pino-icone { filter: grayscale(1) brightness(0.55); }
 .idle .lugar-linha .meio { display: grid; gap: 2px; min-width: 0; }
 .idle .lugar-linha strong { font: 400 20px var(--i-pixel); line-height: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .idle .lugar-linha .sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1135,6 +1138,20 @@ body:has(.idle) { background: #121212; }
   .idle .podio-pos .meio { gap: 0; }
   .idle .semana-lista { gap: 2px; }
   .idle .dono-pedaco { padding: 2px 8px; }
+  /* o caderninho fica com a sobra da faixa: com o pódio, a semana e o dono cheios sobra pouco. Ele mede a própria altura
+     (container) e se enxuga em vez de rolar: o botão sobe pra linha do título, depois saem a linha dos rótulos e a do
+     ponto/foco (tudo continua no caderninho inteiro, atrás do botão) */
+  .idle .lugar-bloco.caderninho { position: relative; container: cad / size; overflow: hidden; }
+  @container cad (max-height: 131.5px) {
+    .idle .caderninho .btn.cup-abrir-caderno, .idle .caderninho .btn.tee-abrir-caderno { position: absolute; top: 3px; right: 10px;
+      min-height: 24px; margin: 0; padding-block: 0; font-size: 15px; }
+  }
+  @container cad (max-height: 88.5px) {
+    .idle .caderninho .cup-resumo-rot, .idle .caderninho .tee-resumo-rot { display: none; }
+  }
+  @container cad (max-height: 66.5px) {
+    .idle .caderninho .cup-resumo-ponto, .idle .caderninho .tee-resumo-foco { display: none; }
+  }
 }
 
 /* tema do lugar (temasLugar.ts): as cores do ícone de cada lugar trocam poucos tokens dentro da tela dele (topo, fundo,
@@ -1626,6 +1643,7 @@ body:has(.idle) { background: #121212; }
 .idle .cup-chat-copoes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .idle .cup-chat-copoes li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 34px;
   border-bottom: 1px solid color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-chat-copoes li.cup-chat-saiu { display: block; font-size: 12px; color: var(--i-mudo); }
 .idle .cup-foto-mini { width: 32px; height: 32px; }
 .idle .cup-chat-copao { display: grid; min-width: 0; font-size: 12px; color: var(--i-mudo); }
 .idle .cup-chat-copao strong { overflow: hidden; font: 400 17px/1 var(--i-pixel); color: var(--paper); white-space: nowrap; text-overflow: ellipsis; }
