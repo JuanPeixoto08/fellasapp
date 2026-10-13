@@ -262,7 +262,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 78, tipo: 'conv_kojima', nome: 'Que geometria', frase: 'Ficou 24 h no estúdio e entregou uma encomenda.', condicao: 'Deixar o Kojima 24 h sentado' },
   { id: 79, tipo: 'conv_hl3', nome: 'Half-Life 3 confirmado', frase: 'Ele finalmente contou até 3.', condicao: 'Sentar o Gabe Newell na 3ª cadeira' },
   { id: 80, tipo: 'conv_derrubada', valor: 1, nome: 'Sample não liberado', frase: 'Lost media brasileira.', condicao: 'Ter uma faixa do MC V.V derrubada por copyright' },
-  { id: 81, tipo: 'conv_toby', nome: 'Já já sai o Chapter 5', frase: 'Ficou 20 horas esperando. O Toby também.', condicao: 'Deixar o Toby Fox 20 h sentado sem trocar' },
+  { id: 81, tipo: 'conv_toby', nome: 'Já já sai o Chapter 6', frase: 'Ficou 20 horas esperando. O Toby também.', condicao: 'Deixar o Toby Fox 20 h sentado sem trocar' },
   { id: 82, tipo: 'opp_dia', valor: 15, nome: 'Receba!', frase: 'Obrigado meu Deus, obrigado meu pai.', condicao: 'Pegar 15 oportunidades num dia' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },

@@ -65,7 +65,7 @@ export function kojimaMult(p: number, desdeMs: number, tMs: number): number {
   return 1 + p * (-0.1 + (0.5 * Math.min(24, h)) / 24);
 }
 
-/** Toby Fox ("Chapter 5 ano que vem"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
+/** Toby Fox ("já já sai o Chapter 6"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
 export function tobyMult(p: number, desdeMs: number, tMs: number): number {
   const h = Math.max(0, Math.floor((tMs - desdeMs) / H));
   return 1 + p * 0.02 * Math.min(20, h);

@@ -401,7 +401,7 @@ insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, va
   (78, 'Que geometria', 'Ficou 24 h no estúdio e entregou uma encomenda.', 'Deixar o Kojima 24 h sentado', 'conv_kojima', null, null, false),
   (79, 'Half-Life 3 confirmado', 'Ele finalmente contou até 3.', 'Sentar o Gabe Newell na 3ª cadeira', 'conv_hl3', null, null, false),
   (80, 'Sample não liberado', 'Lost media brasileira.', 'Ter uma faixa do MC V.V derrubada por copyright', 'conv_derrubada', null, 1, false),
-  (81, 'Já já sai o Chapter 5', 'Ficou 20 horas esperando. O Toby também.', 'Deixar o Toby Fox 20 h sentado sem trocar', 'conv_toby', null, null, false),
+  (81, 'Já já sai o Chapter 6', 'Ficou 20 horas esperando. O Toby também.', 'Deixar o Toby Fox 20 h sentado sem trocar', 'conv_toby', null, null, false),
   (82, 'Receba!', 'Obrigado meu Deus, obrigado meu pai.', 'Pegar 15 oportunidades num dia', 'opp_dia', null, 15, false),
   (101, '6-7', 'Seis sete. Ninguém sabe por quê.', 'Ter exatamente 67 de algum gerador', 'gerador_exato', null, 67, true),
   (102, 'Farmou aura', '+1000 de aura.', 'Ficar em 1º no placar', 'aura', null, null, true),
