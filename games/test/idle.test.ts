@@ -96,6 +96,8 @@ describe('idle_buy', () => {
   });
   it('compra 1 gerador e desconta 15·1,15^n', async () => {
     await dar(A, 100);
+    // relógio parado: sem produção entre dar e comprar (no CI, mais lento, passava da margem)
+    await q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
     const s = await buy('gerador', 1);
     expect(s.generators[0]).toBe(2);
     expect(s.valuation).toBeCloseTo(100 - 17.25, 1);
