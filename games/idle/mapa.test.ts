@@ -23,10 +23,11 @@ describe('lugares', () => {
 });
 
 describe('nível e marcos', () => {
-  it('custo do nível sobe 55% e para no 25', () => {
-    expect(custoNivel(LUGARES[2], 1)).toBe(100);
-    expect(custoNivel(LUGARES[2], 2)).toBeCloseTo(155);
-    expect(custoNivel(LUGARES[2], 24)).toBeCloseTo(100 * 1.55 ** 23);
+  it('custo do nível sobe 55% e para no 25 (a camisetaria custa 450 no 1º desde a 0069)', () => {
+    expect(custoNivel(LUGARES[2], 1)).toBe(450);
+    expect(custoNivel(LUGARES[2], 2)).toBeCloseTo(697.5);
+    expect(custoNivel(LUGARES[2], 24)).toBeCloseTo(450 * 1.55 ** 23);
+    expect(custoNivel(LUGARES[3], 1)).toBe(150);
     expect(custoNivel(LUGARES[2], 25)).toBeNull();
   });
   it('8 marcos por lugar com mecânica (o jantar já com os dele), somando 22%', () => {

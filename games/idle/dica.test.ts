@@ -183,7 +183,7 @@ describe('caixinhas do Mapa do rolê', () => {
     expect(dicaMarco(marco(31), lugar())).toBe('+2% de produção na empresa. Nível 5 (você está no 3).');
     expect(dicaMarco(marco(31), lugar({ marcos: [31] }))).toBe('+2% de produção na empresa. Nível 5. Já ganhou.');
     expect(dicaMarco(marco(36), lugar())).toBe('+3% de produção na empresa. Um resultado lendário neste lugar.');
-    expect(dicaMarco(marco(37), lugar())).toBe('+3% de produção na empresa. 100.000 fãs (você tem 10).');
+    expect(dicaMarco(marco(37), lugar())).toBe('+3% de produção na empresa. 115.000 fãs (você tem 10).');
     expect(dicaMarco(marco(38), lugar())).toBe('+2% de produção na empresa. 50 coleções (você fez 2).');
   });
   it('dica do nível: de quanto pra quanto, o preço na moeda do lugar e o que libera', () => {
@@ -228,8 +228,8 @@ describe('caixinhas da camisetaria (bancada e caderninho)', () => {
     expect(dicaTeeFoco(2, cad)).toBe('O ideal do Rabisco de caneta é segredo. Depois de lançar um, o relatório do caderninho mostra.');
   });
   it('lote: peças, custo, tempo e quanto rende esgotando', () => {
-    expect(dicaTeeLote(1, 1, 0)).toBe('12 peças por 36 cupons. Fica pronto em 1 h e vende em 12 h a 19,5 cupons a peça: esgotando, rende 234.');
-    expect(dicaTeeLote(1, 1, 2)).toBe('84 peças por 252 cupons. Fica pronto em 4 h e vende em 12 h a 19,5 cupons a peça: esgotando, rende 1.638.');
+    expect(dicaTeeLote(1, 1, 0)).toBe('12 peças por 36 cupons. Fica pronto em 2 min e vende em 30 min a 19,5 cupons a peça: esgotando, rende 234.');
+    expect(dicaTeeLote(1, 1, 2)).toBe('84 peças por 252 cupons. Fica pronto em 10 min e vende em 30 min a 19,5 cupons a peça: esgotando, rende 1.638.');
   });
   it('o cadeado do grupo: o próximo, o nível e quantos ainda faltam', () => {
     expect(dicaTeeTrancados('tema', 1)).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25.');

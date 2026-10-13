@@ -243,10 +243,10 @@ wc.__faixaAgora = async () => {
       await dono('update public.idle_place_state set moeda = moeda + 1000 where user_id = $1', [ME]);
       document.dispatchEvent(new Event('visibilitychange'));
     }],
-    // camisetaria: a coleção rodando "vive" 1 h (ou 6 h): a produção e a venda andam (o banco recalcula a venda do pronta_em)
-    ...([1, 6] as const).map((h): [string, () => Promise<void>] => [`Camisetaria +${h} h`, async () => {
-      await dono(`update public.idle_tee_colecoes set criada_em = criada_em - make_interval(hours => $2), pronta_em = pronta_em - make_interval(hours => $2),
-        fim_em = fim_em - make_interval(hours => $2) where user_id = $1 and encerrada_em is null and not fas_excesso_pago`, [ME, h]);
+    // camisetaria: a coleção rodando "vive" 5 min (ou 30): a produção e a venda andam (o banco recalcula a venda do pronta_em)
+    ...([5, 30] as const).map((m): [string, () => Promise<void>] => [`Camisetaria +${m} min`, async () => {
+      await dono(`update public.idle_tee_colecoes set criada_em = criada_em - make_interval(mins => $2), pronta_em = pronta_em - make_interval(mins => $2),
+        fim_em = fim_em - make_interval(mins => $2) where user_id = $1 and encerrada_em is null and not fas_excesso_pago`, [ME, m]);
       document.dispatchEvent(new Event('visibilitychange'));
     }]),
     // copão: tudo do bar volta 1 dia (a noite de hoje vira a de ontem e fecha; os copões postos estreiam)

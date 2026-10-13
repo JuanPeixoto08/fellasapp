@@ -7,7 +7,9 @@ import { catalogo, type Melhoria } from './catalogo';
 import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
-import { CORES, custoLote, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, type Caderno } from './camisetaria';
+import {
+  CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
+} from './camisetaria';
 import {
   aBase, ALFA as ALFA_CUP, BASES, chavePar, custoVenda as custoVendaCup, DJS, EXTRAS, forcaTestada, liberado as liberadoCup,
   lucroVenda as lucroVendaCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP, novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup,
@@ -280,7 +282,7 @@ export function dicaTeeFoco(estilo: number, cad: Caderno): string {
 export function dicaTeeLote(peca: number, nivel: number, lote: 0 | 1 | 2): string {
   const n = pecasLote(nivel, lote);
   const preco = precoPeca(peca);
-  return `${num(n, 0)} peças por ${num(custoLote(peca, nivel, lote), 0)} cupons. Fica pronto em ${producaoMs(lote) / 3600_000} h e vende em 12 h `
+  return `${num(n, 0)} peças por ${num(custoLote(peca, nivel, lote), 0)} cupons. Fica pronto em ${duracao(producaoMs(lote))} e vende em ${duracao(VENDA_MS)} `
     + `a ${num(preco, 1)} cupons a peça: esgotando, rende ${num(n * preco, 0)}.`;
 }
 

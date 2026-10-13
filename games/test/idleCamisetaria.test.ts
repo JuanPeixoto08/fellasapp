@@ -13,6 +13,7 @@ import { freshDb, quartaATarde, type TestDb } from './db';
 const A = '00000000-0000-0000-0000-00000000000a';
 const B = '00000000-0000-0000-0000-00000000000b';
 const H = 3600_000;
+const MIN = 60_000;
 
 let t: TestDb;
 const q = async <T>(sql: string, p: unknown[] = []) => (await t.db.query<T>(sql, p)).rows;
@@ -119,6 +120,7 @@ describe('catálogo', () => {
       'select public.idle_tee_custo_lote(1, 1, 1)', 'select public.idle_tee_publico(1)', `select public.idle_tee_procura(1, 1, 0, '{5,5,5,5}')`,
       `select public.idle_tee_pct_procura(1, 1, 0, '{5,5,5,5}')`, 'select public.idle_tee_preco_relatorio(1)',
       'select public.idle_tee_peso(now(), now())', 'select public.idle_tee_vendido_ate(1, now(), now())',
+      'select public.idle_tee_vendido_ate(1, now(), now(), now())',
       'select public.idle_tee_tendencia(current_date)', `select public.idle_tee_liberado('tema', 1, 1)`,
       'select public.idle_tee_saldao(10, 5, 1, false)',
       `select public.idle_tee_json(s) from public.idle_state s`,
@@ -214,6 +216,16 @@ describe('paridade TS × SQL', () => {
       expect(rel(x.v, vendidoAte(total, pronta, tt)), `${pronta} ${tt}`).toBeLessThan(1e-12);
     }
     expect(noShow).toBeGreaterThan(20); // boa parte atravessa um show
+    // com o fim da coleção (as de antes da 0069 vendem até o fim_em delas)
+    for (let i = 0; i < 100; i++) {
+      const pronta = segunda - 7 * 24 * H + Math.floor(r() * 21 * 24 * H);
+      const fim = pronta + (r() < 0.5 ? 12 * H : 30 * MIN + Math.floor(r() * 12 * H));
+      const tt = pronta - H + Math.floor(r() * 15 * H);
+      const total = Math.floor(r() * 5000) + r();
+      const [x] = await q<{ v: number }>('select public.idle_tee_vendido_ate($1, $2::timestamptz, $3::timestamptz, $4::timestamptz) as v',
+        [total, new Date(pronta).toISOString(), new Date(fim).toISOString(), new Date(tt).toISOString()]);
+      expect(rel(x.v, vendidoAte(total, pronta, tt, fim)), `${pronta} ${fim} ${tt}`).toBeLessThan(1e-12);
+    }
     // sexta 18h às sábado 2h de Brasília: 8 h que pesam 16
     const sexta = segunda + 4 * 24 * H + 18 * H;
     const [x] = await q<{ p: number }>('select public.idle_tee_peso($1::timestamptz, $2::timestamptz) as p',
@@ -248,20 +260,21 @@ describe('lançar', () => {
     expect(rel(c.procura, procura(l, ns))).toBeLessThan(1e-9);
     expect(rel(c.pct, pctProcura(l, ns))).toBeLessThan(1e-9);
     expect(c.criada_em.getTime()).toBe(agora);
-    expect(c.pronta_em.getTime()).toBe(agora + 2 * H);
-    expect(c.fim_em.getTime()).toBe(agora + 14 * H);
+    expect(c.pronta_em.getTime()).toBe(agora + 5 * MIN); // 0069: médio em 5 min, venda de 30 min
+    expect(c.fim_em.getTime()).toBe(agora + 35 * MIN);
     expect(await cupons()).toBe(1000 - 108);
     expect(resp.lugar.moeda).toBe(1000 - 108);
     expect(resp.lugar.mecanica.ativa).toMatchObject({ id: c.id, nome: 'Drop Meme', notas: null });
     expect(resp.marcos_novos).toEqual([]);
   });
-  it('lote pequeno 1 h, grande 4 h; nome sem espaço nas pontas; fãs e nível entram na conta', async () => {
+  it('lote pequeno 2 min, grande 10 min; nome sem espaço nas pontas; fãs e nível entram na conta', async () => {
     await camisetaria(1e6, 4);
     await q('update public.idle_place_state set fas = 2500 where user_id = $1 and lugar = 3', [A]);
     await lancar({ lote: 2, peca: 3, tema: 9, nome: '  Crise  ' });
     let [c] = await colecoes();
     expect(c.nome).toBe('Crise');
-    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(4 * H);
+    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(10 * MIN);
+    expect(c.fim_em.getTime() - c.pronta_em.getTime()).toBe(30 * MIN);
     expect(c.pecas).toBe(pecasLote(4, 2));
     const l: Lancamento = { id: c.id, tema: 9, estilo: 1, peca: 3, cor: 1, foco: [3, 5, 2], lote: 2, nivel: 4, fas: 2500, tendencia: c.tendencia, ultimas: [] };
     expect(rel(c.procura, procura(l, notas(l)))).toBeLessThan(1e-9);
@@ -269,7 +282,7 @@ describe('lançar', () => {
     await fechar();
     await lancar({ lote: 0 });
     c = (await colecoes())[1];
-    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(H);
+    expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(2 * MIN);
   });
   it('as últimas 3 coleções (a mais recente primeiro) entram na repetição, igual ao TS', async () => {
     await camisetaria();
@@ -310,10 +323,10 @@ describe('lançar', () => {
     await camisetaria();
     await lancar();
     await expect(lancar({ tema: 2 })).rejects.toThrow(/idle_tee_ocupada/);
-    andar(2 * H + 1); // pronta, à venda
+    andar(5 * MIN + 1); // pronta, à venda
     await expect(lancar({ tema: 2 })).rejects.toThrow(/idle_tee_ocupada/);
     expect(await colecoes()).toHaveLength(1);
-    andar(12 * H); // a venda acabou
+    andar(30 * MIN); // a venda acabou
     await lancar({ tema: 2 });
     await fechar();
     await lancar({ tema: 3 });
@@ -379,7 +392,7 @@ describe('o JSON da camisetaria', () => {
     let a = (await lugar()).mecanica.ativa!;
     expect(a).toMatchObject({ notas: null, media: null, pct: null, procura: null, rotulo: null, peca_tema: null, nome: 'Drop Meme', lote: 1, pecas: 36 });
     expect(a.pronta).toBe(false);
-    andar(2 * H - 1);
+    andar(5 * MIN - 1);
     expect((await lugar()).mecanica.ativa!.notas).toBeNull();
     andar(1);
     a = (await lugar()).mecanica.ativa!;
@@ -406,7 +419,7 @@ describe('o JSON da camisetaria', () => {
   it('ultima: a última revelada com tudo, pra a tela mostrar a revelação que aconteceu longe (volta 2 dias depois)', async () => {
     await camisetaria(1000);
     expect((await lugar()).mecanica.ultima).toBeNull();
-    await lancar({ nome: 'Sumida' }); // médio: 36 peças, 108 cupons, pronta em 2 h
+    await lancar({ nome: 'Sumida' }); // médio: 36 peças, 108 cupons, pronta em 5 min
     await ajustar({ procura: 20 });
     expect((await lugar()).mecanica.ultima).toBeNull(); // em produção: nada revelado
     andar(2 * H + 2 * 24 * H);
@@ -427,7 +440,7 @@ describe('o JSON da camisetaria', () => {
     expect(rel(await cupons(), 1000 - 108 + (u.receita as number) + (u.saldao as number))).toBeLessThan(1e-12);
     // à venda: a última revelada é a ativa, e o saldão ainda é 0
     await lancar({ tema: 2, nome: 'Nova' });
-    andar(3 * H);
+    andar(10 * MIN);
     const m2 = (await lugar()).mecanica;
     expect(m2.ultima).toMatchObject({ id: m2.ativa!.id, nome: 'Nova', saldao: 0 });
   });
@@ -435,7 +448,7 @@ describe('o JSON da camisetaria', () => {
     await camisetaria(1000);
     await lancar();
     await ajustar({ procura: 10 });
-    andar(3 * H);
+    andar(10 * MIN);
     const r = await t.rpc<Resp>('idle_tee_encerrar');
     const [c] = await colecoes();
     const u = r.lugar.mecanica.ultima!;
@@ -541,34 +554,60 @@ describe('a venda (avancar)', () => {
     expect(await estado()).toEqual(e1);
     expect(await prods()).toHaveLength(1);
   });
-  it('Review Focus 2: venda atravessando sexta 18h e sábado 2h segue o peso 2× e termina exatamente em min(procura, estoque)', async () => {
+  it('Review Focus 2: venda atravessando sexta 18h (e sábado 2h) segue o peso 2× e termina exatamente em min(procura, estoque)', async () => {
     await camisetaria(1000);
-    andar(47 * H); // quarta 15h + 47 h = sexta 14h de Brasília
-    await lancar(); // médio: pronta sexta 16h, fim sábado 4h
-    const [c] = await colecoes();
-    const total = Math.min(c.procura, c.pecas);
-    const pronta = c.pronta_em.getTime();
-    expect(new Date(pronta).toISOString()).toMatch(/T19:00:00/); // 16h de Brasília
-    const m0 = await cupons();
-    const v: Record<number, number> = {};
-    for (const h of [1, 2, 3, 4, 6, 9, 10, 11, 12, 13, 30]) {
-      agora = pronta + h * H;
+    andar(47 * H + 3 * H + 40 * MIN); // quarta 15h + 50h40 = sexta 17h40 de Brasília
+    for (const [rotulo, antes, depois] of [['sexta 18h', 1, 2], ['sábado 2h', 2, 1]] as const) {
+      await lancar({ tema: rotulo === 'sexta 18h' ? 1 : 2 }); // médio: pronta 17h45 (01h45), fim 18h15 (02h15)
+      const c = (await colecoes()).at(-1)!;
+      const total = Math.min(c.procura, c.pecas);
+      const pronta = c.pronta_em.getTime();
+      expect(new Date(pronta).toISOString(), rotulo).toMatch(rotulo === 'sexta 18h' ? /T20:45:00/ : /T04:45:00/);
+      const m0 = await cupons();
+      const v: Record<number, number> = {};
+      for (const m of [5, 10, 15, 20, 25, 30, 31, 60]) {
+        agora = pronta + m * MIN;
+        vi.setSystemTime(agora);
+        await abrirJogo();
+        const x = (await colecoes()).at(-1)!;
+        v[m] = x.vendido;
+        expect(rel(x.vendido, vendidoAte(total, pronta, agora)), `${rotulo} ${m} min`).toBeLessThan(1e-12);
+        // no fim da venda entra também o saldão do estoque que sobrou
+        const fimSaldao = m >= 30 ? saldao(c.custo, c.pecas, total, false) : 0;
+        expect(rel((await cupons()) - m0, x.vendido * precoPeca(1) + fimSaldao), `${rotulo} ${m} min`).toBeLessThan(1e-9);
+      }
+      // 15 min com um peso e 15 com o outro: 45 "minutos" de peso no total
+      expect(rel(v[5], (total * 5 * antes) / 45)).toBeLessThan(1e-12);
+      expect(rel(v[20] - v[15], (total * 5 * depois) / 45)).toBeLessThan(1e-9);
+      expect(v[30]).toBe(total);
+      expect(v[31]).toBe(total);
+      expect(v[60]).toBe(total);
+      expect(rel((await cupons()) - m0, total * precoPeca(1) + saldao(c.custo, c.pecas, total, false))).toBeLessThan(1e-12);
+      agora = pronta + 8 * H - 5 * MIN; // a próxima: sábado 01h40
       vi.setSystemTime(agora);
-      await abrirJogo();
-      const [x] = await colecoes();
-      v[h] = x.vendido;
-      expect(rel(x.vendido, vendidoAte(total, pronta, agora)), `${h} h`).toBeLessThan(1e-12);
-      // no fim da venda entra também o saldão do estoque que sobrou
-      const fimSaldao = h >= 12 ? saldao(c.custo, c.pecas, total, false) : 0;
-      expect(rel((await cupons()) - m0, x.vendido * precoPeca(1) + fimSaldao), `${h} h`).toBeLessThan(1e-9);
     }
-    // 16h-18h pesa 1, 18h-2h pesa 2, 2h-4h pesa 1: 20 "horas" de peso no total
-    expect(rel(v[1], total / 20)).toBeLessThan(1e-12);
-    expect(rel(v[3] - v[2], 2 * v[1])).toBeLessThan(1e-9);
-    expect(v[12]).toBe(total);
-    expect(v[13]).toBe(total);
-    expect(v[30]).toBe(total);
-    expect(rel((await cupons()) - m0, total * precoPeca(1) + saldao(c.custo, c.pecas, total, false))).toBeLessThan(1e-12);
+  });
+  it('coleção que já rodava antes da 0069 (12 h de venda) vende até o fim_em dela', async () => {
+    await camisetaria(1000);
+    await lancar(); // médio, 36 peças
+    await ajustar({ procura: 1000 });
+    const [c] = await colecoes();
+    // como a 0067 gravava: pronta em 2 h, venda de 12 h
+    await q(`update public.idle_tee_colecoes set pronta_em = criada_em + interval '2 hours', fim_em = criada_em + interval '14 hours' where id = $1`, [c.id]);
+    const pronta = c.criada_em.getTime() + 2 * H;
+    const m0 = await cupons();
+    andar(2 * H + 30 * MIN); // meia hora de venda: ainda não acabou
+    await abrirJogo();
+    let [x] = await colecoes();
+    expect(rel(x.vendido, vendidoAte(36, pronta, agora, pronta + 12 * H))).toBeLessThan(1e-12);
+    expect(x.vendido).toBeLessThan(36);
+    expect((await lugar()).mecanica.ativa).toMatchObject({ id: c.id, pronta: true });
+    await expect(lancar({ tema: 2 })).rejects.toThrow(/idle_tee_ocupada/);
+    andar(11 * H + 30 * MIN); // o fim da venda dela
+    await abrirJogo();
+    [x] = await colecoes();
+    expect(x.vendido).toBe(36);
+    expect(rel((await cupons()) - m0, 36 * precoPeca(1))).toBeLessThan(1e-12);
   });
   it('sem sobra de procura: vende só a procura e não ganha fã de excesso', async () => {
     await camisetaria(1000);
@@ -584,7 +623,7 @@ describe('a venda (avancar)', () => {
     await lancar({ lote: 2 }); // 84 peças, 252 cupons
     await ajustar({ procura: 50, notas: [5, 5, 5, 5] });
     const m0 = await cupons();
-    andar(4 * H + 12 * H - 1); // um ms antes do fim: ainda sem saldão
+    andar(10 * MIN + 30 * MIN - 1); // um ms antes do fim: ainda sem saldão
     await abrirJogo();
     expect((await cupons()) - m0).toBeLessThan(50 * precoPeca(1) + 1e-9);
     andar(1);
@@ -610,19 +649,19 @@ describe('a venda (avancar)', () => {
   });
   it('marcos de volume, fãs e lendário só saem no depois (idle_lugar), nunca no avancar', async () => {
     await camisetaria(1000);
-    await q('update public.idle_place_state set volume = 49, fas = 99990 where user_id = $1 and lugar = 3', [A]);
+    await q('update public.idle_place_state set volume = 49, fas = 114990 where user_id = $1 and lugar = 3', [A]);
     await lancar({ lote: 0 });
     await ajustar({ notas: [10, 10, 10, 10], procura: 1000, pct: 50 });
     andar(14 * H);
     await abrirJogo();
     let e = await estado();
-    expect(e.fas).toBe(99990 + fasExcesso(1000, 12, 1)); // passou de 100 mil no avancar
+    expect(e.fas).toBe(114990 + fasExcesso(1000, 12, 1)); // passou de 115 mil no avancar
     expect(e).toMatchObject({ marcos: [], volume: 49, lendario: false });
     expect(await daCamisetaria()).toEqual([]);
     const r = await lugarB();
     e = await estado();
     expect(e).toMatchObject({ volume: 50, lendario: true });
-    expect(e.fas).toBe(99990 + fasExcesso(1000, 12, 1) + fasNota(10, 1));
+    expect(e.fas).toBe(114990 + fasExcesso(1000, 12, 1) + fasNota(10, 1));
     expect(r.marcos_novos).toEqual([36, 37, 38]);
     expect(e.marcos).toEqual([36, 37, 38]);
     expect(await daCamisetaria()).toEqual([88]);
@@ -799,7 +838,7 @@ describe('encerrar', () => {
     await camisetaria(1000);
     await lancar(); // 36 peças, 108 cupons
     await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/); // ainda em produção
-    andar(2 * H + 3 * H);
+    andar(5 * MIN + 10 * MIN);
     const [c] = await colecoes();
     const vendido = vendidoAte(Math.min(c.procura, c.pecas), c.pronta_em.getTime(), agora);
     const resp = await encerrar();
@@ -822,7 +861,7 @@ describe('encerrar', () => {
     await camisetaria(1000);
     await lancar(); // 36 peças, 108 cupons
     await ajustar({ procura: 10 });
-    andar(2 * H + H);
+    andar(5 * MIN + 5 * MIN);
     await encerrar();
     const [c] = await colecoes();
     const m1 = await cupons();
@@ -835,7 +874,7 @@ describe('encerrar', () => {
   it('lote fiado não devolve cupom', async () => {
     await camisetaria(0);
     await lancar({ lote: 0 });
-    andar(H + H);
+    andar(2 * MIN + 5 * MIN);
     const [c] = await colecoes();
     expect(c.fiado).toBe(true);
     const vendido = vendidoAte(Math.min(c.procura, c.pecas), c.pronta_em.getTime(), agora);

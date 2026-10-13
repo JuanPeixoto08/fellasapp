@@ -133,9 +133,10 @@ describe('bancada (sem coleção rodando)', () => {
     const lotes = $$('.tee-lote').map((b) => b.textContent);
     expect(lotes[0]).toContain('12 peças');
     expect(lotes[0]).toContain('36 cupons');
-    expect(lotes[0]).toContain('1 h');
+    expect(lotes[0]).toContain('2 min');
+    expect(lotes[1]).toContain('5 min');
     expect(lotes[2]).toContain('84 peças');
-    expect(lotes[2]).toContain('4 h');
+    expect(lotes[2]).toContain('10 min');
   });
   it('Lançar manda tudo com os nomes p_*; nome em branco vai o sugerido', () => {
     const { t, $, $$ } = montar();

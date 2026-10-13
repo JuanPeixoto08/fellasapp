@@ -12,11 +12,13 @@ export type Cor = { id: number; nome: string; hex: string; forte: boolean; nivel
 export type Influencer = { id: number; nome: string; gosto: string };
 export type Rotulo = 0 | 1 | 2 | 3 | 4; // péssima, ruim, ok, boa, ótima
 
-/** Ajustados na Task 2 (camisetariaSim.test.ts, 16 sementes): 75 de público mantém a % de procura abaixo de 1000% (teto
- *  75 × 4 / 36 = 833%); o lote crescendo 1,35 por nível contra 1,55 do preço do nível acelera o começo e segura o fim
- *  (nível 10 no dia ~7, nível 25 no dia ~40); o preço a 6,5× o custo paga os ~9.200 cupons até o nível 10 em uma semana. */
+/** Ajustados na simulação (camisetariaSim.test.ts, 16 sementes), com o ritmo em minutos da 0069 (produção de 2/5/10 min,
+ *  venda de 30 min): 75 de público mantém a % de procura abaixo de 1000% (teto 75 × 4 / 36 = 833%); o lote crescendo
+ *  1,32 por nível contra 1,55 do preço do nível (e o nível da camisetaria custando 450 × 1,55^(nível−1), mapa.ts) segura o
+ *  fim: quem joga ativo (dois blocos por dia) chega no nível 10 no dia ~3 e no 25 no dia ~29; quem passa 3 vezes por dia,
+ *  no 10 no dia ~8. O preço a 6,5× o custo continua. */
 export const PUBLICO_BASE = 75;
-export const CRESCE = 1.35;
+export const CRESCE = 1.32;
 export const PRECO_MULT = 6.5;
 
 const TODAS: readonly Vibe[] = ['zoeira', 'raiz', 'fofo', 'sombrio', 'retro', 'esporte', 'nerd', 'praia', 'chique', 'bruto', 'urbano', 'grana'];
@@ -204,11 +206,21 @@ export function podeFiar(semColecaoAtiva: boolean, moeda: number, custoPequeno: 
   return ultimoFiadoMs === null || agoraMs - ultimoFiadoMs >= 24 * 3600_000;
 }
 
+/** A produção em minutos (2, 5 ou 10): o ritmo de "tenta outra combinação" (as coleções que já rodavam antes da 0069
+ *  guardam as horas delas). */
 export function producaoMs(lote: 0 | 1 | 2): number {
-  return [1, 2, 4][lote] * 3600_000;
+  return [2, 5, 10][lote] * 60_000;
 }
 
-export const VENDA_MS = 12 * 3600_000;
+/** A venda de uma coleção nova dura 30 min (antes da 0069 eram 12 h: as que já rodavam vendem até o fim_em delas). */
+export const VENDA_MS = 30 * 60_000;
+
+/** Uma duração exata em palavras: "2 min", "30 min", "1 h", "1 h 30 min". */
+export function duracao(ms: number): string {
+  const min = Math.round(ms / 60_000);
+  if (min < 60) return `${min} min`;
+  return min % 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min / 60} h`;
+}
 
 const H = 3600_000;
 const DIA = 24 * H;
@@ -233,10 +245,11 @@ export function pesoVenda(aMs: number, bMs: number): number {
   return acumulado(bMs) - acumulado(aMs);
 }
 
-/** Quanto do lote já vendeu em `tMs`: o total reparte-se pelas 12 h na proporção do peso (t preso entre o pronto e o fim). */
-export function vendidoAte(total: number, prontaMs: number, tMs: number): number {
-  const t = Math.min(Math.max(tMs, prontaMs), prontaMs + VENDA_MS);
-  return (total * pesoVenda(prontaMs, t)) / pesoVenda(prontaMs, prontaMs + VENDA_MS);
+/** Quanto do lote já vendeu em `tMs`: o total reparte-se entre o pronto e o fim (`fimMs`; sem ele, pronto + VENDA_MS) na
+ *  proporção do peso (t preso entre os dois). O fim vem da coleção: as de antes da 0069 vendiam 12 h. */
+export function vendidoAte(total: number, prontaMs: number, tMs: number, fimMs = prontaMs + VENDA_MS): number {
+  const t = Math.min(Math.max(tMs, prontaMs), fimMs);
+  return (total * pesoVenda(prontaMs, t)) / pesoVenda(prontaMs, fimMs);
 }
 
 /** Tema em alta na semana (segunda 'YYYY-MM-DD'): o mesmo para todo mundo, igual no banco. */

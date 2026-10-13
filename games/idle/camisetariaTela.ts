@@ -12,8 +12,8 @@ import { button, el } from '../shared/hud/hud';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
-  caderno, comentario, CORES, custoLote, ESTILOS, gostou, INFLUENCERS, liberado, liberaTextos, NOME_ROTULO, nomeSugerido, PECAS,
-  pecasLote, podeFiar, precoPeca, producaoMs, repeticao, TEMAS, vendidoAte, type Caderno, type ColecaoTee, type EstadoTee,
+  caderno, comentario, CORES, custoLote, duracao, ESTILOS, gostou, INFLUENCERS, liberado, liberaTextos, NOME_ROTULO, nomeSugerido, PECAS,
+  pecasLote, podeFiar, precoPeca, producaoMs, repeticao, TEMAS, VENDA_MS, vendidoAte, type Caderno, type ColecaoTee, type EstadoTee,
   type UltimaTee,
 } from './camisetaria';
 import { avatar, canvasDe, estampa, fotoImagem, fundoBancada, LADO_FOTO, pecaComCor } from './camisetariaArte';
@@ -495,7 +495,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       bt.tabIndex = on ? 0 : -1;
       const custo = custoLote(sel.peca, nivel, k as 0 | 1 | 2);
       bt.replaceChildren(el('strong', undefined, NOMES_LOTE[k]), el('span', 'tee-lote-pecas', `${quantia(pecasLote(nivel, k as 0 | 1 | 2))} peças`),
-        el('span', 'tee-lote-custo', `${quantia(custo)} cupons · ${producaoMs(k as 0 | 1 | 2) / 3600_000} h`));
+        el('span', 'tee-lote-custo', `${quantia(custo)} cupons · ${duracao(producaoMs(k as 0 | 1 | 2))}`));
       bt.classList.toggle('caro', moeda < custo);
     });
     // nome e a prévia ao vivo
@@ -523,7 +523,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const rep = repeticao(sel.tema, sel.estilo, m.historico);
     if (rep === 2) avisos.push('Mesmo tema e estilo de uma das 3 últimas: a nota cai.');
     else if (rep === 1) avisos.push('Mesmo tema ou estilo da última coleção: a nota cai um pouco.');
-    avisos.push(`Fica pronta em ${producaoMs(sel.lote) / 3600_000} h e vende por 12 h.`);
+    avisos.push(`Fica pronta em ${duracao(producaoMs(sel.lote))} e vende por ${duracao(VENDA_MS)}.`);
     avisosLancar = avisos;
     // cabe sem rolar: o espaço embaixo do Lançar tem altura fixa e mostra só a primeira; a caixinha do Lançar mostra todas
     aviso.textContent = avisos[0];
@@ -690,7 +690,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const pronta = Date.parse(c.pronta_em);
     const fim = Date.parse(c.fim_em);
     const preco = precoPeca(c.peca);
-    const vendidoAgora = () => vendidoAte(total, pronta, agora());
+    const vendidoAgora = () => vendidoAte(total, pronta, agora(), fim);
     const devolve = () => (c.fiado ? 0 : (0.5 * c.custo * (c.pecas - vendidoAgora())) / c.pecas);
     const textoConfirma = () => {
       const sobra = Math.max(0, Math.ceil(c.pecas - vendidoAgora()));

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  caderno, comentario, CORES, gostou, CRESCE, custoLote, focoDaNota, liberaTextos, repeticao, distanciaFoco, FAS_TETO, fasExcesso, fasNota, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
+  caderno, comentario, CORES, duracao, gostou, CRESCE, custoLote, focoDaNota, liberaTextos, repeticao, distanciaFoco, FAS_TETO, fasExcesso, fasNota, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
   pecaTema, pesoVenda, precoPeca, precoRelatorio, procura, producaoMs, publico, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte,
   type Lancamento,
 } from './camisetaria';
 import { semanaIdx } from './mapa';
 
 const H = 3600_000;
+const MIN = 60_000;
 
 describe('o catálogo da camisetaria', () => {
   it('contagens: 30 temas, 15 estilos, 6 peças, 12 cores, 4 influencers', () => {
@@ -131,8 +132,8 @@ describe('lote, procura e preço', () => {
     expect(publico(1)).toBe(PUBLICO_BASE);
     expect(publico(3)).toBeCloseTo(PUBLICO_BASE * CRESCE ** 2, 9);
   });
-  it('as constantes da Task 2 (o banco copia em idle_tee_const)', () => {
-    expect([PUBLICO_BASE, CRESCE, PRECO_MULT, FAS_TETO]).toEqual([75, 1.35, 6.5, 3]);
+  it('as constantes (0069: o lote cresce 1,32; o banco copia em idle_tee_const)', () => {
+    expect([PUBLICO_BASE, CRESCE, PRECO_MULT, FAS_TETO]).toEqual([75, 1.32, 6.5, 3]);
   });
   it('procura e pctProcura', () => {
     const l = base({ fas: 900, nivel: 1, peca: 1 });
@@ -169,8 +170,9 @@ describe('lote, procura e preço', () => {
   it('custo, preço, produção, relatório', () => {
     expect(custoLote(1, 1, 1)).toBe(3 * 36);
     expect(precoPeca(1)).toBeCloseTo(3 * PRECO_MULT, 9);
-    expect([producaoMs(0), producaoMs(1), producaoMs(2)]).toEqual([H, 2 * H, 4 * H]);
-    expect(VENDA_MS).toBe(12 * H);
+    expect([producaoMs(0), producaoMs(1), producaoMs(2)]).toEqual([2 * MIN, 5 * MIN, 10 * MIN]);
+    expect(VENDA_MS).toBe(30 * MIN);
+    expect([duracao(2 * MIN), duracao(30 * MIN), duracao(H), duracao(90 * MIN)]).toEqual(['2 min', '30 min', '1 h', '1 h 30 min']);
     expect(precoRelatorio(1)).toBe(50);
     expect(precoRelatorio(3)).toBeCloseTo(50 * CRESCE ** 2, 9);
   });
@@ -191,15 +193,23 @@ describe('venda no tempo', () => {
   });
   it('vendidoAte: 0 no início, total no fim, proporcional no meio, preso nos extremos', () => {
     expect(vendidoAte(100, segunda10, segunda10)).toBe(0);
-    expect(vendidoAte(100, segunda10, segunda10 + 6 * H)).toBeCloseTo(50, 9);
+    expect(vendidoAte(100, segunda10, segunda10 + 15 * MIN)).toBeCloseTo(50, 9);
     expect(vendidoAte(100, segunda10, segunda10 + VENDA_MS)).toBeCloseTo(100, 9);
     expect(vendidoAte(100, segunda10, segunda10 + 99 * H)).toBeCloseTo(100, 9);
     expect(vendidoAte(100, segunda10, segunda10 - H)).toBe(0);
   });
+  it('vendidoAte com o fim da coleção: a que já rodava antes da 0069 vende as 12 h dela', () => {
+    expect(vendidoAte(100, segunda10, segunda10 + 6 * H, segunda10 + 12 * H)).toBeCloseTo(50, 9);
+    expect(vendidoAte(100, segunda10, segunda10 + 30 * MIN, segunda10 + 12 * H)).toBeCloseTo(100 / 24, 9);
+    expect(vendidoAte(100, segunda10, segunda10 + 13 * H, segunda10 + 12 * H)).toBeCloseTo(100, 9);
+    expect(vendidoAte(100, segunda10, segunda10 + 10 * MIN, segunda10 + VENDA_MS)).toBe(vendidoAte(100, segunda10, segunda10 + 10 * MIN));
+  });
   it('venda que atravessa sexta 18h vende mais na janela', () => {
-    const pronta = sexta18 - 6 * H; // 6h sem show, depois show
-    const antes = vendidoAte(120, pronta, pronta + 6 * H);
-    const depois = vendidoAte(120, pronta, pronta + 12 * H) - antes;
+    const pronta = sexta18 - 15 * MIN; // 15 min sem show, depois show
+    const antes = vendidoAte(120, pronta, pronta + 15 * MIN);
+    const depois = vendidoAte(120, pronta, pronta + 30 * MIN) - antes;
+    expect(antes).toBeCloseTo(40, 9); // a janela pesa 2: 15 min valem 1/3
+    expect(depois).toBeCloseTo(80, 9);
     expect(depois).toBeGreaterThan(antes);
   });
 });

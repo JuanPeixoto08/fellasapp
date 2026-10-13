@@ -1,9 +1,12 @@
-// Simulação da camisetaria (Task 2, spec §9): uma pessoa que abre o jogo às 9h, 14h e 21h de Brasília, todo dia, a partir
-// de uma segunda. Em cada visita: recebe o que vendeu (e os fãs), sobe de nível enquanto der guardando cupom pro próximo
-// lote médio de camiseta, e lança uma coleção se não tiver nenhuma rodando (médio se der, senão pequeno). Duas estratégias:
-// "no chute" (tudo aleatório entre o liberado, foco 4/3/3, peça e cor aleatórias) e "com caderninho" (lembra rótulos e
-// peça × tema que viu, repete a melhor combinação conhecida fugindo das 3 últimas, cor forte, compra relatório quando sobra).
-// Sem banco: as mesmas contas puras de camisetaria.ts e o custoNivel de mapa.ts. Sementes fixas, determinística.
+// Simulação da camisetaria (Task 2, spec §9; ritmo em minutos na 0069): a partir de uma segunda, duas pessoas:
+// * "3 visitas": abre o jogo às 9h, 14h e 21h de Brasília, todo dia;
+// * "ativo": as 3 visitas e mais dois blocos de jogo por dia (12h–13h e 20h–22h), com uma visita a cada 6 min.
+// Em cada visita: recebe o que vendeu (e os fãs), sobe de nível enquanto der guardando cupom pro próximo lote médio de
+// camiseta, e lança uma coleção se não tiver nenhuma rodando (médio se der, senão pequeno). A produção leva 2, 5 ou 10 min
+// e a venda, 30 min. Duas estratégias: "no chute" (tudo aleatório entre o liberado, foco 4/3/3, peça e cor aleatórias) e
+// "com caderninho" (lembra rótulos e peça × tema que viu, repete a melhor combinação conhecida fugindo das 3 últimas, cor
+// forte, compra relatório quando sobra). Sem banco: as mesmas contas puras de camisetaria.ts e o custoNivel de mapa.ts.
+// Sementes fixas, determinística.
 //
 // O lugar abre com `moedaInicial` (108 cupons, 1 lote médio de camiseta no nível 1) e, sem cupom nem coleção rodando,
 // o fornecedor fia um lote pequeno por dia (`podeFiar`). No fim natural da venda o estoque que sobrou volta a 50% do custo
@@ -16,11 +19,15 @@ import {
 } from './camisetaria';
 import { custoNivel, LUGARES, MARCOS, NIVEL_MAX } from './mapa';
 
+const MIN = 60_000;
 const H = 3600_000;
 const DIA = 24 * H;
 /** Segunda, 12/10/2026, 00h de Brasília (UTC−3). */
 const INICIO = Date.UTC(2026, 9, 12, 3);
-const VISITAS = [9, 14, 21];
+/** As visitas do dia, em minutos depois da meia-noite de Brasília. */
+const TRES = [9 * 60, 14 * 60, 21 * 60];
+const bloco = (de: number, ate: number) => Array.from({ length: (ate - de) * 10 + 1 }, (_, k) => de * 60 + 6 * k);
+const ATIVO = [...new Set([...TRES, ...bloco(12, 13), ...bloco(20, 22)])].sort((a, b) => a - b);
 const DIAS = 56;
 const CAMISETARIA = LUGARES[2];
 const BASE = [2.5, 4, 6, 7.5, 9];
@@ -61,7 +68,7 @@ function semanaDe(t: number): string {
 const ids = (lista: readonly { id: number }[], tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel: number): number[] =>
   lista.filter((x) => liberado(tipo, x.id, nivel)).map((x) => x.id);
 
-function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISETARIA.moedaInicial): Resultado {
+function simular(estrategia: Estrategia, semente: number, visitas: readonly number[] = TRES, cupomInicial = CAMISETARIA.moedaInicial): Resultado {
   const sorte = aleatorio(semente);
   const escolhe = <T,>(xs: readonly T[]): T => xs[Math.floor(sorte() * xs.length)];
   let cupom = cupomInicial;
@@ -205,8 +212,8 @@ function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISET
   }
 
   for (let dia = 0; dia < DIAS; dia++) {
-    for (const h of VISITAS) {
-      const t = INICIO + dia * DIA + h * H;
+    for (const m of visitas) {
+      const t = INICIO + dia * DIA + m * MIN;
       receber(t);
       subir(t, dia);
       if (estrategia === 'caderninho') relatorio();
@@ -221,78 +228,96 @@ function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISET
 const media = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
 const mediaEntre = (r: Resultado, de: number, ate: number) => media(r.notas.filter((n) => n.dia >= de && n.dia < ate).map((n) => n.media));
 const SEMENTES = Array.from({ length: 16 }, (_, k) => k + 1);
+const LIMIAR_FAS = MARCOS.find((m) => m.id === 37)!.valor!;
+const diaDosFas = (r: Resultado) => r.fasNoDia.find((f) => f.fas >= LIMIAR_FAS)?.dia ?? Infinity;
+const mediana = (xs: number[]) => {
+  const o = [...xs].sort((a, b) => a - b);
+  return (o[(o.length - 1) >> 1] + o[o.length >> 1]) / 2;
+};
 
 describe('balanceamento da camisetaria (simulação)', () => {
   const caderninho = SEMENTES.map((s) => simular('caderninho', s));
   const chute = SEMENTES.map((s) => simular('chute', s));
+  const ativo = SEMENTES.map((s) => simular('caderninho', s, ATIVO));
+  const ativoChute = SEMENTES.map((s) => simular('chute', s, ATIVO));
 
   if (process.env.SIM_LOG) {
-    for (const [nome, rs] of [['caderninho', caderninho], ['chute', chute]] as const) {
+    const grupos = [['3 visitas, caderninho', caderninho], ['3 visitas, chute', chute], ['ativo, caderninho', ativo], ['ativo, chute', ativoChute]] as const;
+    for (const [nome, rs] of grupos) {
       for (const [k, r] of rs.entries()) {
         const semanas = Array.from({ length: 8 }, (_, w) => mediaEntre(r, 7 * w, 7 * w + 7).toFixed(2)).join(' ');
-        console.log(`${nome} s${SEMENTES[k]}: n5 ${r.nivelEm.get(5)?.toFixed(1)} n10 ${r.nivelEm.get(10)?.toFixed(1)} n15 ${r.nivelEm.get(15)?.toFixed(1)} n20 ${r.nivelEm.get(20)?.toFixed(1)} n25 ${r.nivelEm.get(25)?.toFixed(1)} final ${r.nivelFinal} | semanas ${semanas} | tudo ${mediaEntre(r, 0, 49).toFixed(2)} 14+ ${mediaEntre(r, 14, 49).toFixed(2)} | pctMax ${r.pctMax.toFixed(0)} intervalo ${r.maiorIntervaloH.toFixed(0)}h fiados ${r.fiados} fas ${r.fas.toFixed(0)}`);
+        console.log(`${nome} s${SEMENTES[k]}: n5 ${r.nivelEm.get(5)?.toFixed(1)} n10 ${r.nivelEm.get(10)?.toFixed(1)} n15 ${r.nivelEm.get(15)?.toFixed(1)} n20 ${r.nivelEm.get(20)?.toFixed(1)} n25 ${r.nivelEm.get(25)?.toFixed(1)} final ${r.nivelFinal} | semanas ${semanas} | 7+ ${mediaEntre(r, 7, 49).toFixed(2)} | pctMax ${r.pctMax.toFixed(0)} intervalo ${r.maiorIntervaloH.toFixed(1)}h fiados ${r.fiados} coleções ${r.notas.length} fas ${r.fas.toFixed(0)} marco ${diaDosFas(r).toFixed(1)}`);
       }
     }
     // o resumo das metas (o que os testes abaixo conferem)
     const faixa = (xs: number[]) => `${Math.min(...xs).toFixed(1)}–${Math.max(...xs).toFixed(1)}`;
-    const limiar = MARCOS.find((m) => m.id === 37)!.valor!;
-    const dias = caderninho.map((r) => r.fasNoDia.find((f) => f.fas >= limiar)?.dia ?? Infinity).sort((a, b) => a - b);
-    console.log(`resumo: caderninho n10 ${faixa(caderninho.map((r) => r.nivelEm.get(10)!))} n25 ${faixa(caderninho.map((r) => r.nivelEm.get(NIVEL_MAX)!))}`
-      + ` nota 14+ ${media(caderninho.map((r) => mediaEntre(r, 14, 49))).toFixed(2)} marco de fãs (mediana) dia ${((dias[7] + dias[8]) / 2).toFixed(1)}`
-      + ` | chute nota ${media(chute.map((r) => mediaEntre(r, 0, 49))).toFixed(2)} n25 ${faixa(chute.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
-      + ` maior intervalo ${Math.max(...chute.map((r) => r.maiorIntervaloH)).toFixed(0)} h | pctMax ${Math.max(...[...caderninho, ...chute].map((r) => r.pctMax)).toFixed(0)}%`);
+    for (const [nome, cad, ch] of [['3 visitas', caderninho, chute], ['ativo', ativo, ativoChute]] as const) {
+      console.log(`resumo ${nome}: caderninho n10 ${faixa(cad.map((r) => r.nivelEm.get(10) ?? Infinity))} n25 ${faixa(cad.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
+        + ` nota 7+ ${media(cad.map((r) => mediaEntre(r, 7, 49))).toFixed(2)} 14+ ${media(cad.map((r) => mediaEntre(r, 14, 49))).toFixed(2)}`
+        + ` marco de fãs (mediana) dia ${mediana(cad.map(diaDosFas)).toFixed(1)} coleções/dia ${(media(cad.map((r) => r.notas.length)) / DIAS).toFixed(1)}`
+        + ` | chute nota ${media(ch.map((r) => mediaEntre(r, 0, 49))).toFixed(2)} n10 ${faixa(ch.map((r) => r.nivelEm.get(10) ?? Infinity))} n25 ${faixa(ch.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
+        + ` maior intervalo ${Math.max(...ch.map((r) => r.maiorIntervaloH)).toFixed(0)} h | pctMax ${Math.max(...[...cad, ...ch].map((r) => r.pctMax)).toFixed(0)}%`);
+    }
   }
 
-  it('com caderninho: nível 10 entre o dia 5 e o 9', () => {
+  it('ativo com caderninho: nível 10 entre o dia 2 e o 5', () => {
+    for (const r of ativo) {
+      expect(r.nivelEm.get(10)).toBeGreaterThanOrEqual(2);
+      expect(r.nivelEm.get(10)).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('ativo com caderninho: nível 25 entre o dia 20 e o 35', () => {
+    for (const r of ativo) {
+      expect(r.nivelEm.get(NIVEL_MAX)).toBeGreaterThanOrEqual(20);
+      expect(r.nivelEm.get(NIVEL_MAX)).toBeLessThanOrEqual(35);
+    }
+  });
+
+  it('3 visitas com caderninho: nível 10 entre o dia 5 e o 12', () => {
     for (const r of caderninho) {
       expect(r.nivelEm.get(10)).toBeGreaterThanOrEqual(5);
-      expect(r.nivelEm.get(10)).toBeLessThanOrEqual(9);
+      expect(r.nivelEm.get(10)).toBeLessThanOrEqual(12);
     }
   });
 
-  it('com caderninho: nível 25 entre o dia 35 e o 49', () => {
-    for (const r of caderninho) {
-      expect(r.nivelEm.get(NIVEL_MAX)).toBeGreaterThanOrEqual(35);
-      expect(r.nivelEm.get(NIVEL_MAX)).toBeLessThanOrEqual(49);
+  // A nota média é da população (média das sementes): cada semente tem dezenas de coleções e oscila ±0,3.
+  it('no chute: nota média entre 4,5 e 5,5 (3 visitas e ativo)', () => {
+    for (const rs of [chute, ativoChute]) {
+      const m = media(rs.map((r) => mediaEntre(r, 0, 49)));
+      expect(m).toBeGreaterThanOrEqual(4.5);
+      expect(m).toBeLessThanOrEqual(5.5);
     }
-  });
-
-  // A nota média é da população (média das sementes): cada semente tem ~35 coleções e oscila ±0,3.
-  it('no chute: nota média entre 4,5 e 5,5', () => {
-    const m = media(chute.map((r) => mediaEntre(r, 0, 49)));
-    expect(m).toBeGreaterThanOrEqual(4.5);
-    expect(m).toBeLessThanOrEqual(5.5);
   });
 
   it('ninguém no chute fica travado sem cupom (o fornecedor fia): no máximo 1 dia sem lançar', () => {
-    for (const r of chute) expect(r.maiorIntervaloH).toBeLessThanOrEqual(48);
+    for (const r of [...chute, ...ativoChute]) expect(r.maiorIntervaloH).toBeLessThanOrEqual(48);
   });
 
   it('a % de procura fica abaixo de 1000% nos 49 dias', () => {
-    for (const r of [...caderninho, ...chute]) expect(r.pctMax).toBeLessThan(1000);
+    for (const r of [...caderninho, ...chute, ...ativo, ...ativoChute]) expect(r.pctMax).toBeLessThan(1000);
   });
 
-  it('com caderninho: nota média 8 ou mais depois de 14 dias', () => {
-    expect(media(caderninho.map((r) => mediaEntre(r, 14, 49)))).toBeGreaterThanOrEqual(8);
+  it('ativo com caderninho: nota média 8 ou mais depois de 7 dias', () => {
+    expect(media(ativo.map((r) => mediaEntre(r, 7, 49)))).toBeGreaterThanOrEqual(8);
   });
   // Pessoa quebrada: começa sem cupom (ou queimou tudo numa série ruim). O fornecedor fia o lote pequeno e ela volta a jogar.
   it('quem fica sem cupom recebe lote fiado, volta a lançar e depois sobe de nível', () => {
     for (const s of SEMENTES.slice(0, 8)) {
-      const r = simular('chute', s, 0);
+      const r = simular('chute', s, TRES, 0);
       expect(r.fiados).toBeGreaterThan(0);
-      expect(r.primeiroFiado).toBeCloseTo(VISITAS[0] / 24, 9); // fiou já na primeira visita
-      expect(r.notas.length).toBeGreaterThan(40); // continuou lançando (1 por dia)
+      expect(r.primeiroFiado).toBeCloseTo(TRES[0] / (24 * 60), 9); // fiou já na primeira visita
+      expect(r.notas.length).toBeGreaterThan(40); // continuou lançando (1 por dia, no mínimo)
       expect(r.maiorIntervaloH).toBeLessThanOrEqual(48);
       expect(r.nivelEm.get(2)).toBeGreaterThan(r.primeiroFiado!);
     }
   });
 
-  // Marco de fãs da camisetaria (id 37): calibrado para a mediana do caderninho chegar por volta do dia 28.
-  it('com caderninho: o marco de fãs chega por volta do dia 28 (mediana entre 25 e 31)', () => {
-    const limiar = MARCOS.find((m) => m.id === 37)!.valor!;
-    const dias = caderninho.map((r) => r.fasNoDia.find((f) => f.fas >= limiar)?.dia ?? Infinity).sort((a, b) => a - b);
-    const mediana = (dias[7] + dias[8]) / 2;
-    expect(mediana).toBeGreaterThanOrEqual(25);
-    expect(mediana).toBeLessThanOrEqual(31);
+  // Marco de fãs da camisetaria (id 37): calibrado para a mediana de quem joga 3 visitas com caderninho chegar por volta do
+  // dia 28 (quem joga ativo chega antes).
+  it('3 visitas com caderninho: o marco de fãs chega por volta do dia 28 (mediana entre 25 e 31)', () => {
+    const m = mediana(caderninho.map(diaDosFas));
+    expect(m).toBeGreaterThanOrEqual(25);
+    expect(m).toBeLessThanOrEqual(31);
   });
 });
