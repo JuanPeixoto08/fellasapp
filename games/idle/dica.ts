@@ -7,6 +7,7 @@ import { catalogo, type Melhoria } from './catalogo';
 import { estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
+import { CORES, custoLote, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, type Caderno } from './camisetaria';
 
 export type LinhaDica = { texto: string; tom?: 'bom' | 'ruim' | 'fraco' };
 export type Dica = { titulo: string; linhas: LinhaDica[] };
@@ -71,6 +72,8 @@ export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Di
   if (hortaProd(s)) linhas.push({ texto: `Horta: ${hortaProd(s) > 0 ? '+' : '−'}${pct(Math.abs(hortaProd(s)))}`, tom: 'fraco' });
   const conv = multGerador(s, gid, Date.parse(s.server_now) || Date.now());
   if (Math.abs(conv - 1) > 1e-9) linhas.push({ texto: `Convidados: ${vezes(conv)}`, tom: conv >= 1 ? 'fraco' : 'ruim' });
+  const mapa = multMapaDe(s);
+  if (Math.abs(mapa - 1) > 1e-9) linhas.push({ texto: `Mapa do rolê: ${vezes(mapa)}`, tom: mapa >= 1 ? 'fraco' : 'ruim' });
   linhas.push({ texto: `O próximo custa ${formatarValor(precoProximo)}${emTempo(s, precoProximo)}` });
   return { titulo: catalogo.geradores[gid - 1].nome, linhas };
 }
@@ -187,4 +190,83 @@ export function dicaNivel(l: LugarEstado, libera: string[]): string {
   if (l.preco_nivel === null) return `Nível ${n}: o máximo.`;
   const rende = libera.length ? `Rende mais e libera: ${libera.join(', ')}.` : 'Rende mais.';
   return `Nível ${n} → ${n + 1} por ${inteiro(Math.ceil(l.preco_nivel))} ${plural(l.moeda_nome)}. ${rende}`;
+}
+
+// ===== Camisetaria (lugar 3): caixinhas da bancada e do caderninho. Só o que a pessoa já sabe (o caderninho); o que
+// nunca testou diz "Ainda não testou". Não entra no resultado nem no pódio. =====
+
+/** "Combinação ótima!" já tem a pontuação; as outras levam ponto. */
+const frase = (t: string) => (/[.!?]$/.test(t) ? t : `${t}.`);
+const trancado = (nivel: number) => `Libera no nível ${nivel}.`;
+/** "Com Grafite: Combinação ótima!" ou "Ainda não testou com Grafite." */
+const combo = (cad: Caderno, tema: number, estilo: number, com: string) => {
+  const r = cad.combos.get(`${tema},${estilo}`);
+  return r === undefined ? `Ainda não testou com ${com}.` : `Com ${com}: ${frase(NOME_ROTULO[r])}`;
+};
+const focoTexto = (f: readonly number[]) => `Arte ${f[0]} · Tecido ${f[1]} · Divulgação ${f[2]}`;
+
+/** O tema com o estilo escolhido agora (e se está em alta na semana). */
+export function dicaTeeTema(tema: number, estilo: number, nivel: number, cad: Caderno, tendencia: number): string {
+  const t = TEMAS[tema - 1];
+  if (!liberado('tema', tema, nivel)) return trancado(t.nivel);
+  const texto = combo(cad, tema, estilo, ESTILOS[estilo - 1].nome);
+  return tema === tendencia ? `${texto} Em alta esta semana: a nota sobe.` : texto;
+}
+
+/** O estilo com o tema escolhido agora e o foco ideal (se a pessoa comprou o relatório). */
+export function dicaTeeEstilo(estilo: number, tema: number, nivel: number, cad: Caderno): string {
+  const e = ESTILOS[estilo - 1];
+  if (!liberado('estilo', estilo, nivel)) return trancado(e.nivel);
+  const f = cad.focos.get(estilo);
+  return `${combo(cad, tema, estilo, TEMAS[tema - 1].nome)} Foco ideal: ${f ? `${focoTexto(f)}.` : 'só com o relatório.'}`;
+}
+
+/** A peça: quanto custa, por quanto vende e se combina com o tema escolhido. */
+export function dicaTeePeca(peca: number, tema: number, nivel: number, cad: Caderno): string {
+  const p = PECAS[peca - 1];
+  if (!liberado('peca', peca, nivel)) return trancado(p.nivel);
+  const nomeTema = TEMAS[tema - 1].nome;
+  const pt = cad.pecas.get(`${peca},${tema}`);
+  const junto = pt === undefined ? `Ainda não testou com ${nomeTema}.`
+    : `Com ${nomeTema}: ${pt > 0 ? 'combina' : pt < 0 ? 'não combina' : 'nem ajuda nem atrapalha'}.`;
+  return `Custa ${num(p.custo)} cupons e vende por ${num(precoPeca(peca), 1)}. ${junto}`;
+}
+
+export function dicaTeeCor(cor: number, nivel: number): string {
+  const c = CORES[cor - 1];
+  if (!liberado('cor', cor, nivel)) return trancado(c.nivel);
+  return c.forte ? 'Cor forte: o @SuperMauro64 curte.' : 'Cor discreta.';
+}
+
+/** O foco (arte, tecido, divulgação): o ideal do estilo escolhido, se a pessoa tem o relatório. */
+export function dicaTeeFoco(estilo: number, cad: Caderno): string {
+  const nome = ESTILOS[estilo - 1].nome;
+  const f = cad.focos.get(estilo);
+  return f ? `O ideal do ${nome}: ${focoTexto(f)}. Quanto mais longe dele, menor a nota.`
+    : `O ideal do ${nome} é segredo. Depois de lançar um, o relatório do caderninho mostra.`;
+}
+
+/** O lote (0 pequeno, 1 médio, 2 grande) da peça escolhida no nível: peças, custo, tempo e o que rende esgotando. */
+export function dicaTeeLote(peca: number, nivel: number, lote: 0 | 1 | 2): string {
+  const n = pecasLote(nivel, lote);
+  const preco = precoPeca(peca);
+  return `${num(n, 0)} peças por ${num(custoLote(peca, nivel, lote), 0)} cupons. Fica pronto em ${producaoMs(lote) / 3600_000} h e vende em 12 h `
+    + `a ${num(preco, 1)} cupons a peça: esgotando, rende ${num(n * preco, 0)}.`;
+}
+
+export function dicaTeeRelatorio(estilo: number, preco: number, moeda: number): string {
+  const t = `Mostra pra sempre o foco ideal do ${ESTILOS[estilo - 1].nome}. Custa ${inteiro(Math.ceil(preco))} cupons.`;
+  return moeda < preco ? `${t} Faltam ${inteiro(Math.ceil(preco - moeda))}.` : t;
+}
+
+const TIPO_TEE = { tema: ['tema', 'temas'], estilo: ['estilo', 'estilos'], peca: ['peça', 'peças'], cor: ['cor', 'cores'] } as const;
+/** O cadeado de um grupo da bancada: o próximo que libera, em que nível, e quantos ainda faltam. */
+export function dicaTeeTrancados(tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel: number): string {
+  const lista = { tema: TEMAS, estilo: ESTILOS, peca: PECAS, cor: CORES }[tipo];
+  const falta = lista.filter((x) => !liberado(tipo, x.id, nivel));
+  if (!falta.length) return '';
+  const prox = falta.reduce((a, x) => (x.nivel < a.nivel ? x : a));
+  const [um, varios] = TIPO_TEE[tipo];
+  const resto = falta.length - 1;
+  return `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
 }

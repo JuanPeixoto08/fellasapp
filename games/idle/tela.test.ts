@@ -40,7 +40,7 @@ beforeEach(() => {
     config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
     horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
     convidados: vi.fn<Acoes['convidados']>(), sentar: vi.fn<Acoes['sentar']>(), tirar: vi.fn<Acoes['tirar']>(),
-    mapa: vi.fn<Acoes['mapa']>(), lugar: vi.fn<Acoes['lugar']>(), abrirLugar: vi.fn<Acoes['abrirLugar']>(), subirNivel: vi.fn<Acoes['subirNivel']>(), lugarAcao: vi.fn<Acoes['lugarAcao']>(),
+    mapa: vi.fn<Acoes['mapa']>(), lugar: vi.fn<Acoes['lugar']>(), abrirLugar: vi.fn<Acoes['abrirLugar']>(), subirNivel: vi.fn<Acoes['subirNivel']>(), lugarAcao: vi.fn<Acoes['lugarAcao']>(), lugarRecarregar: vi.fn<Acoes['lugarRecarregar']>(),
   };
 });
 const porTexto = (texto: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === texto)!;

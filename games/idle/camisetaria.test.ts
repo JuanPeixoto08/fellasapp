@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CORES, CRESCE, custoLote, distanciaFoco, FAS_TETO, fasExcesso, fasNota, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
+  caderno, comentario, CORES, gostou, CRESCE, custoLote, focoDaNota, liberaTextos, repeticao, distanciaFoco, FAS_TETO, fasExcesso, fasNota, podeFiar, PRECO_MULT, PUBLICO_BASE, ESTILOS, INFLUENCERS, LIBERA, liberado, nomeSugerido, notas, pctProcura, PECAS, pecasLote,
   pecaTema, pesoVenda, precoPeca, precoRelatorio, procura, producaoMs, publico, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte,
   type Lancamento,
 } from './camisetaria';
@@ -219,5 +219,77 @@ describe('tendência e nome', () => {
       expect(nome).toContain(t.nome);
     }
     expect(nomeSugerido(1, 1, 0)).toBe('Coleção Meme Vol. 2');
+  });
+});
+
+describe('o que a tela usa', () => {
+  it('caderno: combinações, peça × tema e focos do caderninho em mapas', () => {
+    const c = caderno([
+      { tipo: 'combo', a: 2, b: 4, rotulo: 4 }, { tipo: 'peca', a: 1, b: 2, rotulo: 2 }, { tipo: 'foco', a: 4, b: 0, rotulo: 523 },
+      { tipo: 'outro', a: 1, b: 1, rotulo: 1 },
+    ]);
+    expect(c.combos.get('2,4')).toBe(4);
+    expect(c.pecas.get('1,2')).toBe(1); // rotulo = pecaTema + 1
+    expect(c.focos.get(4)).toEqual([5, 2, 3]);
+    expect(c.combos.size + c.pecas.size + c.focos.size).toBe(3);
+  });
+  it('focoDaNota: arte·100 + tecido·10 + div, inclusive o 10', () => {
+    expect(focoDaNota(523)).toEqual([5, 2, 3]);
+    expect(focoDaNota(1000)).toEqual([10, 0, 0]);
+    expect(focoDaNota(10)).toEqual([0, 1, 0]);
+    expect(focoDaNota(55)).toEqual([0, 5, 5]);
+  });
+  it('repeticao: igual a uma das 3 últimas = 2; só tema ou só estilo da última = 1; senão 0 (o mesmo que a nota usa)', () => {
+    const ult = [{ tema: 1, estilo: 2 }, { tema: 3, estilo: 3 }, { tema: 4, estilo: 1 }, { tema: 5, estilo: 5 }];
+    const ultMeme = [{ tema: 9, estilo: 9 }, { tema: 1, estilo: 1 }];
+    expect(repeticao(3, 3, ult)).toBe(2);
+    expect(repeticao(5, 5, ult)).toBe(0);
+    expect(repeticao(1, 9, ult)).toBe(1);
+    expect(repeticao(9, 2, ult)).toBe(1);
+    expect(repeticao(9, 9, [])).toBe(0);
+    // Meme × Minimalista (nenhuma nota no 10): repetida de 2 coleções atrás, cai 2 em cada nota (o piso é 1)
+    const base: Lancamento = { id: 1, tema: 1, estilo: 1, peca: 1, cor: 1, foco: [3, 5, 2], lote: 1, nivel: 1, fas: 0, tendencia: 30, ultimas: [] };
+    expect(repeticao(1, 1, ultMeme)).toBe(2);
+    const sem = notas(base);
+    const com = notas({ ...base, ultimas: ultMeme });
+    expect(sem.every((n) => n < 10)).toBe(true);
+    expect(com).toEqual(sem.map((n) => Math.max(1, n - 2)));
+  });
+  it('cada tipo libera em ordem de id (a tela mostra os liberados como os primeiros da lista)', () => {
+    for (const lista of [TEMAS, ESTILOS, PECAS, CORES]) {
+      const niveis = lista.map((x) => x.nivel);
+      expect(niveis).toEqual([...niveis].sort((x, y) => x - y));
+    }
+  });
+  it('liberaTextos: o que o nível libera, com o nome', () => {
+    expect(liberaTextos(2)).toEqual(['Tema: Signo', 'Estilo: Grafite']);
+    expect(liberaTextos(3)).toEqual(['Tema: Anime', 'Cor: Off-white']);
+    expect(liberaTextos(4)).toEqual(['Tema: Crise financeira', 'Peça: Regata']);
+    expect(liberaTextos(1)).toEqual([]);
+    expect(liberaTextos(26)).toEqual([]);
+  });
+});
+
+describe('os posts da revelação', () => {
+  const c = { tema: 3, estilo: 5, cor: 1, tendencia: 3, arte: 3, tecido: 5, div: 2, rotulo: 4 };
+  it('gostou segue os gostos da nota: tendência, vintage/bordado/cor forte, várzea, ótima no foco', () => {
+    expect([0, 1, 2, 3].map((k) => gostou(k, c))).toEqual([true, true, true, true]);
+    const nada = { ...c, tema: 1, estilo: 1, cor: 1, tendencia: 2, rotulo: 2 };
+    expect([0, 1, 2, 3].map((k) => gostou(k, nada))).toEqual([false, false, false, false]);
+    expect(gostou(1, { ...nada, cor: 3 })).toBe(true); // amarelo é forte
+    expect(gostou(3, { ...c, arte: 7, tecido: 1, div: 2 })).toBe(false); // ótima, mas foco longe
+  });
+  it('um comentário por faixa de nota e gosto, com o tema no texto', () => {
+    const todos = new Set<string>();
+    for (let k = 0; k < 4; k++) for (const nota of [10, 6, 2]) for (const g of [false, true]) {
+      const t = comentario(k, nota, g, 3);
+      expect(t.length).toBeGreaterThan(10);
+      expect(t).not.toContain('{tema}');
+      todos.add(t);
+    }
+    expect(todos.size).toBe(24);
+    expect(comentario(0, 9, true, 2)).toBe('Praia tá em alta e vocês entregaram. Já tô no carrinho.');
+    expect(comentario(2, 4, false, 1)).toBe('Não tem escudo, não tem patrocínio, não tem nada.');
+    expect(comentario(3, 5, false, 1)).toBe(comentario(3, 7, false, 1));
   });
 });

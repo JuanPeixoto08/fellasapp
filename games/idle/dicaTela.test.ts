@@ -75,4 +75,13 @@ describe('caixinha de informação', () => {
     alvo.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     expect(aberta()).toBe(false);
   });
+  it('clique do mouse e a tela refeita devolvendo o foco: a caixinha não abre sozinha (só o teclado abre)', () => {
+    ponteiro('pointerdown', alvo, 'mouse');
+    vi.advanceTimersByTime(2000); // a resposta do banco demorou: o foco volta pro botão novo bem depois do clique
+    alvo.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(aberta()).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    alvo.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(aberta()).toBe(true);
+  });
 });

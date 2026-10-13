@@ -19,8 +19,10 @@
 // * idle_place_registrar, idle_place_desafio, idle_place_nota e idle_place_marcos só com o estado travado, a conta fechada e
 //   salva antes; marcos e conquistas nunca dentro do avancar.
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
+import { CAMISETARIA } from './camisetariaTela';
 
-export type AcoesMecanica = { acao(fn: string, args: Record<string, unknown>): void };
+/** `recarregar`: busca o lugar de novo agora (o que tem hora marcada chegou, ex.: a coleção ficou pronta). */
+export type AcoesMecanica = { acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void };
 /** Liga a caixinha de informação a um item (mouse e teclado; no celular não tem). `chave` é estável entre um desenho e
  *  outro (a caixinha aberta passa pro item novo, com os números novos); `titulo` vai em cima e `texto()` embaixo
  *  (null = sem caixinha agora). Montado em tela.ts em cima do `dicas.ligar` de dicaTela.ts. */
@@ -36,4 +38,4 @@ export type Mecanica = {
   libera(nivel: number): string[];
 };
 /** Preenchido pelas partes 2 a 4 (camisetaria = 3, copão = 4, jantar = 7). */
-export const MECANICAS: Partial<Record<number, Mecanica>> = {};
+export const MECANICAS: Partial<Record<number, Mecanica>> = { 3: CAMISETARIA };

@@ -1,6 +1,7 @@
 // A camisetaria (Fellas Inc., lugar 3 do Mapa do rolê): o catálogo (temas, estilos, peças, cores, influencers) e as contas
 // puras de nota, procura, venda e nome. O banco faz as mesmas contas (teste de paridade): conta de nota é em inteiros
 // (décimos) para bater bit a bit; o que é decimal (procura, preço) é só para mostrar e para o relatório.
+import type { NotaCaderninho } from '../shared/types';
 import { semanaIdx } from './mapa';
 
 export type Vibe = 'zoeira' | 'raiz' | 'fofo' | 'sombrio' | 'retro' | 'esporte' | 'nerd' | 'praia' | 'chique' | 'bruto' | 'urbano' | 'grana';
@@ -252,4 +253,102 @@ export function nomeSugerido(tema: number, estilo: number, n: number): string {
 /** Preço do relatório dos influencers no nível dado: 50 × CRESCE^(nível−1). */
 export function precoRelatorio(nivel: number): number {
   return 50 * CRESCE ** (nivel - 1);
+}
+
+// ===== o que a tela da camisetaria (camisetariaTela.ts) recebe e usa =====
+
+/** Uma coleção em produção ou à venda (idle_tee_json → ativa). Notas, média, procura, %, rótulo e peça × tema só depois
+ *  de pronta (antes, null). Horários em ISO. */
+export type ColecaoTee = {
+  id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; arte: number; tecido: number; div: number;
+  lote: 0 | 1 | 2; nivel: number; pecas: number; custo: number; fiado: boolean; tendencia: number;
+  criada_em: string; pronta_em: string; fim_em: string; vendido: number; pronta: boolean;
+  notas: number[] | null; media: number | null; procura: number | null; pct: number | null; rotulo: number | null; peca_tema: number | null;
+};
+/** Uma das últimas 10 coleções reveladas (a mais nova primeiro). */
+export type HistoricoTee = { id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; notas: number[]; pct: number };
+/** `LugarEstado.mecanica` do lugar 3 (idle_tee_json). */
+export type EstadoTee = {
+  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: ColecaoTee | null; historico: HistoricoTee[];
+  semana: number; ultimo_fiado: string | null;
+};
+
+/** O caderninho da camisetaria: combinação tema × estilo → rótulo; peça × tema → -1/0/+1; estilo → foco ideal. */
+export type Caderno = { combos: Map<string, Rotulo>; pecas: Map<string, -1 | 0 | 1>; focos: Map<number, [number, number, number]> };
+
+/** O foco guardado na nota do relatório (arte·100 + tecido·10 + divulgação). */
+export function focoDaNota(n: number): [number, number, number] {
+  const arte = Math.floor(n / 100);
+  const resto = n - arte * 100;
+  return [arte, Math.floor(resto / 10), resto % 10];
+}
+
+export function caderno(itens: readonly NotaCaderninho[]): Caderno {
+  const c: Caderno = { combos: new Map(), pecas: new Map(), focos: new Map() };
+  for (const i of itens) {
+    if (i.tipo === 'combo') c.combos.set(`${i.a},${i.b}`, i.rotulo as Rotulo);
+    else if (i.tipo === 'peca') c.pecas.set(`${i.a},${i.b}`, (i.rotulo - 1) as -1 | 0 | 1);
+    else if (i.tipo === 'foco') c.focos.set(i.a, focoDaNota(i.rotulo));
+  }
+  return c;
+}
+
+/** Quanto a repetição derruba (em pontos da nota): 2 se tema e estilo são de uma das 3 últimas, 1 se só o tema ou só o
+ *  estilo é da última, 0 no resto. A mesma regra de `notas` (ultimas[0] = a última). */
+export function repeticao(tema: number, estilo: number, ultimas: readonly { tema: number; estilo: number }[]): 0 | 1 | 2 {
+  if (ultimas.slice(0, 3).some((u) => u.tema === tema && u.estilo === estilo)) return 2;
+  const u = ultimas[0];
+  return u && (u.tema === tema || u.estilo === estilo) ? 1 : 0;
+}
+
+const NOME_TIPO: Record<string, string> = { tema: 'Tema', estilo: 'Estilo', peca: 'Peça', cor: 'Cor' };
+const LISTA: Record<string, readonly { nome: string }[]> = { tema: TEMAS, estilo: ESTILOS, peca: PECAS, cor: CORES };
+
+/** O que o nível `n` libera, para o botão de subir nível ("Tema: Anime", "Estilo: Grafite"). */
+export function liberaTextos(n: number): string[] {
+  return (LIBERA[n] ?? []).map((i) => {
+    const [tipo, id] = i.split(':');
+    return `${NOME_TIPO[tipo]}: ${LISTA[tipo][Number(id) - 1].nome}`;
+  });
+}
+
+// ===== os posts da revelação: o comentário de cada influencer pela nota (alta 8+, média 5 a 7, baixa até 4) e se a
+// coleção pegou o gosto dele. Zoeira com a camisa, nunca com fato de gente de verdade. =====
+
+/** A coleção pegou o gosto do influencer k (0 a 3, na ordem de INFLUENCERS)? A mesma regra da nota. */
+export function gostou(k: number, c: Pick<ColecaoTee, 'tema' | 'estilo' | 'cor' | 'tendencia' | 'arte' | 'tecido' | 'div' | 'rotulo'>): boolean {
+  if (k === 0) return c.tema === c.tendencia;
+  if (k === 1) return c.estilo === 5 || c.estilo === 10 || CORES[c.cor - 1].forte;
+  if (k === 2) return c.tema === 3;
+  return c.rotulo === 4 && distanciaFoco(c.estilo, [c.arte, c.tecido, c.div]) <= 1;
+}
+
+/** [influencer][alta, média, baixa][sem o gosto, com o gosto]; {tema} vira o nome do tema. */
+const COMENTARIOS: readonly (readonly (readonly [string, string])[])[] = [
+  [ // @hojetemjp: página de moda, vive da tendência
+    ['Peça linda, curadoria impecável. Repostando nos stories.', '{tema} tá em alta e vocês entregaram. Já tô no carrinho.'],
+    ['Usável. Não é look, mas é roupa.', 'Pegou a onda de {tema}, mas chegou de boia de braço.'],
+    ['Não vou nem marcar a loja pra não queimar ninguém.', 'Até com {tema} em alta conseguiram errar. Talento.'],
+  ],
+  [ // @SuperMauro64: bazar, vintage, bordado e cor forte
+    ['Ficou boa, viu. Só faltou um bordadinho.', 'Isso aqui é peça de bazar de respeito. Levo duas.'],
+    ['Dá pra usar em casa. Pra sair, não.', 'Tem a pegada que eu gosto, o resto eu finjo que não vi.'],
+    ['Eu doaria, mas tenho pena de quem fosse receber.', 'Tinha tudo que eu gosto e mesmo assim ficou feio. Como?'],
+  ],
+  [ // @mcresenha: só camisa de time
+    ['Não é camisa de time, mas até que é bonita. Ainda não uso.', 'CAMISA DE VÁRZEA! Joguei o baba com ela e fiz dois.'],
+    ['Bacana. Agora faz uma de futebol que eu compro.', 'Tema certo, mas parece camisa de time que caiu pra segunda.'],
+    ['Não tem escudo, não tem patrocínio, não tem nada.', 'Desrespeitaram a várzea. Vou levar pro tribunal do baba.'],
+  ],
+  [ // @luisviton: o crítico chato
+    ['Bom. Já vi melhor. Não lembro onde, mas vi.', 'Combinação certeira, foco no ponto. Odeio admitir que gostei.'],
+    ['Nota de quem já desistiu de esperar coisa melhor.', 'Tinha tudo pra ser boa. Tinha.'],
+    ['Isso aqui é um crime contra o algodão.', 'A combinação era boa. Conseguiram estragar mesmo assim.'],
+  ],
+];
+
+/** O comentário curto do post do influencer k (0 a 3) pela nota e pelo gosto. */
+export function comentario(k: number, nota: number, gosto: boolean, tema: number): string {
+  const faixa = nota >= 8 ? 0 : nota >= 5 ? 1 : 2;
+  return COMENTARIOS[k][faixa][gosto ? 1 : 0].replace('{tema}', TEMAS[tema - 1].nome);
 }

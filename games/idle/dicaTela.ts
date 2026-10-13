@@ -18,7 +18,9 @@ export function criarDicas(app: HTMLElement) {
   let aberta: string | null = null;
   let ancora: HTMLElement | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let ultimoToque = 0;
+  /** O último jeito de mexer foi o teclado (e não mouse ou dedo). Foco que chega depois de um clique (a tela refeita
+   *  devolvendo o foco pro botão novo, às vezes segundos depois, quando o banco responde) não abre caixinha. */
+  let porTeclado = true;
 
   const limpar = () => {
     if (timer) clearTimeout(timer);
@@ -71,12 +73,13 @@ export function criarDicas(app: HTMLElement) {
 
   // um toque (celular) em qualquer lugar fecha a que estiver aberta (a do teclado, por exemplo)
   document.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'mouse') ultimoToque = Date.now();
+    porTeclado = false;
     if (aberta && e.pointerType !== 'mouse' && !(ancora?.contains(e.target as Node))) esconder();
   }, true);
   document.addEventListener('keydown', (e) => {
+    porTeclado = true;
     if (e.key === 'Escape' && aberta) esconder();
-  });
+  }, true);
   window.addEventListener('scroll', () => aberta && ancora && posicionar(ancora), true);
 
   function ligar(alvo: HTMLElement, chave: string, conteudo: () => Dica | null) {
@@ -93,7 +96,7 @@ export function criarDicas(app: HTMLElement) {
     });
     // teclado: o foco que veio do Tab (não de um toque/clique) mostra
     alvo.addEventListener('focusin', () => {
-      if (Date.now() - ultimoToque > 800 && !alvo.matches(':hover')) mostrar(chave);
+      if (porTeclado && !alvo.matches(':hover')) mostrar(chave);
     });
     alvo.addEventListener('focusout', (e) => {
       if (aberta === chave && !alvo.contains(e.relatedTarget as Node)) esconder();

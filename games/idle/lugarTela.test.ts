@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LugarEstado } from '../shared/types';
 import { criarLugarTela } from './lugarTela';
 import { MECANICAS } from './mecanicas';
@@ -13,6 +13,9 @@ const lugar = (extra: Partial<LugarEstado> = {}): LugarEstado => ({
   semana: [], dono: null, caderninho: [], mecanica: null, server_now: '2026-10-12T12:00:00Z', ...extra,
 });
 const dicas = { ligar: vi.fn() };
+/** A camisetaria de verdade (mecanicas.ts): os testes que trocam a mecânica do lugar 3 devolvem ela no fim. */
+const CAMISETARIA = MECANICAS[3];
+afterEach(() => { MECANICAS[3] = CAMISETARIA; });
 
 describe('moldura do lugar', () => {
   it('cabeçalho, pódio com número formatado e nome de quem fez', () => {
@@ -35,6 +38,7 @@ describe('moldura do lugar', () => {
   });
   it('sem mecânica registrada o corpo diz "Em breve"; com mecânica, desenha a dela', () => {
     const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
+    delete MECANICAS[3];
     t.renderizar(lugar(), false, 0, new Map());
     expect(t.elemento.querySelector('.lugar-corpo')!.textContent).toContain('Em breve');
     MECANICAS[3] = {
@@ -44,7 +48,6 @@ describe('moldura do lugar', () => {
     const t2 = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
     t2.renderizar(lugar(), false, 0, new Map());
     expect(t2.elemento.querySelector('.lugar-corpo')!.textContent).toContain('mecânica de teste');
-    delete MECANICAS[3];
   });
   it('marcos: 8 quadradinhos, os ganhos acesos', () => {
     const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
@@ -62,7 +65,6 @@ describe('moldura do lugar', () => {
     t.renderizar(lugar({ moeda: 99 }), true, 5, new Map());
     expect(criar).toHaveBeenCalledTimes(1);
     expect(renderizar).toHaveBeenLastCalledWith(expect.objectContaining({ moeda: 99 }), true, 5);
-    delete MECANICAS[3];
   });
   it('pódio vazio, semana com dono do pedaço e o desafio feito', () => {
     const t = criarLugarTela({ voltar: vi.fn(), nivel: vi.fn(), acao: vi.fn() }, dicas);
@@ -137,16 +139,12 @@ describe('foco do teclado entre um desenho e outro', () => {
     const miolo = document.createElement('div');
     miolo.append(botao);
     MECANICAS[3] = { criar: () => ({ elemento: miolo, renderizar: () => undefined }), foto: () => document.createElement('canvas'), caderninho: () => document.createElement('div'), libera: () => [] };
-    try {
-      const t = montar();
-      t.renderizar(lugar(), false, 0, new Map());
-      const corpo = t.elemento.querySelector('.lugar-corpo');
-      botao.focus();
-      t.renderizar(lugar({ moeda: 70 }), false, 0, new Map());
-      expect(t.elemento.querySelector('.lugar-corpo')).toBe(corpo);
-      expect(document.activeElement).toBe(botao);
-    } finally {
-      delete MECANICAS[3];
-    }
+    const t = montar();
+    t.renderizar(lugar(), false, 0, new Map());
+    const corpo = t.elemento.querySelector('.lugar-corpo');
+    botao.focus();
+    t.renderizar(lugar({ moeda: 70 }), false, 0, new Map());
+    expect(t.elemento.querySelector('.lugar-corpo')).toBe(corpo);
+    expect(document.activeElement).toBe(botao);
   });
 });

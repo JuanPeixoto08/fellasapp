@@ -1081,8 +1081,10 @@ body:has(.idle) { background: #121212; }
 .idle .quem .mini-boneco { width: 18px; height: 26px; }
 .idle .quem .nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .idle .podio-lista, .idle .semana-lista { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.idle .podio-pos { display: grid; grid-template-columns: 20px 44px minmax(0, 1fr); align-items: center; gap: 10px; }
-.idle .podio-foto { width: 44px; height: 44px; image-rendering: pixelated; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+/* a foto da produção é 48 × 48: só em escala inteira (no PC com zoom, o múltiplo de 48 px de tela que cabe; nunca 44/40, que come pixel) */
+.idle .podio-pos { display: grid; grid-template-columns: 20px auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.idle .podio-foto { width: 48px; height: 48px; image-rendering: pixelated; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda);
+  width: calc(max(48px, round(down, 48px * var(--zoom, 1), 48px)) / var(--zoom, 1)); height: calc(max(48px, round(down, 48px * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
 .idle .podio-pos.vaga .podio-foto { box-shadow: inset 0 0 0 2px var(--i-linha); }
 .idle .podio-pos .meio { display: grid; gap: 2px; min-width: 0; }
 .idle .podio-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
@@ -1131,8 +1133,6 @@ body:has(.idle) { background: #121212; }
   .idle .lugar-bloco { gap: 5px; padding: 7px 12px 8px; }
   .idle .podio-lista { gap: 4px; }
   .idle .podio-pos .meio { gap: 0; }
-  .idle .podio-pos { grid-template-columns: 20px 40px minmax(0, 1fr); }
-  .idle .podio-foto { width: 40px; height: 40px; }
   .idle .semana-lista { gap: 2px; }
   .idle .dono-pedaco { padding: 2px 8px; }
 }
@@ -1156,3 +1156,230 @@ body:has(.idle) { background: #121212; }
 .idle .pino[data-tema]:hover:not(:disabled) { --c: var(--lugar-texto); }
 .idle .lugar-linha[data-tema].aberto { --c: var(--lugar-acento); }
 .idle .lugar-linha[data-tema].aberto .lugar-linha-fim { color: var(--lugar-acento); }
+
+/* ===== Camisetaria (lugar 3, camisetariaTela.ts): estilo de rua em cima do tema do lugar. A parede de tijolo com a
+   camiseta pendurada e o nome colado de lambe-lambe; as escolhas em ladrilhos de adesivo (contorno grosso), a escolhida
+   com o anel de spray amarelo. Cores do rótulo da combinação (caderninho, carimbo): péssima → ótima.
+   Pixel art sempre em escala inteira: no PC com zoom, o tamanho em px de tela arredonda pro múltiplo do lado da arte. ===== */
+.idle .lugar-tela[data-tema='3'] {
+  --tee-rot-0: #E5484D; --tee-rot-1: #E8954A; --tee-rot-2: var(--i-borda2); --tee-rot-3: var(--mint); --tee-rot-4: var(--gold);
+}
+.idle .rot-0 { --tee-rot-c: var(--tee-rot-0); } .idle .rot-1 { --tee-rot-c: var(--tee-rot-1); } .idle .rot-2 { --tee-rot-c: var(--tee-rot-2); }
+.idle .rot-3 { --tee-rot-c: var(--tee-rot-3); } .idle .rot-4 { --tee-rot-c: var(--tee-rot-4); }
+.idle .tee { min-width: 0; }
+.idle .tee > .vazio { margin: 0; padding: 40px 12px; font: 400 20px var(--i-pixel); }
+.idle .tee canvas { image-rendering: pixelated; }
+
+/* a parede (fundoBancada 128 × 72 a 3×) com a camiseta (48 × 48 a 3×; 4× no PC) e o lambe-lambe */
+.idle .tee-vitrine { position: relative; display: grid; place-items: center; min-height: 196px; padding: 14px 12px 40px; overflow: hidden;
+  background: var(--i-fundo2) center 30% / 384px auto repeat; background-size: calc(max(128px, round(down, 384px * var(--zoom, 1), 128px)) / var(--zoom, 1)) auto;
+  image-rendering: pixelated; box-shadow: inset 0 0 0 2px var(--i-borda), inset 0 -36px 0 color-mix(in srgb, var(--lugar-fundo) 55%, transparent); }
+.idle .tee-foto { width: 144px; height: 144px; width: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+  height: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1)); filter: drop-shadow(4px 5px 0 rgba(0, 0, 0, 0.4)); }
+.idle .tee-lambe { position: absolute; left: 12px; bottom: 9px; max-width: calc(100% - 28px); margin: 0; padding: 4px 10px 5px; overflow: hidden;
+  font: 400 21px/1 var(--i-pixel); color: var(--lugar-fundo); white-space: nowrap; text-overflow: ellipsis; background: var(--paper);
+  transform: rotate(-1.5deg); transform-origin: left center; box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35); }
+.idle .tee-lambe:empty { display: none; }
+
+/* bancada */
+.idle .tee-bancada { display: flex; flex-direction: column; gap: 14px; }
+.idle .tee-lado { display: contents; }
+.idle .tee-vitrine { order: 0; } .idle .tee-escolhas { order: 1; } .idle .tee-linha-nome { order: 2; } .idle .tee-foco { order: 3; } .idle .tee-fim { order: 4; }
+.idle .tee-escolhas { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.idle .tee-secao { min-width: 0; }
+.idle .tee-rot { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 7px; font: 400 17px/1 var(--i-pixel); color: var(--i-mudo); }
+.idle .tee-sel { min-width: 0; overflow: hidden; font-size: 20px; color: var(--paper); white-space: nowrap; text-overflow: ellipsis; }
+.idle .tee-grade { display: flex; flex-wrap: wrap; gap: 6px; }
+.idle .tee-item { position: relative; flex: none; display: grid; place-items: center; align-content: center; gap: 2px; width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: 0; color: var(--paper); background: var(--i-fundo2); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda);
+  transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out; }
+.idle .tee-item:hover:not(.tee-trancados) { box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .tee-item[aria-checked='true'], .idle .tee-item[aria-checked='true']:hover { background: color-mix(in srgb, var(--gold) 16%, var(--i-fundo2));
+  box-shadow: inset 0 0 0 3px var(--gold), 0 0 0 2px color-mix(in srgb, var(--gold) 30%, transparent); }
+.idle .tee-item:focus-visible, .idle .tee-lote:focus-visible, .idle .tee-nome:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+.idle .tee-item:active:not(.tee-trancados) { transform: translateY(1px); }
+/* o que ainda não liberou: um cadeado só no fim do grupo, com quantos faltam (a caixinha diz o próximo) */
+.idle .tee-trancados { cursor: default; background: transparent; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .tee-trancados .pino-cadeado { width: 12px; height: 12px; opacity: 0.8; }
+.idle .tee-niv { font: 400 13px/1 var(--i-pixel); color: var(--i-mudo); white-space: nowrap; }
+.idle .tee-arte { width: 32px; height: 32px; width: calc(max(16px, round(nearest, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1));
+  height: calc(max(16px, round(nearest, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .tee-alta { position: absolute; top: -7px; right: -7px; z-index: 1; padding: 2px 3px 1px; font: 400 12px/1 var(--i-pixel); color: var(--lugar-fundo);
+  background: var(--mint); box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4); pointer-events: none; }
+.idle .tee-peca, .idle .tee-trancados-peca { width: 56px; height: 56px; }
+.idle .tee-peca .tee-arte { width: 48px; height: 48px; width: calc(max(24px, round(nearest, 48px * var(--zoom, 1), 24px)) / var(--zoom, 1));
+  height: calc(max(24px, round(nearest, 48px * var(--zoom, 1), 24px)) / var(--zoom, 1)); }
+.idle .tee-amostra { width: 22px; height: 22px; background: var(--cor); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), inset -3px -3px 0 rgba(0, 0, 0, 0.18); }
+.idle .tee-peca-cor { display: flex; flex-wrap: wrap; gap: 14px 22px; }
+.idle .tee-s-cor .tee-grade { max-width: calc(7 * 44px + 6 * 6px); }
+.idle .tee-trancados-cor .pino-cadeado { width: 10px; height: 10px; }
+/* foco: três contadores de 0 a 10 que somam 10 */
+.idle .tee-foco-linha { display: grid; grid-template-columns: 84px minmax(0, 1fr) 44px 30px 44px; align-items: center; gap: 8px; }
+.idle .tee-foco-linha + .tee-foco-linha { margin-top: 4px; }
+.idle .tee-foco-nome { font-size: 13px; }
+.idle .tee-pips { display: flex; gap: 3px; min-width: 0; }
+.idle .tee-pips i { flex: 1; height: 12px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .tee-pips i.cheio { background: var(--gold); box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo)); }
+.idle .btn.tee-passo { min-height: 44px; padding: 0; font-size: 22px; }
+.idle .tee-foco-valor { font: 400 24px/1 var(--i-pixel); text-align: center; font-variant-numeric: tabular-nums; }
+.idle .tee-sobra { font-size: 17px; color: var(--i-mudo); font-variant-numeric: tabular-nums; }
+.idle .tee-sobra.falta { color: var(--tee-rot-1); }
+/* lote */
+.idle .tee-lotes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.idle .tee-lote { display: grid; justify-items: start; gap: 2px; min-width: 0; min-height: 44px; padding: 6px 10px 7px; border: 0; border-radius: 0; text-align: left;
+  color: var(--paper); background: var(--i-fundo2); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .tee-lote:hover { box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .tee-lote[aria-checked='true'], .idle .tee-lote[aria-checked='true']:hover { background: color-mix(in srgb, var(--gold) 16%, var(--i-fundo2)); box-shadow: inset 0 0 0 3px var(--gold); }
+.idle .tee-lote strong { font: 400 19px/1 var(--i-pixel); }
+.idle .tee-lote span { max-width: 100%; overflow: hidden; font-size: 12px; color: var(--i-mudo); white-space: nowrap; text-overflow: ellipsis; }
+.idle .tee-lote.caro .tee-lote-custo { color: var(--tee-rot-1); }
+/* nome, Lançar e o aviso */
+.idle .tee-linha-nome { display: flex; gap: 8px; }
+.idle .tee-nome { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 0; color: var(--paper); background: var(--i-fundo2);
+  font: 400 21px var(--i-pixel); caret-color: var(--gold); box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .tee-nome::placeholder { color: var(--i-mudo); opacity: 1; }
+.idle .tee-nome::selection { color: var(--lugar-fundo); background: var(--gold); }
+.idle .tee-fim { display: grid; gap: 6px; }
+.idle .btn.tee-lancar { width: 100%; min-height: 52px; font-size: 25px; }
+.idle .tee-aviso { min-height: 2.7em; margin: 0; font-size: 12.5px; line-height: 1.35; color: var(--i-mudo); }
+.idle .tee-aviso.alerta { color: var(--tee-rot-1); }
+
+/* produção e venda: a parede grande de um lado, o painel do outro */
+.idle .tee-palco { display: grid; gap: 14px; }
+.idle .tee-palco .tee-vitrine { min-height: 230px; }
+.idle .tee-painel { display: grid; gap: 10px; align-content: start; min-width: 0; padding: 14px 16px 16px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .tee-titulo { margin: 0; font: 400 27px/1 var(--i-pixel); }
+.idle .tee-falta { margin: 0; font-size: 14px; color: var(--i-mudo); }
+.idle .tee-conta { display: block; margin-top: 2px; font: 400 34px/1 var(--i-pixel); color: var(--gold); font-variant-numeric: tabular-nums; }
+.idle .tee-barra { height: 16px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .tee-barra i { display: block; height: 100%; background: var(--gold); box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo));
+  transition: width 0.4s ease-out; }
+.idle .tee-ficha { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 13px; }
+.idle .tee-ficha dt { color: var(--i-mudo); }
+.idle .tee-ficha dd { margin: 0; }
+.idle .tee-dica { margin: 0; }
+.idle .tee-venda-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.idle .tee-acaba { font: 400 18px/1 var(--i-pixel); color: var(--i-mudo); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.idle .tee-mini-notas { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
+.idle .tee-mini-notas li { display: flex; align-items: center; gap: 6px; }
+.idle .tee-mini-notas .tee-avatar { width: 32px; height: 32px; width: calc(max(16px, round(nearest, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1));
+  height: calc(max(16px, round(nearest, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .tee-mini-notas b { font: 400 26px/1 var(--i-pixel); }
+.idle .tee-venda-num { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0; font-size: 13px; color: var(--i-mudo); font-variant-numeric: tabular-nums; }
+.idle .tee-cupons { color: var(--gold); }
+.idle .tee-previsao { margin: 0; font: 400 19px/1.1 var(--i-pixel); }
+.idle .tee-venda-acoes { display: flex; }
+.idle .tee-confirma { display: grid; gap: 10px; width: 100%; padding: 10px 12px 12px; background: color-mix(in srgb, var(--tee-rot-0) 12%, var(--i-painel));
+  box-shadow: inset 0 0 0 2px var(--tee-rot-0); }
+.idle .tee-confirma p { margin: 0; font-size: 13.5px; line-height: 1.35; }
+.idle .tee-confirma-bts { display: flex; flex-wrap: wrap; gap: 10px; }
+.idle .tee-confirma-bts .btn { flex: none; width: auto; padding: 0 16px; white-space: nowrap; }
+.idle .btn.tee-encerrar-sim { --c: var(--tee-rot-0); }
+
+/* revelação: os 4 posts entram um por um, a % sobe e o rótulo carimba */
+.idle .tee-revelacao { display: grid; gap: 12px; align-content: start; }
+.idle .tee-rev-topo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.idle .tee-rev-foto { flex: none; width: 48px; height: 48px; width: calc(max(48px, round(down, 48px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+  height: calc(max(48px, round(down, 48px * var(--zoom, 1), 48px)) / var(--zoom, 1)); background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .tee-rev-tit { display: grid; gap: 3px; min-width: 0; }
+.idle .tee-rev-tit .tee-titulo { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .tee-rev-tit .sub { margin: 0; }
+.idle .tee-posts { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.idle .tee-post { display: grid; grid-template-columns: auto minmax(0, 1fr) 46px; align-items: center; gap: 12px; padding: 10px 12px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c);
+  opacity: 0; transform: translateY(10px); transition: opacity 0.22s ease-out, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+.idle .tee-post.entrou { opacity: 1; transform: none; }
+.idle .tee-post .tee-avatar { width: 48px; height: 48px; width: calc(max(16px, round(nearest, 48px * var(--zoom, 1), 16px)) / var(--zoom, 1));
+  height: calc(max(16px, round(nearest, 48px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .tee-post-meio { min-width: 0; }
+.idle .tee-handle { font: 400 18px/1 var(--i-pixel); color: var(--mint); }
+.idle .tee-comentario { margin: 3px 0 0; font-size: 13px; line-height: 1.35; }
+.idle .tee-nota { font: 400 42px/1 var(--i-pixel); text-align: center; font-variant-numeric: tabular-nums; }
+.idle .tee-post.alta .tee-nota { color: var(--gold); }
+.idle .tee-post.baixa .tee-nota { color: var(--tee-rot-0); }
+.idle .tee-resultado { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; opacity: 0; transition: opacity 0.2s ease-out; }
+.idle .tee-resultado.entrou { opacity: 1; }
+.idle .tee-resultado .tee-previsao, .idle .tee-resultado .sub { flex-basis: 100%; margin: 0; }
+.idle .tee-linha-pct { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 13px; color: var(--i-mudo); }
+.idle .tee-pct { font: 400 52px/0.9 var(--i-pixel); color: var(--mint); font-variant-numeric: tabular-nums; }
+.idle .tee-venda .tee-pct { font-size: 40px; }
+.idle .tee-selo { display: inline-block; padding: 5px 10px 4px; font: 400 22px/1 var(--i-pixel); color: var(--lugar-fundo); background: var(--tee-rot-c);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35); opacity: 0; transform: rotate(-3deg) scale(1.5); transition: opacity 0.12s ease-out, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.idle .tee-selo.entrou { opacity: 1; transform: rotate(-3deg); }
+.idle .tee-venda .tee-linha-pct .tee-selo { margin-left: 6px; font-size: 18px; }
+.idle .btn.tee-ver-venda { justify-self: start; min-width: 200px; }
+
+/* caderninho. Na faixa: o resumo em números e o botão. No miolo (aberto): a tabela tema × estilo do que liberou com a
+   cor do rótulo, a legenda e o foco ideal de cada estilo lançado. Cabe sem rolar até no nível 25 (30 × 15). */
+.idle .tee-cad-resumo { display: grid; gap: 6px; justify-items: start; }
+.idle .tee-cad-resumo p { margin: 0; font-size: 13px; color: var(--i-mudo); }
+.idle .tee-resumo-num b { margin-right: 3px; font: 400 22px/1 var(--i-pixel); color: var(--paper); }
+.idle .tee-resumo-rot { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.idle .tee-resumo-rot span, .idle .tee-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.idle .tee-resumo-rot i, .idle .tee-legenda i { flex: none; width: 10px; height: 10px; background: var(--tee-rot-c); }
+.idle .tee-legenda i.vazio { background: var(--i-fundo2); box-shadow: inset 0 0 0 1px var(--i-borda); }
+.idle .btn.tee-abrir-caderno { min-height: 36px; margin-top: 2px; font-size: 18px; }
+.idle .tee-caderno { display: grid; gap: 12px; align-content: start; }
+.idle .tee-caderno-cab { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 18px; }
+.idle .tee-caderno-tit { display: grid; gap: 4px; flex: 1 1 260px; }
+.idle .tee-caderno-tit .sub { max-width: 62ch; margin: 0; line-height: 1.35; }
+.idle .btn.tee-fechar-caderno { flex: none; }
+.idle .tee-cad { display: grid; gap: 14px 24px; align-items: start; min-width: 0; }
+.idle .tee-tabela { border-collapse: separate; border-spacing: 2px; }
+.idle .tee-tabela thead th { padding: 0 0 2px; font: 400 13px/1 var(--i-pixel); color: var(--i-mudo); text-align: center; }
+.idle .tee-tabela tbody th { max-width: 84px; padding: 0 6px 0 0; overflow: hidden; font-size: 12px; font-weight: 400; line-height: 16px; text-align: left;
+  color: var(--i-mudo); white-space: nowrap; text-overflow: ellipsis; }
+.idle .tee-c { width: 15px; min-width: 15px; height: 16px; padding: 0; background: var(--tee-rot-c); }
+.idle .tee-c.vazio { background: var(--i-fundo2); box-shadow: inset 0 0 0 1px var(--i-borda); }
+.idle .tee-cad-lado { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.idle .tee-legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; color: var(--i-mudo); }
+.idle .tee-focos { display: grid; gap: 4px; }
+.idle .tee-focos .tee-rot { margin: 0 0 2px; }
+.idle .tee-focos .sub { margin: 0; }
+.idle .tee-focos-lista { display: grid; gap: 2px 18px; margin: 0; padding: 0; list-style: none; }
+.idle .tee-foco-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .tee-foco-ideal { font: 400 18px/1 var(--i-pixel); color: var(--mint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.idle .tee-rel-preco { font-size: 15px; color: var(--gold); white-space: nowrap; }
+.idle .btn.tee-relatorio { min-height: 28px; padding: 0 10px; font-size: 16px; }
+
+@media (min-width: 1100px) {
+  /* o miolo do lugar inteiro, sem rolar: a parede, o nome, o foco e o Lançar à esquerda; as escolhas à direita */
+  .idle .minigame-corpo .tee { height: 100%; }
+  .idle .tee-bancada { display: grid; height: 100%; grid-template-columns: 318px minmax(0, 1fr); gap: 22px; }
+  .idle .tee-lado { display: grid; gap: 10px; align-content: start; }
+  /* as escolhas do desenho em cima; o Lote embaixo, na linha do Lançar */
+  .idle .tee-escolhas { display: flex; flex-direction: column; gap: 10px; }
+  .idle .tee-peca-cor { gap: 10px 22px; }
+  .idle .tee-s-lote { margin-top: auto; }
+  .idle .tee-vitrine { min-height: 0; padding: 6px 12px 30px; }
+  .idle .tee-foto { width: 192px; height: 192px; width: calc(max(48px, round(down, 192px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+    height: calc(max(48px, round(down, 192px * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
+  .idle .tee-grade { gap: 5px; }
+  .idle .tee-item { width: 40px; height: 40px; }
+  .idle .tee-peca, .idle .tee-trancados-peca { width: 54px; height: 54px; }
+  /* as 12 cores numa linha só (no nível 25 a peça e a cor ficam uma embaixo da outra) */
+  .idle .tee-cor, .idle .tee-trancados-cor { width: 30px; height: 30px; }
+  .idle .tee-s-cor .tee-grade { max-width: none; gap: 5px; }
+  .idle .tee-amostra { width: 18px; height: 18px; }
+  .idle .btn.tee-passo { min-height: 34px; }
+  .idle .tee-foco-linha { grid-template-columns: 80px minmax(0, 1fr) 34px 28px 34px; }
+  /* produção e venda: a parede ocupa a altura toda */
+  .idle .tee-palco { height: 100%; grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); gap: 22px; }
+  .idle .tee-palco .tee-vitrine { min-height: 0; }
+  .idle .tee-palco .tee-foto { width: 288px; height: 288px; width: calc(max(48px, round(down, 288px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+    height: calc(max(48px, round(down, 288px * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
+  .idle .tee-posts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .idle .tee-caderno { height: 100%; }
+  .idle .tee-cad { grid-template-columns: auto minmax(0, 1fr); }
+  .idle .tee-tabela { border-spacing: 2px 1px; }
+  .idle .tee-tabela tbody th { max-width: 116px; padding-right: 8px; font-size: 11.5px; line-height: 13px; }
+  .idle .tee-c { width: 18px; min-width: 18px; height: 12px; }
+  .idle .tee-focos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .idle .tee-foco-item { min-height: 28px; }
+  .idle .tee-caderno { gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle .tee-post, .idle .tee-selo, .idle .tee-resultado, .idle .tee-barra i, .idle .tee-item { transition: none; }
+}

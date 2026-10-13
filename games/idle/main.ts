@@ -476,6 +476,7 @@ const tela = criarTela(document.getElementById('app')!, {
     audio.tocar('compra');
     avisarMarcos(r.marcos_novos);
   }),
+  lugarRecarregar: () => void carregarMapa(),
   melhorar: (tipo, nivel) => void guard(async () => {
     const r = await api.idleBolsaMelhorar(tipo, nivel);
     receberBolsa(r.bolsa);

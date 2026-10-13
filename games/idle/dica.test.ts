@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
-import { dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaPino, dicaProducao, tempoDeProducao } from './dica';
+import {
+  dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
+  dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
+} from './dica';
+import { caderno } from './camisetaria';
 import { MARCOS } from './mapa';
 import type { LugarEstado } from '../shared/types';
 import { fatores, multContratos, taxa } from './economia';
@@ -74,6 +78,11 @@ describe('caixinha do gerador', () => {
     expect(t).toContain('Melhorias: rende 2× mais');
     expect(t).toContain(`Sinergias: +${Math.round(sin.porUnidade * 10 * 100)}%`);
     expect(t).toContain('Horta: +5%');
+  });
+  it('mostra o Mapa do rolê (que já multiplica o gerador) quando tem marco', () => {
+    const s = comTaxa({ generators: gens({ 1: 3 }), mapa_mult: 1.07 });
+    expect(textos(dicaGerador(s, 1, 1))).toContain('Mapa do rolê: ×1,07');
+    expect(textos(dicaGerador(comTaxa({ generators: gens({ 1: 3 }) }), 1, 1)).some((x) => x.startsWith('Mapa do rolê'))).toBe(false);
   });
 });
 
@@ -178,5 +187,55 @@ describe('caixinhas do Mapa do rolê', () => {
     expect(dicaNivel(lugar({ nivel: 4 }), ['Tema praia', 'Peça regata'])).toBe('Nível 4 → 5 por 240 cupons. Rende mais e libera: Tema praia, Peça regata.');
     expect(dicaNivel(lugar({ nivel: 4 }), [])).toBe('Nível 4 → 5 por 240 cupons. Rende mais.');
     expect(dicaNivel(lugar({ nivel: 25, preco_nivel: null }), [])).toBe('Nível 25: o máximo.');
+  });
+});
+
+describe('caixinhas da camisetaria (bancada e caderninho)', () => {
+  const cad = caderno([
+    { tipo: 'combo', a: 2, b: 1, rotulo: 4 }, { tipo: 'combo', a: 1, b: 1, rotulo: 1 },
+    { tipo: 'peca', a: 1, b: 2, rotulo: 2 }, { tipo: 'peca', a: 2, b: 2, rotulo: 0 }, { tipo: 'peca', a: 1, b: 1, rotulo: 1 },
+    { tipo: 'foco', a: 1, b: 0, rotulo: 352 },
+  ]);
+  it('tema: o que o caderninho sabe com o estilo escolhido; nunca testado = "Ainda não testou"; em alta; trancado', () => {
+    expect(dicaTeeTema(2, 1, 1, cad, 30)).toBe('Com Minimalista: Combinação ótima!');
+    expect(dicaTeeTema(1, 1, 1, cad, 30)).toBe('Com Minimalista: Combinação ruim.');
+    expect(dicaTeeTema(3, 1, 1, cad, 30)).toBe('Ainda não testou com Minimalista.');
+    expect(dicaTeeTema(3, 1, 1, cad, 3)).toBe('Ainda não testou com Minimalista. Em alta esta semana: a nota sobe.');
+    expect(dicaTeeTema(7, 1, 1, cad, 30)).toBe('Libera no nível 2.');
+  });
+  it('estilo: com o tema escolhido e o foco ideal se tem relatório', () => {
+    expect(dicaTeeEstilo(1, 2, 1, cad)).toBe('Com Praia: Combinação ótima! Foco ideal: Arte 3 · Tecido 5 · Divulgação 2.');
+    expect(dicaTeeEstilo(2, 2, 1, cad)).toBe('Ainda não testou com Praia. Foco ideal: só com o relatório.');
+    expect(dicaTeeEstilo(4, 2, 1, cad)).toBe('Libera no nível 2.');
+  });
+  it('peça: custo, preço de venda e se combina com o tema escolhido', () => {
+    expect(dicaTeePeca(1, 2, 1, cad)).toBe('Custa 3 cupons e vende por 19,5. Com Praia: combina.');
+    expect(dicaTeePeca(2, 2, 1, cad)).toBe('Custa 2 cupons e vende por 13. Com Praia: não combina.');
+    expect(dicaTeePeca(1, 1, 1, cad)).toBe('Custa 3 cupons e vende por 19,5. Com Meme: nem ajuda nem atrapalha.');
+    expect(dicaTeePeca(2, 1, 1, cad)).toBe('Custa 2 cupons e vende por 13. Ainda não testou com Meme.');
+    expect(dicaTeePeca(3, 1, 1, cad)).toBe('Libera no nível 4.');
+  });
+  it('cor: forte ou discreta; trancada', () => {
+    expect(dicaTeeCor(3, 1)).toBe('Cor forte: o @SuperMauro64 curte.');
+    expect(dicaTeeCor(1, 1)).toBe('Cor discreta.');
+    expect(dicaTeeCor(5, 1)).toBe('Libera no nível 3.');
+  });
+  it('foco: o ideal do estilo se tem relatório; senão, segredo', () => {
+    expect(dicaTeeFoco(1, cad)).toBe('O ideal do Minimalista: Arte 3 · Tecido 5 · Divulgação 2. Quanto mais longe dele, menor a nota.');
+    expect(dicaTeeFoco(2, cad)).toBe('O ideal do Rabisco de caneta é segredo. Depois de lançar um, o relatório do caderninho mostra.');
+  });
+  it('lote: peças, custo, tempo e quanto rende esgotando', () => {
+    expect(dicaTeeLote(1, 1, 0)).toBe('12 peças por 36 cupons. Fica pronto em 1 h e vende em 12 h a 19,5 cupons a peça: esgotando, rende 234.');
+    expect(dicaTeeLote(1, 1, 2)).toBe('84 peças por 252 cupons. Fica pronto em 4 h e vende em 12 h a 19,5 cupons a peça: esgotando, rende 1.638.');
+  });
+  it('o cadeado do grupo: o próximo, o nível e quantos ainda faltam', () => {
+    expect(dicaTeeTrancados('tema', 1)).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25.');
+    expect(dicaTeeTrancados('peca', 13)).toBe('Próximo: Moletom, no nível 19.');
+    expect(dicaTeeTrancados('estilo', 23)).toBe('Próximo: Gótico, no nível 24. Depois mais 1 estilo até o nível 25.');
+    expect(dicaTeeTrancados('cor', 25)).toBe('');
+  });
+  it('relatório: o que mostra, o preço e quanto falta', () => {
+    expect(dicaTeeRelatorio(4, 50, 80)).toBe('Mostra pra sempre o foco ideal do Grafite. Custa 50 cupons.');
+    expect(dicaTeeRelatorio(4, 67.5, 30)).toBe('Mostra pra sempre o foco ideal do Grafite. Custa 68 cupons. Faltam 38.');
   });
 });

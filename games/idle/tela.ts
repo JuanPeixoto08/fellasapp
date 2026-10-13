@@ -91,6 +91,7 @@ export type Acoes = {
   abrirLugar(id: number): void; // compra (idle_place_abrir)
   subirNivel(id: number): void; // idle_place_nivel
   lugarAcao(fn: string, args: Record<string, unknown>): void; // mecânica de lugar (partes 2 a 4)
+  lugarRecarregar(): void; // a mecânica pede o lugar de novo (chegou a hora de algo: a coleção ficou pronta)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
   pegarDourado(seg: number, lado: number): void;
 };
@@ -300,7 +301,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const hortaTela = criarHortaTela({ plantar: (c, e) => a.plantar(c, e), colher: (c) => a.colher(c), arrancar: (c) => a.arrancar(c) });
   const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t, lote) => a.negociar(e, l, q, t, lote), melhorar: (tp, n) => a.melhorar(tp, n) });
   const mapaTela = criarMapaTela({ entrar: (id) => a.lugar(id), abrir: (id) => a.abrirLugar(id) }, dicasMapa, (v) => boneco(v, null));
-  const lugarTela = criarLugarTela({ voltar: () => a.lugar(null), nivel: (id) => a.subirNivel(id), acao: (fn, args) => a.lugarAcao(fn, args) }, dicasMapa, (v) => boneco(v, null));
+  const lugarTela = criarLugarTela({ voltar: () => a.lugar(null), nivel: (id) => a.subirNivel(id), acao: (fn, args) => a.lugarAcao(fn, args), recarregar: () => a.lugarRecarregar() }, dicasMapa, (v) => boneco(v, null));
   // o minigame aberto, em tela cheia (como a árvore): Voltar, o ícone, o nome e o F$
   let gavetaAberta: 'bolsa' | 'horta' | 'convidados' | 'mapa' | null = null;
   // no Mapa do rolê, dentro de um lugar o Voltar volta pro mapa (não fecha a tela cheia)

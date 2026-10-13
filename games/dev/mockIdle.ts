@@ -243,6 +243,12 @@ wc.__faixaAgora = async () => {
       await dono('update public.idle_place_state set moeda = moeda + 1000 where user_id = $1', [ME]);
       document.dispatchEvent(new Event('visibilitychange'));
     }],
+    // camisetaria: a coleção rodando "vive" 1 h (ou 6 h): a produção e a venda andam (o banco recalcula a venda do pronta_em)
+    ...([1, 6] as const).map((h): [string, () => Promise<void>] => [`Camisetaria +${h} h`, async () => {
+      await dono(`update public.idle_tee_colecoes set criada_em = criada_em - make_interval(hours => $2), pronta_em = pronta_em - make_interval(hours => $2),
+        fim_em = fim_em - make_interval(hours => $2) where user_id = $1 and encerrada_em is null and not fas_excesso_pago`, [ME, h]);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }]),
   ];
   for (const [nome, f] of mapa) {
     const b = document.createElement('button');
