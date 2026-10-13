@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ativos } from './ativos';
 import { catalogo } from './catalogo';
+import { DJS } from './copao';
 import { CADEIRA, LINHAS_KIT, POSES, QUADROS_POSE, validarVagas, VAGAS_CONTRATADO, type Pose, type Vagas } from './montagem';
 import { CENAS as RITMO, type NomeCena } from './palco';
 
@@ -94,6 +95,14 @@ describe('arte da entrega 3 (ícones das conquistas e da árvore)', () => {
       expect(dim(`convidados/convidado-${String(id).padStart(2, '0')}.png`)).toEqual([32, 32]);
       expect(ativos.convidado(id)).not.toBeNull();
     }
+  });
+  it('os 10 retratos dos DJs do copão, 64x64, e nenhum sobrando', () => {
+    for (const d of DJS) {
+      expect(dim(`djs/dj-${String(d.id).padStart(2, '0')}.png`), d.nome).toEqual([64, 64]);
+      expect(ativos.dj(d.id), d.nome).not.toBeNull();
+    }
+    expect(readdirSync(resolve(pasta, 'djs')).length).toBe(DJS.length);
+    expect(ativos.dj(99)).toBeNull();
   });
   it('nenhum ícone sobrando (de id que não existe no catálogo)', () => {
     const conquistas = new Set(catalogo.conquistas.map((c) => conquista(c.id)));
