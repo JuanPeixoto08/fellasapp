@@ -55,7 +55,7 @@ export function posicao(uid: string, s: number, _lado = 0): { x: number; y: numb
 }
 
 // ---------- o que está valendo (selos) e os textos ----------
-type ComBonus = { promo_ate: string | null; viral?: readonly string[] };
+type ComBonus = { promo_ate: string | null; viral?: readonly string[]; boosts?: readonly string[] };
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -75,6 +75,9 @@ export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro:
   const out: { texto: string; ouro: boolean }[] = [];
   const v = viraisAtivos(s, agoraMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
+  // os ×5 da oportunidade (0062: empilham): ×5, ×25, ×125… até o primeiro acabar
+  const b = (s.boosts ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((x, y) => x - y);
+  if (b.length) out.push({ texto: `×${(5 ** b.length).toLocaleString('pt-BR')} · ${mmss(b[0] - agoraMs)}`, ouro: b.length >= 2 });
   if (promoAtiva(s, agoraMs)) out.push({ texto: `Metade · ${mmss(Date.parse(s.promo_ate!) - agoraMs)}`, ouro: false });
   return out;
 }

@@ -119,7 +119,7 @@ describe('pegar um evento', () => {
   it('Promoção: 30 s de compras pela metade; a meia-preço da Caixinha fica guardada', async () => {
     const seg = await agoraSeg();
     await evento(seg, 1);
-    await q('update public.idle_state set half_price = true where user_id = $1', [A]);
+    await q('update public.idle_state set meias = 1 where user_id = $1', [A]);
     const s = await pegar(seg);
     const dur = Date.parse(s.promo_ate!) - Date.parse((await q<{ n: string }>('select now()::text as n'))[0].n);
     expect(dur).toBeGreaterThan(25_000);
@@ -157,7 +157,8 @@ describe('pegar um evento', () => {
   it('a conta: ×10 por Viralizou ativo, sem teto (três = ×1000); ×50 com o ×5 da oportunidade', async () => {
     const r = await taxa();
     const ganho = async (viral: string, boost = 'null') => {
-      await q(`update public.idle_state set settled_at = now() - interval '100 seconds', viral_ate = ${viral}, boost_until = ${boost} where user_id = $1`, [A]);
+      const ate = boost === 'null' ? "'{}'" : `array[${boost}]`; // a lista dos ×5 (0062)
+      await q(`update public.idle_state set settled_at = now() - interval '100 seconds', viral_ate = ${viral}, boost_ate = ${ate} where user_id = $1`, [A]);
       return (await q<{ v: number }>('select (public.idle_settle(s, now())).valuation - s.valuation as v from public.idle_state s where user_id = $1', [A]))[0].v / r;
     };
     const perto = (v: number, alvo: number) => expect(Math.abs(v - alvo)).toBeLessThan(1);

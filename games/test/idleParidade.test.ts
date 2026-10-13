@@ -106,8 +106,8 @@ describe('paridade', () => {
     const s = estados(1)[0];
     await q('delete from public.idle_state where true');
     await q(
-      `insert into public.idle_state (user_id, week_start, started, valuation, generators, upgrades, strategies, settled_at, boost_until)
-       values ($1, public.games_week_start(), true, 1000, $2, $3, $4, '2026-10-12 10:00:00+00', '2026-10-12 10:00:40+00')`,
+      `insert into public.idle_state (user_id, week_start, started, valuation, generators, upgrades, strategies, settled_at, boost_ate)
+       values ($1, public.games_week_start(), true, 1000, $2, $3, $4, '2026-10-12 10:00:00+00', array['2026-10-12 10:00:40+00'::timestamptz])`,
       [A, s.generators, s.upgrades, s.strategies],
     );
     for (const ate of ['2026-10-12 10:01:00+00', '2026-10-12 23:00:00+00']) {
@@ -145,7 +145,7 @@ describe('paridade', () => {
     const T0 = Date.parse('2026-10-12T10:00:00Z');
     const iso = (ms: number) => `'${new Date(ms).toISOString()}'::timestamptz`;
     const s = estados(3)[2];
-    await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
+    await preparar(s, 'valuation, settled_at, boost_ate', [1000, new Date(T0).toISOString(), [new Date(T0 + 200_000).toISOString()]]);
     const criado = iso(T0 - 86400_000);
     await contrato(A, B, criado, iso(T0 + 100_000)); // A contratou B: vence 100 s depois
     await contrato(C, A, criado, iso(T0 + 300_000)); // C (Cultura) contratou A: vence 300 s depois
@@ -207,7 +207,7 @@ describe('paridade', () => {
     for (const nos of [[], [1, 41], [1, 41, 42, 43, 44, 45], [1, 11, 41, 44, 54, 61, 64]]) {
       const bonus = { arvore: nos, conquistas: 9 };
       const viralMs = 60_000 * efeitosArvore(catalogo, nos).douradoDuracao;
-      await preparar(s, 'valuation, settled_at, boost_until', [1000, new Date(T0).toISOString(), new Date(T0 + 200_000).toISOString()]);
+      await preparar(s, 'valuation, settled_at, boost_ate', [1000, new Date(T0).toISOString(), [new Date(T0 + 200_000).toISOString()]]);
       await q('update public.idle_state set viral_ate = $2::timestamptz[] where user_id = $1', [A, virais.map((v) => new Date(v).toISOString())]);
       await arvore(nos);
       await conquistas(bonus.conquistas);

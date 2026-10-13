@@ -85,6 +85,17 @@ describe('Viralizou na conta (igual a idle_settle na 0045)', () => {
   });
 });
 
+describe('o ×5 da oportunidade empilha (igual a idle_settle na 0062)', () => {
+  it('um = ×5; dois = ×25; com o Viralizou multiplica (×5 e ×10 = ×50)', () => {
+    expect(acumular(0, 1, 0, 100_000, [90_000])).toBeCloseTo(90 * 5 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [90_000, 90_000])).toBeCloseTo(90 * 25 + 10, 9);
+    expect(acumular(0, 1, 0, 100_000, [60_000, 90_000])).toBeCloseTo(60 * 25 + 30 * 5 + 10, 9);
+    // ×5 até 90 s; Viralizou de 30 a 90 s: 30 s a ×5, 60 s a ×50, 10 s a ×1
+    expect(acumular(0, 1, 0, 100_000, [90_000], [90_000])).toBeCloseTo(30 * 5 + 60 * 50 + 10, 9);
+    expect(acumularTrechos(0, [{ desdeMs: 0, r: 1 }, { desdeMs: 50_000, r: 2 }], 0, 100_000, [90_000, 90_000])).toBeCloseTo(50 * 25 + 40 * 2 * 25 + 10 * 2, 9);
+  });
+});
+
 describe('acumularTrechos (contrato vencendo no meio)', () => {
   it('com um trecho só é o mesmo que acumular', () => {
     expect(acumularTrechos(10, [{ desdeMs: 0, r: 0.5 }], 0, 100_000, 60_000)).toBeCloseTo(acumular(10, 0.5, 0, 100_000, 60_000), 12);

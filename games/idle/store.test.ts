@@ -20,6 +20,11 @@ describe('âncora no relógio do banco', () => {
     expect(agoraServidor(a, cliente + 10_000)).toBe(Date.parse('2026-10-12T12:00:10Z'));
     expect(valuationAgora(a, cliente + 10_000)).toBeCloseTo(120, 10);
   });
+  it('dois ×5 no ar (lista boosts da 0062) = ×25; sem a lista, o boost_until da página velha', () => {
+    const fim = new Date(Date.parse('2026-10-12T12:00:00.000Z') + 10_000).toISOString();
+    expect(valuationAgora(ancorar(base({ boosts: [fim, fim], boost_until: fim }), 0), 20_000)).toBeCloseTo(100 + 2 * (10 * 25 + 10), 6);
+    expect(valuationAgora(ancorar(base({ boost_until: fim }), 0), 20_000)).toBeCloseTo(100 + 2 * (10 * 5 + 10), 6);
+  });
   it('bônus ×5 conta só até boost_until', () => {
     const a = ancorar(base({ boost_until: '2026-10-12T12:00:05.000Z' }), 0);
     expect(valuationAgora(a, 10_000)).toBeCloseTo(100 + 2 * 10 + 2 * 4 * 5, 10);

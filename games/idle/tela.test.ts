@@ -157,6 +157,16 @@ describe('tela da Fellas Inc.', () => {
     expect(preco1()).toBe(metade);
     expect(preco1()).not.toBe(cheio);
   });
+  it('o aviso do bônus diz quantos ×5 e quantas meias: "Produção ×25 por alguns segundos", "Próximas 2 compras pela metade"', () => {
+    const tela = criarTela(root, acoes);
+    const fim = new Date(Date.parse('2026-10-12T12:00:00.000Z') + 30_000).toISOString();
+    tela.renderizar(modelo({ estado: estado({ boosts: [fim, fim], boost_until: fim }) }));
+    expect(root.querySelector('.bonus')!.textContent).toBe('Produção ×25 por alguns segundos');
+    tela.renderizar(modelo({ estado: estado({ meias: 2, half_price: true }) }));
+    expect(root.querySelector('.bonus')!.textContent).toBe('Próximas 2 compras pela metade');
+    tela.renderizar(modelo({ estado: estado({ meias: 1, half_price: true }) }));
+    expect(root.querySelector('.bonus')!.textContent).toBe('Próxima compra pela metade');
+  });
   it('a oportunidade não passa mais na cena (fica só na Caixinha)', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ aoVivo: 3 }));
@@ -224,7 +234,7 @@ describe('tela da Fellas Inc.', () => {
     expect(root.querySelector('.bancada-caixa .selo')!.textContent).toBe('2');
     expect(root.querySelector('.caixinha')).toBeNull();
   });
-  it('caixinha: com uma meia-preço guardada, outra meia-preço fica apagada com o aviso; os outros tipos não', () => {
+  it('caixinha: meia-preço empilha (0062): com uma guardada, pegar outra continua valendo, sem aviso', () => {
     const uid = '00000000-0000-0000-0000-00000000000a';
     const janela = (k: 0 | 1 | 2) => { let w = 50; while (tipo(uid, w) !== k) w++; return w; };
     const meia = janela(2);
@@ -235,8 +245,8 @@ describe('tela da Fellas Inc.', () => {
       return [...root.querySelectorAll('.modal-caixa .escolha')];
     };
     const [m1, o1] = linhas(true);
-    expect(m1.querySelector('button')!.disabled).toBe(true);
-    expect(m1.textContent).toContain('Usa a que você já tem primeiro');
+    expect(m1.querySelector('button')!.disabled).toBe(false);
+    expect(m1.textContent).not.toContain('Usa a que você já tem primeiro');
     expect(o1.querySelector('button')!.disabled).toBe(false);
     const [m2] = linhas(false);
     expect(m2.querySelector('button')!.disabled).toBe(false);
@@ -787,10 +797,9 @@ describe('empresa, resumo e bancada', () => {
     const meia = janela(2);
     const outra = janela(0);
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ pendentes: [meia, outra], estado: estado({ user_id: uid, half_price: true }) }));
+    tela.renderizar(modelo({ pendentes: [meia, outra], estado: estado({ user_id: uid, half_price: true, meias: 1 }) }));
     const [m1, o1] = [...root.querySelectorAll('.bancada .escolha')];
-    expect(m1.querySelector('button')!.disabled).toBe(true);
-    expect(m1.textContent).toContain('Usa a que você já tem primeiro');
+    expect(m1.querySelector('button')!.disabled).toBe(false);
     o1.querySelector('button')!.click();
     expect(acoes.pegar).toHaveBeenCalledWith(outra);
     tela.renderizar(modelo({ pendentes: [outra], estado: estado({ user_id: uid, opp_left: 0 }) }));
