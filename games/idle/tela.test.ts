@@ -293,7 +293,7 @@ describe('tela da Fellas Inc.', () => {
   });
   it('placar mostra o F$/s de cada um, não o valuation', () => {
     const tela = criarTela(root, acoes);
-    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0 }] }));
+    tela.renderizar(modelo({ aba: 'placar', placar: [{ userId: 'b', name: 'Bia', valuation: 9e9, rate: 1234.5, era: 3, strategies: [0, -1, -1, -1], avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0, orbita: false }] }));
     const v = root.querySelector('.lista-placar .v')!.textContent!;
     expect(v).toContain('/s');
     expect(v).not.toContain('bi');
@@ -339,7 +339,7 @@ describe('tela da Fellas Inc.', () => {
 
 const linha = (x: Partial<IdleBoardRow> = {}): IdleBoardRow => ({
   userId: 'b', name: 'Bia', valuation: 1000, rate: 2, era: 2, strategies: [0, -1, -1, -1],
-  avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0, ...x,
+  avatar: null, hiredCount: 0, byMe: false, mostHired: false, pontos: 0, conquistas: 0, orbita: false, ...x,
 });
 const ATE = '2026-10-19T00:00:00.000Z'; // 6,5 dias depois do server_now das fixtures
 
@@ -396,6 +396,15 @@ describe('contratar', () => {
     expect(itens[0].querySelector('canvas')).not.toBeNull();
     expect(itens[0].textContent).toContain('Mais disputado da semana');
     expect(itens[1].textContent).not.toContain('Mais disputado');
+  });
+  it('placar e Gente: quem tem o gerador 30 aparece "Em órbita" (Era 6)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ aba: 'placar', placar: [linha({ era: 5, orbita: true }), linha({ userId: 'c', name: 'Teteu', era: 5 })] }));
+    const itens = root.querySelectorAll('.lista-placar li');
+    expect(itens[0].textContent).toContain('Era 6 · Em órbita');
+    expect(itens[1].textContent).toContain('Era 5 · Sede');
+    tela.renderizar(modelo({ aba: 'gente', placar: [linha({ userId: 'u', name: 'Você' }), linha({ era: 5, orbita: true })] }));
+    expect(root.textContent).toContain('Em órbita · ');
   });
   it('porcento, empresas e restam', () => {
     expect(porcento(1.02)).toBe('+2%');
@@ -781,6 +790,12 @@ describe('empresa, resumo e bancada', () => {
       .toEqual(['Era 3 · Escritório', '2 contratados', '+12% das conquistas']);
     tela.renderizar(modelo());
     expect([...root.querySelectorAll('.valor .info span')].map((x) => x.textContent)).toEqual(['Era 1 · Quarto']);
+    // o gerador 30 mostra a cena 6: o nome acompanha (no jogo segue a era 5)
+    const g = Array(30).fill(0);
+    g[24] = 1;
+    g[29] = 1;
+    tela.renderizar(modelo({ estado: estado({ era: 5, generators: g }) }));
+    expect(root.querySelector('.valor .info span')!.textContent).toBe('Era 6 · Em órbita');
   });
   it('a Caixinha da bancada: o selo some sem nada guardado e o aviso aparece no lugar da lista', () => {
     const tela = criarTela(root, acoes);

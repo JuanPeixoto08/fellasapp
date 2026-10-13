@@ -29,7 +29,7 @@ import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, VISUAL_NOMES } from './nomes';
 import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
-import { caixa, estrategiaPendente, segundosOportunidade, type Fase } from './store';
+import { caixa, estrategiaPendente, rotuloEra, segundosOportunidade, type Fase } from './store';
 
 export type Aba = 'loja' | 'gente' | 'placar' | 'legado';
 export type AcaoEditor = 'abrir' | 'fechar' | 'sortear' | 'salvar';
@@ -663,7 +663,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     listaM.replaceChildren();
     if (s && jogando) {
       taxaTxt.textContent = formatarTaxa(s.rate);
-      info.replaceChildren(el('span', undefined, `Era ${s.era} · ${ERAS[s.era - 1]}`));
+      info.replaceChildren(el('span', undefined, rotuloEra(s.era, (s.generators[29] ?? 0) > 0)));
       if (s.equipe.length) info.append(el('span', undefined, s.equipe.length === 1 ? '1 contratado' : `${s.equipe.length} contratados`));
       if (s.bonus.conquistas > 0) info.append(el('span', undefined, `+${s.bonus.conquistas}% das conquistas`));
       const naFrente = s.convidados?.cadeira[0];
@@ -750,7 +750,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         for (const r of outros) {
           const carta = el('div', 'carta');
           const meio = el('div', 'meio');
-          meio.append(el('strong', undefined, r.name), el('span', 'sub', `${ERAS[r.era - 1]} · ${empresas(r.hiredCount)}`));
+          meio.append(el('strong', undefined, r.name), el('span', 'sub', `${rotuloEra(r.era, r.orbita, true)} · ${empresas(r.hiredCount)}`));
           carta.append(boneco(r.avatar, null), meio);
           // "já trabalha pra você" vem do estado (sempre fresco), não só do placar (recarrega a cada 60 s)
           const meu = s.equipe.find((e) => e.user_id === r.userId);
@@ -783,7 +783,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         // a era é a cena em que a pessoa está (cena 1 = era 1, cena 2 = era 2...)
         li.append(
           el('span', 'pos', `${i + 1}º`), boneco(r.avatar, null), el('span', 'nome', r.name),
-          el('span', 'sub', `Era ${r.era} · ${ERAS[r.era - 1]}`), el('span', 'v', formatarTaxa(r.rate)),
+          el('span', 'sub', rotuloEra(r.era, r.orbita)), el('span', 'v', formatarTaxa(r.rate)),
         );
         if (r.pontos > 0) li.append(el('span', 'pontos', `★ ${r.pontos}`));
         if (r.mostHired) li.append(el('span', 'disputado', 'Mais disputado da semana'));

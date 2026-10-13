@@ -64,6 +64,17 @@ describe('a meia-preço empilha', () => {
   });
 });
 
+describe('o placar diz quem está em órbita (gerador 30: a cena 6, "Era 6 · Em órbita")', () => {
+  it('orbita = tem o gerador 30; a era continua 5 no jogo', async () => {
+    await q(`update public.idle_state set generators[25] = 1 where user_id = $1`, [A]);
+    let [r] = await t.rpc<{ era: number; orbita: boolean }[]>('idle_board');
+    expect(r).toMatchObject({ era: 5, orbita: false });
+    await q(`update public.idle_state set generators[30] = 1 where user_id = $1`, [A]);
+    [r] = await t.rpc<{ era: number; orbita: boolean }[]>('idle_board');
+    expect(r).toMatchObject({ era: 5, orbita: true });
+  });
+});
+
 describe('a venda e a migração', () => {
   it('vender a startup zera os ×5 e as meias guardadas', async () => {
     await q(`update public.idle_state set generators[30] = 150, strategies = '{0,0,0,0}', boost_ate = array[now() + interval '1 minute'], meias = 3 where user_id = $1`, [A]);
