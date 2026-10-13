@@ -19,7 +19,7 @@ import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
 import { gravarChave, gravarVolumeMusica, lerChave, lerVista, lerVolumeMusica, marcarVista, type ChaveSom } from './preferencias';
 import {
-  agoraServidor, ancorar, caixa, cenaDoEstado, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+  agoraServidor, ancorar, caixa, cenaDoEstado, efeitos, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba, type TelaConfig } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -201,7 +201,10 @@ const tela = criarTela(document.getElementById('app')!, {
       const s = await api.idleDouradoPegar(seg, lado);
       aplicar(s);
       audio.tocar('douradoPego');
-      if (chaves.avisos) tela.dourados.subirTexto(textoPegou(tipo, { ganho: s0.rate * 1200, viral: s.viral.length }), p.x, p.y);
+      const ef = efeitos(s0); // Investidor anjo e Hype mudam o que o texto diz
+      if (chaves.avisos) {
+        tela.dourados.subirTexto(textoPegou(tipo, { ganho: s0.rate * 1200 * ef.douradoInvestidor, viral: s.viral.length, duracao: ef.douradoDuracao }), p.x, p.y);
+      }
     } catch (e) {
       const err = toGameError(e);
       if (err.code === 'no_session') fase = 'sem_sessao';

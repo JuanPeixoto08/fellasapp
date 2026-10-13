@@ -87,3 +87,56 @@ begin
 end;
 $$;
 revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;
+
+-- pegar evento (o da 0051) com o ramo Dourados: mais eventos, mais tempo na tela, Investidor anjo e Hype
+create or replace function public.idle_dourado_pegar(p_seg bigint, p_lado int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_me   uuid := auth.uid();
+  v_tipo int;
+  v_ini  timestamptz;
+  v_freq double precision := public.idle_arv(auth.uid(), 'dourado_freq', 'max', 1);    -- Pé de coelho / Dia de sorte
+  v_tela double precision := public.idle_arv(auth.uid(), 'dourado_tela', 'max', 12);   -- Olho de lince: 24 s
+  v_dur  double precision := public.idle_arv(auth.uid(), 'dourado_duracao', 'max', 1); -- Hype: o dobro
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 60 then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  -- a frequência da árvore entra como peso a mais no extra do Gemaplys (igual a convidados.ts eventoEm)
+  v_tipo := coalesce(public.idle_dourado(v_me, p_seg, public.idle_conv_peso(s, 3) + v_freq - 1), public.idle_conv_faixa(s, p_seg));
+  v_ini := to_timestamp(p_seg);
+  -- na tela: base × (1 − gema/2); o banco aceita 3 s a mais (rede)
+  if v_tipo is null or now() < v_ini - interval '2 seconds'
+     or now() > v_ini + make_interval(secs => v_tela * (1 - public.idle_conv_peso(s, 3) / 2) + 3) then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  if p_lado is null or p_lado not in (0, 1) or (p_lado = 1 and v_tipo <> 3) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  delete from public.idle_dourados_pegos where user_id = v_me and pegou_em < now() - interval '1 hour';
+  insert into public.idle_dourados_pegos (user_id, seg, lado) values (v_me, p_seg, p_lado) on conflict do nothing;
+  if not found then
+    raise exception 'idle_dourado_pego' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  case v_tipo
+    when 0 then s.valuation := s.valuation + public.idle_rate(s) * 1200 * public.idle_arv(v_me, 'dourado_investidor', 'mult', 1)
+                * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), now()) b));
+    when 1 then s.promo_ate := greatest(coalesce(s.promo_ate, now()), now() + make_interval(secs => 30 * v_dur));
+    else s.viral_ate := array(select v from unnest(s.viral_ate) v where v > now()) || (now() + make_interval(secs => 60 * v_dur));
+  end case;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+revoke all on function public.idle_dourado_pegar(bigint, int) from public, anon;
+grant execute on function public.idle_dourado_pegar(bigint, int) to authenticated;

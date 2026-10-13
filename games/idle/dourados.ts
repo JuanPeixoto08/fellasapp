@@ -1,5 +1,5 @@
-// Eventos na tela (tipo cookie dourado): a cada segundo há chance 1/600 de aparecer um, pra quem está com o jogo
-// aberto, e ele some em 12 s. A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
+// Eventos na tela (tipo cookie dourado): a cada segundo há chance 1/600 de aparecer um (mais com o ramo Dourados da
+// árvore ou o Gemaplys), pra quem está com o jogo aberto, e ele some em 12 s (24 com o Olho de lince). A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
 // (idle_dourado na 0045), que confere o clique. BigInt: os quadrados passam de 2^53.
 import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
@@ -34,8 +34,8 @@ export function douradoEm(uid: string, s: number, gema = 0): TipoDourado | null 
   return tipoDourado(uid, s);
 }
 
-/** Quanto tempo o evento fica na tela com o Gemaplys (peso `gema`): metade com ele na frente. */
-export const janelaS = (gema = 0) => JANELA_S * (1 - gema / 2);
+/** Quanto tempo o evento fica na tela: `base` (12 s, 24 com o Olho de lince) e metade com o Gemaplys na frente. */
+export const janelaS = (gema = 0, base = JANELA_S) => base * (1 - gema / 2);
 
 /** Os eventos de [de, ate) (segundos): pra agendar o som com a aba escondida. */
 export function douradosEntre(uid: string, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {
@@ -80,8 +80,9 @@ export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro:
 }
 
 /** O texto que sobe quando pega: quanto ganhou (Investidor), a Promoção, o Viralizou (×100 quando são dois). */
-export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number }): string {
+export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number; duracao?: number }): string {
+  const d = o.duracao ?? 1; // Hype de lançamento: 2
   if (tipo === 0) return `+${formatarValor(o.ganho)}`;
-  if (tipo === 1) return 'Promoção! Tudo pela metade por 30 s';
-  return o.viral >= 2 ? `×${vezes(o.viral)}!` : 'Viralizou! ×10 por 1 min';
+  if (tipo === 1) return `Promoção! Tudo pela metade por ${d === 1 ? '30 s' : `${(d / 2).toLocaleString('pt-BR')} min`}`;
+  return o.viral >= 2 ? `×${vezes(o.viral)}!` : `Viralizou! ×10 por ${d.toLocaleString('pt-BR')} min`;
 }

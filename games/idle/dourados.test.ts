@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { douradoEm, douradosEntre, JANELA_S, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
+import { douradoEm, douradosEntre, JANELA_S, janelaS, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -76,6 +76,13 @@ describe('selos e textos', () => {
     expect(textoPegou(2, { ganho: 0, viral: 1 })).toBe('Viralizou! ×10 por 1 min');
     expect(textoPegou(3, { ganho: 0, viral: 2 })).toBe('×100!');
     expect(textoPegou(2, { ganho: 0, viral: 3 })).toBe('×1.000!');
+  });
+  it('com o Hype (duração 2): Promoção por 1 min e Viralizou por 2 min; Olho de lince: 24 s na tela', () => {
+    expect(textoPegou(1, { ganho: 0, viral: 1, duracao: 2 })).toBe('Promoção! Tudo pela metade por 1 min');
+    expect(textoPegou(2, { ganho: 0, viral: 1, duracao: 2 })).toBe('Viralizou! ×10 por 2 min');
+    expect(janelaS(0, 24)).toBe(24);
+    expect(janelaS(1, 24)).toBe(12);
+    expect(janelaS(1)).toBe(6);
   });
 });
 
