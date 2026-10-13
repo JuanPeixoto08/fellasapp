@@ -15,9 +15,14 @@ export type Rotulo = 0 | 1 | 2 | 3 | 4; // péssima, ruim, ok, boa, ótima
 /** 0 = base × mistura, 1 = base × extra, 2 = mistura × extra */
 export type TipoPar = 0 | 1 | 2;
 
-/** Ajustados na simulação (copaoSim.test.ts): nível 10 entre o dia 5 e o 9, nível 25 entre o dia 35 e o 49. */
-export const PUBLICO_BASE = 60;
+/** Ajustados na simulação (copaoSim.test.ts): nível 10 entre o dia 5 e o 9, nível 25 entre o dia 35 e o 49, para quem cobra o
+ *  preço que dá mais lucro ao cardápio (com a elasticidade abaixo dá uns 70% da referência no balde das bases baratas;
+ *  cobrar a referência rende ~12% menos, o dobro ~80% menos). */
+export const PUBLICO_BASE = 25;
 export const CRESCE = 1.25;
+/** Quanto o preço espanta a galera: cada copão vende × (referência / preço)^ELASTICIDADE. Com 1,25 o lucro
+ *  (preço − custo)·preço^−1,25 é máximo em 5 × o custo da venda. */
+export const ELASTICIDADE = 1.25;
 /** Teto do bônus da galera no movimento (√galera/30 para de crescer aqui: no máximo 4× o público). */
 export const GALERA_TETO = 3;
 
@@ -274,12 +279,16 @@ export function novidade(noites: number): number {
   return Math.max(0.3, 1 - 0.1 * noites);
 }
 
-export type NoCardapio = { base: number; mistura: number; nota: number; /** noites no cardápio */ noites: number };
+export type NoCardapio = {
+  base: number; mistura: number; tamanho: number; forca: number; preco: number; nota: number; /** noites no cardápio */ noites: number;
+};
 export type Noite = { nivel: number; galera: number; sexta: boolean; /** DJ escolhido (null = nenhum) */ dj: number | null };
 
 /** Quantos copões cada um do cardápio vende na noite inteira (na ordem do cardápio): movimento · atração_i / Σ atração ·
- *  participação, com atração = (nota/999)² · novidade · canibal (0,7 se outro do cardápio tem a mesma base e mistura) e
- *  participação = min(1, Σ atração). Sexta ×2, e na sexta o DJ escolhido dá ×1,2 nos copões das bases que ele curte. */
+ *  participação · preço_i, com atração = (nota/999)² · novidade · canibal (0,7 se outro do cardápio tem a mesma base e
+ *  mistura), participação = min(1, Σ atração) e preço_i = (precoRef(tamanho, força) / preço)^ELASTICIDADE. Sexta ×2, e na
+ *  sexta o DJ escolhido dá ×1,2 nos copões das bases que ele curte. Ordem das contas (o banco faz igual):
+ *  ((mov · atr_i) / Σatr) · participação · preço_i · (sexta ? 2 : 1) · (curte ? 1,2 : 1). */
 export function vendasNoite(cardapio: readonly NoCardapio[], n: Noite): number[] {
   const atracao = cardapio.map((c, i) => {
     const canibal = cardapio.some((o, j) => j !== i && o.base === c.base && o.mistura === c.mistura) ? 0.7 : 1;
@@ -292,7 +301,8 @@ export function vendasNoite(cardapio: readonly NoCardapio[], n: Noite): number[]
   const dj = n.sexta && n.dj !== null ? DJS[n.dj - 1] : null;
   return cardapio.map((c, i) => {
     const curte = dj !== null && dj.bases.includes(c.base) ? 1.2 : 1;
-    return ((mov * atracao[i]) / soma) * participacao * (n.sexta ? 2 : 1) * curte;
+    const preco = (precoRef(c.tamanho, c.forca) / c.preco) ** ELASTICIDADE;
+    return ((mov * atracao[i]) / soma) * participacao * preco * (n.sexta ? 2 : 1) * curte;
   });
 }
 

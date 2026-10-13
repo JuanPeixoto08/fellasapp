@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aguenta, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, EXTRAS, fimNoite, galeraNoite,
+  abreNoite, aguenta, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
   GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
   noitesEntre, nomeSugerido, nota, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor,
   SABORES, TAMANHOS, vagas, vendasNoite, vendidoNaNoite,
@@ -303,8 +303,29 @@ describe('as noites', () => {
 });
 
 describe('movimento, vendas, lucro e galera', () => {
+  /** Copo força 10 a 12 fichas: exatamente o preço de referência (8 · 30/20), o preço não mexe na venda. */
+  const NA_REF = { tamanho: 1, forca: 10, preco: 12 };
+
   it('constantes (ajustadas na simulação, copaoSim.test.ts)', () => {
-    expect([PUBLICO_BASE, CRESCE, GALERA_TETO]).toEqual([60, 1.25, 3]);
+    expect([PUBLICO_BASE, CRESCE, GALERA_TETO, ELASTICIDADE]).toEqual([25, 1.25, 3, 1.25]);
+    expect(precoRef(NA_REF.tamanho, NA_REF.forca)).toBe(NA_REF.preco);
+  });
+
+  it('vendasNoite: o preço espanta: o dobro da referência vende (1/2)^1,25 do mesmo copão na referência', () => {
+    const noite = { nivel: 3, galera: 400, sexta: false, dj: null };
+    const copao = { base: 1, mistura: 1, tamanho: 2, forca: 4, nota: 700, noites: 1 }; // Copão força 4: ref 22·24/20 = 26,4
+    const ref = precoRef(2, 4);
+    const caro = vendasNoite([{ ...copao, preco: Math.floor(2 * ref) }], noite)[0];
+    const certo = vendasNoite([{ ...copao, preco: ref }], noite)[0];
+    expect(caro / certo).toBeCloseTo((ref / Math.floor(2 * ref)) ** 1.25, 12);
+    // Balde força 6 (ref 78): preço 156 = 2× a referência, exato
+    const balde = { base: 2, mistura: 3, tamanho: 3, forca: 6, preco: 78, nota: 650, noites: 0 };
+    const b1 = vendasNoite([balde], noite)[0];
+    const b2 = vendasNoite([{ ...balde, preco: 156 }], noite)[0];
+    expect(b2 / b1).toBeCloseTo(0.5 ** 1.25, 12);
+    // e só no copão dele: o outro do cardápio vende o mesmo
+    const outro = { base: 4, mistura: 5, ...NA_REF, nota: 800, noites: 2 };
+    expect(vendasNoite([{ ...balde, preco: 156 }, outro], noite)[1]).toBeCloseTo(vendasNoite([balde, outro], noite)[1], 9);
   });
 
   it('publico(nivel) cresce com o nível; movimento soma a galera (√galera/30, até 3)', () => {
@@ -324,14 +345,14 @@ describe('movimento, vendas, lucro e galera', () => {
   });
 
   it('vendasNoite: um copão só vende movimento · atração (a participação é a própria atração abaixo de 1)', () => {
-    const v = vendasNoite([{ base: 1, mistura: 1, nota: 999, noites: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null });
+    const v = vendasNoite([{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(v[0]).toBeCloseTo(PUBLICO_BASE, 9);
-    const meio = vendasNoite([{ base: 1, mistura: 1, nota: 999, noites: 5 }], { nivel: 1, galera: 0, sexta: false, dj: null });
+    const meio = vendasNoite([{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 5 }], { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(meio[0]).toBeCloseTo(PUBLICO_BASE / 2, 9); // novidade 0,5
   });
 
   it('vendasNoite: reparte pela atração; com a soma acima de 1 vende o movimento inteiro', () => {
-    const c = [{ base: 1, mistura: 1, nota: 999, noites: 0 }, { base: 2, mistura: 2, nota: 999, noites: 0 }];
+    const c = [{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }, { base: 2, mistura: 2, ...NA_REF, nota: 999, noites: 0 }];
     const v = vendasNoite(c, { nivel: 1, galera: 0, sexta: false, dj: null });
     expect(v[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     expect(v[1]).toBeCloseTo(PUBLICO_BASE / 2, 9);
@@ -344,10 +365,10 @@ describe('movimento, vendas, lucro e galera', () => {
 
   it('vendasNoite: mesma base e mistura perdem 30% cada; sexta ×2; DJ da sexta ×1,2 nos copões das bases dele', () => {
     // dois Vodka+Energético nota 999 novos: atração 0,7 cada, soma 1,4 -> cada um vende público·0,7/1,4·1 = metade
-    const gemeos = [{ base: 1, mistura: 1, nota: 999, noites: 0 }, { base: 1, mistura: 1, nota: 999, noites: 0 }];
+    const gemeos = [{ base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }, { base: 1, mistura: 1, ...NA_REF, nota: 999, noites: 0 }];
     expect(vendasNoite(gemeos, { nivel: 1, galera: 0, sexta: false, dj: null })[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     // sozinho com nota 500: atração (500/999)² = 0,2505 -> e o canibal só com outro no cardápio
-    const um = [{ base: 1, mistura: 1, nota: 500, noites: 0 }];
+    const um = [{ base: 1, mistura: 1, ...NA_REF, nota: 500, noites: 0 }];
     const a = vendasNoite(um, { nivel: 1, galera: 0, sexta: false, dj: null })[0];
     expect(a).toBeCloseTo(PUBLICO_BASE * (500 / 999) ** 2, 9);
     expect(vendasNoite(um, { nivel: 1, galera: 0, sexta: true, dj: null })[0]).toBeCloseTo(2 * a, 9);
@@ -365,9 +386,11 @@ describe('movimento, vendas, lucro e galera', () => {
   });
 
   it('galeraNoite: sobe com média ≥ 600, cai 5% abaixo de 300, cai 15% com PT (uma vez), piso 0', () => {
-    // nível 1 (público 60), média 800: + round(60·0,02·800/999) = round(0,961) = 1; média 600 conta: round(0,7207) = 1
-    expect(galeraNoite(100, 1, [800, 800], false)).toBe(101);
-    expect(galeraNoite(100, 1, [599, 601], false)).toBe(101);
+    // nível 5 (público 25·1,25⁴ = 61,04), média 800: + round(61,04·0,02·800/999) = round(0,978) = 1; média 600 conta:
+    // round(0,733) = 1; no nível 1 (público 25) a média 800 dá round(0,4) = 0
+    expect(galeraNoite(100, 5, [800, 800], false)).toBe(101);
+    expect(galeraNoite(100, 5, [599, 601], false)).toBe(101);
+    expect(galeraNoite(100, 1, [800, 800], false)).toBe(100);
     expect(galeraNoite(100, 1, [599], false)).toBe(100);
     expect(galeraNoite(100, 1, [200, 300], false)).toBeCloseTo(95, 9);
     expect(galeraNoite(100, 1, [300], false)).toBe(100);

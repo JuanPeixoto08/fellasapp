@@ -27,7 +27,7 @@ export const LUGARES: readonly Lugar[] = [
 ];
 
 const BONUS = [0.02, 0.02, 0.03, 0.03, 0.04, 0.03, 0.03, 0.02];
-const LIMIARES: Record<number, { fas: number; volume: number }> = { 3: { fas: 100_000, volume: 50 }, 4: { fas: 700, volume: 30 }, 7: { fas: 2_000, volume: 100 } };
+const LIMIARES: Record<number, { fas: number; volume: number }> = { 3: { fas: 100_000, volume: 50 }, 4: { fas: 300, volume: 30 }, 7: { fas: 2_000, volume: 100 } };
 /** Oito marcos por lugar do lote 1: cinco de nível, um lendário, o de fãs e o de volume. */
 export const MARCOS: readonly Marco[] = Object.entries(LIMIARES).flatMap(([lugarTxt, lim]) => {
   const lugar = Number(lugarTxt);
