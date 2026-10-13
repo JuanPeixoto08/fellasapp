@@ -4,6 +4,19 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-13-mapa-do-role',
+    titulo: 'Mapa do rolê',
+    data: '2026-10-13',
+    itens: [
+      'Abriu o Mapa do rolê: os lugares do rolê viram filiais da Fellas Inc. Cada um tem moeda, nível e um jeito próprio de render.',
+      'Todo lugar tem marcos (bônus de produção na empresa toda), desafio da semana, pódio de sempre e um caderninho com o que você já descobriu.',
+      'Camisetaria: monta a coleção (tema, estilo, peça, cor e foco), quatro influencers postam a nota e a procura decide se esgota ou encalha.',
+      'Copão: monta o copão (base, mistura, extra, tamanho, força e preço) e o bar vende sozinho toda noite, das 18h às 2h. A nota sai na estreia e no dia seguinte a galera comenta no chat.',
+      'Sexta é movimento em dobro com DJ: escolhe quem toca e os copões das bases certas vendem mais. Passou do ponto da força, alguém dá PT.',
+      'O jantar é o próximo. Tá no forno.',
+    ],
+  },
+  {
     id: '2026-10-13-somam',
     titulo: 'Os ×5 somam',
     data: '2026-10-13',

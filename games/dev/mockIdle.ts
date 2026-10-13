@@ -249,6 +249,17 @@ wc.__faixaAgora = async () => {
         fim_em = fim_em - make_interval(hours => $2) where user_id = $1 and encerrada_em is null and not fas_excesso_pago`, [ME, h]);
       document.dispatchEvent(new Event('visibilitychange'));
     }]),
+    // copão: tudo do bar volta 1 dia (a noite de hoje vira a de ontem e fecha; os copões postos estreiam)
+    ['Copão −1 dia', async () => {
+      await dono(`alter table public.idle_cup_noite_copoes drop constraint if exists idle_cup_noite_copoes_user_id_inicio_fkey,
+        add constraint idle_cup_noite_copoes_user_id_inicio_fkey foreign key (user_id, inicio)
+        references public.idle_cup_noites (user_id, inicio) on delete cascade on update cascade`, []);
+      await dono(`update public.idle_cup_copoes set entrou_em = entrou_em - interval '1 day', primeira_noite = primeira_noite - interval '1 day',
+        saiu_em = saiu_em - interval '1 day' where user_id = $1`, [ME]);
+      await dono(`update public.idle_cup_noites set inicio = inicio - interval '1 day' where user_id = $1`, [ME]);
+      await dono(`update public.idle_place_state set aberto_em = aberto_em - interval '1 day' where user_id = $1 and lugar = 4`, [ME]);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }],
   ];
   for (const [nome, f] of mapa) {
     const b = document.createElement('button');

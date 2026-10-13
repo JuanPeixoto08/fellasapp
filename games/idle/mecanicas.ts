@@ -25,6 +25,7 @@
 //   salva antes; marcos e conquistas nunca dentro do avancar.
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { CAMISETARIA } from './camisetariaTela';
+import { COPAO } from './copaoTela';
 
 /** `recarregar`: busca o lugar de novo agora (o que tem hora marcada chegou, ex.: a coleção ficou pronta). */
 export type AcoesMecanica = { acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void;
@@ -45,4 +46,4 @@ export type Mecanica = {
   libera(nivel: number): string[];
 };
 /** Preenchido pelas partes 2 a 4 (camisetaria = 3, copão = 4, jantar = 7). */
-export const MECANICAS: Partial<Record<number, Mecanica>> = { 3: CAMISETARIA };
+export const MECANICAS: Partial<Record<number, Mecanica>> = { 3: CAMISETARIA, 4: COPAO };

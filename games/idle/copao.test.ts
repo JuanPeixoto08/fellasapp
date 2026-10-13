@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aguenta, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
+  abreNoite, aBase, aguenta, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
   GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
   noitesEntre, nomeSugerido, nota, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor,
   SABORES, TAMANHOS, vagas, vendasNoite, vendidoNaNoite,
@@ -413,5 +413,57 @@ describe('nome', () => {
     }
     expect(nomeSugerido(1, 1, 1, 0)).toBe('Balde de Vodka do Grau');
     expect(nomeSugerido(11, 1, 1, 0)).toBe('Bomba de Absinto do Grau');
+  });
+});
+
+describe('o que a tela usa: caderninho, distância do ponto, estreia', () => {
+  it('cadernoCup lê os pares (chave do banco) e o aguenta por base e força', () => {
+    const c = cadernoCup([{ tipo: 'par', a: chavePar(0, 2, 1), b: 0, rotulo: 4 }, { tipo: 'aguenta', a: 2, b: 5, rotulo: 199 }, { tipo: 'outra', a: 1, b: 1, rotulo: 1 }]);
+    expect(chavePar(0, 2, 1)).toBe(201);
+    expect(chavePar(1, 2, 1)).toBe(10201);
+    expect(chavePar(2, 15, 12)).toBe(21512);
+    expect(c.pares.get(201)).toBe(4);
+    expect(c.aguenta.get(2)?.get(5)).toBe(199);
+  });
+  it('distância do ponto pelo aguenta: única, menos 35 (3 acima ou 4 abaixo) e 0 (longe)', () => {
+    expect(distanciasAguenta(199)).toEqual([1]);
+    expect(distanciasAguenta(170)).toEqual([0]);
+    expect(distanciasAguenta(140)).toEqual([-1]);
+    expect(distanciasAguenta(80)).toEqual([2]);
+    expect(distanciasAguenta(105)).toEqual([-2]);
+    expect(distanciasAguenta(35)).toEqual([-4, 3]);
+    expect(distanciaTexto(6, 199)).toBe('1 acima do ponto');
+    expect(distanciaTexto(3, 105)).toBe('2 abaixo do ponto');
+    expect(distanciaTexto(8, 35)).toBe('3 acima ou 4 abaixo do ponto');
+    expect(distanciaTexto(10, 0)).toBe('longe do ponto');
+    expect(distanciaTexto(10, 0, 5)).toBe('5 acima do ponto');
+  });
+  it('o ponto fecha quando os testes só batem com um; batem com o ponto escondido de verdade', () => {
+    for (const b of BASES) {
+      const testes = new Map([[b.ponto + 1, aguenta(b.ponto + 1, b.ponto)]]);
+      expect(pontoDescoberto(testes)).toBe(b.ponto);
+      expect(pontosPossiveis(new Map([[5, aguenta(5, b.ponto)]]))).toContain(b.ponto);
+    }
+    expect(pontoDescoberto(new Map([[5, 35]]))).toBeNull(); // 2 ou 9
+    expect(pontoDescoberto(new Map([[5, 35], [3, 140]]))).toBeNull(); // a 3 diz ponto 4, a 5 diz 2 ou 9: nenhum bate
+    expect(pontoDescoberto(new Map([[5, 35], [8, 140]]))).toBe(9);
+    expect(pontoDescoberto(undefined)).toBeNull();
+  });
+  it('a estreia é a primeira noite que começa em t ou depois; o dia em Brasília', () => {
+    const ini = inicioNoite('2026-10-13');
+    expect(proximaNoite(ini)).toBe(ini);
+    expect(proximaNoite(ini - 1)).toBe(ini);
+    expect(proximaNoite(ini + 1)).toBe(ini + 24 * 3600_000);
+    expect(diaBR(Date.parse('2026-10-14T02:59:00Z'))).toBe(diaBR(Date.parse('2026-10-13T12:00:00Z')));
+    expect(diaBR(Date.parse('2026-10-14T03:00:00Z'))).toBe(diaBR(Date.parse('2026-10-13T12:00:00Z')) + 1);
+  });
+});
+
+describe('artigo da base', () => {
+  it('a Vodka, o Gin; da Cachaça, do Corote de pêssego', () => {
+    expect(aBase(1)).toBe('a Vodka');
+    expect(aBase(4)).toBe('o Gin');
+    expect(daBase(2)).toBe('da Cachaça');
+    expect(daBase(8)).toBe('do Corote de pêssego');
   });
 });

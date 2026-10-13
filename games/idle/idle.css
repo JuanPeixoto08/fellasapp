@@ -1393,3 +1393,346 @@ body:has(.idle) { background: #121212; }
 @media (prefers-reduced-motion: reduce) {
   .idle .tee-post, .idle .tee-selo, .idle .tee-resultado, .idle .tee-barra i, .idle .tee-item { transition: none; }
 }
+
+/* ===== Copão (lugar 4, copaoTela.ts): o bar à noite em cima do tema do lugar (preto, neon vermelho, laranja). A parede do
+   bar (fundoBar) atrás do copão, do chat e da revelação; o nome do copão aceso como placa de neon; as escolhas em
+   ladrilhos com a cor do líquido. Cores do rótulo do par (caderninho, revelação): péssima → ótima.
+   Pixel art sempre em escala inteira: no PC com zoom, o tamanho em px de tela arredonda pro múltiplo do lado da arte. ===== */
+.idle .lugar-tela[data-tema='4'] {
+  --tee-rot-0: #E5484D; --tee-rot-1: #E8954A; --tee-rot-2: var(--i-borda2); --tee-rot-3: #C8E07A; --tee-rot-4: #7BD9A0;
+  --cup-neon: var(--lugar-acento); --cup-bom: #7BD9A0; --cup-ruim: #E5484D;
+}
+.idle .cup { min-width: 0; }
+.idle .cup > .vazio { margin: 0; padding: 40px 12px; font: 400 20px var(--i-pixel); }
+.idle .cup canvas, .idle .cup-retrato { image-rendering: pixelated; }
+.idle .cup-titulo { margin: 0; font: 400 27px/1 var(--i-pixel); }
+.idle .cup-rot { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 7px; font: 400 17px/1 var(--i-pixel); color: var(--i-mudo); }
+.idle .cup-rot-valor, .idle .cup-sel { min-width: 0; overflow: hidden; font-size: 20px; color: var(--paper); white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-info { margin: 0; font-size: 12.5px; line-height: 1.35; color: var(--i-mudo); }
+.idle .cup-fichas { color: var(--cup-bom); }
+.idle .cup-prejuizo { color: var(--cup-ruim); }
+.idle .cup .sub { margin: 0; }
+/* a parede do bar (128 × 72) em escala inteira: 2× no celular, 3× no PC */
+.idle .cup-previa, .idle .cup-rev-palco, .idle .cup-msgs, .idle .cup-vaga-foto {
+  background: var(--i-fundo2) center bottom / 256px auto repeat-x; image-rendering: pixelated;
+  background-size: calc(max(128px, round(down, 256px * var(--zoom, 1), 128px)) / var(--zoom, 1)) auto; }
+/* a placa de neon com o nome */
+.idle .cup-placa { margin: 0; padding: 3px 10px 4px; max-width: calc(100% - 20px); overflow: hidden; font: 400 22px/1 var(--i-pixel); color: var(--cup-neon);
+  white-space: nowrap; text-overflow: ellipsis; background: color-mix(in srgb, var(--lugar-fundo) 82%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cup-neon) 70%, transparent); text-shadow: 0 0 6px color-mix(in srgb, var(--cup-neon) 55%, transparent); }
+.idle .cup-placa:empty { display: none; }
+
+/* --- bar: a noite, o cardápio e o pé --- */
+.idle .cup-bar { display: grid; gap: 14px; }
+.idle .cup-noite { display: grid; gap: 12px; padding: 12px 14px; background: var(--i-painel); --c: var(--i-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .cup-noite.aberto { --c: var(--cup-neon); }
+.idle .cup-relogio { display: grid; gap: 2px; align-content: start; min-width: 0; }
+.idle .cup-status { font: 400 17px/1 var(--i-pixel); color: var(--i-mudo); }
+.idle .cup-noite.aberto .cup-status { color: var(--cup-neon); text-shadow: 0 0 6px color-mix(in srgb, var(--cup-neon) 55%, transparent); }
+.idle .cup-conta { font: 400 32px/1 var(--i-pixel); color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .cup-noite-linha { margin: 2px 0 0; font-size: 13px; line-height: 1.35; color: var(--i-mudo); }
+.idle .cup-vendas { margin: 4px 0 0; font: 400 20px/1 var(--i-pixel); font-variant-numeric: tabular-nums; }
+.idle .cup-vendas:empty { display: none; }
+.idle .cup-sexta { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; min-width: 0; }
+.idle .cup-sexta .cup-trocar-dj { grid-column: 1 / -1; justify-self: start; }
+.idle .cup-sexta-info { display: grid; gap: 2px; min-width: 0; }
+.idle .cup-sexta-tit { font: 400 16px/1 var(--i-pixel); color: var(--mint); }
+.idle .cup-dj-nome { overflow: hidden; font: 400 22px/1 var(--i-pixel); white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-dj-estilo { font-size: 12.5px; color: var(--i-mudo); }
+.idle .cup-curte { margin: 0; font-size: 12.5px; line-height: 1.3; color: var(--paper); }
+.idle .cup-retrato { flex: none; display: block; width: 64px; height: 64px;
+  width: calc(max(32px, round(nearest, 64px * var(--zoom, 1), 32px)) / var(--zoom, 1)); height: calc(max(32px, round(nearest, 64px * var(--zoom, 1), 32px)) / var(--zoom, 1)); background: var(--i-fundo2) center / 100% 100% no-repeat;
+  box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-retrato.vazio { background: repeating-linear-gradient(45deg, var(--i-fundo2) 0 6px, color-mix(in srgb, var(--i-borda) 40%, var(--i-fundo2)) 6px 8px);
+  box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .btn.compacto.cup-trocar-dj, .idle .btn.compacto.cup-ver-chat { min-height: 36px; font-size: 17px; }
+
+.idle .cup-cardapio { min-width: 0; }
+.idle .cup-vagas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.idle .cup-vaga { position: relative; display: grid; grid-template-rows: auto auto auto auto auto 1fr; gap: 3px; min-width: 0; padding: 8px 8px 10px;
+  background: var(--i-painel); --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .cup-vaga:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 4px; }
+.idle .cup-vaga-foto { display: grid; place-items: end center; min-height: 104px; margin-bottom: 3px; padding-bottom: 4px; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-foto-vaga { width: 96px; height: 96px; width: calc(max(48px, round(down, 96px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+  height: calc(max(48px, round(down, 96px * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
+.idle .cup-vaga-nome { overflow: hidden; font: 400 19px/1.05 var(--i-pixel); white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-vaga-nota { display: flex; align-items: baseline; gap: 5px; margin: 0; font-size: 12px; color: var(--i-mudo); }
+.idle .cup-vaga-nota b { font: 400 30px/0.9 var(--i-pixel); color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .cup-vaga-nota.nota-top b { color: var(--cup-neon); }
+.idle .cup-vaga-nota.nota-boa b { color: var(--mint); }
+.idle .cup-vaga-nota.nota-ruim b { color: var(--cup-ruim); }
+.idle .cup-estreia { margin: 0; padding: 5px 0 3px; font: 400 17px/1 var(--i-pixel); color: var(--mint); }
+.idle .cup-vaga-linha { margin: 0; overflow: hidden; font-size: 12px; color: var(--i-mudo); white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.idle .cup-vaga-vendas { color: var(--paper); }
+.idle .cup-vaga .btn.cup-tirar { align-self: end; justify-self: start; min-height: 30px; margin-top: 4px; padding: 0 12px; font-size: 16px; }
+.idle .cup-confirma { align-self: end; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.idle .cup-confirma p { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--paper); }
+.idle .cup-confirma .btn { min-height: 30px; padding: 0 8px; font-size: 16px; }
+.idle .btn.cup-tirar-sim { --c: var(--cup-ruim); }
+.idle .cup-vaga.livre { padding: 0; background: transparent; box-shadow: none; }
+.idle .cup-montar-vaga { display: grid; place-content: center; justify-items: center; gap: 4px; width: 100%; height: 100%; min-height: 150px; padding: 10px; border: 0;
+  border-radius: 0; font: 400 19px/1.05 var(--i-pixel); text-align: center; color: var(--cup-neon); background: color-mix(in srgb, var(--cup-neon) 5%, transparent);
+  cursor: pointer; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cup-neon) 55%, transparent); outline-offset: 3px; transition: background-color 0.12s ease-out; }
+.idle .cup-montar-vaga:hover:not(:disabled) { background: color-mix(in srgb, var(--cup-neon) 12%, transparent); }
+.idle .cup-montar-vaga:focus-visible { outline: 2px solid var(--i-lilas); }
+.idle .cup-montar-vaga:disabled { cursor: default; opacity: 0.5; }
+.idle .cup-mais { font-size: 40px; line-height: 0.8; }
+.idle .cup-vaga.trancada { display: grid; place-content: center; justify-items: center; gap: 6px; min-height: 60px; background: transparent;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-vaga.trancada .pino-cadeado { width: 14px; height: 14px; opacity: 0.8; }
+.idle .cup-niv { font: 400 13px/1 var(--i-pixel); color: var(--i-mudo); white-space: nowrap; }
+
+.idle .cup-pe { display: grid; gap: 8px; }
+.idle .cup-moda, .idle .cup-ontem-num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0; font-size: 13.5px; }
+.idle .cup-pe-rot { font: 400 16px/1 var(--i-pixel); color: var(--i-mudo); }
+.idle .cup-pe-sub { font-size: 12px; color: var(--i-mudo); }
+.idle .cup-ontem { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+
+/* --- montar --- */
+.idle .cup-montar { display: flex; flex-direction: column; gap: 14px; }
+.idle .cup-lado { display: contents; }
+.idle .cup-previa { order: 0; } .idle .cup-escolhas { order: 1; } .idle .cup-linha-nome { order: 2; } .idle .cup-forca { order: 3; }
+.idle .cup-preco { order: 4; } .idle .cup-fim { order: 5; }
+.idle .cup-previa { position: relative; display: grid; place-items: center; min-height: 168px; padding: 8px 10px 40px; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-previa .cup-placa { position: absolute; left: 10px; bottom: 8px; }
+.idle .cup-foto-previa { width: 144px; height: 144px; width: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+  height: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1)); filter: drop-shadow(4px 5px 0 rgba(0, 0, 0, 0.45)); }
+.idle .cup-escolhas { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.idle .cup-secao { min-width: 0; }
+.idle .cup-alta-trancada { min-width: 0; margin-right: auto; overflow: hidden; font-size: 14px; color: var(--mint); white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-alta-trancada:empty { display: none; }
+.idle .cup-grade { display: flex; flex-wrap: wrap; gap: 6px; padding-right: 8px; } /* o selo +N do cadeado sai 7 px pra fora */
+.idle .cup-item { position: relative; flex: none; display: grid; place-items: center; align-content: center; gap: 3px; width: 46px; height: 46px; padding: 0;
+  border: 0; border-radius: 0; color: var(--paper); background: var(--i-fundo2); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda);
+  transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out; }
+.idle .cup-item:hover:not(.cup-trancados) { box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .cup-item[aria-checked='true'], .idle .cup-item[aria-checked='true']:hover { background: color-mix(in srgb, var(--gold) 16%, var(--i-fundo2));
+  box-shadow: inset 0 0 0 3px var(--gold), 0 0 0 2px color-mix(in srgb, var(--gold) 30%, transparent); }
+.idle .cup-item:focus-visible, .idle .cup-f:focus-visible, .idle .cup-nome:focus-visible, .idle .cup-dj:focus-visible, .idle .cup-preco-range:focus-visible {
+  outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+.idle .cup-item:active:not(.cup-trancados) { transform: translateY(1px); }
+.idle .cup-gota { width: 18px; height: 18px; background: var(--cor); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), inset -3px -3px 0 rgba(0, 0, 0, 0.2), inset 3px 3px 0 rgba(255, 255, 255, 0.25); }
+.idle .cup-abrev { max-width: 100%; overflow: hidden; font: 400 13px/1 var(--i-pixel); white-space: nowrap; }
+.idle .cup-arte-extra { width: 16px; height: 16px; }
+.idle .cup-tamanho, .idle .cup-trancados-tamanho { width: 58px; height: 58px; }
+.idle .cup-arte-tamanho { width: 48px; height: 48px; margin: -6px 0 -4px; width: calc(max(24px, round(nearest, 48px * var(--zoom, 1), 24px)) / var(--zoom, 1));
+  height: calc(max(24px, round(nearest, 48px * var(--zoom, 1), 24px)) / var(--zoom, 1)); }
+.idle .cup-trancados { cursor: default; background: transparent; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-trancados .pino-cadeado, .idle .cup-dj.trancado .pino-cadeado { width: 12px; height: 12px; opacity: 0.8; }
+.idle .cup-mais-n { position: absolute; top: -7px; right: -7px; z-index: 1; padding: 2px 3px 1px; font: 400 12px/1 var(--i-pixel); color: var(--i-mudo);
+  background: var(--i-painel); box-shadow: inset 0 0 0 1px var(--i-borda); pointer-events: none; }
+.idle .cup-alta, .idle .cup-dj-selo { position: absolute; top: -7px; right: -7px; z-index: 1; padding: 2px 3px 1px; font: 400 12px/1 var(--i-pixel);
+  color: var(--lugar-fundo); background: var(--mint); box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4); pointer-events: none; }
+.idle .cup-dj-selo { right: auto; left: -7px; background: var(--cup-neon); }
+.idle .cup-linha-nome { display: flex; gap: 8px; }
+.idle .cup-nome { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 0; color: var(--paper); background: var(--i-fundo2);
+  font: 400 21px var(--i-pixel); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-nome::placeholder { color: var(--i-mudo); opacity: 1; }
+.idle .cup-nome::selection { color: var(--lugar-fundo); background: var(--gold); }
+.idle .cup-forcas { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.idle .cup-f { position: relative; min-width: 0; height: 44px; padding: 0; border: 0; border-radius: 0; font: 400 20px/1 var(--i-pixel); color: var(--paper);
+  background: var(--i-fundo2); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-f:hover { box-shadow: inset 0 0 0 2px var(--i-borda2); }
+/* o que o caderninho sabe: um traço embaixo na cor de quanto a galera aguentou; o ponto descoberto em verde */
+.idle .cup-f.cup-f-testada::after, .idle .cup-f.cup-f-ponto::after { content: ''; position: absolute; left: 5px; right: 5px; bottom: 4px; height: 3px; background: var(--i-borda2); }
+.idle .cup-f[data-aguenta='alto']::after, .idle .cup-f.cup-f-ponto::after { background: var(--cup-bom); }
+.idle .cup-f[data-aguenta='medio']::after { background: var(--tee-rot-1); }
+.idle .cup-f[data-aguenta='baixo']::after { background: var(--cup-ruim); }
+.idle .cup-f.cup-f-ponto { color: var(--cup-bom); }
+.idle .cup-f[aria-checked='true'] { color: var(--lugar-fundo); background: var(--gold); box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo)); }
+.idle .cup-forca-info { margin-top: 6px; display: -webkit-box; height: 2.7em; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.idle .cup-linha-preco { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+.idle .btn.cup-passo { min-height: 44px; padding: 0; font-size: 22px; }
+.idle .cup-preco-range { width: 100%; height: 44px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.idle .cup-preco-range::-webkit-slider-runnable-track { height: 10px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-preco-range::-moz-range-track { height: 10px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-preco-range::-webkit-slider-thumb { width: 16px; height: 26px; margin-top: -8px; border: 0; border-radius: 0; background: var(--gold); -webkit-appearance: none;
+  box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo)), 0 0 0 2px var(--lugar-fundo); }
+.idle .cup-preco-range::-moz-range-thumb { width: 16px; height: 26px; border: 0; border-radius: 0; background: var(--gold);
+  box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo)), 0 0 0 2px var(--lugar-fundo); }
+.idle .cup-preco-info { margin-top: 4px; }
+.idle .cup-fim { display: grid; gap: 6px; }
+.idle .cup-fim-bts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.idle .btn.cup-por { min-height: 52px; font-size: 24px; }
+.idle .btn.compacto.cup-voltar { min-height: 52px; }
+.idle .cup-aviso { display: -webkit-box; height: 2.7em; margin: 0; overflow: hidden; font-size: 12.5px; line-height: 1.35; color: var(--i-mudo);
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.idle .cup-aviso.alerta { color: var(--cup-ruim); }
+.idle .cup-moda-montar { color: var(--mint); }
+
+/* --- DJs --- */
+.idle .cup-djs, .idle .cup-caderno { display: grid; gap: 12px; align-content: start; }
+.idle .cup-djs-cab, .idle .cup-caderno-cab { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 18px; }
+.idle .cup-djs-tit, .idle .cup-caderno-tit { display: grid; gap: 4px; flex: 1 1 260px; }
+.idle .cup-djs-tit .sub, .idle .cup-caderno-tit .sub { max-width: 62ch; line-height: 1.35; }
+.idle .cup-djs-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.idle .cup-dj { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 8px 10px 8px 8px; border: 0;
+  border-radius: 0; text-align: left; color: var(--paper); background: var(--i-painel); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda);
+  transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out; }
+.idle .cup-dj:hover:not(:disabled):not(.trancado) { box-shadow: inset 0 0 0 2px var(--i-borda2); }
+.idle .cup-dj[aria-checked='true'] { background: color-mix(in srgb, var(--gold) 14%, var(--i-painel)); box-shadow: inset 0 0 0 3px var(--gold); }
+.idle .cup-dj:disabled { cursor: default; }
+.idle .cup-dj-txt { display: grid; gap: 3px; min-width: 0; }
+.idle .cup-dj.trancado { position: relative; display: flex; place-content: center; align-items: center; gap: 8px; min-height: 80px; cursor: default; background: transparent;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-dj.trancado .cup-mais-n { top: 6px; right: 6px; }
+
+/* --- revelação --- */
+.idle .cup-revelacao { display: grid; gap: 14px; align-content: start; }
+.idle .cup-rev-palco { position: relative; display: grid; place-items: center; min-height: 200px; padding: 10px 10px 44px; box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-rev-palco .cup-placa { position: absolute; left: 10px; bottom: 10px; }
+.idle .cup-foto-rev { width: 144px; height: 144px; width: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+  height: calc(max(48px, round(down, 144px * var(--zoom, 1), 48px)) / var(--zoom, 1)); filter: drop-shadow(4px 5px 0 rgba(0, 0, 0, 0.45)); }
+.idle .cup-rev-painel { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.idle .cup-rev-topo { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 10px; }
+.idle .cup-rev-topo .sub { grid-column: 1 / -1; margin-bottom: 2px; }
+.idle .cup-rev-nota { font: 400 84px/0.85 var(--i-pixel); color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .cup-rev-nota.nota-top { color: var(--cup-neon); text-shadow: 0 0 10px color-mix(in srgb, var(--cup-neon) 50%, transparent); }
+.idle .cup-rev-nota.nota-boa { color: var(--mint); }
+.idle .cup-rev-nota.nota-ruim { color: var(--cup-ruim); }
+.idle .cup-rev-de { font: 400 20px/1 var(--i-pixel); color: var(--i-mudo); }
+.idle .cup-partes { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.idle .cup-parte { display: grid; grid-template-columns: 112px minmax(0, 1fr) 40px 36px; align-items: center; gap: 8px; font-size: 13px; opacity: 0.35;
+  transition: opacity 0.2s ease-out; }
+.idle .cup-parte.entrou { opacity: 1; }
+.idle .cup-parte-barra { height: 14px; background: var(--i-fundo2); box-shadow: inset 0 0 0 2px var(--i-borda); }
+.idle .cup-parte-barra i { display: block; width: 0; height: 100%; background: var(--gold); box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--gold) 60%, var(--lugar-fundo));
+  transition: width 0.38s cubic-bezier(0.16, 1, 0.3, 1); }
+.idle .cup-parte-valor { font: 400 20px/1 var(--i-pixel); text-align: right; font-variant-numeric: tabular-nums; }
+.idle .cup-parte-max { font-size: 12px; color: var(--i-mudo); }
+.idle .cup-rev-pares { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.idle .cup-par { display: inline-flex; align-items: center; gap: 6px; }
+.idle .cup-par i { flex: none; width: 10px; height: 10px; background: var(--tee-rot-c); }
+.idle .cup-par b { color: var(--tee-rot-c); }
+.idle .cup-rev-forca { margin: 0; font: 400 19px/1.1 var(--i-pixel); }
+.idle .btn.cup-rev-ver, .idle .btn.cup-chat-ver { justify-self: start; min-width: 200px; }
+
+/* --- chat da última noite --- */
+.idle .cup-chat { display: grid; gap: 14px; align-content: start; }
+.idle .cup-chat-lado { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.idle .cup-chat-num { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+.idle .cup-chat-num div { display: grid; gap: 2px; }
+.idle .cup-chat-num dt { order: 2; font-size: 12px; color: var(--i-mudo); }
+.idle .cup-chat-num dd { margin: 0; font: 400 32px/0.9 var(--i-pixel); font-variant-numeric: tabular-nums; }
+.idle .cup-chat-num .bom dd { color: var(--cup-bom); }
+.idle .cup-chat-num .ruim dd { color: var(--cup-ruim); }
+.idle .cup-pt-aviso { margin: 0; padding: 4px 8px 3px; justify-self: start; font: 400 18px/1 var(--i-pixel); color: var(--lugar-fundo); background: var(--cup-neon); }
+.idle .cup-chat-copoes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.idle .cup-chat-copoes li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 34px;
+  border-bottom: 1px solid color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-foto-mini { width: 32px; height: 32px; }
+.idle .cup-chat-copao { display: grid; min-width: 0; font-size: 12px; color: var(--i-mudo); }
+.idle .cup-chat-copao strong { overflow: hidden; font: 400 17px/1 var(--i-pixel); color: var(--paper); white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-mini-nota { font: 400 22px/1 var(--i-pixel); font-variant-numeric: tabular-nums; }
+.idle .cup-mini-nota.nota-top { color: var(--cup-neon); } .idle .cup-mini-nota.nota-boa { color: var(--mint); } .idle .cup-mini-nota.nota-ruim { color: var(--cup-ruim); }
+.idle .cup-msgs { display: grid; gap: 14px 10px; align-content: start; margin: 0; padding: 12px 12px 16px; list-style: none; box-shadow: inset 0 0 0 2px var(--i-borda); }
+/* o balão: o corpo em CSS no desenho da arte (contorno preto, canto cortado, sombra embaixo) e a cauda da arte (2×) */
+.idle .cup-msg { --bal: #F4F1EA; --bal-s: #C9C4B8; position: relative; justify-self: start; max-width: min(100%, 300px); margin-bottom: 6px; padding: 5px 9px 7px;
+  color: #111; background: var(--bal); box-shadow: 0 -2px 0 0 #000, 0 2px 0 0 #000, -2px 0 0 0 #000, 2px 0 0 0 #000, inset 0 -2px 0 var(--bal-s);
+  opacity: 0; transform: translateY(8px); transition: opacity 0.18s ease-out, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.idle .cup-msg.entrou { opacity: 1; transform: none; }
+.idle .cup-msg.dir { justify-self: end; }
+.idle .cup-msg.pt { --bal: var(--lugar-acento); --bal-s: #C23B53; }
+.idle .cup-msg.dj { --bal: var(--lugar-acento2); --bal-s: #B8561C; }
+.idle .cup-msg::after { content: ''; position: absolute; left: 4px; bottom: -10px; width: 24px; height: 10px; background: var(--cauda) left top / 24px 10px no-repeat;
+  image-rendering: pixelated; }
+.idle .cup-msg.dir::after { left: auto; right: 4px; }
+.idle .cup-autor { display: block; font: 400 15px/1 var(--i-pixel); color: #4A2A33; }
+.idle .cup-msg p { margin: 2px 0 0; font-size: 13px; line-height: 1.3; }
+
+/* --- caderninho (miolo e faixa) --- */
+.idle .cup-cad { display: grid; gap: 12px; min-width: 0; }
+.idle .cup-tabelas { display: flex; flex-wrap: wrap; gap: 12px 18px; }
+.idle .cup-tabela-fig { margin: 0; }
+.idle .cup-tabela-fig .cup-rot { margin-bottom: 4px; }
+.idle .cup-tabela { border-collapse: separate; border-spacing: 2px; }
+.idle .cup-tabela thead th { height: 40px; padding: 0 0 3px; font: 400 12px/1 var(--i-pixel); color: var(--i-mudo); text-align: left; vertical-align: bottom;
+  white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); }
+.idle .cup-tabela tbody th { padding: 0 5px 0 0; font: 400 13px/1 var(--i-pixel); color: var(--i-mudo); text-align: right; white-space: nowrap; }
+.idle .cup-c { width: 16px; min-width: 16px; height: 14px; padding: 0; background: var(--tee-rot-c); }
+.idle .cup-c.vazio { background: var(--i-fundo2); box-shadow: inset 0 0 0 1px var(--i-borda); }
+.idle .cup-legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; color: var(--i-mudo); }
+.idle .cup-legenda span, .idle .cup-resumo-rot span { display: inline-flex; align-items: center; gap: 5px; }
+.idle .cup-legenda i, .idle .cup-resumo-rot i { flex: none; width: 10px; height: 10px; background: var(--tee-rot-c); }
+.idle .cup-legenda i.vazio { background: var(--i-fundo2); box-shadow: inset 0 0 0 1px var(--i-borda); }
+.idle .cup-pontos .cup-rot { margin-bottom: 4px; }
+.idle .cup-pontos-lista { display: grid; gap: 2px 18px; margin: 0 0 6px; padding: 0; list-style: none; }
+.idle .cup-ponto-item { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 26px; font-size: 12.5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--i-borda) 60%, transparent); }
+.idle .cup-ponto-base { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.idle .cup-ponto-forcas { display: flex; flex-wrap: wrap; gap: 3px 8px; min-width: 0; }
+.idle .cup-ponto-f { display: inline-flex; align-items: baseline; gap: 4px; color: var(--i-mudo); white-space: nowrap; }
+.idle .cup-ponto-f b { font: 400 17px/1 var(--i-pixel); }
+.idle .cup-ponto-f.alto b { color: var(--cup-bom); } .idle .cup-ponto-f.medio b { color: var(--tee-rot-1); } .idle .cup-ponto-f.baixo b { color: var(--cup-ruim); }
+.idle .cup-ponto-res { font: 400 16px/1 var(--i-pixel); color: var(--i-mudo); white-space: nowrap; }
+.idle .cup-ponto-res.achou { color: var(--cup-bom); }
+.idle .cup-cad-resumo { display: grid; gap: 6px; justify-items: start; }
+.idle .cup-cad-resumo p { margin: 0; font-size: 13px; color: var(--i-mudo); }
+.idle .cup-resumo-num b { margin-right: 3px; font: 400 22px/1 var(--i-pixel); color: var(--paper); }
+.idle .cup-resumo-rot { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.idle .btn.cup-abrir-caderno { min-height: 36px; margin-top: 2px; font-size: 18px; }
+
+@media (min-width: 600px) {
+  .idle .cup-vagas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .idle .cup-noite { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+  .idle .cup-sexta { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .idle .cup-sexta .cup-trocar-dj { grid-column: auto; }
+}
+@media (min-width: 1100px) {
+  /* o miolo do lugar inteiro, sem rolar */
+  .idle .minigame-corpo .cup { height: 100%; padding: 2px; }
+  .idle .cup-bar { height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; }
+  .idle .cup-cardapio { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+  .idle .cup-vagas { display: flex; min-height: 0; }
+  .idle .cup-vaga { flex: 1 1 0; grid-template-rows: minmax(0, 1fr) auto auto auto auto auto; }
+  .idle .cup-vaga.trancada { flex: 0 0 76px; min-height: 0; }
+  /* a foto cresce com o espaço da vaga, sempre em escala inteira (48 × n) */
+  .idle .cup-vaga-foto { min-height: 0; container-type: size; }
+  .idle .cup-foto-vaga { width: calc(max(48px, round(down, min(100cqw - 12px, 100cqh - 8px, 192px) * var(--zoom, 1), 48px)) / var(--zoom, 1));
+    height: calc(max(48px, round(down, min(100cqw - 12px, 100cqh - 8px, 192px) * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
+  .idle .cup-pe { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+  /* montar: a prévia, o nome, a força, o preço e o Pôr à esquerda; as escolhas à direita */
+  .idle .cup-montar { display: grid; height: 100%; grid-template-columns: 318px minmax(0, 1fr); gap: 22px; }
+  .idle .cup-lado { display: grid; grid-template-rows: minmax(0, 1fr) auto auto auto auto; gap: 10px; min-height: 0; }
+  .idle .cup-previa { min-height: 0; }
+  .idle .cup-escolhas { display: flex; flex-direction: column; gap: 9px; }
+  .idle .cup-moda-montar { margin-top: auto; }
+  .idle .cup-item { width: 44px; height: 44px; }
+  .idle .cup-tamanho, .idle .cup-trancados-tamanho { width: 56px; height: 56px; }
+  .idle .cup-grade { gap: 5px; }
+  .idle .cup-f { height: 36px; }
+  .idle .btn.cup-passo { min-height: 36px; }
+  .idle .cup-linha-preco { grid-template-columns: 36px minmax(0, 1fr) 36px; }
+  .idle .cup-preco-range { height: 36px; }
+  /* revelação: o copão no balcão de um lado, a nota do outro */
+  .idle .cup-revelacao { height: 100%; grid-template-columns: minmax(0, 1fr) minmax(380px, 1.1fr); grid-template-rows: minmax(0, 1fr); gap: 22px; }
+  .idle .cup-rev-palco { min-height: 0; }
+  .idle .cup-foto-rev { width: 240px; height: 240px; width: calc(max(48px, round(down, 240px * var(--zoom, 1), 48px)) / var(--zoom, 1));
+    height: calc(max(48px, round(down, 240px * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
+  /* chat: os números e os copões à esquerda; o chat em duas colunas na parede do bar */
+  .idle .cup-chat { height: 100%; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 18px; }
+  .idle .cup-chat-lado { min-height: 0; }
+  .idle .btn.cup-chat-ver { margin-top: auto; }
+  .idle .cup-msgs { min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; align-content: start; }
+  .idle .cup-msg { max-width: 100%; margin-bottom: 4px; padding: 4px 8px 6px; }
+  .idle .cup-msgs { gap: 12px 10px; padding: 10px 10px 12px; }
+  .idle .cup-autor { font-size: 14px; }
+  .idle .cup-msg p { font-size: 12.5px; line-height: 1.25; }
+  .idle .cup-djs, .idle .cup-caderno { height: 100%; }
+  .idle .cup-djs-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .idle .cup-tabelas { flex-wrap: nowrap; }
+  .idle .cup-tabelas .cup-legenda { flex-direction: column; align-self: flex-end; gap: 4px; }
+  .idle .cup-c { height: 12px; }
+  .idle .cup-tabela { border-spacing: 2px 1px; }
+  .idle .cup-tabela tbody th { font-size: 12px; line-height: 12px; }
+  .idle .cup-pontos-lista { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .idle .cup-ponto-item { grid-template-columns: 96px minmax(0, 1fr) auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle .cup-msg, .idle .cup-parte, .idle .cup-parte-barra i, .idle .cup-item, .idle .cup-dj { transition: none; }
+}
+@media (min-width: 1600px) {
+  /* tela larga: o chat em 3 colunas */
+  .idle .cup-msgs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

@@ -336,3 +336,124 @@ export function nomeSugerido(base: number, mistura: number, extra: number, n: nu
   const semSufixo = `${prefixo} de ${nome}`;
   return [...semSufixo].length <= 30 ? semSufixo : nome;
 }
+
+// ===== o que a tela do copão (copaoTela.ts) recebe e usa =====
+
+/** Um copão do cardápio (idle_cup_json → cardapio). Nota, partes, rótulos e chance de PT só depois que a primeira noite
+ *  dele começou (`revelado`; antes, null). Horários em ISO. vendido e fichas = o que ele fez em todas as noites. */
+export type CopaoCup = {
+  id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nivel: number;
+  entrou_em: string; primeira_noite: string; saiu_em: string | null; revelado: boolean; noites: number; vendido: number; fichas: number;
+  nota: number | null; sabor: number | null; cb: number | null; moda: number | null; aguenta: number | null;
+  rotulos: number[] | null; chance_pt: number | null;
+};
+/** A noite em andamento ou a próxima. aberta: a linha da noite diz (antes de começar, true: a pessoa está aqui); dj = o
+ *  gravado quando a noite foi contada (só vale na sexta); vendido/fichas = o que o banco já contou até agora. */
+export type HojeCup = {
+  inicio: string; fim: string; sexta: boolean; aberta: boolean; dj: number | null; vendido_ate_agora: number; fichas_ate_agora: number;
+};
+/** O que um copão fez numa noite (ultima_noite.copoes). */
+export type CopaoNaNoite = {
+  id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number;
+  vendidos: number; fichas: number; pt: boolean;
+};
+/** A última noite aberta que fechou (a tela mostra o chat dela uma vez). chat_seed = o número da noite. */
+export type UltimaNoite = {
+  inicio: string; fim: string; sexta: boolean; dj: number | null; vendas: number; fichas: number; pt: boolean; galera_delta: number;
+  chat_seed: number; copoes: CopaoNaNoite[];
+};
+/** Um dos últimos 10 copões revelados (o mais novo primeiro), mesmo os que já saíram do cardápio. */
+export type HistoricoCup = {
+  id: number; nome: string; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number;
+  sabor: number; cb: number; moda: number; aguenta: number; primeira_noite: string; saiu_em: string | null; noites: number; vendido: number; fichas: number;
+};
+/** `LugarEstado.mecanica` do lugar 4 (idle_cup_json). moda = o copão da moda desta semana; dj = o DJ escolhido pra sexta. */
+export type EstadoCup = {
+  moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: CopaoCup[]; hoje: HojeCup;
+  ultima_noite: UltimaNoite | null; historico: HistoricoCup[];
+};
+
+export const NOME_ROTULO: readonly string[] = ['péssima', 'ruim', 'ok', 'boa', 'ótima'];
+
+/** A chave do par no caderninho (a mesma do idle_cup_depois): base × mistura = base·100 + mistura; base × extra = 10000 +
+ *  base·100 + extra; mistura × extra = 20000 + mistura·100 + extra. */
+export function chavePar(tipo: TipoPar, a: number, b: number): number {
+  return tipo * 10000 + a * 100 + b;
+}
+
+/** O caderninho do copão: os pares testados (chave → rótulo) e, por base, o aguenta de cada força testada. */
+export type CadernoCup = { pares: Map<number, Rotulo>; aguenta: Map<number, Map<number, number>> };
+
+export function cadernoCup(itens: readonly { tipo: string; a: number; b: number; rotulo: number }[]): CadernoCup {
+  const c: CadernoCup = { pares: new Map(), aguenta: new Map() };
+  for (const i of itens) {
+    if (i.tipo === 'par') c.pares.set(i.a, i.rotulo as Rotulo);
+    else if (i.tipo === 'aguenta') {
+      const m = c.aguenta.get(i.a) ?? new Map<number, number>();
+      m.set(i.b, i.rotulo);
+      c.aguenta.set(i.a, m);
+    }
+  }
+  return c;
+}
+
+/** As distâncias do ponto (força − ponto, de −9 a 9) que dão esse aguenta. Quase sempre uma só; 35 pode ser 3 acima ou 4
+ *  abaixo e 0 é "longe" (4 ou mais acima, 5 ou mais abaixo). */
+export function distanciasAguenta(v: number): number[] {
+  const out: number[] = [];
+  for (let d = -9; d <= 9; d++) if (aguenta(d, 0) === v) out.push(d);
+  return out;
+}
+
+/** Os pontos (1 a 10) que batem com tudo que o caderninho sabe da base (força → aguenta). Sem teste: os 10. */
+export function pontosPossiveis(testes: ReadonlyMap<number, number> | undefined): number[] {
+  const out: number[] = [];
+  for (let p = 1; p <= 10; p++) if (![...(testes ?? new Map<number, number>()).entries()].some(([f, v]) => aguenta(f, p) !== v)) out.push(p);
+  return out;
+}
+
+const distTexto = (d: number) => (d === 0 ? 'no ponto' : `${Math.abs(d)} ${d > 0 ? 'acima' : 'abaixo'} do ponto`);
+
+/** Quão longe do ponto a força testada ficou, em palavras: "no ponto", "1 acima do ponto", "3 acima ou 4 abaixo do ponto",
+ *  "longe do ponto". Com o ponto já descoberto (`ponto`), a distância exata. */
+export function distanciaTexto(forca: number, v: number, ponto: number | null = null): string {
+  if (ponto !== null) return distTexto(forca - ponto);
+  const ds = distanciasAguenta(v);
+  if (ds.length === 1) return distTexto(ds[0]);
+  if (ds.length === 2) return `${Math.abs(Math.max(...ds))} acima ou ${Math.abs(Math.min(...ds))} abaixo do ponto`;
+  return 'longe do ponto';
+}
+
+/** O ponto da base, se o caderninho já fecha num só. */
+export function pontoDescoberto(testes: ReadonlyMap<number, number> | undefined): number | null {
+  if (!testes?.size) return null;
+  const ps = pontosPossiveis(testes);
+  return ps.length === 1 ? ps[0] : null;
+}
+
+/** O que o caderninho diz de uma força numa base: { texto, v } ou null se nunca testou essa força. */
+export function forcaTestada(cad: CadernoCup, base: number, forca: number): { texto: string; aguenta: number } | null {
+  const testes = cad.aguenta.get(base);
+  const v = testes?.get(forca);
+  if (v === undefined) return null;
+  return { texto: distanciaTexto(forca, v, pontoDescoberto(testes)), aguenta: v };
+}
+
+const H_BR = 3 * H; // Brasília = UTC−3 fixo
+
+/** A estreia de um copão posto em `tMs`: a primeira noite que começa em t ou depois (às 18h em ponto conta a de agora). */
+export function proximaNoite(tMs: number): number {
+  return NOITE_0 + Math.ceil((tMs - NOITE_0) / DIA) * DIA;
+}
+
+/** O dia (em Brasília) de um instante, como número de dias desde 1970 (pra comparar "hoje", "amanhã", "ontem"). */
+export function diaBR(tMs: number): number {
+  return Math.floor((tMs - H_BR) / DIA);
+}
+
+/** As bases que pedem "a" (a vodka, a cachaça, a catuaba, a tequila); as outras pedem "o" (o gin, o corote...). */
+const BASES_FEMININAS = new Set([1, 2, 3, 7]);
+/** "a Vodka" / "o Gin". */
+export const aBase = (id: number) => `${BASES_FEMININAS.has(id) ? 'a' : 'o'} ${BASES[id - 1].nome}`;
+/** "da Vodka" / "do Gin". */
+export const daBase = (id: number) => `${BASES_FEMININAS.has(id) ? 'da' : 'do'} ${BASES[id - 1].nome}`;

@@ -8,6 +8,11 @@ import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContra
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import { CORES, custoLote, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, type Caderno } from './camisetaria';
+import {
+  aBase, BASES, chavePar, DJS, EXTRAS, forcaTestada, liberado as liberadoCup, lucroVenda as lucroVendaCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP,
+  novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup, precoRef as precoRefCup, TAMANHOS, type CadernoCup, type CopaoCup,
+  type TipoPar,
+} from './copao';
 
 export type LinhaDica = { texto: string; tom?: 'bom' | 'ruim' | 'fraco' };
 export type Dica = { titulo: string; linhas: LinhaDica[] };
@@ -295,4 +300,100 @@ export function dicaTeeTrancados(tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel
   const texto = `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
   const alta = tipo === 'tema' && tendencia ? TEMAS[tendencia - 1] : undefined;
   return alta && !liberado('tema', alta.id, nivel) ? `${texto} Em alta esta semana: ${alta.nome} (libera no nível ${alta.nivel}).` : texto;
+}
+
+// ===== Copão (lugar 4): caixinhas do montar, do cardápio e do DJ. Só o que a pessoa já sabe (o caderninho); o que nunca
+// testou diz "Ainda não testou". Não entra no chat, na revelação nem no pódio. =====
+
+const parTexto = (cad: CadernoCup, tipo: TipoPar, a: number, b: number, com: string) => {
+  const r = cad.pares.get(chavePar(tipo, a, b));
+  return r === undefined ? `Ainda não testou com ${com}.` : `Com ${com}: combinação ${NOME_ROTULO_CUP[r]}${r === 4 ? '!' : '.'}`;
+};
+const minusc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/** A base com a mistura e o extra escolhidos agora, o ponto (se o caderninho fecha), a moda e o DJ que curte. */
+export function dicaCupBase(base: number, mistura: number, extra: number, nivel: number, cad: CadernoCup, moda: number, dj: number | null): string {
+  const b = BASES[base - 1];
+  if (!liberadoCup('base', base, nivel)) return trancado(b.nivel);
+  const ponto = pontoDescoberto(cad.aguenta.get(base));
+  const partes = [parTexto(cad, 0, base, mistura, minusc(MISTURAS[mistura - 1].nome)), parTexto(cad, 1, base, extra, minusc(EXTRAS[extra - 1].nome)),
+    ponto !== null ? `Ponto: força ${ponto}.` : cad.aguenta.has(base) ? 'O ponto ainda não fechou: testa outra força.' : 'Ponto de força: ainda não testou.'];
+  if (base === moda) partes.push('Em alta esta semana: a nota sobe.');
+  const d = dj ? DJS[dj - 1] : null;
+  if (d && d.bases.includes(base)) partes.push(`${d.nome} toca na sexta: +20% nas vendas.`);
+  return partes.join(' ');
+}
+
+export function dicaCupMistura(mistura: number, base: number, extra: number, nivel: number, cad: CadernoCup, moda: number): string {
+  const m = MISTURAS[mistura - 1];
+  if (!liberadoCup('mistura', mistura, nivel)) return trancado(m.nivel);
+  const partes = [parTexto(cad, 0, base, mistura, BASES[base - 1].nome), parTexto(cad, 2, mistura, extra, minusc(EXTRAS[extra - 1].nome))];
+  if (mistura === moda) partes.push('Em alta esta semana: a nota sobe.');
+  return partes.join(' ');
+}
+
+export function dicaCupExtra(extra: number, base: number, mistura: number, nivel: number, cad: CadernoCup): string {
+  const e = EXTRAS[extra - 1];
+  if (!liberadoCup('extra', extra, nivel)) return trancado(e.nivel);
+  return `${parTexto(cad, 1, base, extra, BASES[base - 1].nome)} ${parTexto(cad, 2, mistura, extra, minusc(MISTURAS[mistura - 1].nome))}`;
+}
+
+/** O tamanho: doses, a referência na força escolhida e o custo de cada venda com a base escolhida. */
+export function dicaCupTamanho(tamanho: number, base: number, forca: number, nivel: number): string {
+  const t = TAMANHOS[tamanho - 1];
+  if (!liberadoCup('tamanho', tamanho, nivel)) return trancado(t.nivel);
+  const custo = t.doses * BASES[base - 1].custo * (0.5 + forca / 10);
+  return `${t.doses} ${t.doses === 1 ? 'dose' : 'doses'}. Preço de referência ${num(precoRefCup(tamanho, forca), 1)} fichas na força ${forca}. `
+    + `Cada venda gasta ${num(custo, 1)} fichas de ${BASES[base - 1].nome}.`;
+}
+
+/** A força na base escolhida: o que o caderninho sabe (a distância do ponto) e o risco de PT quando já dá pra saber. */
+export function dicaCupForca(base: number, forca: number, cad: CadernoCup): string {
+  const nome = BASES[base - 1].nome;
+  const testes = cad.aguenta.get(base);
+  const ponto = pontoDescoberto(testes);
+  const t = forcaTestada(cad, base, forca);
+  const linha = t ? `${nome} na força ${forca}: ${t.texto} (aguenta ${t.aguenta} de 199).`
+    : ponto !== null ? `${nome} na força ${forca}: ${forca === ponto ? 'no ponto' : `${Math.abs(forca - ponto)} ${forca > ponto ? 'acima' : 'abaixo'} do ponto`}.`
+      : `Ainda não testou ${aBase(base)} na força ${forca}.`;
+  const pt = ponto !== null && forca > ponto ? ` Chance de PT: ${(forca - ponto) * 10}% por noite.` : '';
+  return `${linha}${pt} Perto do ponto a galera aguenta mais; 1 acima ainda sobe, mas já pode dar PT.`;
+}
+
+/** O preço: a faixa, a referência e o lucro de cada venda. */
+export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; preco: number }): string {
+  const [lo, hi] = precoFaixaCup(c.tamanho, c.forca);
+  const lucro = lucroVendaCup(c);
+  const ganho = lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`;
+  return `Vai de ${lo} a ${hi} fichas; referência ${num(precoRefCup(c.tamanho, c.forca), 1)}. Cada venda dá ${ganho}. `
+    + 'Mais caro que a referência vende menos e a nota cai; mais barato vende mais.';
+}
+
+/** Um copão do cardápio: a nota e as partes (se já estreou), a novidade e o que vendeu. */
+export function dicaCupVaga(c: CopaoCup): string {
+  const nov = Math.round(novidadeCup(c.noites) * 100);
+  const vendas = `No total: ${num(c.vendido, 0)} vendidos, ${num(c.fichas, 0)} fichas.`;
+  const novidade = `Novidade ${nov}%: cai 10% por noite no cardápio, até 30%.`;
+  if (!c.revelado || c.nota === null) return `Estreia na primeira noite, aí sai a nota. ${novidade}`;
+  return `Nota ${c.nota}: sabor ${c.sabor} · custo-benefício ${c.cb} · moda ${c.moda} · aguenta ${c.aguenta}. ${novidade} ${vendas}`;
+}
+
+/** O DJ da sexta: o som e as bases que vendem mais com ele. */
+export function dicaCupDj(dj: number, nivel: number, escolhido: boolean): string {
+  const d = DJS[dj - 1];
+  if (!liberadoCup('dj', dj, nivel)) return trancado(d.nivel);
+  const bases = d.bases.map((b) => BASES[b - 1].nome);
+  return `Toca ${d.estilo}. Na sexta, copão de ${bases.slice(0, -1).join(', ')} ou ${bases.at(-1)} vende 20% mais.${escolhido ? ' É o DJ da sua sexta.' : ''}`;
+}
+
+const TIPO_CUP = { base: ['base', 'bases'], mistura: ['mistura', 'misturas'], extra: ['extra', 'extras'], tamanho: ['tamanho', 'tamanhos'], dj: ['DJ', 'DJs'] } as const;
+/** O cadeado de um grupo do montar (ou dos DJs): o próximo que libera, em que nível, e quantos ainda faltam. */
+export function dicaCupTrancados(tipo: 'base' | 'mistura' | 'extra' | 'tamanho' | 'dj', nivel: number): string {
+  const lista = { base: BASES, mistura: MISTURAS, extra: EXTRAS, tamanho: TAMANHOS, dj: DJS }[tipo];
+  const falta = lista.filter((x) => !liberadoCup(tipo, x.id, nivel));
+  if (!falta.length) return '';
+  const prox = falta.reduce((a, x) => (x.nivel < a.nivel ? x : a));
+  const [um, varios] = TIPO_CUP[tipo];
+  const resto = falta.length - 1;
+  return `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
 }
