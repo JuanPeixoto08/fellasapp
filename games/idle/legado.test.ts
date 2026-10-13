@@ -137,9 +137,9 @@ describe('detectarNovas (o que avisar ao recarregar)', () => {
 });
 
 describe('árvore', () => {
-  it('a raiz e os 5 ramos, na ordem, com 5 nós cada', () => {
+  it('a raiz e os 6 ramos, na ordem, com 5 nós cada', () => {
     expect(RAMOS_ARVORE.map((r) => [r.nome, r.nos.length])).toEqual([
-      ['Raiz', 1], ['Produção', 5], ['Recomeço', 5], ['Oportunidades', 5], ['Tempo', 5], ['Gente', 5],
+      ['Raiz', 1], ['Produção', 5], ['Recomeço', 5], ['Oportunidades', 5], ['Dourados', 5], ['Gente', 5], ['Horta', 5],
     ]);
   });
   it('comprado, disponível (o anterior é seu) ou trancado (falta o anterior)', () => {
@@ -158,7 +158,7 @@ describe('árvore', () => {
 const noDe = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
 
 describe('árvore em tela cheia: a copa', () => {
-  it('as 26 posições existem e cabem no mundo com folga de 26', () => {
+  it('as 31 posições existem e cabem no mundo com folga de 26', () => {
     const ids = Object.keys(POSICOES_ARVORE).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(catalogo.arvore.map((n) => n.id).sort((a, b) => a - b));
     for (const [x, y] of Object.values(POSICOES_ARVORE)) {
@@ -184,18 +184,24 @@ describe('árvore em tela cheia: a copa', () => {
     }
   });
   it('o nome de cada ramo fica 44 acima do 5º nó, dentro do mundo', () => {
-    expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente']);
+    expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta']);
     for (const r of ROTULOS_ARVORE) {
       const quinto = catalogo.arvore.find((n) => n.posicao === 5 && POSICOES_ARVORE[n.id][0] === r.x)!;
       expect(r.y).toBe(POSICOES_ARVORE[quinto.id][1] - 44);
       expect(r.y).toBeGreaterThanOrEqual(8);
     }
   });
-  it('escala: cabe no lado mais apertado, presa entre 0,85 e 1,4', () => {
-    expect(escalaArvore(400, 540)).toBe(1);
+  it('escala: cabe no lado mais apertado, presa entre 0,8 e 1,4 (a copa de 480 cabe nos 390 do celular)', () => {
+    expect(escalaArvore(480, 540)).toBe(1);
     expect(escalaArvore(2000, 2000)).toBe(1.4);
-    expect(escalaArvore(300, 800)).toBe(0.85);
-    expect(escalaArvore(380, 900)).toBeCloseTo(0.95, 10);
+    expect(escalaArvore(300, 800)).toBe(0.8);
+    expect(escalaArvore(390, 900)).toBeCloseTo(0.8125, 10);
+    expect(MUNDO_ARVORE.largura * escalaArvore(390, 900)).toBeLessThanOrEqual(390);
+  });
+  it('a Horta é o ramo mais à direita e a raiz fica no meio', () => {
+    const primeiros = [11, 21, 31, 41, 51].map((id) => POSICOES_ARVORE[id][0]);
+    for (const x of primeiros) expect(POSICOES_ARVORE[61][0]).toBeGreaterThan(x);
+    expect(POSICOES_ARVORE[1][0]).toBe(MUNDO_ARVORE.largura / 2);
   });
   it('situação na tela: comprado, dá pra comprar, falta ponto, trancado', () => {
     expect(situacaoTela(noDe(1), [1], 0)).toBe('comprado');
