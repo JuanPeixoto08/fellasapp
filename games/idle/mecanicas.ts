@@ -27,7 +27,9 @@ import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { CAMISETARIA } from './camisetariaTela';
 
 /** `recarregar`: busca o lugar de novo agora (o que tem hora marcada chegou, ex.: a coleção ficou pronta). */
-export type AcoesMecanica = { acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void };
+export type AcoesMecanica = { acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void;
+  /** O user_id de quem está jogando (null = ainda não sabe): a camisetaria guarda o que já revelou por pessoa. */
+  usuario?(): string | null };
 /** Liga a caixinha de informação a um item (mouse e teclado; no celular não tem). `chave` é estável entre um desenho e
  *  outro (a caixinha aberta passa pro item novo, com os números novos); `titulo` vai em cima e `texto()` embaixo
  *  (null = sem caixinha agora). Montado em tela.ts em cima do `dicas.ligar` de dicaTela.ts. */

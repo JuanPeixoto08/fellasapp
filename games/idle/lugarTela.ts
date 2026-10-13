@@ -18,7 +18,7 @@ const PREMIO = (d: NonNullable<LugarEstado['desafio']>) => (d.premio === 'horas'
   : d.premio === 'legado' ? `${num(d.premio_valor)} ${d.premio_valor === 1 ? 'ponto' : 'pontos'} do Legado` : 'Investidor na hora');
 
 export function criarLugarTela(
-  a: { voltar(): void; nivel(id: number): void; acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void },
+  a: { voltar(): void; nivel(id: number): void; acao(fn: string, args: Record<string, unknown>): void; recarregar?(): void; usuario?(): string | null },
   dicas: Dicas,
   boneco: Boneco = () => el('span'),
 ) {
@@ -95,7 +95,7 @@ export function criarLugarTela(
     if (mec) {
       let t = telas.get(l.id);
       if (!t) {
-        t = mec.criar({ acao: (fn, args) => a.acao(fn, args), recarregar: () => a.recarregar?.() }, dicas);
+        t = mec.criar({ acao: (fn, args) => a.acao(fn, args), recarregar: () => a.recarregar?.(), usuario: () => a.usuario?.() ?? null }, dicas);
         telas.set(l.id, t);
       }
       t.renderizar(l, ocupado, agoraMs);

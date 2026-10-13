@@ -2,9 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { nomeSugerido, pecasLote, precoPeca, saldao, type ColecaoTee, type EstadoTee, type UltimaTee } from './camisetaria';
-import { criarCamisetaria, CHAVE_REVELADA } from './camisetariaTela';
+import { criarCamisetaria, chaveRevelada } from './camisetariaTela';
 import { MECANICAS } from './mecanicas';
 
+const CHAVE_REVELADA = chaveRevelada(null); // sem usuário nas ações dos testes
 const AGORA = Date.parse('2026-10-12T12:00:00Z');
 const H = 3600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -333,7 +334,7 @@ describe('revelação (uma vez por coleção)', () => {
     expect($('.tee-resultado').textContent).toContain('Esgota');
     expect(localStorage.getItem(CHAVE_REVELADA)).toBeNull();
     $<HTMLButtonElement>('.tee-ver-venda').click();
-    expect(localStorage.getItem(CHAVE_REVELADA)).toBe('41');
+    expect(JSON.parse(localStorage.getItem(CHAVE_REVELADA)!)).toEqual([41]);
     expect(t.elemento.dataset.estado).toBe('venda');
   });
   it('sem localStorage (bloqueado): revela uma vez e não volta em loop', () => {
@@ -349,8 +350,22 @@ describe('revelação (uma vez por coleção)', () => {
     ler.mockRestore();
     gravar.mockRestore();
   });
+  it('sai no meio da animação e volta: a revelação recomeça e termina', () => {
+    const { t, $$, $ } = montar();
+    t.renderizar(lugar(estadoTee({ ativa: pronta({ id: 450 }) })), false, AGORA);
+    vi.advanceTimersByTime(1000);
+    t.elemento.remove(); // saiu do lugar: o relógio da tela percebe e para tudo
+    vi.advanceTimersByTime(2000);
+    document.body.replaceChildren(t.elemento);
+    t.renderizar(lugar(estadoTee({ ativa: pronta({ id: 450 }) })), false, AGORA + 3000);
+    expect($$('.tee-post').filter((p) => p.classList.contains('entrou'))).toHaveLength(0);
+    vi.advanceTimersByTime(10_000);
+    expect($$('.tee-post').filter((p) => p.classList.contains('entrou'))).toHaveLength(4);
+    expect($('.tee-pct').textContent).toBe('167%');
+    expect($('.tee-selo').textContent).toBe('Combinação ótima!');
+  });
   it('já viu: vai direto pra venda', () => {
-    localStorage.setItem(CHAVE_REVELADA, '41');
+    localStorage.setItem(CHAVE_REVELADA, '[41]');
     const { t } = montar();
     t.renderizar(lugar(estadoTee({ ativa: pronta() })), false, AGORA);
     expect(t.elemento.dataset.estado).toBe('venda');
@@ -375,11 +390,17 @@ describe('revelação atrasada (ficou pronta e acabou com a pessoa longe)', () =
     const ver = $<HTMLButtonElement>('.tee-ver-bancada');
     expect(ver.textContent).toBe('Ver a bancada');
     ver.click();
-    expect(localStorage.getItem(CHAVE_REVELADA)).toBe('90');
+    expect(JSON.parse(localStorage.getItem(CHAVE_REVELADA)!)).toEqual([90]);
     expect(t.elemento.dataset.estado).toBe('bancada');
     // uma vez só
     t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 90 }) })), false, AGORA + 60_000);
     expect(t.elemento.dataset.estado).toBe('bancada');
+  });
+  it('arredonda o vendido na exibição (uma peça a menos por erro de ponto flutuante não aparece)', () => {
+    const { t, $ } = montar();
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 92 + 700, vendido: 19.999999999999996 }) })), false, AGORA);
+    vi.advanceTimersByTime(6000);
+    expect($('.tee-fechou').textContent).toContain('vendeu 20 de 36');
   });
   it('esgotou e lote fiado: sem a parte do saldão', () => {
     const { t, $ } = montar();
@@ -387,15 +408,38 @@ describe('revelação atrasada (ficou pronta e acabou com a pessoa longe)', () =
     vi.advanceTimersByTime(6000);
     expect($('.tee-fechou').textContent).toBe('Fechou: vendeu 36 de 36, +702 cupons');
   });
-  it('já viu (esta ou uma mais nova): direto pra bancada', () => {
-    localStorage.setItem(CHAVE_REVELADA, '92');
+  it('já viu: direto pra bancada; outra coleção (mesmo mais velha) ainda não vista revela', () => {
+    localStorage.setItem(CHAVE_REVELADA, '[92]');
     const { t } = montar();
     t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 92 }) })), false, AGORA);
     expect(t.elemento.dataset.estado).toBe('bancada');
-    localStorage.setItem(CHAVE_REVELADA, '97');
+    localStorage.setItem(CHAVE_REVELADA, '[97]');
     const m2 = montar();
     m2.t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 93 }) })), false, AGORA);
-    expect(m2.t.elemento.dataset.estado).toBe('bancada');
+    expect(m2.t.elemento.dataset.estado).toBe('revelacao');
+  });
+  it('a chave é por pessoa: o que outra conta viu no aparelho não pula a revelação, e guarda só os últimos 20', () => {
+    const com = (uid: string | null) => {
+      const mec = criarCamisetaria();
+      const t = mec.criar({ acao, recarregar, usuario: () => uid }, { ligar });
+      document.body.replaceChildren(t.elemento);
+      return t;
+    };
+    localStorage.setItem('fellas:tee-revelada:ana', '[41]');
+    const b = com('bia');
+    b.renderizar(lugar(estadoTee({ ativa: pronta() })), false, AGORA);
+    expect(b.elemento.dataset.estado).toBe('revelacao');
+    const a = com('ana');
+    a.renderizar(lugar(estadoTee({ ativa: pronta() })), false, AGORA);
+    expect(a.elemento.dataset.estado).toBe('venda');
+    localStorage.setItem('fellas:tee-revelada:cai', JSON.stringify(Array.from({ length: 20 }, (_, i) => i + 100)));
+    const c = com('cai');
+    c.renderizar(lugar(estadoTee({ ativa: pronta({ id: 300 }) })), false, AGORA);
+    c.elemento.querySelector<HTMLButtonElement>('.tee-ver-venda')!.click();
+    const ids = JSON.parse(localStorage.getItem('fellas:tee-revelada:cai')!) as number[];
+    expect(ids).toHaveLength(20);
+    expect(ids.at(-1)).toBe(300);
+    expect(ids).not.toContain(100);
   });
   it('com uma coleção nova rodando, a antiga não volta (a pessoa já seguiu em frente)', () => {
     const { t } = montar();
@@ -405,7 +449,7 @@ describe('revelação atrasada (ficou pronta e acabou com a pessoa longe)', () =
 });
 
 describe('venda', () => {
-  beforeEach(() => localStorage.setItem(CHAVE_REVELADA, '41'));
+  beforeEach(() => localStorage.setItem(CHAVE_REVELADA, '[41]'));
   it('barra vendido/estoque, cupons entrando e o tempo que falta', () => {
     const { t, $ } = montar();
     t.renderizar(lugar(estadoTee({ ativa: pronta() })), false, AGORA);

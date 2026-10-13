@@ -22,9 +22,11 @@ import { criarFoco } from './foco';
 import { formatarValor } from './formatar';
 import type { AcoesMecanica, Dicas, Mecanica, TelaMecanica } from './mecanicas';
 
-/** A última coleção que a pessoa já viu revelar (id). A revelação passa uma vez por coleção; o id cresce a cada coleção,
- *  então guardar a mais nova vale pras de antes também. */
+/** As coleções que a pessoa já viu revelar (os últimos 20 ids), uma lista por pessoa (`<chave>:<user_id>`): outra conta no
+ *  mesmo aparelho não pula a revelação. A revelação passa uma vez por coleção. */
 export const CHAVE_REVELADA = 'fellas:tee-revelada';
+export const chaveRevelada = (uid: string | null) => `${CHAVE_REVELADA}:${uid ?? 'anon'}`;
+const MAX_REVELADAS = 20;
 
 type Tipo = 'tema' | 'estilo' | 'peca' | 'cor';
 type Estado = 'carregando' | 'bancada' | 'producao' | 'revelacao' | 'venda' | 'caderno';
@@ -66,21 +68,27 @@ function pinta(c: HTMLCanvasElement, img: ImageData): void {
   c.getContext('2d')?.putImageData(img, 0, 0);
 }
 
-/** As reveladas nesta aba: vale quando o localStorage não deixa ler ou gravar (aba anônima, bloqueado), pra a revelação
- *  não voltar em loop. */
-const reveladasAqui = new Set<number>();
-function jaRevelou(id: number): boolean {
-  if (reveladasAqui.has(id)) return true;
+/** As reveladas nesta aba (por chave): vale quando o localStorage não deixa ler ou gravar (aba anônima, bloqueado), pra a
+ *  revelação não voltar em loop. */
+const reveladasAqui = new Map<string, Set<number>>();
+function lerReveladas(chave: string): number[] {
   try {
-    return Number(localStorage.getItem(CHAVE_REVELADA) ?? 0) >= id;
+    const v: unknown = JSON.parse(localStorage.getItem(chave) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is number => typeof x === 'number') : [];
   } catch {
-    return false;
+    return [];
   }
 }
-function gravarRevelada(id: number): void {
-  reveladasAqui.add(id);
+function jaRevelou(chave: string, id: number): boolean {
+  return reveladasAqui.get(chave)?.has(id) === true || lerReveladas(chave).includes(id);
+}
+function gravarRevelada(chave: string, id: number): void {
+  const aqui = reveladasAqui.get(chave) ?? new Set<number>();
+  aqui.add(id);
+  reveladasAqui.set(chave, aqui);
   try {
-    localStorage.setItem(CHAVE_REVELADA, String(id));
+    const ids = [...lerReveladas(chave).filter((x) => x !== id), id].slice(-MAX_REVELADAS);
+    localStorage.setItem(chave, JSON.stringify(ids));
   } catch {
     // sem localStorage: fica só na memória desta aba
   }
@@ -150,7 +158,7 @@ function previsao(c: ColecaoTee): string {
 /** O fim da coleção que acabou longe: "Fechou: vendeu 20 de 36, +390 cupons e +24 do saldão" (os cupons em dourado). */
 function fechou(u: UltimaTee): HTMLElement {
   const p = el('p', 'tee-previsao tee-fechou');
-  p.append(`Fechou: vendeu ${quantia(u.vendido)} de ${quantia(u.pecas)}, `, el('span', 'tee-cupons', `+${quantia(u.receita)} cupons`));
+  p.append(`Fechou: vendeu ${quantia(Math.round(u.vendido))} de ${quantia(u.pecas)}, `, el('span', 'tee-cupons', `+${quantia(u.receita)} cupons`));
   if (u.saldao >= 1) p.append(' e ', el('span', 'tee-cupons', `+${quantia(u.saldao)} do saldão`));
   return p;
 }
@@ -173,6 +181,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   /** As segundas tentativas marcadas (saem junto com o relógio quando a tela sai da página). */
   let tentativas: ReturnType<typeof setTimeout>[] = [];
   let confirmando = false;
+  const chaveUsuario = () => chaveRevelada(a.usuario?.() ?? null);
 
   /** Pede o lugar de novo uma vez por coisa (`k`); se 3 s depois ainda está igual (`aindaIgual`), tenta mais uma vez. */
   const pedir = (k: string, aindaIgual: () => boolean) => {
@@ -199,6 +208,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
         for (const t of tentativas) clearTimeout(t);
         tentativas = [];
         limparTimers();
+        if (estado === 'revelacao') revelando = null; // os timers dela morreram: ao voltar, recomeça
         return;
       }
       tick?.();
@@ -611,7 +621,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     res.append(linhaPct, selo, prev, peca);
     const chaveVer = fim ? 'tee-ver-bancada' : 'tee-ver-venda';
     const ver = button(fim ? 'Ver a bancada' : 'Ver a venda', `btn main ${chaveVer}`, () => {
-      gravarRevelada(c.id);
+      gravarRevelada(chaveUsuario(), c.id);
       revelando = null;
       const chave = foco.guardar();
       if (ultimo) desenhar(ultimo.l, ultimo.m);
@@ -768,9 +778,9 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   function desenhar(l: LugarEstado, m: EstadoTee) {
     const c = m.ativa;
     // sem coleção rodando: a última que acabou longe e ainda não passou aqui ganha a revelação atrasada
-    const u = !c && m.ultima && m.ultima.notas && (revelando === m.ultima.id || !jaRevelou(m.ultima.id)) ? m.ultima : null;
+    const u = !c && m.ultima && m.ultima.notas && (revelando === m.ultima.id || !jaRevelou(chaveUsuario(), m.ultima.id)) ? m.ultima : null;
     const novo: Estado = !c ? (u ? 'revelacao' : 'bancada') : !c.pronta || !c.notas ? 'producao'
-      : revelando === c.id || !jaRevelou(c.id) ? 'revelacao' : 'venda';
+      : revelando === c.id || !jaRevelou(chaveUsuario(), c.id) ? 'revelacao' : 'venda';
     const revela = c ?? u;
     if (!vendoCaderno && novo === 'revelacao' && estado === 'revelacao' && revelando === revela?.id) return; // a revelação que está passando não recomeça
     limparTimers();
