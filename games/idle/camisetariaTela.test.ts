@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
-import { nomeSugerido, pecasLote, type ColecaoTee, type EstadoTee } from './camisetaria';
+import { nomeSugerido, pecasLote, precoPeca, saldao, type ColecaoTee, type EstadoTee, type UltimaTee } from './camisetaria';
 import { criarCamisetaria, CHAVE_REVELADA } from './camisetariaTela';
 import { MECANICAS } from './mecanicas';
 
@@ -10,7 +10,7 @@ const H = 3600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const estadoTee = (x: Partial<EstadoTee> = {}): EstadoTee => ({
-  tendencia: 2, lotes: [12, 36, 84], precos: { relatorio: 50 }, ativa: null, historico: [], semana: 0, ultimo_fiado: null, ...x,
+  tendencia: 2, lotes: [12, 36, 84], precos: { relatorio: 50 }, ativa: null, ultima: null, historico: [], semana: 0, ultimo_fiado: null, ...x,
 });
 const colecao = (x: Partial<ColecaoTee> = {}): ColecaoTee => ({
   id: 41, nome: 'Drop Praia Raiz', tema: 2, estilo: 3, peca: 1, cor: 3, arte: 6, tecido: 2, div: 2, lote: 1, nivel: 1, pecas: 36, custo: 108,
@@ -20,6 +20,13 @@ const colecao = (x: Partial<ColecaoTee> = {}): ColecaoTee => ({
 const pronta = (x: Partial<ColecaoTee> = {}) => colecao({
   criada_em: iso(AGORA - 3 * H), pronta_em: iso(AGORA - H), fim_em: iso(AGORA + 11 * H), pronta: true,
   notas: [9, 8, 4, 7], media: 7, procura: 60, pct: 166.6, rotulo: 4, peca_tema: 1, ...x,
+});
+/** A última revelada, que acabou com a pessoa longe (pronta 2 dias atrás): vendeu 20 de 36, sobrou estoque pro saldão.
+ *  Cada teste usa um id (a aba lembra o que revelou: reveladasAqui vale pro arquivo todo). */
+const acabou = (x: Partial<UltimaTee> = {}): UltimaTee => ({
+  ...pronta({ criada_em: iso(AGORA - 50 * H), pronta_em: iso(AGORA - 48 * H), fim_em: iso(AGORA - 36 * H), procura: 20, pct: 55.5 }),
+  encerrada_em: null, vendido: 20, receita: 20 * precoPeca(1), saldao: saldao(108, 36, 20, false),
+  notas: [9, 8, 4, 7], media: 7, procura: 20, pct: 55.5, rotulo: 4, peca_tema: 1, ...x,
 });
 const lugar = (mec: EstadoTee | null, x: Partial<LugarEstado> = {}): LugarEstado => ({
   id: 3, moeda_nome: 'cupom', numero: 'pct', lancado: true, nome: null, frase: null, icone: null,
@@ -208,6 +215,19 @@ describe('bancada (sem coleção rodando)', () => {
       if (menos) $$<HTMLButtonElement>('.tee-foco-mais')[0].click();
     }
   });
+  it('tema da semana trancado: "Em alta: <tema> (libera no nível N)" na bancada e na caixinha do cadeado', () => {
+    const { t, $ } = montar();
+    t.renderizar(lugar(estadoTee({ tendencia: 9 })), false, AGORA); // Crise financeira, nível 4
+    expect($('.tee-alta-trancada').textContent).toBe('Em alta: Crise financeira (libera no nível 4)');
+    expect(caixinha('tee-tema-trancados')).toContain('Em alta esta semana: Crise financeira (libera no nível 4).');
+    expect($('.tee-trancados-tema').getAttribute('aria-label')).toContain('Em alta esta semana: Crise financeira');
+    // liberou (ou a semana virou pra um tema liberado): some
+    t.renderizar(lugar(estadoTee({ tendencia: 9 }), { nivel: 4 }), false, AGORA);
+    expect($('.tee-alta-trancada').textContent).toBe('');
+    t.renderizar(lugar(estadoTee({ tendencia: 2 })), false, AGORA);
+    expect($('.tee-alta-trancada').textContent).toBe('');
+    expect(caixinha('tee-tema-trancados')).not.toContain('Em alta');
+  });
   it('o "alta" segue a tendência que vem em cada desenho (a semana vira com a tela aberta)', () => {
     const { t, $$ } = montar();
     t.renderizar(lugar(estadoTee({ tendencia: 2 })), false, AGORA);
@@ -266,6 +286,17 @@ describe('produção', () => {
     vi.advanceTimersByTime(60_000);
     expect(recarregar).toHaveBeenCalledTimes(2);
   });
+  it('saiu da tela antes da segunda tentativa: ela não acontece e não sobra relógio nenhum', () => {
+    const { t } = montar();
+    t.renderizar(lugar(estadoTee({ ativa: colecao({ id: 53, pronta_em: iso(AGORA + 1000) }) })), false, AGORA);
+    vi.advanceTimersByTime(1500);
+    expect(recarregar).toHaveBeenCalledTimes(1);
+    document.body.replaceChildren(); // fechou o lugar
+    vi.advanceTimersByTime(1000); // o relógio de 1 s vê que saiu
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10_000);
+    expect(recarregar).toHaveBeenCalledTimes(1);
+  });
   it('a resposta chegou com a coleção pronta: sem segunda tentativa', () => {
     const { t } = montar();
     t.renderizar(lugar(estadoTee({ ativa: colecao({ id: 52, pronta_em: iso(AGORA + 1000) }) })), false, AGORA);
@@ -323,6 +354,53 @@ describe('revelação (uma vez por coleção)', () => {
     const { t } = montar();
     t.renderizar(lugar(estadoTee({ ativa: pronta() })), false, AGORA);
     expect(t.elemento.dataset.estado).toBe('venda');
+  });
+});
+
+describe('revelação atrasada (ficou pronta e acabou com a pessoa longe)', () => {
+  it('sem coleção rodando e a última não vista aqui: passa a revelação dela, fecha com o que vendeu, e depois a bancada', () => {
+    const { t, $, $$ } = montar();
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 90 }) })), false, AGORA);
+    expect(t.elemento.dataset.estado).toBe('revelacao');
+    expect($$('.tee-post')).toHaveLength(4);
+    vi.advanceTimersByTime(6000);
+    expect($('.tee-pct').textContent).toBe('56%');
+    // 20 × 19,5 = 390 cupons da venda e metade do custo das 16 que sobraram (24) de saldão
+    expect($('.tee-fechou').textContent).toBe('Fechou: vendeu 20 de 36, +390 cupons e +24 do saldão');
+    expect(t.elemento.textContent).not.toContain('Vão sobrar');
+    // o banco redesenha no meio: não recomeça
+    const post = $$('.tee-post')[0];
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 90 }) })), false, AGORA + 1000);
+    expect($$('.tee-post')[0]).toBe(post);
+    const ver = $<HTMLButtonElement>('.tee-ver-bancada');
+    expect(ver.textContent).toBe('Ver a bancada');
+    ver.click();
+    expect(localStorage.getItem(CHAVE_REVELADA)).toBe('90');
+    expect(t.elemento.dataset.estado).toBe('bancada');
+    // uma vez só
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 90 }) })), false, AGORA + 60_000);
+    expect(t.elemento.dataset.estado).toBe('bancada');
+  });
+  it('esgotou e lote fiado: sem a parte do saldão', () => {
+    const { t, $ } = montar();
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 91, vendido: 36, procura: 60, receita: 36 * precoPeca(1), saldao: 0 }) })), false, AGORA);
+    vi.advanceTimersByTime(6000);
+    expect($('.tee-fechou').textContent).toBe('Fechou: vendeu 36 de 36, +702 cupons');
+  });
+  it('já viu (esta ou uma mais nova): direto pra bancada', () => {
+    localStorage.setItem(CHAVE_REVELADA, '92');
+    const { t } = montar();
+    t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 92 }) })), false, AGORA);
+    expect(t.elemento.dataset.estado).toBe('bancada');
+    localStorage.setItem(CHAVE_REVELADA, '97');
+    const m2 = montar();
+    m2.t.renderizar(lugar(estadoTee({ ultima: acabou({ id: 93 }) })), false, AGORA);
+    expect(m2.t.elemento.dataset.estado).toBe('bancada');
+  });
+  it('com uma coleção nova rodando, a antiga não volta (a pessoa já seguiu em frente)', () => {
+    const { t } = montar();
+    t.renderizar(lugar(estadoTee({ ativa: colecao({ id: 99 }), ultima: acabou({ id: 94 }) })), false, AGORA);
+    expect(t.elemento.dataset.estado).toBe('producao');
   });
 });
 

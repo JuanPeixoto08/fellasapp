@@ -195,8 +195,9 @@ export type PinoMapa = {
   aberto: boolean; nivel: number | null; moeda_qtd: number | null; fas: number | null;
   dono: { user_id: string; avatar: IdleVisual | null } | null;
 };
-/** marcos_novos: os marcos que a mecânica alcançou desde a última vez (a tela avisa "Marco: +N%"). */
-export type MapaEstado = { mapa: string | null; lugares: PinoMapa[]; mult: number; marcos_novos?: number[] };
+/** marcos_novos: os marcos que a mecânica alcançou desde a última vez (a tela avisa "Marco: +N%"). estado_mudou: o depois
+ *  dos lugares mexeu na empresa (desafio, conquista); a resposta não traz o estado dela, então a tela busca de novo. */
+export type MapaEstado = { mapa: string | null; lugares: PinoMapa[]; mult: number; marcos_novos?: number[]; estado_mudou?: boolean };
 export type ProducaoLugar = { id: number; user_id: string; nome: string; partes: number[]; numero: number; criado_em: string; avatar: IdleVisual | null };
 export type NotaCaderninho = { tipo: string; a: number; b: number; rotulo: number };
 export type LugarEstado = {
@@ -210,4 +211,6 @@ export type LugarEstado = {
   caderninho: NotaCaderninho[]; mecanica: unknown; server_now: string;
   /** Só na resposta do idle_lugar: os marcos alcançados desde a última vez (de qualquer lugar aberto). */
   marcos_novos?: number[];
+  /** Só na resposta do idle_lugar: o depois mexeu na empresa (desafio, conquista) e a tela busca o estado dela de novo. */
+  estado_mudou?: boolean;
 };

@@ -2,7 +2,9 @@
 // o nome colado como lambe-lambe. Quatro estados:
 // * bancada (sem coleção rodando): tema, estilo, peça, cor, foco (10 pontos), lote, nome e "Lançar";
 // * produção: a contagem até ficar pronta (chegando a hora, pede o lugar de novo pra revelar);
-// * revelação (uma vez por coleção, guardada em localStorage): os 4 posts entrando, a % de procura subindo e o rótulo;
+// * revelação (uma vez por coleção, guardada em localStorage): os 4 posts entrando, a % de procura subindo e o rótulo.
+//   A que ficou pronta e acabou com a pessoa longe (idle_tee_json → ultima) passa na próxima visita, fechando com o que
+//   vendeu ("Fechou: vendeu X de Y, +Z cupons"), e volta pra bancada;
 // * venda: a barra vendido/estoque, os cupons entrando e o "Encerrar (saldão)" com a confirmação aqui dentro.
 // O caderninho (a faixa da moldura) mostra a tabela tema × estilo, os focos descobertos e o Relatório. Quem decide é o
 // banco (idle_tee_*); aqui só mostra e chama.
@@ -12,6 +14,7 @@ import { ativos } from './ativos';
 import {
   caderno, comentario, CORES, custoLote, ESTILOS, gostou, INFLUENCERS, liberado, liberaTextos, NOME_ROTULO, nomeSugerido, PECAS,
   pecasLote, podeFiar, precoPeca, producaoMs, repeticao, TEMAS, vendidoAte, type Caderno, type ColecaoTee, type EstadoTee,
+  type UltimaTee,
 } from './camisetaria';
 import { avatar, canvasDe, estampa, fotoImagem, fundoBancada, LADO_FOTO, pecaComCor } from './camisetariaArte';
 import { dicaTeeCor, dicaTeeEstilo, dicaTeeFoco, dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados } from './dica';
@@ -19,7 +22,8 @@ import { criarFoco } from './foco';
 import { formatarValor } from './formatar';
 import type { AcoesMecanica, Dicas, Mecanica, TelaMecanica } from './mecanicas';
 
-/** A última coleção que a pessoa já viu revelar (id). A revelação passa uma vez por coleção. */
+/** A última coleção que a pessoa já viu revelar (id). A revelação passa uma vez por coleção; o id cresce a cada coleção,
+ *  então guardar a mais nova vale pras de antes também. */
 export const CHAVE_REVELADA = 'fellas:tee-revelada';
 
 type Tipo = 'tema' | 'estilo' | 'peca' | 'cor';
@@ -68,7 +72,7 @@ const reveladasAqui = new Set<number>();
 function jaRevelou(id: number): boolean {
   if (reveladasAqui.has(id)) return true;
   try {
-    return Number(localStorage.getItem(CHAVE_REVELADA) ?? 0) === id;
+    return Number(localStorage.getItem(CHAVE_REVELADA) ?? 0) >= id;
   } catch {
     return false;
   }
@@ -143,6 +147,13 @@ function previsao(c: ColecaoTee): string {
   if (procura >= c.pecas) return procura - c.pecas >= 1 ? `Esgota, e ainda sobra procura pra ${quantia(procura - c.pecas)} peças` : 'Esgota';
   return `Vão sobrar ${quantia(Math.ceil(c.pecas - procura))} peças`;
 }
+/** O fim da coleção que acabou longe: "Fechou: vendeu 20 de 36, +390 cupons e +24 do saldão" (os cupons em dourado). */
+function fechou(u: UltimaTee): HTMLElement {
+  const p = el('p', 'tee-previsao tee-fechou');
+  p.append(`Fechou: vendeu ${quantia(u.vendido)} de ${quantia(u.pecas)}, `, el('span', 'tee-cupons', `+${quantia(u.receita)} cupons`));
+  if (u.saldao >= 1) p.append(' e ', el('span', 'tee-cupons', `+${quantia(u.saldao)} do saldão`));
+  return p;
+}
 const PECA_TEMA = { 1: 'A peça combinou com o tema.', 0: 'A peça nem ajudou nem atrapalhou.', [-1]: 'A peça não combinou com o tema.' } as Record<number, string>;
 
 function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): TelaMecanica {
@@ -159,6 +170,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   let tick: (() => void) | null = null;
   let intervalo: ReturnType<typeof setInterval> | null = null;
   const pedidos = new Set<string>();
+  /** As segundas tentativas marcadas (saem junto com o relógio quando a tela sai da página). */
+  let tentativas: ReturnType<typeof setTimeout>[] = [];
   let confirmando = false;
 
   /** Pede o lugar de novo uma vez por coisa (`k`); se 3 s depois ainda está igual (`aindaIgual`), tenta mais uma vez. */
@@ -166,7 +179,11 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     if (pedidos.has(k)) return;
     pedidos.add(k);
     a.recarregar?.();
-    setTimeout(() => { if (aindaIgual()) a.recarregar?.(); }, NOVA_TENTATIVA_MS);
+    const id = setTimeout(() => {
+      tentativas = tentativas.filter((x) => x !== id);
+      if (raiz.isConnected && aindaIgual()) a.recarregar?.();
+    }, NOVA_TENTATIVA_MS);
+    tentativas.push(id);
   };
   const limparTimers = () => {
     for (const t of timers) clearTimeout(t);
@@ -176,8 +193,12 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     if (intervalo) return;
     intervalo = setInterval(() => {
       if (!raiz.isConnected) {
+        // saiu da página: para o relógio, as segundas tentativas e o que a revelação tinha marcado
         if (intervalo) clearInterval(intervalo);
         intervalo = null;
+        for (const t of tentativas) clearTimeout(t);
+        tentativas = [];
+        limparTimers();
         return;
       }
       tick?.();
@@ -220,7 +241,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     el: HTMLElement; nivel: number; vitrine: ReturnType<typeof criarVitrine>;
     botoes: Record<Tipo, HTMLButtonElement[]>; artes: Partial<Record<Tipo, (HTMLCanvasElement | null)[]>>;
     nomes: Record<Tipo, HTMLElement>; focoValores: HTMLElement[]; pips: HTMLElement[][]; mais: HTMLButtonElement[]; menos: HTMLButtonElement[];
-    focoSobra: HTMLElement; lotes: HTMLButtonElement[]; temaArte: number; corArte: number;
+    focoSobra: HTMLElement; lotes: HTMLButtonElement[]; temaArte: number; corArte: number; altaTrancada: HTMLElement;
   };
   let bancada: Bancada | null = null;
 
@@ -298,12 +319,12 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       const t = el('span', `tee-item tee-trancados tee-trancados-${tipo}`);
       t.tabIndex = 0;
       t.dataset.foco = `tee-${tipo}-trancados`;
-      const texto = dicaTeeTrancados(tipo, nivel);
+      const texto = dicaTeeTrancados(tipo, nivel, tendencia);
       t.setAttribute('role', 'note');
       t.setAttribute('aria-label', texto);
       const prox = trancados.reduce((x, y) => (y.nivel < x.nivel ? y : x));
       t.append(cadeado(), el('span', 'tee-niv', `nív. ${prox.nivel}`), el('span', 'tee-mais', `+${trancados.length}`));
-      dicas.ligar(t, `tee-${tipo}-trancados`, 'Trancado', () => dicaTeeTrancados(tipo, nivelAtual()));
+      dicas.ligar(t, `tee-${tipo}-trancados`, 'Trancado', () => dicaTeeTrancados(tipo, nivelAtual(), ultimo?.m.tendencia));
       g.append(t);
     }
     return g;
@@ -321,7 +342,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   function montarBancada(nivel: number, tendencia: number): Bancada {
     const b = {
       el: el('div', 'tee-bancada'), nivel, vitrine: criarVitrine(), botoes: {}, artes: {}, nomes: {}, focoValores: [], pips: [], mais: [], menos: [],
-      focoSobra: el('span', 'tee-sobra'), lotes: [], temaArte: 0, corArte: 0,
+      focoSobra: el('span', 'tee-sobra'), lotes: [], temaArte: 0, corArte: 0, altaTrancada: el('span', 'tee-alta-trancada'),
     } as unknown as Bancada;
     for (const t of ['tema', 'estilo', 'peca', 'cor'] as const) b.nomes[t] = el('span', `tee-sel tee-sel-${t}`);
 
@@ -361,6 +382,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     // à direita: as escolhas
     const escolhas = el('div', 'tee-escolhas');
     const sTema = secao('tee-s-tema', 'Tema', b.nomes.tema);
+    // o tema da semana ainda trancado: a etiqueta fica no título (sem ladrilho pra pendurar o "alta")
+    sTema.querySelector('.tee-rot')!.firstElementChild!.after(b.altaTrancada);
     sTema.append(grade('tema', 'Tema', nivel, b, tendencia));
     const sEstilo = secao('tee-s-estilo', 'Estilo', b.nomes.estilo);
     sEstilo.append(grade('estilo', 'Estilo', nivel, b, tendencia));
@@ -432,6 +455,10 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       if (!alta) selo?.remove();
       bt.setAttribute('aria-label', alta ? `${TEMAS[i].nome}, em alta` : TEMAS[i].nome);
     });
+    const temaAlta = TEMAS[m.tendencia - 1];
+    b.altaTrancada.textContent = temaAlta && !liberado('tema', temaAlta.id, nivel)
+      ? `Em alta: ${temaAlta.nome} (libera no nível ${temaAlta.nivel})` : '';
+    b.el.querySelector('.tee-trancados-tema')?.setAttribute('aria-label', dicaTeeTrancados('tema', nivel, m.tendencia));
     // a arte dos estilos é o tema escolhido em cada estilo; a das peças, a cor escolhida
     if (b.temaArte !== sel.tema) {
       b.temaArte = sel.tema;
@@ -544,7 +571,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   }
 
   // ===================== revelação =====================
-  function desenharRevelacao(c: ColecaoTee) {
+  /** `fim`: a coleção que acabou com a pessoa longe (a revelação atrasada): fecha com o que vendeu e volta pra bancada. */
+  function desenharRevelacao(c: ColecaoTee, fim: UltimaTee | null = null) {
     revelando = c.id;
     const ns = c.notas ?? [];
     const s = el('div', 'tee-revelacao');
@@ -553,7 +581,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     mini.className = 'tee-rev-foto';
     mini.setAttribute('aria-hidden', 'true');
     const tit = el('div', 'tee-rev-tit');
-    tit.append(el('h3', 'tee-titulo', c.nome), el('p', 'sub', 'Ficou pronta. Os influencers postaram:'));
+    tit.append(el('h3', 'tee-titulo', c.nome),
+      el('p', 'sub', fim ? 'Ficou pronta enquanto você tava fora. Os influencers postaram:' : 'Ficou pronta. Os influencers postaram:'));
     topo.append(mini, tit);
 
     const posts = el('ol', 'tee-posts');
@@ -577,17 +606,18 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const linhaPct = el('p', 'tee-linha-pct');
     linhaPct.append(pct, el('span', undefined, 'de procura'));
     const selo = el('span', `tee-selo rot-${c.rotulo ?? 2}`, NOME_ROTULO[c.rotulo ?? 2]);
-    const prev = el('p', 'tee-previsao', previsao(c));
+    const prev = fim ? fechou(fim) : el('p', 'tee-previsao', previsao(c));
     const peca = el('p', 'sub', PECA_TEMA[c.peca_tema ?? 0] ?? '');
     res.append(linhaPct, selo, prev, peca);
-    const ver = button('Ver a venda', 'btn main tee-ver-venda', () => {
+    const chaveVer = fim ? 'tee-ver-bancada' : 'tee-ver-venda';
+    const ver = button(fim ? 'Ver a bancada' : 'Ver a venda', `btn main ${chaveVer}`, () => {
       gravarRevelada(c.id);
       revelando = null;
       const chave = foco.guardar();
       if (ultimo) desenhar(ultimo.l, ultimo.m);
-      foco.devolver(chave === 'tee-ver-venda' ? 'tee-encerrar' : chave);
+      foco.devolver(chave === chaveVer ? (fim ? 'tee-lancar' : 'tee-encerrar') : chave);
     });
-    ver.dataset.foco = 'tee-ver-venda';
+    ver.dataset.foco = chaveVer;
     s.append(topo, posts, res, ver);
     raiz.replaceChildren(s);
     tick = null;
@@ -737,11 +767,14 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
 
   function desenhar(l: LugarEstado, m: EstadoTee) {
     const c = m.ativa;
-    const novo: Estado = !c ? 'bancada' : !c.pronta || !c.notas ? 'producao'
+    // sem coleção rodando: a última que acabou longe e ainda não passou aqui ganha a revelação atrasada
+    const u = !c && m.ultima && m.ultima.notas && (revelando === m.ultima.id || !jaRevelou(m.ultima.id)) ? m.ultima : null;
+    const novo: Estado = !c ? (u ? 'revelacao' : 'bancada') : !c.pronta || !c.notas ? 'producao'
       : revelando === c.id || !jaRevelou(c.id) ? 'revelacao' : 'venda';
-    if (!vendoCaderno && novo === 'revelacao' && estado === 'revelacao' && revelando === c?.id) return; // a revelação que está passando não recomeça
+    const revela = c ?? u;
+    if (!vendoCaderno && novo === 'revelacao' && estado === 'revelacao' && revelando === revela?.id) return; // a revelação que está passando não recomeça
     limparTimers();
-    if (estado === 'bancada' && novo !== 'bancada') {
+    if (estado === 'bancada' && c) {
       // lançou: o próximo nome começa do zero
       nome.value = '';
       sel.n++;
@@ -760,7 +793,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     raiz.dataset.estado = novo;
     if (novo === 'bancada') desenharBancada(l, m);
     else if (novo === 'producao') desenharProducao(c!);
-    else if (novo === 'revelacao') desenharRevelacao(c!);
+    else if (novo === 'revelacao') desenharRevelacao(revela!, u);
     else desenharVenda(c!, ultimo?.ocupado ?? false);
     garantirIntervalo();
   }

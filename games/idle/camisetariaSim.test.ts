@@ -6,12 +6,13 @@
 // Sem banco: as mesmas contas puras de camisetaria.ts e o custoNivel de mapa.ts. Sementes fixas, determinística.
 //
 // O lugar abre com `moedaInicial` (108 cupons, 1 lote médio de camiseta no nível 1) e, sem cupom nem coleção rodando,
-// o fornecedor fia um lote pequeno por dia (`podeFiar`).
+// o fornecedor fia um lote pequeno por dia (`podeFiar`). No fim natural da venda o estoque que sobrou volta a 50% do custo
+// (`saldao`; lote fiado: nada), igual ao banco.
 import { describe, expect, it } from 'vitest';
 
 import {
   CORES, custoLote, ESTILOS, fasExcesso, fasNota, liberado, notas, PECAS, pecasLote, pecaTema, pctProcura, podeFiar, precoPeca,
-  precoRelatorio, procura, producaoMs, rotulo, TEMAS, tendencia, VENDA_MS, vendidoAte, type Lancamento,
+  precoRelatorio, procura, producaoMs, rotulo, saldao, TEMAS, tendencia, VENDA_MS, vendidoAte, type Lancamento,
 } from './camisetaria';
 import { custoNivel, LUGARES, MARCOS, NIVEL_MAX } from './mapa';
 
@@ -28,7 +29,7 @@ const FOCO_PADRAO = [4, 3, 3] as const;
 type Estrategia = 'chute' | 'caderninho';
 type Colecao = {
   l: Lancamento; media: number; procura: number; pecas: number; preco: number; pronta: number; fim: number;
-  vendido: number; revelada: boolean; excessoPago: boolean;
+  vendido: number; revelada: boolean; excessoPago: boolean; custo: number; fiado: boolean;
 };
 type Resultado = {
   nivelEm: Map<number, number>; notas: { dia: number; media: number }[]; nivelFinal: number;
@@ -95,6 +96,7 @@ function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISET
     }
     if (t >= c.fim && !c.excessoPago) {
       fas += fasExcesso(c.procura, c.pecas, c.l.nivel);
+      cupom += saldao(c.custo, c.pecas, c.vendido, c.fiado);
       c.excessoPago = true;
     }
     if (t >= c.pronta && !c.revelada) {
@@ -175,11 +177,12 @@ function simular(estrategia: Estrategia, semente: number, cupomInicial = CAMISET
     };
     const ns = notas(l);
     const media = ns.reduce((a, b) => a + b, 0) / 4;
-    if (!fiado) cupom -= custoLote(peca, nivel, lote);
+    const custo = fiado ? 0 : custoLote(peca, nivel, lote);
+    cupom -= custo;
     const pronta = t + producaoMs(lote);
     ativa = {
       l, media, procura: procura(l, ns), pecas: pecasLote(nivel, lote), preco: precoPeca(peca), pronta, fim: pronta + VENDA_MS,
-      vendido: 0, revelada: false, excessoPago: false,
+      vendido: 0, revelada: false, excessoPago: false, custo, fiado,
     };
     historico.unshift({ tema, estilo });
     estilosLancados.add(estilo);
@@ -230,6 +233,14 @@ describe('balanceamento da camisetaria (simulação)', () => {
         console.log(`${nome} s${SEMENTES[k]}: n5 ${r.nivelEm.get(5)?.toFixed(1)} n10 ${r.nivelEm.get(10)?.toFixed(1)} n15 ${r.nivelEm.get(15)?.toFixed(1)} n20 ${r.nivelEm.get(20)?.toFixed(1)} n25 ${r.nivelEm.get(25)?.toFixed(1)} final ${r.nivelFinal} | semanas ${semanas} | tudo ${mediaEntre(r, 0, 49).toFixed(2)} 14+ ${mediaEntre(r, 14, 49).toFixed(2)} | pctMax ${r.pctMax.toFixed(0)} intervalo ${r.maiorIntervaloH.toFixed(0)}h fiados ${r.fiados} fas ${r.fas.toFixed(0)}`);
       }
     }
+    // o resumo das metas (o que os testes abaixo conferem)
+    const faixa = (xs: number[]) => `${Math.min(...xs).toFixed(1)}–${Math.max(...xs).toFixed(1)}`;
+    const limiar = MARCOS.find((m) => m.id === 37)!.valor!;
+    const dias = caderninho.map((r) => r.fasNoDia.find((f) => f.fas >= limiar)?.dia ?? Infinity).sort((a, b) => a - b);
+    console.log(`resumo: caderninho n10 ${faixa(caderninho.map((r) => r.nivelEm.get(10)!))} n25 ${faixa(caderninho.map((r) => r.nivelEm.get(NIVEL_MAX)!))}`
+      + ` nota 14+ ${media(caderninho.map((r) => mediaEntre(r, 14, 49))).toFixed(2)} marco de fãs (mediana) dia ${((dias[7] + dias[8]) / 2).toFixed(1)}`
+      + ` | chute nota ${media(chute.map((r) => mediaEntre(r, 0, 49))).toFixed(2)} n25 ${faixa(chute.map((r) => r.nivelEm.get(NIVEL_MAX) ?? Infinity))}`
+      + ` maior intervalo ${Math.max(...chute.map((r) => r.maiorIntervaloH)).toFixed(0)} h | pctMax ${Math.max(...[...caderninho, ...chute].map((r) => r.pctMax)).toFixed(0)}%`);
   }
 
   it('com caderninho: nível 10 entre o dia 5 e o 9', () => {

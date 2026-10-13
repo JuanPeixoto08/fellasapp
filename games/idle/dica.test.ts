@@ -233,6 +233,10 @@ describe('caixinhas da camisetaria (bancada e caderninho)', () => {
     expect(dicaTeeTrancados('peca', 13)).toBe('Próximo: Moletom, no nível 19.');
     expect(dicaTeeTrancados('estilo', 23)).toBe('Próximo: Gótico, no nível 24. Depois mais 1 estilo até o nível 25.');
     expect(dicaTeeTrancados('cor', 25)).toBe('');
+    // o tema da semana ainda trancado entra no cadeado dos temas
+    expect(dicaTeeTrancados('tema', 1, 9)).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25. Em alta esta semana: Crise financeira (libera no nível 4).');
+    expect(dicaTeeTrancados('tema', 1, 2)).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25.');
+    expect(dicaTeeTrancados('estilo', 1, 9)).toBe(dicaTeeTrancados('estilo', 1));
   });
   it('relatório: o que mostra, o preço e quanto falta', () => {
     expect(dicaTeeRelatorio(4, 50, 80)).toBe('Mostra pra sempre o foco ideal do Grafite. Custa 50 cupons.');

@@ -260,13 +260,16 @@ export function dicaTeeRelatorio(estilo: number, preco: number, moeda: number): 
 }
 
 const TIPO_TEE = { tema: ['tema', 'temas'], estilo: ['estilo', 'estilos'], peca: ['peça', 'peças'], cor: ['cor', 'cores'] } as const;
-/** O cadeado de um grupo da bancada: o próximo que libera, em que nível, e quantos ainda faltam. */
-export function dicaTeeTrancados(tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel: number): string {
+/** O cadeado de um grupo da bancada: o próximo que libera, em que nível, e quantos ainda faltam. Nos temas, se o tema em
+ *  alta da semana (`tendencia`) ainda está trancado, diz qual é e em que nível libera. */
+export function dicaTeeTrancados(tipo: 'tema' | 'estilo' | 'peca' | 'cor', nivel: number, tendencia?: number): string {
   const lista = { tema: TEMAS, estilo: ESTILOS, peca: PECAS, cor: CORES }[tipo];
   const falta = lista.filter((x) => !liberado(tipo, x.id, nivel));
   if (!falta.length) return '';
   const prox = falta.reduce((a, x) => (x.nivel < a.nivel ? x : a));
   const [um, varios] = TIPO_TEE[tipo];
   const resto = falta.length - 1;
-  return `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
+  const texto = `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
+  const alta = tipo === 'tema' && tendencia ? TEMAS[tendencia - 1] : undefined;
+  return alta && !liberado('tema', alta.id, nivel) ? `${texto} Em alta esta semana: ${alta.nome} (libera no nível ${alta.nivel}).` : texto;
 }

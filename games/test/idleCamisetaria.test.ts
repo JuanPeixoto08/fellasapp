@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LugarEstado } from '../shared/types';
 import {
   CONFLITOS, CORES, CRESCE, custoLote, distanciaFoco, ESTILOS, FAS_TETO, fasExcesso, fasNota, liberado, notas, PECAS, pctProcura,
-  pecasLote, pecaTema, pesoVenda, PRECO_MULT, precoPeca, precoRelatorio, procura, PUBLICO_BASE, publico, rotulo, TEMAS, tendencia,
-  vendidoAte, type Lancamento,
+  pecasLote, pecaTema, pesoVenda, PRECO_MULT, precoPeca, precoRelatorio, procura, PUBLICO_BASE, publico, rotulo, saldao, TEMAS,
+  tendencia, vendidoAte, type Lancamento,
 } from '../idle/camisetaria';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
@@ -34,7 +34,7 @@ type Colecao = {
 };
 type Ativa = Record<string, unknown> & { id: number; notas: number[] | null; media: number | null; pct: number | null; procura: number | null; rotulo: number | null };
 type Tee = {
-  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: Ativa | null; ultimo_fiado: string | null;
+  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: Ativa | null; ultimo_fiado: string | null; ultima: Ativa | null;
   historico: { id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; notas: number[]; pct: number }[];
   semana: number;
 };
@@ -107,6 +107,7 @@ describe('catálogo', () => {
     ]);
     expect(d.find((x) => x.id === 302)!.texto).toBe('Coleção com 300% de procura');
     expect(d.find((x) => x.id === 312)!.texto).toBe('Coleção com 600% de procura');
+    expect(d.find((x) => x.id === 303)!.texto).toBe('Lote grande com procura pra esgotar'); // julgado na revelação, pela procura
   });
   it('catálogo, coleções e ajudantes ficam escondidos de quem joga', async () => {
     for (const tab of ['idle_tee_cat_tema', 'idle_tee_cat_estilo', 'idle_tee_cat_peca', 'idle_tee_cat_cor', 'idle_tee_cat_conflito', 'idle_tee_const', 'idle_tee_colecoes']) {
@@ -119,6 +120,7 @@ describe('catálogo', () => {
       `select public.idle_tee_pct_procura(1, 1, 0, '{5,5,5,5}')`, 'select public.idle_tee_preco_relatorio(1)',
       'select public.idle_tee_peso(now(), now())', 'select public.idle_tee_vendido_ate(1, now(), now())',
       'select public.idle_tee_tendencia(current_date)', `select public.idle_tee_liberado('tema', 1, 1)`,
+      'select public.idle_tee_saldao(10, 5, 1, false)',
       `select public.idle_tee_json(s) from public.idle_state s`,
     ]) {
       await expect(t.asRole('authenticated', sql), sql).rejects.toThrow(/permission denied/);
@@ -401,6 +403,46 @@ describe('o JSON da camisetaria', () => {
     expect(m.historico[0]).toEqual({ id: c11.id, nome: 'Coleção 11', tema: c11.tema, estilo: 1, peca: 1, cor: 1, notas: c11.notas, pct: c11.pct });
     expect(m.semana).toBe(12);
   });
+  it('ultima: a última revelada com tudo, pra a tela mostrar a revelação que aconteceu longe (volta 2 dias depois)', async () => {
+    await camisetaria(1000);
+    expect((await lugar()).mecanica.ultima).toBeNull();
+    await lancar({ nome: 'Sumida' }); // médio: 36 peças, 108 cupons, pronta em 2 h
+    await ajustar({ procura: 20 });
+    expect((await lugar()).mecanica.ultima).toBeNull(); // em produção: nada revelado
+    andar(2 * H + 2 * 24 * H);
+    const m = (await lugar()).mecanica;
+    expect(m.ativa).toBeNull(); // a venda acabou com a pessoa longe
+    const [c] = await colecoes();
+    const u = m.ultima!;
+    expect(u).toMatchObject({
+      id: c.id, nome: 'Sumida', tema: 1, estilo: 1, peca: 1, cor: 1, arte: 3, tecido: 5, div: 2, lote: 1, nivel: 1, pecas: 36, custo: 108,
+      fiado: false, tendencia: c.tendencia, rotulo: c.rotulo, peca_tema: c.peca_tema, notas: c.notas, media: c.media, procura: 20,
+      pct: c.pct, vendido: 20, encerrada_em: null, pronta: true,
+    });
+    expect(Date.parse(u.pronta_em as string)).toBe(c.pronta_em.getTime());
+    expect(Date.parse(u.fim_em as string)).toBe(c.fim_em.getTime());
+    expect(rel(u.receita as number, 20 * precoPeca(1))).toBeLessThan(1e-12);
+    expect(rel(u.saldao as number, saldao(108, 36, 20, false))).toBeLessThan(1e-12);
+    // é o que entrou: a venda + o saldão
+    expect(rel(await cupons(), 1000 - 108 + (u.receita as number) + (u.saldao as number))).toBeLessThan(1e-12);
+    // à venda: a última revelada é a ativa, e o saldão ainda é 0
+    await lancar({ tema: 2, nome: 'Nova' });
+    andar(3 * H);
+    const m2 = (await lugar()).mecanica;
+    expect(m2.ultima).toMatchObject({ id: m2.ativa!.id, nome: 'Nova', saldao: 0 });
+  });
+  it('ultima encerrada: o saldão do encerrar', async () => {
+    await camisetaria(1000);
+    await lancar();
+    await ajustar({ procura: 10 });
+    andar(3 * H);
+    const r = await t.rpc<Resp>('idle_tee_encerrar');
+    const [c] = await colecoes();
+    const u = r.lugar.mecanica.ultima!;
+    expect(u).toMatchObject({ id: c.id, vendido: c.vendido });
+    expect(u.encerrada_em).not.toBeNull();
+    expect(rel(u.saldao as number, saldao(108, 36, c.vendido, false))).toBeLessThan(1e-12);
+  });
 });
 
 // ===== parte B: venda, revelação, caderninho, desafios, encerrar e relatório =====
@@ -516,7 +558,9 @@ describe('a venda (avancar)', () => {
       const [x] = await colecoes();
       v[h] = x.vendido;
       expect(rel(x.vendido, vendidoAte(total, pronta, agora)), `${h} h`).toBeLessThan(1e-12);
-      expect(rel((await cupons()) - m0, x.vendido * precoPeca(1)), `${h} h`).toBeLessThan(1e-9);
+      // no fim da venda entra também o saldão do estoque que sobrou
+      const fimSaldao = h >= 12 ? saldao(c.custo, c.pecas, total, false) : 0;
+      expect(rel((await cupons()) - m0, x.vendido * precoPeca(1) + fimSaldao), `${h} h`).toBeLessThan(1e-9);
     }
     // 16h-18h pesa 1, 18h-2h pesa 2, 2h-4h pesa 1: 20 "horas" de peso no total
     expect(rel(v[1], total / 20)).toBeLessThan(1e-12);
@@ -524,7 +568,7 @@ describe('a venda (avancar)', () => {
     expect(v[12]).toBe(total);
     expect(v[13]).toBe(total);
     expect(v[30]).toBe(total);
-    expect(rel((await cupons()) - m0, total * precoPeca(1))).toBeLessThan(1e-12);
+    expect(rel((await cupons()) - m0, total * precoPeca(1) + saldao(c.custo, c.pecas, total, false))).toBeLessThan(1e-12);
   });
   it('sem sobra de procura: vende só a procura e não ganha fã de excesso', async () => {
     await camisetaria(1000);
@@ -534,6 +578,35 @@ describe('a venda (avancar)', () => {
     await abrirJogo();
     expect((await colecoes())[0].vendido).toBe(50);
     expect((await estado()).fas).toBe(0);
+  });
+  it('fim natural da venda: o estoque que sobrou volta a 50% do custo (o saldão), uma vez só', async () => {
+    await camisetaria(1000);
+    await lancar({ lote: 2 }); // 84 peças, 252 cupons
+    await ajustar({ procura: 50, notas: [5, 5, 5, 5] });
+    const m0 = await cupons();
+    andar(4 * H + 12 * H - 1); // um ms antes do fim: ainda sem saldão
+    await abrirJogo();
+    expect((await cupons()) - m0).toBeLessThan(50 * precoPeca(1) + 1e-9);
+    andar(1);
+    await abrirJogo();
+    expect(saldao(252, 84, 50, false)).toBe(0.5 * 3 * 34);
+    const esperado = m0 + 50 * precoPeca(1) + saldao(252, 84, 50, false);
+    expect(rel(await cupons(), esperado)).toBeLessThan(1e-12);
+    // as próximas visitas (e o depois) não pagam de novo
+    await lugarB();
+    andar(H);
+    await abrirJogo();
+    await lugarB();
+    expect(rel(await cupons(), esperado)).toBeLessThan(1e-12);
+  });
+  it('fim natural de lote fiado: sem saldão (custou 0)', async () => {
+    await camisetaria(0);
+    await lancar({ lote: 0 }); // fiado, 12 peças
+    await ajustar({ procura: 5 });
+    andar(14 * H);
+    await abrirJogo();
+    expect(saldao(0, 12, 5, true)).toBe(0);
+    expect(rel(await cupons(), 5 * precoPeca(1))).toBeLessThan(1e-12);
   });
   it('marcos de volume, fãs e lendário só saem no depois (idle_lugar), nunca no avancar', async () => {
     await camisetaria(1000);
@@ -670,6 +743,27 @@ describe('desafios da camisetaria', () => {
       expect(await feitos(), `${id}`).toEqual([id]);
     }
   });
+  it('3 coleções na semana: paga no 3º lançamento, sem esperar revelar', async () => {
+    await camisetaria(1e8);
+    await soDesafio(311);
+    for (const k of [1, 2]) {
+      andar(60_000);
+      await lancar({ lote: 0, tema: k });
+      await fechar();
+      expect(await feitos(), `${k}`).toEqual([]);
+    }
+    andar(60_000);
+    const v0 = await valuation();
+    await lancar({ lote: 0, tema: 3 });
+    expect(await feitos()).toEqual([311]);
+    expect(await valuation()).toBeGreaterThan(v0);
+    andar(H); // revela: confere de novo e não paga outra vez
+    await abrirJogo();
+    const v1 = await valuation();
+    await lugarB();
+    expect(await valuation()).toBe(v1);
+    expect(await feitos()).toEqual([311]);
+  });
   it('combinação ótima só conta quando é nova no caderninho', async () => {
     await camisetaria(1e8);
     await soDesafio(309);
@@ -723,6 +817,20 @@ describe('encerrar', () => {
     expect(await estado()).toEqual(e);
     await expect(encerrar()).rejects.toThrow(/idle_tee_sem_venda/);
     await lancar({ tema: 2 }); // livre de novo
+  });
+  it('encerrou e depois passou do fim: o saldão é pago uma vez só (o do encerrar)', async () => {
+    await camisetaria(1000);
+    await lancar(); // 36 peças, 108 cupons
+    await ajustar({ procura: 10 });
+    andar(2 * H + H);
+    await encerrar();
+    const [c] = await colecoes();
+    const m1 = await cupons();
+    expect(rel(m1, 1000 - 108 + c.vendido * precoPeca(1) + saldao(108, 36, c.vendido, false))).toBeLessThan(1e-12);
+    andar(20 * H);
+    await abrirJogo();
+    await lugarB();
+    expect(await cupons()).toBe(m1);
   });
   it('lote fiado não devolve cupom', async () => {
     await camisetaria(0);

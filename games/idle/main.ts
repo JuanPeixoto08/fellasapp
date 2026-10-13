@@ -134,13 +134,13 @@ async function carregarMapa() {
   try {
     if (lugarAberto === null) {
       const m = await api.idleMapa();
-      avisarMarcos(m.marcos_novos, true); // ganhou de qualquer jeito: avisa mesmo se a tela já mudou
+      depoisDaBusca(m); // ganhou de qualquer jeito: avisa mesmo se a tela já mudou
       if (!mapaAberto || lugarAberto !== null) return; // fechou o mapa ou entrou num lugar enquanto buscava
       mapa = m;
     } else {
       const id = lugarAberto;
       const l = await api.idleLugar(id);
-      avisarMarcos(l.marcos_novos, true);
+      depoisDaBusca(l);
       if (!mapaAberto || lugarAberto !== id) return; // saiu do lugar enquanto buscava
       lugar = l;
       await carregarNomesLugar(l);
@@ -174,14 +174,18 @@ const avisoMarcos = (ids: number[]): string | null => {
   const total = ids.reduce((t, id) => t + (MARCOS.find((m) => m.id === id)?.bonus ?? 0), 0);
   return ids.length ? `Marco: +${Math.round(total * 100)}% de produção` : null;
 };
-/** Marcos que chegaram (subir nível, ação da mecânica ou a mecânica andando sozinha no idle_lugar/idle_mapa): avisa e toca.
- *  `recarregarEstado`: a resposta não trouxe o estado da empresa (idle_lugar/idle_mapa), então busca a taxa nova. */
-function avisarMarcos(ids: number[] | undefined, recarregarEstado = false) {
+/** Marcos que chegaram (subir nível, ação da mecânica ou a mecânica andando sozinha no idle_lugar/idle_mapa): avisa e toca. */
+function avisarMarcos(ids: number[] | undefined) {
   const marco = avisoMarcos(ids ?? []);
   if (!marco) return;
   aviso = marco;
   audio.tocar('conquista');
-  if (recarregarEstado) void recarregar().catch(() => undefined);
+}
+/** idle_lugar e idle_mapa não trazem o estado da empresa: avisa os marcos e, se eles ou o depois dos lugares (desafio,
+ *  conquista: estado_mudou) mexeram nela, busca o estado de novo (uma vez só). */
+function depoisDaBusca(r: { marcos_novos?: number[]; estado_mudou?: boolean }) {
+  avisarMarcos(r.marcos_novos);
+  if (r.marcos_novos?.length || r.estado_mudou) void recarregar().catch(() => undefined);
 }
 let bolsaBuscadaEm = 0; // quando o mercado chegou (o "preço novo em" desce a partir daí)
 let timerBolsa: ReturnType<typeof setTimeout> | null = null;

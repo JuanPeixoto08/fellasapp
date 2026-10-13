@@ -125,6 +125,9 @@ returns jsonb language plpgsql volatile security definer set search_path = publi
 declare
   s       public.idle_state;
   v_novos int[];
+  antes   public.idle_state;
+  v_conq  bigint;
+  v_mudou boolean;
 begin
   if not public.is_member() then
     raise exception 'not_member' using errcode = '42501';
@@ -136,11 +139,19 @@ begin
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
   perform public.idle_save(s);
+  -- o depois; salva de novo só se ele mexeu no s. estado_mudou = mexeu no s ou deu conquista (a resposta não traz o
+  -- idle_json: a tela busca o estado da empresa de novo)
+  antes := s;
+  v_conq := (select count(*) from public.idle_conquistas c where c.user_id = s.user_id);
   s := public.idle_place_depois(s);
-  perform public.idle_save(s);
+  v_mudou := s is distinct from antes;
+  if v_mudou then
+    perform public.idle_save(s);
+  end if;
+  v_mudou := v_mudou or (select count(*) from public.idle_conquistas c where c.user_id = s.user_id) <> v_conq;
   -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
   v_novos := public.idle_place_marcos_todos(s.user_id);
-  return public.idle_mapa_json(s) || jsonb_build_object('marcos_novos', to_jsonb(v_novos));
+  return public.idle_mapa_json(s) || jsonb_build_object('marcos_novos', to_jsonb(v_novos), 'estado_mudou', v_mudou);
 end;
 $$;
 
@@ -505,12 +516,19 @@ $$;
 -- * Cada lugar troca só os stubs dele: idle_<x>_avancar(s), idle_<x>_depois(s) e idle_<x>_json(s). Os despachantes abaixo
 --   (idle_place_avancar, idle_place_depois e idle_place_mecanica_json) já chamam os nove e não mudam mais.
 -- * O que precisa da conta fechada (registrar, caderninho, desafio, conquistas) vai no idle_<x>_depois, que devolve o s (o
---   prêmio de desafio mexe no valuation). idle_lugar e idle_mapa já rodam o idle_place_depois; a RPC de mecânica termina com
---   `return idle_place_responder(s, p_lugar)` (depois, save, marcos e a resposta padrão).
+--   prêmio de desafio mexe no valuation). O idle_<x>_depois é idempotente (uma marca por linha, ex.: revelada: rodar duas
+--   vezes não paga duas vezes), trata os resultados na ordem em que aconteceram e registra cada um com p_quando = a hora
+--   em que aconteceu (o que acabou longe da pessoa entra na semana certa).
+-- * Quem roda o depois: idle_lugar e idle_mapa (salvam de novo só se o s mudou e devolvem estado_mudou, que faz a tela
+--   buscar o estado da empresa) e as RPCs de mecânica, pelo idle_place_responder. idle_place_nivel e idle_place_abrir
+--   não rodam o depois.
 -- * RPC de mecânica (idle_tee_*, idle_cup_*, idle_din_*): trava + fecha a conta (idle_settle(idle_lock(auth.uid()))), salva
---   (idle_save) e só então mexe no lugar; devolve idle_json(s) || jsonb_build_object('lugar', idle_lugar_json(s, p_lugar),
---   'marcos_novos', to_jsonb(idle_place_marcos(s.user_id, p_lugar))). Grant só na RPC; tudo que é ajudante fica revogado
---   de public, anon e authenticated (o regex de shared/api.ts é só cosmético: quem protege é o revoke).
+--   (idle_save), só então mexe no lugar e termina com `return public.idle_place_responder(s, p_lugar)` (o depois, o save,
+--   os marcos de todos os lugares pelo idle_place_marcos_todos e a resposta padrão idle_json(s) || {lugar, marcos_novos}).
+--   Grant só na RPC; tudo que é ajudante fica revogado de public, anon e authenticated (o regex de shared/api.ts é só
+--   cosmético: quem protege é o revoke).
+-- * O JSON da mecânica traz o último resultado que terminou (`ultima`, com tudo pra tela mostrar): o que ficou pronto e
+--   acabou com a pessoa longe é mostrado na próxima visita (a revelação atrasada; a camisetaria é o exemplo).
 -- * Erro novo: o código vai em games/shared/errors.ts (FROM_DB e ERROR_TEXT) e, se a tela precisa buscar o lugar de novo,
 --   em RECARREGA_MAPA de games/idle/main.ts.
 -- * idle_place_mecanica_json e os idle_<x>_json são estáveis: só leem, nunca escrevem (rodam dentro do idle_lugar_json).
@@ -633,6 +651,9 @@ returns jsonb language plpgsql volatile security definer set search_path = publi
 declare
   s       public.idle_state;
   v_novos int[];
+  antes   public.idle_state;
+  v_conq  bigint;
+  v_mudou boolean;
 begin
   if not public.is_member() then
     raise exception 'not_member' using errcode = '42501';
@@ -642,11 +663,19 @@ begin
   end if;
   s := public.idle_settle(public.idle_lock(auth.uid()));
   perform public.idle_save(s);
+  -- o depois; salva de novo só se ele mexeu no s. estado_mudou = mexeu no s ou deu conquista (a resposta não traz o
+  -- idle_json: a tela busca o estado da empresa de novo)
+  antes := s;
+  v_conq := (select count(*) from public.idle_conquistas c where c.user_id = s.user_id);
   s := public.idle_place_depois(s);
-  perform public.idle_save(s);
+  v_mudou := s is distinct from antes;
+  if v_mudou then
+    perform public.idle_save(s);
+  end if;
+  v_mudou := v_mudou or (select count(*) from public.idle_conquistas c where c.user_id = s.user_id) <> v_conq;
   -- marcos que a mecânica alcançou desde a última vez (fechada a conta com a taxa de antes: o bônus vale daqui pra frente)
   v_novos := public.idle_place_marcos_todos(s.user_id);
-  return public.idle_lugar_json(s, p_lugar) || jsonb_build_object('marcos_novos', to_jsonb(v_novos));
+  return public.idle_lugar_json(s, p_lugar) || jsonb_build_object('marcos_novos', to_jsonb(v_novos), 'estado_mudou', v_mudou);
 end;
 $$;
 

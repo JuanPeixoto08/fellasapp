@@ -499,5 +499,45 @@ describe('gancho depois (idle_place_depois)', () => {
   });
   it('ajudantes revogados de authenticated', async () => {
     await expect(t.asRole('authenticated', `select public.idle_place_depois(s) from public.idle_state s`)).rejects.toThrow();
+    for (const f of [
+      'idle_place_depois(public.idle_state)', 'idle_place_responder(public.idle_state, integer)', 'idle_tee_depois(public.idle_state)',
+      'idle_cup_depois(public.idle_state)', 'idle_din_depois(public.idle_state)', 'idle_tee_avancar(public.idle_state)',
+      'idle_tee_json(public.idle_state)',
+    ]) {
+      const r = await q<{ pode: boolean }>(`select has_function_privilege('authenticated', $1, 'execute') as pode`, [`public.${f}`]);
+      expect(r[0].pode, f).toBe(false);
+    }
+  });
+  it('idle_lugar e idle_mapa salvam de novo só se o depois mexeu no s; estado_mudou diz se a tela busca a empresa', async () => {
+    await empresa(4, 1000);
+    await q(`insert into public.idle_place_state (user_id, lugar) values ($1, 3)`, [A]);
+    // conta os idle_save: a de verdade vira idle_save_real e a nova anota antes de chamar
+    await q('create table public.saves_teste (n int)');
+    await q('alter function public.idle_save(public.idle_state) rename to idle_save_real');
+    await q(`create function public.idle_save(s public.idle_state) returns void language plpgsql set search_path = public as $$
+             begin insert into public.saves_teste values (1); perform public.idle_save_real(s); end; $$`);
+    const saves = async () => (await q<{ n: number }>('select count(*)::int as n from public.saves_teste'))[0].n;
+    type R = { estado_mudou: boolean };
+    // nada pra revelar: o depois não mexe no s, um save só (o de fechar a conta)
+    expect((await t.rpc<R>('idle_lugar', { p_lugar: 3 })).estado_mudou).toBe(false);
+    expect(await saves()).toBe(1);
+    expect((await t.rpc<R>('idle_mapa')).estado_mudou).toBe(false);
+    expect(await saves()).toBe(2);
+    // o depois mexe no s: salva de novo e avisa
+    await stub('idle_tee_depois');
+    expect((await t.rpc<R>('idle_lugar', { p_lugar: 3 })).estado_mudou).toBe(true);
+    expect(await saves()).toBe(4);
+    expect(await val()).toBe(1005);
+    expect((await t.rpc<R>('idle_mapa')).estado_mudou).toBe(true);
+    expect(await saves()).toBe(6);
+    expect(await val()).toBe(1010);
+    // o depois só dá conquista (o s igual): não salva de novo, mas avisa (a conquista mexe na taxa)
+    await q(`create or replace function public.idle_tee_depois(s public.idle_state)
+      returns public.idle_state language plpgsql volatile set search_path = public as $$
+      begin perform public.idle_ganhar(s.user_id, 'mapa_podio'); return s; end; $$`);
+    expect((await t.rpc<R>('idle_lugar', { p_lugar: 3 })).estado_mudou).toBe(true);
+    expect(await saves()).toBe(7);
+    expect((await t.rpc<R>('idle_lugar', { p_lugar: 3 })).estado_mudou).toBe(false); // já tinha a conquista
+    expect(await saves()).toBe(8);
   });
 });

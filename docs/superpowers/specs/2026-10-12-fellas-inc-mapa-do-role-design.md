@@ -179,7 +179,20 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 - Fãs: a procura usa `1 + min(√fãs/30, 3)` (no máximo ×4) e os fãs do excesso de uma coleção têm teto de 20% do público
   do nível; fãs pela nota = `round(público × 0,1 × (média − 6))` com média ≥ 7. Constantes: público 75, cresce 1,35,
   preço da peça = custo × 6,5; relatório = 50 × 1,35^(nível−1).
-- Desafios de procura: 300% e 600% (150%/250% ficavam automáticos).
+- Desafios de procura: 300% e 600% (150%/250% ficavam automáticos). O 303 virou "Lote grande com procura pra esgotar"
+  (é julgado na revelação, pela procura). "Lança 3 coleções na semana" paga no próprio 3º lançamento.
+- **Saldão também no fim natural da venda:** quando as 12 h acabam, o estoque que sobrou volta a 50% do custo, uma vez
+  (no `idle_tee_avancar`, junto dos fãs do excesso; lote fiado não tem saldão). Quem joga parado não perde pra quem fica
+  online pra encerrar; o Encerrar só libera a bancada antes (e não paga de novo no fim). A simulação continua nas metas sem
+  mexer no preço da peça.
+- **Revelação atrasada (o padrão das partes 3 e 4):** o JSON da mecânica traz o último resultado que terminou (`ultima`,
+  com tudo). A coleção que ficou pronta e acabou com a pessoa longe ganha a revelação na próxima visita (uma vez por
+  aparelho), fechando com "Fechou: vendeu X de Y, +Z cupons" (e o saldão, se teve) e "Ver a bancada". Com uma coleção nova
+  já rodando, a antiga não volta.
+- Tema da semana ainda trancado: a bancada mostra "Em alta: <tema> (libera no nível N)" no título do Tema, e a caixinha do
+  cadeado dos temas diz o mesmo.
+- idle_lugar e idle_mapa salvam de novo só quando o depois mexeu no estado da empresa e avisam a tela (`estado_mudou`) pra
+  ela buscar o estado de novo.
 - Tela: o caderninho completo (tabela 30 × 15, focos, relatório) abre no miolo do lugar; a faixa mostra o resumo.
   Trancados aparecem como um chip "nív. N +N" por grupo. Nenhuma barra de rolagem no PC (pedido do Juan).
 - O tema Pagode virou um cavaquinho na estampa (o pandeiro não se lia em 16×16): conferir com o Juan.

@@ -1189,6 +1189,10 @@ body:has(.idle) { background: #121212; }
 .idle .tee-secao { min-width: 0; }
 .idle .tee-rot { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 7px; font: 400 17px/1 var(--i-pixel); color: var(--i-mudo); }
 .idle .tee-sel { min-width: 0; overflow: hidden; font-size: 20px; color: var(--paper); white-space: nowrap; text-overflow: ellipsis; }
+/* o tema em alta da semana ainda trancado: a etiqueta mint do "alta" encostada no título (não cresce a bancada) */
+.idle .tee-alta-trancada { min-width: 0; margin-right: auto; overflow: hidden; font-size: 14px; color: var(--mint); white-space: nowrap;
+  text-overflow: ellipsis; }
+.idle .tee-alta-trancada:empty { display: none; }
 .idle .tee-grade { display: flex; flex-wrap: wrap; gap: 6px; }
 .idle .tee-item { position: relative; flex: none; display: grid; place-items: center; align-content: center; gap: 2px; width: 44px; height: 44px; padding: 0;
   border: 0; border-radius: 0; color: var(--paper); background: var(--i-fundo2); cursor: pointer; box-shadow: inset 0 0 0 2px var(--i-borda);
@@ -1313,7 +1317,7 @@ body:has(.idle) { background: #121212; }
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35); opacity: 0; transform: rotate(-3deg) scale(1.5); transition: opacity 0.12s ease-out, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 .idle .tee-selo.entrou { opacity: 1; transform: rotate(-3deg); }
 .idle .tee-venda .tee-linha-pct .tee-selo { margin-left: 6px; font-size: 18px; }
-.idle .btn.tee-ver-venda { justify-self: start; min-width: 200px; }
+.idle .btn.tee-ver-venda, .idle .btn.tee-ver-bancada { justify-self: start; min-width: 200px; }
 
 /* caderninho. Na faixa: o resumo em números e o botão. No miolo (aberto): a tabela tema × estilo do que liberou com a
    cor do rótulo, a legenda e o foco ideal de cada estilo lançado. Cabe sem rolar até no nível 25 (30 × 15). */

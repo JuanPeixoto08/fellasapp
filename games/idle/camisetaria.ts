@@ -191,6 +191,12 @@ export function precoPeca(peca: number): number {
   return PECAS[peca - 1].custo * PRECO_MULT;
 }
 
+/** O saldão: o estoque que sobrou volta a 50% do que custou (lote fiado custou 0: nada). Vale no Encerrar e no fim natural
+ *  da venda (quem não estava online não perde pra quem encerrou). Mesma conta do idle_tee_saldao. */
+export function saldao(custo: number, pecas: number, vendido: number, fiado: boolean): number {
+  return fiado ? 0 : ((0.5 * custo) / pecas) * (pecas - vendido);
+}
+
 /** "O fornecedor fia": sem coleção rodando e sem cupom para o lote pequeno da peça escolhida, o lote pequeno sai de graça,
  *  no máximo uma vez a cada 24 h (ultimoFiadoMs null = nunca fiou). Assim ninguém fica travado sem cupom. */
 export function podeFiar(semColecaoAtiva: boolean, moeda: number, custoPequeno: number, ultimoFiadoMs: number | null, agoraMs: number): boolean {
@@ -265,12 +271,16 @@ export type ColecaoTee = {
   criada_em: string; pronta_em: string; fim_em: string; vendido: number; pronta: boolean;
   notas: number[] | null; media: number | null; procura: number | null; pct: number | null; rotulo: number | null; peca_tema: number | null;
 };
+/** A última coleção revelada (idle_tee_json → ultima), com tudo: a tela passa a revelação dela quando a pessoa não viu
+ *  (ficou pronta e acabou com ela longe) e fecha com o que vendeu. receita = vendido × preço da peça; saldao = o que o
+ *  estoque que sobrou devolveu (no Encerrar ou no fim natural; 0 enquanto vende). */
+export type UltimaTee = ColecaoTee & { encerrada_em: string | null; receita: number; saldao: number };
 /** Uma das últimas 10 coleções reveladas (a mais nova primeiro). */
 export type HistoricoTee = { id: number; nome: string; tema: number; estilo: number; peca: number; cor: number; notas: number[]; pct: number };
 /** `LugarEstado.mecanica` do lugar 3 (idle_tee_json). */
 export type EstadoTee = {
-  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: ColecaoTee | null; historico: HistoricoTee[];
-  semana: number; ultimo_fiado: string | null;
+  tendencia: number; lotes: number[]; precos: { relatorio: number }; ativa: ColecaoTee | null; ultima: UltimaTee | null;
+  historico: HistoricoTee[]; semana: number; ultimo_fiado: string | null;
 };
 
 /** O caderninho da camisetaria: combinação tema × estilo → rótulo; peça × tema → -1/0/+1; estilo → foco ideal. */

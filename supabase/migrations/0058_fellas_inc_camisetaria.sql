@@ -111,7 +111,7 @@ delete from public.idle_cat_place_desafio where lugar = 3;
 insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values
   (301, 3, 'tee_nota', 8, 'Lança uma coleção com nota média 8 ou mais', 'horas', 2),
   (302, 3, 'tee_pct', 300, 'Coleção com 300% de procura', 'horas', 3),
-  (303, 3, 'tee_esgotou_grande', 1, 'Esgota uma coleção de lote grande', 'legado', 2),
+  (303, 3, 'tee_esgotou_grande', 1, 'Lote grande com procura pra esgotar', 'legado', 2),
   (304, 3, 'tee_tendencia', 7, 'Coleção com o tema da semana e nota 7 ou mais', 'horas', 2),
   (305, 3, 'tee_quatro', 8, 'Os 4 influencers dão 8 ou mais', 'legado', 3),
   (306, 3, 'tee_luis', 9, 'Arranca 9 ou mais do @luisviton', 'investidor', 1),
@@ -124,8 +124,9 @@ insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio
 
 -- ===== as coleções (só pelas funções) =====
 -- Tudo é calculado no lançamento (determinístico, guardado aqui) e só mostrado quando fica pronta. custo = o que a pessoa
--- pagou (0 quando o fornecedor fiou: encerrar antes não devolve cupom de lote fiado). fiado = saiu de graça (no máximo um
--- a cada 24 h: a última vez é o max(criada_em) das fiadas).
+-- pagou (0 quando o fornecedor fiou: lote fiado não tem saldão). fiado = saiu de graça (no máximo um a cada 24 h: a última
+-- vez é o max(criada_em) das fiadas). fas_excesso_pago = o fim natural da venda já foi pago (fãs do excesso e saldão);
+-- a encerrada fica false para sempre (o encerrar pagou o saldão dela e o avancar não olha mais pra ela).
 create table if not exists public.idle_tee_colecoes (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
@@ -296,6 +297,19 @@ returns int language sql immutable set search_path = public as $$
   select 1 + public.idle_place_semana_idx(3, 1, 30, p_semana)
 $$;
 
+-- preço de uma peça vendida: o custo da peça × PRECO_MULT (precoPeca)
+create or replace function public.idle_tee_preco_peca(p_peca int)
+returns double precision language sql stable set search_path = public as $$
+  select p.custo * k.preco_mult from public.idle_tee_cat_peca p, public.idle_tee_const k where p.id = p_peca
+$$;
+
+-- o saldão: o estoque que sobrou volta a 50% do que custou (saldao; lote fiado custou 0: nada). Vale no encerrar e no fim
+-- natural da venda (a pessoa que não estava online não perde pra quem encerrou).
+create or replace function public.idle_tee_saldao(p_custo double precision, p_pecas int, p_vendido double precision, p_fiado boolean)
+returns double precision language sql immutable set search_path = public as $$
+  select case when p_fiado then 0::double precision else 0.5 * p_custo / p_pecas * (p_pecas - p_vendido) end
+$$;
+
 -- ===== lançar uma coleção =====
 -- Uma por vez (em produção ou à venda). Calcula tudo agora (notas, média, procura, %, rótulo, peça × tema, o tema da semana)
 -- e grava; a tela só mostra o resultado quando fica pronta. "O fornecedor fia": sem cupom pro lote pequeno da peça, o lote
@@ -310,6 +324,7 @@ declare
   v_custo     double precision;
   v_fiado     boolean := false;
   v_ult_fiado timestamptz;
+  v_sem       int;
   v_id        bigint;
   v_tend      int;
   v_ult_t     int[];
@@ -380,12 +395,18 @@ begin
           public.idle_tee_procura(st.nivel, p_peca, st.fas, v_notas), public.idle_tee_pct_procura(st.nivel, p_peca, st.fas, v_notas),
           now(), v_pronta, v_pronta + interval '12 hours', v_fiado);
   update public.idle_place_state set moeda = moeda - v_custo where user_id = s.user_id and lugar = 3;
+  -- "Lança 3 coleções na semana" paga no lançamento (a nova já conta); o depois confere de novo e não paga duas vezes
+  select count(*) into v_sem from public.idle_tee_colecoes c
+   where c.user_id = s.user_id and c.criada_em >= (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo');
+  s := public.idle_place_desafio(s, 3, 'tee_colecoes', v_sem);
   return public.idle_place_responder(s, 3);
 end;
 $$;
 
 -- ===== o JSON da tela (troca o stub da 0057; estável: só lê) =====
 -- ativa = a coleção em produção ou à venda; notas, média, procura, %, rótulo e peça × tema só depois de pronta.
+-- ultima = a última revelada (a que ficou pronta por último), com tudo: a tela mostra a revelação dela quando a pessoa não
+-- viu (ficou pronta e acabou com ela longe), fechando com quanto vendeu, a receita e o saldão (o padrão das partes 3 e 4).
 -- historico = as últimas 10 reveladas; semana = quantas lançou nesta semana; ultimo_fiado = a última vez que o fornecedor fiou
 -- (a tela usa com podeFiar). Lugar fechado: null.
 create or replace function public.idle_tee_json(s public.idle_state)
@@ -410,6 +431,21 @@ returns jsonb language sql stable set search_path = public as $$
                where c.user_id = s.user_id and c.encerrada_em is null and now() < c.fim_em
                order by c.criada_em desc, c.id desc
                limit 1),
+    'ultima', (select jsonb_build_object(
+                   'id', c.id, 'nome', c.nome, 'tema', c.tema, 'estilo', c.estilo, 'peca', c.peca, 'cor', c.cor,
+                   'arte', c.arte, 'tecido', c.tecido, 'div', c.div, 'lote', c.lote, 'nivel', c.nivel, 'pecas', c.pecas,
+                   'custo', c.custo, 'fiado', c.fiado, 'tendencia', c.tendencia, 'criada_em', c.criada_em,
+                   'pronta_em', c.pronta_em, 'fim_em', c.fim_em, 'encerrada_em', c.encerrada_em, 'vendido', c.vendido,
+                   'pronta', true, 'notas', to_jsonb(c.notas), 'media', c.media, 'procura', c.procura, 'pct', c.pct,
+                   'rotulo', c.rotulo, 'peca_tema', c.peca_tema,
+                   'receita', c.vendido * public.idle_tee_preco_peca(c.peca),
+                   -- o saldão já pago: no encerrar ou no fim natural (fas_excesso_pago); rodando ainda, 0
+                   'saldao', case when c.encerrada_em is not null or c.fas_excesso_pago
+                                  then public.idle_tee_saldao(c.custo, c.pecas, c.vendido, c.fiado) else 0 end)
+                 from public.idle_tee_colecoes c
+                where c.user_id = s.user_id and c.revelada
+                order by c.pronta_em desc, c.id desc
+                limit 1),
     'historico', coalesce((select jsonb_agg(jsonb_build_object('id', h.id, 'nome', h.nome, 'tema', h.tema, 'estilo', h.estilo,
                                                                'peca', h.peca, 'cor', h.cor, 'notas', to_jsonb(h.notas), 'pct', h.pct)
                                             order by h.criada_em desc, h.id desc)
@@ -439,17 +475,13 @@ revoke all on function public.idle_tee_acumulado(double precision) from public, 
 revoke all on function public.idle_tee_peso(timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_tee_vendido_ate(double precision, timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.idle_tee_tendencia(date) from public, anon, authenticated;
+revoke all on function public.idle_tee_preco_peca(int) from public, anon, authenticated;
+revoke all on function public.idle_tee_saldao(double precision, int, double precision, boolean) from public, anon, authenticated;
 revoke all on function public.idle_tee_json(public.idle_state) from public, anon, authenticated;
 revoke all on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) from public, anon;
 grant execute on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) to authenticated;
 
 -- ===== parte B: a venda, a revelação (caderninho, conquistas, desafios), encerrar e o relatório =====
-
--- preço de uma peça vendida: o custo da peça × PRECO_MULT (precoPeca)
-create or replace function public.idle_tee_preco_peca(p_peca int)
-returns double precision language sql stable set search_path = public as $$
-  select p.custo * k.preco_mult from public.idle_tee_cat_peca p, public.idle_tee_const k where p.id = p_peca
-$$;
 
 -- fãs que a coleção traz pela nota ao ser revelada: média 7 ou mais dá 10% do público do nível por ponto acima de 6
 -- (fasNota; round do JS: meio pra cima)
@@ -470,7 +502,8 @@ $$;
 -- anda a venda até agora (roda no idle_lock, antes de fechar a conta). Só mexe nos cupons e nos fãs do lugar e no vendido
 -- da coleção; marcos, conquistas, pódio, caderninho e desafio ficam pro idle_tee_depois. A coleção vende as 12 h dela
 -- mesmo sem a pessoa passar (visto_em não conta aqui). Encerrada: parou na hora (o encerrar andou até ela) e os fãs do
--- excesso não vêm. No fim da venda: vendido = min(procura, estoque) exato, os fãs do excesso entram e a coleção sai da conta.
+-- excesso não vêm. No fim da venda: vendido = min(procura, estoque) exato, os fãs do excesso e o saldão do estoque que
+-- sobrou (50% do custo, como no encerrar; lote fiado: nada) entram uma vez (fas_excesso_pago) e a coleção sai da conta.
 create or replace function public.idle_tee_avancar(s public.idle_state)
 returns void language plpgsql volatile set search_path = public as $$
 declare
@@ -487,6 +520,7 @@ begin
     v_moeda := v_moeda + (v_novo - c.vendido) * public.idle_tee_preco_peca(c.peca);
     if now() >= c.fim_em then
       v_fas := v_fas + public.idle_tee_fas_excesso(c.procura, c.pecas, c.nivel);
+      v_moeda := v_moeda + public.idle_tee_saldao(c.custo, c.pecas, v_novo, c.fiado);
     end if;
     update public.idle_tee_colecoes set vendido = v_novo, fas_excesso_pago = (now() >= c.fim_em) where id = c.id;
   end loop;
@@ -552,7 +586,8 @@ begin
 end;
 $$;
 
--- encerrar antes (saldão): a venda para agora e o estoque que sobrou devolve 50% do que custou (lote fiado custou 0: nada)
+-- encerrar antes (saldão): a venda para agora e o estoque que sobrou devolve 50% do que custou (lote fiado custou 0: nada).
+-- A encerrada sai do avancar (encerrada_em): o fim natural não paga o saldão dela de novo.
 create or replace function public.idle_tee_encerrar()
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -577,7 +612,7 @@ begin
     raise exception 'idle_tee_sem_venda' using errcode = 'P0001';
   end if;
   update public.idle_tee_colecoes set encerrada_em = now() where id = c.id;
-  update public.idle_place_state set moeda = moeda + 0.5 * c.custo / c.pecas * (c.pecas - c.vendido)
+  update public.idle_place_state set moeda = moeda + public.idle_tee_saldao(c.custo, c.pecas, c.vendido, c.fiado)
    where user_id = s.user_id and lugar = 3;
   return public.idle_place_responder(s, 3);
 end;
@@ -619,7 +654,6 @@ begin
 end;
 $$;
 
-revoke all on function public.idle_tee_preco_peca(int) from public, anon, authenticated;
 revoke all on function public.idle_tee_fas_nota(double precision, int) from public, anon, authenticated;
 revoke all on function public.idle_tee_fas_excesso(double precision, double precision, int) from public, anon, authenticated;
 revoke all on function public.idle_tee_avancar(public.idle_state) from public, anon, authenticated;
