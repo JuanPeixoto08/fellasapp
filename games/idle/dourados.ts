@@ -80,6 +80,11 @@ export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro:
 }
 
 /** O texto que sobe quando pega: quanto ganhou (Investidor), a Promoção, o Viralizou (×100 quando são dois). */
+/** O que o Investidor apressado paga (igual a idle_dourado_pegar na 0061): 20 min da produção `rate`, × o Investidor anjo
+ *  (`investidor`) e × (1 + o bônus de oportunidades da horta). */
+export const ganhoInvestidor = (rate: number, investidor: number, hortaOportunidades: number) =>
+  rate * 1200 * investidor * (1 + hortaOportunidades);
+
 export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number; duracao?: number }): string {
   const d = o.duracao ?? 1; // Hype de lançamento: 2
   if (tipo === 0) return `+${formatarValor(o.ganho)}`;

@@ -8,7 +8,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual } fr
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
@@ -203,7 +203,8 @@ const tela = criarTela(document.getElementById('app')!, {
       audio.tocar('douradoPego');
       const ef = efeitos(s0); // Investidor anjo e Hype mudam o que o texto diz
       if (chaves.avisos) {
-        tela.dourados.subirTexto(textoPegou(tipo, { ganho: s0.rate * 1200 * ef.douradoInvestidor, viral: s.viral.length, duracao: ef.douradoDuracao }), p.x, p.y);
+        const ganho = ganhoInvestidor(s0.rate, ef.douradoInvestidor, s0.horta_bonus?.oportunidades ?? 0);
+        tela.dourados.subirTexto(textoPegou(tipo, { ganho, viral: s.viral.length, duracao: ef.douradoDuracao }), p.x, p.y);
       }
     } catch (e) {
       const err = toGameError(e);
