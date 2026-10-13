@@ -69,10 +69,10 @@ describe('selos e textos', () => {
     expect(selosBonus({ promo_ate: null, viral: [em(15), em(55)] }, T)).toEqual([{ texto: '×100 · 0:15', ouro: true }]);
     expect(selosBonus({ promo_ate: null, viral: [em(5), em(15), em(55)] }, T)).toEqual([{ texto: '×1.000 · 0:05', ouro: true }]);
     expect(selosBonus({ promo_ate: em(21), viral: [em(-3)] }, T)).toEqual([{ texto: 'Metade · 0:21', ouro: false }]);
-    // os ×5 da oportunidade empilhados (0062): ×5, ×25…, até o primeiro acabar
+    // os ×5 da oportunidade empilhados somam (0064): ×5, ×10…, até o primeiro acabar
     expect(selosBonus({ promo_ate: null, viral: [], boosts: [em(42)] }, T)).toEqual([{ texto: '×5 · 0:42', ouro: false }]);
     expect(selosBonus({ promo_ate: null, viral: [em(15)], boosts: [em(55), em(30), em(-1)] }, T)).toEqual([
-      { texto: '×10 · 0:15', ouro: false }, { texto: '×25 · 0:30', ouro: true }]);
+      { texto: '×10 · 0:15', ouro: false }, { texto: '×10 · 0:30', ouro: true }]);
   });
   it('o texto que sobe ao pegar', () => {
     expect(textoPegou(0, { ganho: 1_234_567, viral: 0 })).toBe('+F$ 1,23 mi');

@@ -129,7 +129,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   mult('Convidados', multGerador(s, 0, agoraMs));
   mult('Mapa do rolê', multMapaDe(s));
   const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
-  if (cincos) linhas.push({ texto: `Agora: ×${num(5 ** cincos, 0)} ${cincos === 1 ? 'da oportunidade' : 'das oportunidades'}`, tom: 'bom' });
+  if (cincos) linhas.push({ texto: `Agora: ×${num(5 * cincos, 0)} ${cincos === 1 ? 'da oportunidade' : 'das oportunidades'}`, tom: 'bom' });
   const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
@@ -145,9 +145,9 @@ export function dicaOportunidade(s: IdleState, tipo: 0 | 1 | 2, agoraMs: number)
   if (tipo === 1) {
     const n = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
     const texto = n
-      ? `Agora: ×${num(5 ** n, 0)} no ar. Pegando esta, vira ×${num(5 ** (n + c), 0)}`
-      : c > 1 ? `${rende(c)}: conta como ${c} de uma vez (×${num(5 ** c, 0)})`
-        : 'Empilha: pegar outra com esta no ar dá ×25, e com o Viralizou multiplica de novo';
+      ? `Agora: ×${num(5 * n, 0)} no ar. Pegando esta, vira ×${num(5 * (n + c), 0)}`
+      : c > 1 ? `${rende(c)}: conta como ${c} de uma vez (×${num(5 * c, 0)})`
+        : 'Soma: pegar outra com esta no ar dá ×10, e o Viralizou multiplica por cima';
     return { titulo: 'Produção ×5 por 1 minuto', linhas: [{ texto }] };
   }
   const n = s.meias ?? (s.half_price ? 1 : 0);
