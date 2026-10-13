@@ -2,7 +2,7 @@
 // celular. O número anima com a mesma conta do banco (economia.ts acumular).
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas } from './economia';
+import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas, VIRAL_MS } from './economia';
 import { CAIXA_PADRAO, type Caixa } from './oportunidades';
 import type { NomeCena } from './palco';
 
@@ -15,15 +15,15 @@ export const agoraServidor = (a: Ancora, clienteMs: number) => a.servidorMs + (c
 /** Segunda 00:00 de Brasília da semana do estado, em ms (para `pendentes(..., inicioSemanaMs)`). */
 export const inicioSemana = (estado: IdleState): number => Date.parse(estado.week_start + 'T00:00:00-03:00');
 
-/** O que a árvore do estado faz (teto do offline, caixinha…): a mesma conta do banco. */
+/** O que a árvore do estado faz (caixinha, eventos, horta…): a mesma conta do banco. */
 export const efeitos = (estado: IdleState) => efeitosDe(catalogo, estado);
 /** A caixinha de oportunidades: o tamanho vem da árvore; a validade é sempre a padrão (4h). */
 export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).caixinha, validadeS: CAIXA_PADRAO.validadeS });
 
 export function valuationAgora(a: Ancora, clienteMs: number): number {
   const boost = a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
-  const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (teto ×100), igual ao banco
-  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, efeitos(a.estado).tetoS, virais);
+  const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
+  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais, VIRAL_MS * efeitos(a.estado).douradoDuracao);
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {

@@ -39,7 +39,7 @@ export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BON
   let dia = 0;
 
   const avancar = (ate: number) => {
-    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null, ef.tetoS);
+    v = acumular(v, taxa(cat, s), relogio * 1000, ate * 1000, null);
     relogio = ate;
   };
   const comprar = () => {
@@ -106,7 +106,12 @@ export function primeiraVenda(m: Marcos, minimo: number): Amostra | null {
 // o que não acelera o jogador sozinho da simulação: o ramo Gente (ninguém o contrata) e o tempo das oportunidades na cena
 // (é só o tempo na tela: o limite dele é a caixinha). A simulação ESCOLHE a Viralizar
 // na era 3, mas a conta em TS não aplica oppExtra/oppBonusMult de estratégia (só os dos nós da árvore); o banco aplica.
-const NAO_ACELERA: readonly No['tipo'][] = ['contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'segundos'];
+// a simulação não tem eventos dourados nem horta: os ramos Dourados e Horta não aceleram aqui
+const NAO_ACELERA: readonly No['tipo'][] = [
+  'contrato_preco', 'por_contratado', 'contrato_dias', 'emprego_mult', 'segundos',
+  'dourado_freq', 'dourado_tela', 'dourado_investidor', 'dourado_duracao',
+  'horta_amadurece', 'horta_vida', 'horta_cruza', 'horta_mult', 'morango_chance',
+];
 
 /** O jogador gasta os pontos na árvore: sempre o nó mais barato já liberado que acelera (empate: o de id menor). */
 export function gastar(cat: Catalogo, pontos: number, ja: readonly number[] = []): { arvore: number[]; sobra: number } {
