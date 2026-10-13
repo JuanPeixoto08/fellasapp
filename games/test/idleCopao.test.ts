@@ -8,7 +8,7 @@ import {
   abreNoite, aguenta, avaliar, BASES, chancePT, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS,
   fimNoite, GALERA_TETO, galeraNoite, inicioNoite, liberado, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, noiteIdx,
   noitesEntre, novidade, PONTOS, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor, TAMANHOS, vagas,
-  vendasNoite, vendidoNaNoite, type Copao, type NoCardapio, type Sabor, type TipoPar,
+  vendasNoite, vendidoNaNoite, type Copao, type NoCardapio, type Noite, type Sabor, type TipoPar,
 } from '../idle/copao';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
@@ -689,5 +689,553 @@ describe('o JSON do copão', () => {
     await escolherDj(1);
     await t.as(B);
     expect((await lugar()).mecanica).toBeNull();
+  });
+});
+
+// ===== parte B: as noites do bar (avancar), o PT, a galera, a revelação, o caderninho, as conquistas e os desafios =====
+
+type NoiteLinha = {
+  inicio: Date; aberta: boolean; sexta: boolean; dj: number | null; vendas: number; fichas: number; pt: boolean; galera_delta: number;
+  fechada: boolean; vagas: number; conferida: boolean;
+};
+type NoiteCopao = { inicio: Date; copao: number; total: number; vendidos: number; fichas: number; pt: boolean };
+type EstadoBar = { moeda: number; fas: number; volume: number; lendario: boolean; marcos: number[] };
+const ir = (ms: number) => { agora = ms; vi.setSystemTime(agora); };
+const noitesDb = () => q<NoiteLinha>(
+  `select inicio, aberta, sexta, dj, vendas, fichas, pt, galera_delta, fechada, vagas, conferida
+     from public.idle_cup_noites where user_id = $1 order by inicio`, [A]);
+const ultimaDb = async () => (await noitesDb()).at(-1)!;
+const noiteCopoes = (inicio: number) => q<NoiteCopao>(
+  `select k.inicio, k.copao::int as copao, k.total, k.vendidos, k.fichas, k.pt
+     from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+    where k.user_id = $1 and k.inicio = $2 order by c.entrou_em, c.id`, [A, iso(inicio)]);
+const estadoBar = async () => (await q<EstadoBar>(
+  'select moeda, fas, volume, lendario, marcos from public.idle_place_state where user_id = $1 and lugar = 4', [A]))[0];
+const abrirJogo = () => t.rpc('idle_open'); // trava + fecha a conta + salva: só o avancar roda (sem o depois)
+const prods = () => q<{ nome: string; partes: number[]; numero: number; criado_em: Date }>(
+  'select nome, partes, numero, criado_em from public.idle_place_prod where user_id = $1 and lugar = 4 order by id', [A]);
+const notasCad = () => q<{ tipo: string; a: number; b: number; rotulo: number }>(
+  'select tipo, a, b, rotulo from public.idle_place_notes where user_id = $1 and lugar = 4 order by tipo, a, b', [A]);
+const conquistas = async () => (await q<{ c: number }>(
+  'select conquista_id as c from public.idle_conquistas where user_id = $1 order by 1', [A])).map((x) => x.c);
+const valuation = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+const setFas = (fas: number) => q('update public.idle_place_state set fas = $2 where user_id = $1 and lugar = 4', [A, fas]);
+const setNivel = (nivel: number) => q('update public.idle_place_state set nivel = $2 where user_id = $1 and lugar = 4', [A, nivel]);
+type Ajuste = Partial<Record<'nota' | 'chance_pt' | 'sabor' | 'moda' | 'aguenta' | 'preco', number>>;
+/** Mexe no que foi calculado ao pôr (antes de estrear): nota, chance de PT, partes da nota, preço. */
+async function ajustar(id: number, campos: Ajuste) {
+  for (const [k, v] of Object.entries(campos)) await q(`update public.idle_cup_copoes set ${k} = $2 where id = $1`, [id, v]);
+}
+/** O que o cardápio (na ordem) venderia na noite inteira, pelo copao.ts. */
+const totaisTs = (cs: CopaoLinha[], n: Noite) => vendasNoite(
+  cs.map((c) => ({ base: c.base, mistura: c.mistura, tamanho: c.tamanho, forca: c.forca, preco: c.preco, nota: c.nota, noites: c.noites })), n);
+const juntos = (xs: number[], ys: number[]) => {
+  expect(xs).toHaveLength(ys.length);
+  xs.forEach((x, i) => expect(rel(x, ys[i]), `${i}: ${x} × ${ys[i]}`).toBeLessThan(1e-12));
+};
+
+describe('as noites do bar (avancar)', () => {
+  it('vende proporcional nas 8 h, fecha uma vez (galera, noites no cardápio) e o total bate com vendasNoite', async () => {
+    await bar();
+    await por({ nome: 'Um' });
+    await por({ extra: 2, forca: 6, preco: 30, nome: 'Dois' });
+    await setFas(50);
+    const cs = await copoes();
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 4 * H); // quarta 22h de Brasília: metade da noite
+    let m = (await lugar()).mecanica;
+    let ns = await noitesDb();
+    expect(ns).toHaveLength(1);
+    expect(ns[0]).toMatchObject({ aberta: true, sexta: false, dj: null, fechada: false, vagas: 3, conferida: false, pt: false });
+    expect(ns[0].inicio.getTime()).toBe(ini);
+    const tot = totaisTs(cs, { nivel: 1, galera: 50, sexta: false, dj: null });
+    const lucros = cs.map((c) => lucroVenda(c));
+    let ks = await noiteCopoes(ini);
+    expect(ks.map((k) => k.copao)).toEqual(cs.map((c) => c.id));
+    juntos(ks.map((k) => k.total), tot);
+    juntos(ks.map((k) => k.vendidos), tot.map((x) => vendidoNaNoite(x, ini, agora)));
+    juntos(ks.map((k) => k.fichas), tot.map((x, i) => vendidoNaNoite(x, ini, agora) * lucros[i]));
+    const meio = tot.reduce((s, x, i) => s + vendidoNaNoite(x, ini, agora) * lucros[i], 0);
+    expect(rel(await fichas(), meio)).toBeLessThan(1e-12);
+    expect(rel(m.hoje.vendido_ate_agora, tot.reduce((s, x) => s + x / 2, 0))).toBeLessThan(1e-12);
+    expect(rel(m.hoje.fichas_ate_agora, meio)).toBeLessThan(1e-12);
+    expect(m.hoje.aberta).toBe(true);
+    expect(m.ultima_noite).toBeNull();
+    expect((await estadoBar()).fas).toBe(50);
+    // quinta 3h: a noite fechou
+    ir(ini + 9 * H);
+    m = (await lugar()).mecanica;
+    ks = await noiteCopoes(ini);
+    juntos(ks.map((k) => k.vendidos), tot);
+    const pts = cs.map((c) => deuPT(c.id, noiteIdx(ini), c.chance_pt));
+    expect(ks.map((k) => k.pt)).toEqual(pts);
+    const g = galeraNoite(50, 1, cs.map((c) => c.nota), pts.some(Boolean));
+    const e1 = await estadoBar();
+    expect(rel(e1.fas, g)).toBeLessThan(1e-12);
+    const fim = tot.reduce((s, x, i) => s + x * lucros[i], 0);
+    expect(rel(e1.moeda, fim)).toBeLessThan(1e-12);
+    const cs1 = await copoes();
+    expect(cs1.map((c) => c.noites)).toEqual([1, 1]);
+    juntos(cs1.map((c) => c.vendido), tot);
+    juntos(cs1.map((c) => c.fichas), tot.map((x, i) => x * lucros[i]));
+    ns = await noitesDb();
+    expect(ns).toHaveLength(1);
+    expect(ns[0]).toMatchObject({ fechada: true, conferida: true, pt: pts.some(Boolean) });
+    expect(rel(ns[0].galera_delta, g - 50)).toBeLessThan(1e-12);
+    expect(Date.parse(m.ultima_noite!.inicio as string)).toBe(ini);
+    expect(m.ultima_noite!.copoes.map((x) => x.id)).toEqual(cs.map((c) => c.id));
+    expect(Date.parse(m.hoje.inicio)).toBe(ini + DIA); // a próxima, ainda não começou
+    expect(m.hoje.aberta).toBe(true);
+    // mais visitas não mexem em nada
+    await lugar();
+    ir(agora + H);
+    await abrirJogo();
+    await lugar();
+    expect(await estadoBar()).toEqual(e1);
+    expect(await copoes()).toEqual(cs1);
+    // a noite seguinte: a novidade de quem já ficou 1 noite e a galera nova entram no total
+    ir(ini + DIA + 2 * H);
+    await lugar();
+    juntos((await noiteCopoes(ini + DIA)).map((k) => k.total), totaisTs(cs1, { nivel: 1, galera: e1.fas, sexta: false, dj: null }));
+  });
+
+  it('Review Focus 1: some 3 dias: só a primeira noite abre, as fichas dela entram uma vez, a revelação sai na volta', async () => {
+    await bar();
+    await por({ nome: 'Sumiu' });
+    const [c] = await copoes();
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    ir(ini + 3 * DIA + 2 * H); // sábado 20h de Brasília
+    await abrirJogo(); // só o avancar
+    let ns = await noitesDb();
+    // quarta abriu (passou às 15h); quinta e sexta ninguém abriu (sem linha); sábado: a de hoje, fechada pra quem chegou agora
+    expect(ns.map((n) => [n.inicio.getTime(), n.aberta, n.fechada])).toEqual([[ini, true, true], [ini + 3 * DIA, false, false]]);
+    const [tot] = totaisTs([c], { nivel: 1, galera: 0, sexta: false, dj: null });
+    expect(rel(await fichas(), tot * lucroVenda(c))).toBeLessThan(1e-12);
+    expect((await copoes())[0]).toMatchObject({ noites: 1, revelado: false });
+    expect(await prods()).toEqual([]);
+    expect(await notasCad()).toEqual([]);
+    expect((await estadoBar()).volume).toBe(0);
+    // a próxima visita revela, com a hora da estreia
+    let m = (await lugar()).mecanica;
+    expect(m.hoje).toMatchObject({ aberta: false, vendido_ate_agora: 0 });
+    expect(Date.parse(m.ultima_noite!.inicio as string)).toBe(ini);
+    const ps = await prods();
+    expect(ps).toHaveLength(1);
+    expect(ps[0]).toMatchObject({ nome: 'Sumiu', partes: [1, 1, 1, 2, 5], numero: c.nota });
+    expect(ps[0].criado_em.getTime()).toBe(ini);
+    expect(await notasCad()).toEqual([
+      { tipo: 'aguenta', a: 1, b: 5, rotulo: c.aguenta },
+      { tipo: 'par', a: 101, b: 0, rotulo: c.rot_bm },
+      { tipo: 'par', a: 10101, b: 0, rotulo: c.rot_be },
+      { tipo: 'par', a: 20101, b: 0, rotulo: c.rot_me },
+    ]);
+    const e1 = await estadoBar();
+    expect(e1.volume).toBe(1);
+    expect((await copoes())[0].revelado).toBe(true);
+    // voltar de novo não paga nada de novo
+    await lugar();
+    ir(agora + H);
+    await abrirJogo();
+    await lugar();
+    expect(await estadoBar()).toEqual(e1);
+    expect(await prods()).toHaveLength(1);
+    ns = await noitesDb();
+    expect(ns).toHaveLength(2);
+    // passou no sábado: a de domingo abre
+    ir(ini + 4 * DIA + H);
+    m = (await lugar()).mecanica;
+    expect(m.hoje.aberta).toBe(true);
+    expect((await noitesDb()).map((n) => [n.inicio.getTime(), n.aberta])).toEqual([[ini, true], [ini + 3 * DIA, false], [ini + 4 * DIA, true]]);
+    expect(await noiteCopoes(ini + 4 * DIA)).toHaveLength(1);
+  });
+
+  it('nunca passou (visto_em nulo): nenhuma noite abre', async () => {
+    await bar();
+    await por();
+    await q('update public.idle_state set visto_em = null where user_id = $1', [A]);
+    ir(agora + 4 * H); // quarta 19h
+    await q('select public.idle_cup_avancar(s) from public.idle_state s where user_id = $1', [A]);
+    expect((await noitesDb()).map((n) => n.aberta)).toEqual([false]);
+    expect(await fichas()).toBe(0);
+  });
+
+  it('a noite só começa depois das 18h: o copão posto às 18h em ponto estreia nela', async () => {
+    await bar();
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini);
+    await por();
+    expect(await noitesDb()).toEqual([]);
+    const [c] = await copoes();
+    expect(c.primeira_noite.getTime()).toBe(ini);
+    expect((await lugar()).mecanica.hoje.aberta).toBe(true);
+    ir(ini + H);
+    await lugar();
+    expect((await noiteCopoes(ini)).map((k) => k.copao)).toEqual([c.id]);
+  });
+
+  it('Review Focus 2: a noite de domingo atravessa a meia-noite e a virada da semana: vende e dá PT uma vez, na noite certa', async () => {
+    await bar();
+    await por();
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    const dom = ini + 4 * DIA; // domingo 18h de Brasília
+    expect(ehSexta(dom)).toBe(false);
+    ir(dom - 3 * H); // passa no domingo às 15h (a de domingo abre)
+    await lugar();
+    const semanaDom = await semana();
+    const [c] = await copoes();
+    expect(c.noites).toBe(1); // a de quarta
+    await ajustar(c.id, { chance_pt: 100 });
+    await setFas(1000);
+    const [tot] = totaisTs([c], { nivel: 1, galera: 1000, sexta: false, dj: null });
+    const m0 = await fichas();
+    for (const h of [2.5, 5.5, 6.5, 7.99, 9, 12]) { // 20h30, 23h30, 0h30 (segunda), 1h59, 3h, 6h
+      ir(dom + h * H);
+      const m = (await lugar()).mecanica;
+      const ks = await noiteCopoes(dom);
+      expect(ks).toHaveLength(1);
+      expect(rel(ks[0].total, tot), `${h}`).toBeLessThan(1e-12);
+      expect(rel(ks[0].vendidos, vendidoNaNoite(tot, dom, agora)), `${h}`).toBeLessThan(1e-12);
+      expect(rel((await fichas()) - m0, vendidoNaNoite(tot, dom, agora) * lucroVenda(c)), `${h}`).toBeLessThan(1e-9);
+      if (h < 8) expect(Date.parse(m.hoje.inicio), `${h}`).toBe(dom);
+      // a de segunda (18h) ainda não começou: nenhuma linha depois da de domingo
+      expect((await ultimaDb()).inicio.getTime()).toBe(dom);
+    }
+    expect(await semana()).not.toBe(semanaDom); // virou a semana no meio da noite
+    expect(await ultimaDb()).toMatchObject({ aberta: true, fechada: true, pt: true, sexta: false });
+    expect(rel((await estadoBar()).fas, galeraNoite(1000, 1, [c.nota], true))).toBeLessThan(1e-12);
+    expect((await copoes())[0].noites).toBe(2); // quarta e domingo
+    expect(await conquistas()).toContain(115);
+  });
+
+  it('Review Focus 2: a sexta pesa 2× do começo ao fim, com o DJ escolhido quando ela começou (×1,2 nas bases dele)', async () => {
+    await bar();
+    await por({ nome: 'Vodka' }); // base 1: o DJ 2 curte
+    await por({ base: 2, mistura: 2, nome: 'Cachaça' }); // base 2: não curte
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    const sex = ini + 2 * DIA;
+    expect(ehSexta(sex)).toBe(true);
+    ir(sex - DIA - 3 * H); // quinta 15h
+    await lugar();
+    ir(sex - 3 * H); // sexta 15h
+    await escolherDj(2);
+    const fas = (await estadoBar()).fas;
+    const cs = await copoes();
+    ir(sex + 2 * H);
+    await lugar();
+    expect(await ultimaDb()).toMatchObject({ sexta: true, dj: 2, aberta: true });
+    const tot = totaisTs(cs, { nivel: 1, galera: fas, sexta: true, dj: 2 });
+    const normal = totaisTs(cs, { nivel: 1, galera: fas, sexta: false, dj: null });
+    juntos((await noiteCopoes(sex)).map((k) => k.total), tot);
+    expect(rel(tot[0], normal[0] * 2.4)).toBeLessThan(1e-12);
+    expect(rel(tot[1], normal[1] * 2)).toBeLessThan(1e-12);
+    // trocar o DJ no meio da noite não muda a de sexta
+    ir(sex + 3 * H);
+    await escolherDj(null);
+    expect((await ultimaDb()).dj).toBe(2);
+    ir(sex + 7 * H); // sábado 1h de Brasília: ainda a noite de sexta
+    await lugar();
+    const ks = await noiteCopoes(sex);
+    juntos(ks.map((k) => k.total), tot);
+    juntos(ks.map((k) => k.vendidos), tot.map((x) => (x * 7) / 8));
+    ir(sex + DIA + 2 * H); // sábado 20h
+    await lugar();
+    const ns = await noitesDb();
+    expect(ns.find((n) => n.inicio.getTime() === sex)).toMatchObject({ fechada: true, sexta: true, dj: 2 });
+    expect(ns.at(-1)).toMatchObject({ sexta: false, dj: null, aberta: true });
+    juntos((await noiteCopoes(sex + DIA)).map((k) => k.total),
+      totaisTs(await copoes(), { nivel: 1, galera: (await estadoBar()).fas, sexta: false, dj: null }));
+  });
+
+  it('Review Focus 3: PT pela semente (copão, noite), igual ao TS; recarregar dá o mesmo', async () => {
+    await bar();
+    await por({ forca: 10, preco: 33, nome: 'Forte' }); // vodka força 10: 50% de PT por noite
+    await por({ extra: 2, forca: 8, preco: 30, nome: 'Médio' }); // 30%
+    const cs = await copoes();
+    expect(cs.map((c) => c.chance_pt)).toEqual([50, 30]);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    const vistos: boolean[] = [];
+    for (let d = 0; d < 8; d++) {
+      ir(ini + d * DIA + H);
+      await lugar();
+      await lugar();
+      const esperado = cs.map((c) => deuPT(c.id, noiteIdx(ini + d * DIA), c.chance_pt));
+      expect((await noiteCopoes(ini + d * DIA)).map((k) => k.pt), `noite ${d}`).toEqual(esperado);
+      vistos.push(...esperado);
+    }
+    expect(vistos).toContain(true);
+    expect(vistos).toContain(false);
+    const fechadas = (await noitesDb()).filter((n) => n.fechada);
+    expect(fechadas).toHaveLength(7);
+    for (const n of fechadas) expect(n.pt).toBe(cs.some((c) => deuPT(c.id, noiteIdx(n.inicio.getTime()), c.chance_pt)));
+  });
+
+  it('Review Focus 3: dois copões em PT tiram 15% da galera uma vez só na noite; a conquista sai no depois', async () => {
+    await bar();
+    await por({ nome: 'Um' });
+    await por({ extra: 2, nome: 'Dois' });
+    const cs = await copoes();
+    for (const c of cs) await ajustar(c.id, { chance_pt: 100 });
+    await setFas(1000);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 9 * H);
+    await abrirJogo();
+    expect((await noiteCopoes(ini)).map((k) => k.pt)).toEqual([true, true]);
+    const notas = cs.map((c) => c.nota);
+    const g = galeraNoite(1000, 1, notas, true);
+    const fas = (await estadoBar()).fas;
+    expect(rel(fas, g)).toBeLessThan(1e-12);
+    expect(rel(fas, galeraNoite(1000, 1, notas, false) * 0.85)).toBeLessThan(1e-12);
+    expect(fas).toBeGreaterThan(galeraNoite(1000, 1, notas, false) * 0.85 * 0.85 + 1);
+    expect(await conquistas()).not.toContain(115); // conquista só no depois
+    await lugar();
+    await lugar();
+    expect((await estadoBar()).fas).toBe(fas);
+    expect(await conquistas()).toContain(115);
+    const n = (await noitesDb())[0];
+    expect(n).toMatchObject({ pt: true, fechada: true, conferida: true });
+    expect(rel(n.galera_delta, g - 1000)).toBeLessThan(1e-12);
+  });
+
+  it('Review Focus 4: copão tirado no meio da noite vende até a hora em que saiu; o que saiu antes de estrear não entra', async () => {
+    await bar();
+    await por({ nome: 'Sai' });
+    await por({ extra: 2, nome: 'Fica' });
+    await por({ extra: 3, nome: 'Nem estreia' });
+    const cs = await copoes();
+    await tirar(cs[2].id); // quarta 15h: saiu antes da primeira noite
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    const ativos = cs.slice(0, 2);
+    const tot = totaisTs(ativos, { nivel: 1, galera: 0, sexta: false, dj: null });
+    ir(ini + 3 * H); // quarta 21h
+    await tirar(cs[0].id);
+    ir(ini + 5 * H);
+    await lugar();
+    let ks = await noiteCopoes(ini);
+    expect(ks.map((k) => k.copao)).toEqual([cs[0].id, cs[1].id]);
+    juntos(ks.map((k) => k.total), tot); // o total ficou o do início
+    juntos(ks.map((k) => k.vendidos), [(tot[0] * 3) / 8, (tot[1] * 5) / 8]);
+    ir(ini + 9 * H);
+    await lugar();
+    ks = await noiteCopoes(ini);
+    juntos(ks.map((k) => k.vendidos), [(tot[0] * 3) / 8, tot[1]]);
+    const lucros = ativos.map((c) => lucroVenda(c));
+    expect(rel(await fichas(), ((tot[0] * 3) / 8) * lucros[0] + tot[1] * lucros[1])).toBeLessThan(1e-12);
+    expect((await copoes()).map((c) => [c.revelado, c.noites])).toEqual([[true, 1], [true, 1], [false, 0]]);
+    expect((await prods()).map((p) => p.nome)).toEqual(['Sai', 'Fica']);
+    // a noite de quinta: só o que ficou
+    ir(ini + DIA + H);
+    await lugar();
+    expect((await noiteCopoes(ini + DIA)).map((k) => k.copao)).toEqual([cs[1].id]);
+    expect((await copoes())[2].revelado).toBe(false);
+  });
+});
+
+describe('o depois do copão', () => {
+  it('marcos de volume, galera e lendário e a conquista da nota só saem no depois', async () => {
+    await bar();
+    await setFas(299);
+    await q('update public.idle_place_state set volume = 29 where user_id = $1 and lugar = 4', [A]);
+    await por();
+    const [c] = await copoes();
+    await ajustar(c.id, { nota: 999, chance_pt: 0 });
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 9 * H);
+    await abrirJogo(); // a noite fechou: a galera subiu (round(25 · 0,02 · 1) = 1), mas nada de marco
+    let e = await estadoBar();
+    expect(e).toMatchObject({ fas: 300, volume: 29, lendario: false, marcos: [] });
+    expect(await conquistas()).not.toContain(89);
+    const resp = await lugar();
+    e = await estadoBar();
+    expect(e).toMatchObject({ fas: 300, volume: 30, lendario: true });
+    expect([...e.marcos].sort()).toEqual([46, 47, 48]);
+    expect([...resp.marcos_novos!].sort()).toEqual([46, 47, 48]);
+    expect(await conquistas()).toContain(89);
+    const [n] = await noitesDb();
+    expect(n.conferida).toBe(true);
+    expect(rel(n.galera_delta, 1)).toBeLessThan(1e-12);
+  });
+
+  it('nota abaixo de 900: sem lendário e sem a conquista 89', async () => {
+    await bar();
+    await por();
+    const [c] = await copoes();
+    await ajustar(c.id, { nota: 899 });
+    ir(c.primeira_noite.getTime() + H);
+    await lugar();
+    expect((await estadoBar()).lendario).toBe(false);
+    expect(await conquistas()).not.toContain(89);
+    expect(await conquistas()).not.toContain(115);
+  });
+});
+
+describe('desafios do copão', () => {
+  type D = { id: number; lugar: number; tipo: string; valor: number; texto: string; premio: string; premio_valor: number };
+  let todos: D[] = [];
+  async function soDesafio(id: number) {
+    if (todos.length === 0) todos = await q<D>('select * from public.idle_cat_place_desafio where lugar = 4 order by id');
+    const d = todos.find((x) => x.id === id)!;
+    await q('delete from public.idle_cat_place_desafio where lugar = 4');
+    await q(`insert into public.idle_cat_place_desafio (id, lugar, tipo, valor, texto, premio, premio_valor) values ($1, $2, $3, $4, $5, $6, $7)`,
+      [d.id, d.lugar, d.tipo, d.valor, d.texto, d.premio, d.premio_valor]);
+  }
+  const feitos = async () => (await q<{ d: number }>(
+    'select desafio as d from public.idle_place_challenges where user_id = $1 and lugar = 4', [A])).map((x) => x.d);
+  const limpar = async () => {
+    await q('delete from public.idle_place_challenges where user_id = $1', [A]);
+    await q('delete from public.idle_cup_copoes where user_id = $1', [A]);
+    await q('delete from public.idle_place_notes where user_id = $1', [A]);
+    await setFas(0);
+  };
+  type Copo = { o?: Partial<Opcoes>; aj?: Ajuste };
+  /** Põe os copões (ajustados antes de estrear), passa no começo da primeira noite deles e, com `fechar`, no fim dela;
+   *  tira todos e vai pro dia seguinte às 16h. */
+  async function noite(copos: Copo[], fechar: boolean) {
+    for (const [k, x] of copos.entries()) {
+      await por({ extra: k + 1, ...x.o });
+      if (x.aj) await ajustar((await copoes()).at(-1)!.id, x.aj);
+    }
+    const ini = (await copoes()).at(-1)!.primeira_noite.getTime();
+    ir(ini + 60_000);
+    await lugar();
+    if (fechar) {
+      ir(ini + 9 * H);
+      await lugar();
+    }
+    for (const c of await copoes()) if (c.saiu_em === null) await tirar(c.id);
+    ir(ini + 22 * H);
+  }
+  const CASOS: [number, Copo[][], Copo[], boolean][] = [
+    [401, [[{ aj: { nota: 699 } }]], [{ aj: { nota: 700 } }], false],
+    [412, [[{ aj: { nota: 849 } }]], [{ aj: { nota: 850 } }], false],
+    [407, [[{ aj: { sabor: 299 } }]], [{ aj: { sabor: 300 } }], false],
+    [408, [[{ aj: { moda: 75 } }]], [{ aj: { moda: 150 } }], false],
+    [410, [[{ aj: { aguenta: 170 } }]], [{ aj: { aguenta: 199 } }], false],
+    // a galera: média 500 não mexe; 999 soma round(25 · 0,02) = 1
+    [403, [[{ aj: { nota: 500, chance_pt: 0 } }]], [{ aj: { nota: 999, chance_pt: 0 } }], true],
+    // cardápio cheio (3 vagas no nível 1)
+    [405, [[{ aj: { nota: 900 } }, { aj: { nota: 900 } }], [{ aj: { nota: 599 } }, { aj: { nota: 900 } }, { aj: { nota: 900 } }]],
+      [{ aj: { nota: 600 } }, { aj: { nota: 700 } }, { aj: { nota: 800 } }], true],
+    // lucro com cardápio cheio: 2 copões não enchem; a 1 ficha cada venda dá prejuízo
+    [411, [[{}, {}], [{ aj: { preco: 1 } }, { aj: { preco: 1 } }, { aj: { preco: 1 } }]], [{}, {}, {}], true],
+    [402, [[{ aj: { nota: 699, chance_pt: 0 } }]], [{ aj: { nota: 700, chance_pt: 0 } }], true],
+  ];
+  it('cada tipo com o valor dele: o que não alcança não paga, o que alcança paga', async () => {
+    await bar();
+    for (const [id, nao, sim, fechar] of CASOS) {
+      await soDesafio(id);
+      await limpar();
+      for (const caso of nao) {
+        await noite(caso, fechar);
+        expect(await feitos(), `${id} ${JSON.stringify(caso)}`).toEqual([]);
+      }
+      await noite(sim, fechar);
+      expect(await feitos(), `${id}`).toEqual([id]);
+    }
+  });
+  it('balde no cardápio: paga na hora de pôr; o copo não', async () => {
+    await bar();
+    await setNivel(7);
+    await soDesafio(406);
+    await por({ tamanho: 1, preco: 8 });
+    expect(await feitos()).toEqual([]);
+    const v0 = await valuation();
+    await por({ tamanho: 3, preco: 75 });
+    expect(await feitos()).toEqual([406]);
+    expect(await valuation()).toBeGreaterThan(v0);
+  });
+  it('sexta com o DJ que combina com 2 copões: paga quando a noite de sexta começa; noutra noite não', async () => {
+    await bar();
+    await soDesafio(404);
+    await escolherDj(2); // curte a base 1
+    await por({ nome: 'Vodka 1' });
+    await por({ base: 2, mistura: 2, nome: 'Cachaça' });
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    ir(ini + H);
+    await lugar();
+    ir(ini + DIA - 3 * H); // quinta 15h: troca a cachaça por outra vodka
+    await tirar((await copoes())[1].id);
+    await por({ extra: 2, nome: 'Vodka 2' });
+    ir(ini + DIA + H); // quinta 19h: 2 vodkas, mas não é sexta
+    await lugar();
+    expect((await noiteCopoes(ini + DIA))).toHaveLength(2);
+    expect(await feitos()).toEqual([]);
+    ir(ini + 2 * DIA - 3 * H); // sexta 15h
+    await lugar();
+    expect(await feitos()).toEqual([]);
+    ir(ini + 2 * DIA + 60_000); // sexta 18h01
+    await lugar();
+    expect(await feitos()).toEqual([404]);
+  });
+  it('sexta com 1 copão só da base do DJ não paga', async () => {
+    await bar();
+    await soDesafio(404);
+    await escolherDj(2);
+    await por({ nome: 'Vodka' });
+    await por({ base: 2, mistura: 2, nome: 'Cachaça' });
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    for (const d of [0, 1, 2]) {
+      ir(ini + d * DIA + H);
+      await lugar();
+    }
+    ir(ini + 2 * DIA + 9 * H);
+    await lugar();
+    expect((await noitesDb()).find((n) => n.sexta)).toMatchObject({ aberta: true, fechada: true, dj: 2 });
+    expect(await feitos()).toEqual([]);
+  });
+  it('5 noites abertas na semana (com copão no cardápio): paga quando a 5ª começa', async () => {
+    await bar();
+    await soDesafio(409);
+    const ini = inicioNoite(iso(agora).slice(0, 10)); // quarta 18h
+    const seg = ini + 5 * DIA; // segunda 18h
+    ir(seg - 3 * H);
+    await por();
+    for (let d = 0; d < 5; d++) {
+      ir(seg + d * DIA + H);
+      await lugar();
+      expect(await feitos(), `noite ${d + 1}`).toEqual(d < 4 ? [] : [409]);
+    }
+  });
+  it('copão 700+ sem PT na semana: o PT da noite ou de antes na semana não deixa; na semana seguinte paga', async () => {
+    await bar();
+    await soDesafio(402);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    const seg = ini + 5 * DIA; // segunda 18h
+    ir(seg - 3 * H);
+    await por({ nome: 'Bomba' });
+    const [c] = await copoes();
+    await ajustar(c.id, { nota: 900, chance_pt: 100 });
+    ir(seg + 9 * H); // terça 3h: a de segunda deu PT
+    await lugar();
+    expect(await ultimaDb()).toMatchObject({ pt: true, fechada: true });
+    expect(await feitos()).toEqual([]);
+    await ajustar(c.id, { chance_pt: 0 });
+    ir(seg + DIA + 9 * H); // quarta 3h: a de terça sem PT, mas a semana já teve
+    await lugar();
+    expect(await ultimaDb()).toMatchObject({ pt: false, fechada: true, aberta: true });
+    expect(await feitos()).toEqual([]);
+    ir(seg + 7 * DIA - 3 * H); // a outra segunda, 15h
+    await lugar();
+    ir(seg + 7 * DIA + 9 * H);
+    await lugar();
+    expect(await feitos()).toEqual([402]);
+  });
+  it('pago uma vez só na semana', async () => {
+    await bar();
+    await soDesafio(401);
+    const taxa = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+    for (const k of [0, 1]) {
+      await por({ extra: k + 1 });
+      const c = (await copoes()).at(-1)!;
+      await ajustar(c.id, { nota: 800 });
+      ir(c.primeira_noite.getTime() + 60_000);
+      await abrirJogo(); // fecha a conta até agora (sem o depois)
+      const v0 = await valuation();
+      await lugar(); // revela: paga (ou não) sem passar tempo
+      const dv = (await valuation()) - v0;
+      if (k === 0) expect(rel(dv, 2 * 3600 * (await taxa()))).toBeLessThan(1e-6);
+      else expect(dv).toBe(0);
+      ir(agora + 20 * H);
+    }
+    expect(await feitos()).toEqual([401]);
   });
 });

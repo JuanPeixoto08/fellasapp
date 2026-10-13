@@ -138,12 +138,15 @@ create table if not exists public.idle_cup_copoes (
 create index if not exists idle_cup_copoes_user on public.idle_cup_copoes (user_id, entrou_em, id);
 -- As noites do bar de cada pessoa (a parte B grava uma linha por noite, uma vez: a chave impede contar duas vezes).
 -- aberta = a pessoa passou desde a noite anterior; dj = o escolhido quando a noite foi contada; vendas e fichas = o que a
--- noite já rendeu; fechada = o fim da noite já foi contado (galera, noites += 1), galera_delta = quanto a galera mudou.
+-- noite já rendeu; fechada = o fim da noite já foi contado (galera, noites += 1), galera_delta = quanto a galera mudou;
+-- vagas = as vagas do cardápio no início da noite (o "cardápio cheio" dos desafios); conferida = o idle_cup_depois já tratou
+-- a noite fechada (conquista do PT e desafios: uma vez).
 create table if not exists public.idle_cup_noites (
   user_id uuid not null references public.idle_state (user_id) on delete cascade,
   inicio timestamptz not null, aberta boolean not null, sexta boolean not null, dj int,
   vendas double precision not null default 0, fichas double precision not null default 0, pt boolean not null default false,
   galera_delta double precision not null default 0, fechada boolean not null default false,
+  vagas int not null default 3, conferida boolean not null default false,
   primary key (user_id, inicio)
 );
 -- o que cada copão fez numa noite: total = o que ele venderia na noite inteira (fixado no início da noite), vendidos e
@@ -585,7 +588,8 @@ $$;
 
 -- moda = o copão da moda desta semana; dj = o escolhido; vagas = as do nível; cardapio = os copões no cardápio (na ordem em
 -- que entraram); hoje = a noite em andamento ou a próxima (aberta: a linha da noite diz; a que ainda não começou abre, a
--- pessoa está aqui; vendido/fichas até agora = o que a parte B já contou); ultima_noite = a última noite aberta que fechou,
+-- pessoa está aqui; a parte B grava a linha assim que a noite passa do início, então às 18h em ponto ainda vale "abre";
+-- vendido/fichas até agora = o que a parte B já contou); ultima_noite = a última noite aberta que fechou,
 -- com o que cada copão fez e a semente do chat (o número da noite): a tela mostra o que aconteceu com a pessoa longe;
 -- historico = os últimos 10 revelados (mesmo os que já saíram). Lugar fechado: null.
 create or replace function public.idle_cup_json(s public.idle_state)
@@ -598,7 +602,7 @@ returns jsonb language sql stable set search_path = public as $$
     'cardapio', coalesce((select jsonb_agg(public.idle_cup_copao_json(c, now() >= c.primeira_noite) order by c.entrou_em, c.id)
                             from public.idle_cup_copoes c where c.user_id = s.user_id and c.saiu_em is null), '[]'::jsonb),
     'hoje', (select jsonb_build_object('inicio', h.ini, 'fim', h.ini + interval '8 hours', 'sexta', public.idle_cup_eh_sexta(h.ini),
-                                       'aberta', coalesce(n.aberta, now() < h.ini), 'dj', n.dj,
+                                       'aberta', coalesce(n.aberta, now() <= h.ini), 'dj', n.dj,
                                        'vendido_ate_agora', coalesce(n.vendas, 0), 'fichas_ate_agora', coalesce(n.fichas, 0))
                from (select public.idle_cup_noite_de(now()) as ini) h
                left join public.idle_cup_noites n on n.user_id = s.user_id and n.inicio = h.ini),
@@ -668,3 +672,251 @@ revoke all on function public.idle_cup_tirar(bigint) from public, anon;
 grant execute on function public.idle_cup_tirar(bigint) to authenticated;
 revoke all on function public.idle_cup_dj(int) from public, anon;
 grant execute on function public.idle_cup_dj(int) to authenticated;
+
+-- ===== parte B: as noites do bar (no idle_lock) e a revelação, o caderninho, as conquistas e os desafios (depois) =====
+
+-- Abre a linha da noite (uma vez: a chave impede contar duas vezes). aberta = o visto_em de antes da visita (o do s que o
+-- idle_lock passa). O cardápio da noite é o do início dela: copões que estrearam até o início e não saíram antes dele. O
+-- total de cada um (o que ele venderia na noite inteira, igual a vendasNoite do TS) sai agora com o nível, a galera e o DJ
+-- de agora, que são os do início: toda RPC trava e anda o bar antes de mudar qualquer um deles, e as noites são abertas e
+-- fechadas em ordem (a galera e as noites no cardápio da noite anterior já entraram). O PT de cada copão é sorteado agora
+-- pela semente (copão, noite): recarregar dá o mesmo. Noite que ninguém abriu: só a linha.
+create or replace function public.idle_cup_noite_abrir(p_user uuid, p_inicio timestamptz, p_aberta boolean)
+returns void language plpgsql volatile set search_path = public as $$
+declare
+  st       public.idle_place_state;
+  v_dj     int := (select e.dj from public.idle_cup_estado e where e.user_id = p_user);
+  v_sexta  boolean := public.idle_cup_eh_sexta(p_inicio);
+  v_ids    bigint[];
+  v_bases  int[];
+  v_mist   int[];
+  v_tams   int[];
+  v_forcas int[];
+  v_precos int[];
+  v_notas  int[];
+  v_noites int[];
+  v_chance int[];
+  v_tot    double precision[];
+begin
+  select * into st from public.idle_place_state where user_id = p_user and lugar = 4;
+  insert into public.idle_cup_noites (user_id, inicio, aberta, sexta, dj, vagas)
+  values (p_user, p_inicio, p_aberta, v_sexta, v_dj, public.idle_cup_vagas(st.nivel))
+  on conflict do nothing;
+  if not found or not p_aberta then
+    return;
+  end if;
+  select array_agg(c.id order by c.entrou_em, c.id), array_agg(c.base order by c.entrou_em, c.id),
+         array_agg(c.mistura order by c.entrou_em, c.id), array_agg(c.tamanho order by c.entrou_em, c.id),
+         array_agg(c.forca order by c.entrou_em, c.id), array_agg(c.preco order by c.entrou_em, c.id),
+         array_agg(c.nota order by c.entrou_em, c.id), array_agg(c.noites order by c.entrou_em, c.id),
+         array_agg(c.chance_pt order by c.entrou_em, c.id)
+    into v_ids, v_bases, v_mist, v_tams, v_forcas, v_precos, v_notas, v_noites, v_chance
+    from public.idle_cup_copoes c
+   where c.user_id = p_user and c.primeira_noite <= p_inicio and (c.saiu_em is null or c.saiu_em > p_inicio);
+  if v_ids is null then
+    return;
+  end if;
+  v_tot := public.idle_cup_vendas_noite(v_bases, v_mist, v_tams, v_forcas, v_precos, v_notas, v_noites, st.nivel, st.fas, v_sexta, v_dj);
+  insert into public.idle_cup_noite_copoes (user_id, inicio, copao, total, pt)
+  select p_user, p_inicio, v_ids[i], v_tot[i], public.idle_cup_deu_pt(v_ids[i], public.idle_cup_noite_idx(p_inicio), v_chance[i])
+    from generate_subscripts(v_ids, 1) i;
+end;
+$$;
+
+-- Anda uma noite até agora: cada copão do cardápio dela vendeu o proporcional do total até min(agora, fim, saiu_em)
+-- (vendidoNaNoite do TS); as fichas (vendidos × lucro de cada venda; pode ser negativo) entram na moeda do lugar, pela
+-- diferença do que já tinha entrado. No fim da noite, uma vez (fechada): a galera (galeraNoite do TS com as notas do
+-- cardápio; −15% uma vez só, por mais copões em PT) e noites += 1 de cada copão do cardápio. Noite que ninguém abriu: só
+-- fecha. Nada de marcos, conquistas, pódio, caderninho ou desafio aqui (isso é do idle_cup_depois).
+create or replace function public.idle_cup_noite_andar(p_user uuid, p_inicio timestamptz)
+returns void language plpgsql volatile set search_path = public as $$
+declare
+  n       public.idle_cup_noites;
+  x       record;
+  v_v     double precision;
+  v_f     double precision;
+  v_dv    double precision := 0;
+  v_df    double precision := 0;
+  v_notas int[];
+  v_pt    boolean := false;
+  v_antes double precision;
+  v_g     double precision;
+begin
+  select * into n from public.idle_cup_noites where user_id = p_user and inicio = p_inicio for update;
+  if not found or n.fechada then
+    return;
+  end if;
+  if n.aberta then
+    for x in select k.copao, k.total, k.vendidos, k.fichas, c.saiu_em,
+                    public.idle_cup_lucro_venda(c.base, c.tamanho, c.forca, c.preco) as lucro
+               from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+              where k.user_id = p_user and k.inicio = p_inicio
+              order by c.entrou_em, c.id loop
+      v_v := public.idle_cup_vendido_noite(x.total, p_inicio, least(now(), coalesce(x.saiu_em, now())));
+      v_f := v_v * x.lucro;
+      if v_v <> x.vendidos or v_f <> x.fichas then
+        update public.idle_cup_noite_copoes set vendidos = v_v, fichas = v_f
+         where user_id = p_user and inicio = p_inicio and copao = x.copao;
+        update public.idle_cup_copoes set vendido = vendido + (v_v - x.vendidos), fichas = fichas + (v_f - x.fichas)
+         where id = x.copao;
+        v_dv := v_dv + (v_v - x.vendidos);
+        v_df := v_df + (v_f - x.fichas);
+      end if;
+    end loop;
+    if v_dv <> 0 or v_df <> 0 then
+      update public.idle_cup_noites set vendas = vendas + v_dv, fichas = fichas + v_df where user_id = p_user and inicio = p_inicio;
+      update public.idle_place_state set moeda = moeda + v_df where user_id = p_user and lugar = 4;
+    end if;
+  end if;
+  if now() < p_inicio + interval '8 hours' then
+    return;
+  end if;
+  if n.aberta then
+    select coalesce(array_agg(c.nota order by c.entrou_em, c.id), '{}'), coalesce(bool_or(k.pt), false)
+      into v_notas, v_pt
+      from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+     where k.user_id = p_user and k.inicio = p_inicio;
+    select st.fas, public.idle_cup_galera_noite(st.fas, st.nivel, v_notas, v_pt) into v_antes, v_g
+      from public.idle_place_state st where st.user_id = p_user and st.lugar = 4 for update;
+    update public.idle_place_state set fas = v_g where user_id = p_user and lugar = 4;
+    update public.idle_cup_copoes c set noites = c.noites + 1
+      from public.idle_cup_noite_copoes k
+     where k.user_id = p_user and k.inicio = p_inicio and c.id = k.copao;
+    update public.idle_cup_noites set fechada = true, pt = v_pt, galera_delta = v_g - v_antes
+     where user_id = p_user and inicio = p_inicio;
+  else
+    update public.idle_cup_noites set fechada = true where user_id = p_user and inicio = p_inicio;
+  end if;
+end;
+$$;
+
+-- O bar anda até agora (dentro do idle_lock, antes de fechar a conta; s.visto_em = a visita de antes desta). Primeiro a
+-- noite que ficou em andamento na última vez; depois cada noite que começou desde a última contada (a primeira: a do
+-- momento em que o lugar abriu), em ordem: abre (aberta = a pessoa passou desde 24 h antes do início) e anda. Só a
+-- primeira noite depois da última visita abre; as seguintes ficam fechadas e não ganham linha, menos a última que
+-- começou, que sempre ganha (o JSON lê dela a noite de hoje). A noite começa depois do início (às 18h em ponto ainda
+-- não: o copão posto nessa hora estreia nela). Mexe só na moeda, na galera e nos contadores das noites e dos copões.
+create or replace function public.idle_cup_avancar(s public.idle_state)
+returns void language plpgsql volatile set search_path = public as $$
+declare
+  st       public.idle_place_state;
+  v_ini    timestamptz;
+  v_desde  timestamptz;
+  v_aberta boolean;
+begin
+  select * into st from public.idle_place_state where user_id = s.user_id and lugar = 4 for update;
+  if not found then
+    return;
+  end if;
+  for v_ini in select n.inicio from public.idle_cup_noites n where n.user_id = s.user_id and not n.fechada order by n.inicio loop
+    perform public.idle_cup_noite_andar(s.user_id, v_ini);
+  end loop;
+  v_desde := coalesce((select max(n.inicio) from public.idle_cup_noites n where n.user_id = s.user_id) + interval '24 hours',
+                      public.idle_cup_noite_de(st.aberto_em));
+  for v_ini in select g from generate_series(v_desde, now(), interval '24 hours') g where g < now() order by g loop
+    v_aberta := public.idle_cup_abre_noite(v_ini, s.visto_em);
+    if v_aberta or v_ini + interval '24 hours' >= now() then
+      perform public.idle_cup_noite_abrir(s.user_id, v_ini, v_aberta);
+      perform public.idle_cup_noite_andar(s.user_id, v_ini);
+    end if;
+  end loop;
+end;
+$$;
+
+-- Depois da conta fechada e salva, na ordem em que aconteceu (uma marca por linha: rodar de novo não paga de novo):
+-- * copão que estreou (primeira_noite ≤ agora; não conta o que saiu antes de estrear): revelado; pódio e placar com a hora
+--   da estreia; caderninho (os 3 pares com o rótulo e o "aguenta" da base na força); volume + 1; lendário com nota 900+;
+--   conquista da nota; desafios da nota, do sabor, da moda e do "aguenta";
+-- * noite aberta que fechou: conferida; conquista do PT; desafios da galera ganha, do cardápio cheio (a menor nota), do
+--   lucro com cardápio cheio e do copão 700+ sem PT na semana (a maior nota do cardápio, se nenhuma noite da semana deu PT
+--   até ela);
+-- * e o que vale assim que acontece, nesta semana (segunda 0h de Brasília): o balde posto no cardápio, as noites que o
+--   bar abriu com copão no cardápio e a sexta que abriu com o DJ que combina com 2 copões do cardápio dela (sem esperar a
+--   noite acabar: a de domingo acaba na semana seguinte).
+-- Devolve o s (o prêmio do desafio mexe no valuation; quem chama salva).
+create or replace function public.idle_cup_depois(s public.idle_state)
+returns public.idle_state language plpgsql volatile set search_path = public as $$
+declare
+  e         record;
+  c         public.idle_cup_copoes;
+  n         public.idle_cup_noites;
+  v_semana  timestamptz := public.games_week_start()::timestamp at time zone 'America/Sao_Paulo';
+  v_qtd     int;
+  v_menor   int;
+  v_maior   int;
+  v_combina int;
+  v_cheio   boolean;
+  v_noites  int;
+  v_pt_sem  boolean;
+begin
+  for e in select x.quando, x.copao, x.inicio
+             from (select k.primeira_noite as quando, k.id as copao, null::timestamptz as inicio
+                     from public.idle_cup_copoes k
+                    where k.user_id = s.user_id and not k.revelado and k.primeira_noite <= now()
+                      and (k.saiu_em is null or k.saiu_em > k.primeira_noite)
+                   union all
+                   select m.inicio + interval '8 hours', null::bigint, m.inicio
+                     from public.idle_cup_noites m
+                    where m.user_id = s.user_id and m.aberta and m.fechada and not m.conferida) x
+            order by x.quando, x.inicio nulls first, x.copao loop
+    if e.copao is not null then
+      update public.idle_cup_copoes set revelado = true where id = e.copao and not revelado returning * into c;
+      continue when not found;
+      perform public.idle_place_registrar(s.user_id, 4, c.nome, array[c.base, c.mistura, c.extra, c.tamanho, c.forca], c.nota,
+                                          c.primeira_noite, 0);
+      perform public.idle_place_nota(s.user_id, 4, 'par', c.base * 100 + c.mistura, 0, c.rot_bm);
+      perform public.idle_place_nota(s.user_id, 4, 'par', 10000 + c.base * 100 + c.extra, 0, c.rot_be);
+      perform public.idle_place_nota(s.user_id, 4, 'par', 20000 + c.mistura * 100 + c.extra, 0, c.rot_me);
+      perform public.idle_place_nota(s.user_id, 4, 'aguenta', c.base, c.forca, c.aguenta);
+      update public.idle_place_state set volume = volume + 1, lendario = lendario or c.nota >= 900
+       where user_id = s.user_id and lugar = 4;
+      perform public.idle_ganhar(s.user_id, 'cup_nota', c.nota);
+      s := public.idle_place_desafio(s, 4, 'cup_nota', c.nota);
+      s := public.idle_place_desafio(s, 4, 'cup_sabor', c.sabor);
+      s := public.idle_place_desafio(s, 4, 'cup_moda', c.moda);
+      s := public.idle_place_desafio(s, 4, 'cup_aguenta', c.aguenta);
+    else
+      update public.idle_cup_noites set conferida = true
+       where user_id = s.user_id and inicio = e.inicio and not conferida returning * into n;
+      continue when not found;
+      select count(*)::int, min(k2.nota), max(k2.nota) into v_qtd, v_menor, v_maior
+        from public.idle_cup_noite_copoes k join public.idle_cup_copoes k2 on k2.id = k.copao
+       where k.user_id = s.user_id and k.inicio = n.inicio;
+      v_cheio := v_qtd > 0 and v_qtd >= n.vagas;
+      v_pt_sem := n.pt or exists (select 1 from public.idle_cup_noites m
+                                   where m.user_id = s.user_id and m.aberta and m.fechada and m.pt
+                                     and m.inicio >= v_semana and m.inicio <= n.inicio);
+      if n.pt then
+        perform public.idle_ganhar(s.user_id, 'cup_pt');
+      end if;
+      s := public.idle_place_desafio(s, 4, 'cup_galera', case when n.galera_delta > 0 then 1 else 0 end);
+      s := public.idle_place_desafio(s, 4, 'cup_cardapio', case when v_cheio then v_menor end);
+      s := public.idle_place_desafio(s, 4, 'cup_fichas', case when v_cheio and n.fichas > 0 then 1 else 0 end);
+      s := public.idle_place_desafio(s, 4, 'cup_sem_pt', case when not v_pt_sem then v_maior end);
+    end if;
+  end loop;
+  s := public.idle_place_desafio(s, 4, 'cup_balde',
+         case when exists (select 1 from public.idle_cup_copoes k
+                            where k.user_id = s.user_id and k.tamanho = 3 and k.entrou_em >= v_semana) then 1 else 0 end);
+  -- as noites que já começaram nesta semana (a linha só existe depois do início)
+  select count(*)::int into v_noites from public.idle_cup_noites m
+   where m.user_id = s.user_id and m.aberta and m.inicio >= v_semana
+     and exists (select 1 from public.idle_cup_noite_copoes k where k.user_id = m.user_id and k.inicio = m.inicio);
+  s := public.idle_place_desafio(s, 4, 'cup_noites', v_noites);
+  select coalesce(max(x.q), 0) into v_combina
+    from (select count(*) as q
+            from public.idle_cup_noites m
+            join public.idle_cup_cat_dj d on d.id = m.dj
+            join public.idle_cup_noite_copoes k on k.user_id = m.user_id and k.inicio = m.inicio
+            join public.idle_cup_copoes k2 on k2.id = k.copao
+           where m.user_id = s.user_id and m.aberta and m.sexta and m.inicio >= v_semana and k2.base = any (d.bases)
+           group by m.inicio) x;
+  s := public.idle_place_desafio(s, 4, 'cup_sexta', case when v_combina >= 2 then 1 else 0 end);
+  return s;
+end;
+$$;
+
+revoke all on function public.idle_cup_noite_abrir(uuid, timestamptz, boolean) from public, anon, authenticated;
+revoke all on function public.idle_cup_noite_andar(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.idle_cup_avancar(public.idle_state) from public, anon, authenticated;
+revoke all on function public.idle_cup_depois(public.idle_state) from public, anon, authenticated;
