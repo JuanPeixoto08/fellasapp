@@ -73,7 +73,7 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 | Nível 20 | +3% |
 | Nível 25 | +4% |
 | 1º resultado "lendário" (camisetaria: 4 notas 10; copão: nota 900+; jantar: 4,5 estrelas+) | +3% |
-| Fãs: camisetaria 100 mil fãs (ajustado pela simulação); copão 5 mil de galera; jantar 2 mil de reputação | +3% |
+| Fãs: camisetaria 100 mil fãs (ajustado pela simulação); copão 300 de galera (ajustado pela simulação); jantar 2 mil de reputação | +3% |
 | Volume: camisetaria 50 coleções; copão 30 copões; jantar 100 casais formados | +2% |
 
 ### 3.4 Desafio da semana
@@ -235,6 +235,22 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
   "isso aí é só energético", "balde a esse preço é assalto", "DEU PT NO MEU PRIMO") e a nota subindo até o número final.
 - Arte: 3 recipientes (copo, copão, balde) com o líquido na mistura das cores da base e da mistura, 12 extras, gelo,
   10 DJs (feitos com o kit de personagem). A foto do pódio é o recipiente montado.
+
+### 5.4 Ajustes da implementação (parte 3)
+
+- **O preço espanta a galera**: as vendas de cada copão são multiplicadas por `(preço de referência / preço)^1,25`
+  (sem isso, cobrar o dobro rendia ~9× mais que caprichar na nota). Com isso o lucro fica parecido entre 0,5× e 0,8× da
+  referência e cobrar o dobro perde. Constantes: público 25, cresce 1,25; meta de nota com caderninho ≥ 700 (era 750 na
+  conta de rascunho), no chute 350–550.
+- O DJ só dá +20% na noite de sexta (e a galera ×2 também); a noite guarda o DJ escolhido quando ela começou.
+- A galera muda só nas noites abertas: ganha `round(público × 0,02 × média/999)` com média ≥ 600, perde 5% abaixo de
+  300 e 15% numa noite de PT (uma vez por noite). Marco de galera do copão: 300.
+- Uma noite só abre se a pessoa passou pelo jogo nas 24 h antes das 18h; quem some vários dias só tem a primeira noite
+  aberta. A tela mostra "Ontem à noite" (o chat da galera) uma vez por noite, mesmo que tenha acontecido com a pessoa fora.
+- Os 10 DJs são artistas reais escolhidos pelo Juan (nome e estilo); o chat nunca põe fala ou fato na boca deles.
+  Retratos 64×64; os sem foto de referência estão marcados "a conferir".
+- Os desafios de noite contam na semana em que são conferidos; "abre o bar 5 noites", "sexta com o DJ certo" e "balde"
+  pagam na hora em que acontecem.
 
 ## 6. Lugar 7: o jantar (primeiro encontro + crítico)
 
