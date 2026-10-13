@@ -278,20 +278,24 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 113, escondida: true, tipo: 'conv_mesma', nome: 'São a mesma pessoa?', frase: 'Nunca foram vistos juntos.', condicao: 'Tentar sentar o Gemaplys e o MC V.V juntos' },
 ];
 
-/** Ramos da árvore de habilidades: 0 é a raiz; 1 a 5 são os ramos. */
-export const RAMOS: readonly string[] = ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Tempo', 'Gente'];
+/** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os ramos (o Tempo virou Dourados e a Horta entrou em 13/10). */
+export const RAMOS: readonly string[] = ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta'];
 
-/** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult), horas (teto), segundos (segundos: quanto a oportunidade fica na cena),
- *  quantidade (caixinha, opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado)
- *  ou 1 (inicio_era1, manter_gerais: só ter o nó). */
+/** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult, dourado_freq,
+ *  dourado_investidor, dourado_duracao, horta_amadurece, horta_vida, horta_cruza, horta_mult, morango_chance),
+ *  segundos (segundos: quanto a oportunidade fica na cena; dourado_tela: quanto o evento fica na tela), quantidade
+ *  (caixinha, opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado) ou 1
+ *  (inicio_era1, manter_gerais: só ter o nó). */
 export type TipoNo =
   | 'producao' | 'inicio_valuation' | 'inicio_notebooks' | 'manter_gerais' | 'inicio_era1'
-  | 'caixinha' | 'segundos' | 'opp_extra' | 'opp_bonus' | 'teto'
-  | 'contrato_preco' | 'por_contratado' | 'contrato_dias' | 'emprego_mult';
+  | 'caixinha' | 'segundos' | 'opp_extra' | 'opp_bonus'
+  | 'contrato_preco' | 'por_contratado' | 'contrato_dias' | 'emprego_mult'
+  | 'dourado_freq' | 'dourado_tela' | 'dourado_investidor' | 'dourado_duracao'
+  | 'horta_amadurece' | 'horta_vida' | 'horta_cruza' | 'horta_mult' | 'morango_chance';
 
 export type NoTexto = { ramo: number; posicao: number; nome: string; efeito: string; tipo: TipoNo; valor: number };
 
-/** A árvore de habilidades, na ordem: a raiz e os 5 ramos de 5 nós. id = ramo·10 + posição (a raiz é 1). Nó novo ou
+/** A árvore de habilidades, na ordem: a raiz e os 6 ramos de 5 nós. id = ramo·10 + posição (a raiz é 1). Nó novo ou
  *  efeito mudado = migração nova do catálogo; id nunca muda (o banco guarda quem comprou pelo id). */
 export const ARVORE: readonly NoTexto[] = [
   { ramo: 0, posicao: 1, tipo: 'producao', valor: 1.05, nome: 'Virou MEI', efeito: 'Abre a árvore. Produção +5%.' },
@@ -310,14 +314,19 @@ export const ARVORE: readonly NoTexto[] = [
   { ramo: 3, posicao: 3, tipo: 'opp_extra', valor: 3, nome: 'Relâmpago da Shopee', efeito: '+3 oportunidades por dia.' },
   { ramo: 3, posicao: 4, tipo: 'opp_bonus', valor: 2, nome: 'Xepa da feira', efeito: 'Oportunidades rendem o dobro.' },
   { ramo: 3, posicao: 5, tipo: 'caixinha', valor: 5, nome: 'Gaveta de tranqueira', efeito: 'A caixinha guarda 5 oportunidades.' },
-  { ramo: 4, posicao: 1, tipo: 'teto', valor: 12, nome: 'Soneca pós-almoço', efeito: 'A empresa rende até 12h com o jogo fechado.' },
-  { ramo: 4, posicao: 2, tipo: 'teto', valor: 16, nome: 'Ponto facultativo', efeito: 'Rende até 16h com o jogo fechado.' },
-  { ramo: 4, posicao: 3, tipo: 'teto', valor: 24, nome: 'Feriado prolongado', efeito: 'Rende até 24h com o jogo fechado.' },
-  { ramo: 4, posicao: 4, tipo: 'teto', valor: 36, nome: 'Feriadão emendado', efeito: 'Rende até 36h com o jogo fechado.' },
-  { ramo: 4, posicao: 5, tipo: 'teto', valor: 48, nome: 'Carnaval', efeito: 'Rende até 48h com o jogo fechado.' },
+  { ramo: 4, posicao: 1, tipo: 'dourado_freq', valor: 1.5, nome: 'Pé de coelho', efeito: 'Eventos aparecem 50% mais vezes.' },
+  { ramo: 4, posicao: 2, tipo: 'dourado_tela', valor: 24, nome: 'Olho de lince', efeito: 'Eventos ficam 24 s na tela (no lugar de 12).' },
+  { ramo: 4, posicao: 3, tipo: 'dourado_investidor', valor: 2, nome: 'Investidor anjo', efeito: 'Investidor apressado rende 40 min de produção (no lugar de 20).' },
+  { ramo: 4, posicao: 4, tipo: 'dourado_duracao', valor: 2, nome: 'Hype de lançamento', efeito: 'Viralizou e Promoção duram o dobro.' },
+  { ramo: 4, posicao: 5, tipo: 'dourado_freq', valor: 2, nome: 'Dia de sorte', efeito: 'Eventos aparecem 2× mais vezes.' },
   { ramo: 5, posicao: 1, tipo: 'contrato_preco', valor: 0.75, nome: 'Placa de "Precisa-se"', efeito: 'Contratar custa 25% menos.' },
   { ramo: 5, posicao: 2, tipo: 'por_contratado', valor: 0.15, nome: 'Aniversariante do mês', efeito: 'Seus contratados rendem 15% (no lugar de 10%).' },
   { ramo: 5, posicao: 3, tipo: 'contrato_dias', valor: 10, nome: 'Carteira assinada', efeito: 'Os contratos que você faz duram 10 dias.' },
   { ramo: 5, posicao: 4, tipo: 'emprego_mult', valor: 2, nome: 'Passe de craque', efeito: 'Quem te contrata rende o dobro pra você.' },
   { ramo: 5, posicao: 5, tipo: 'contrato_preco', valor: 0.5, nome: 'Jovem Aprendiz', efeito: 'Contratar custa 50% menos.' },
+  { ramo: 6, posicao: 1, tipo: 'horta_amadurece', valor: 0.75, nome: 'Borra de café no adubo', efeito: 'Plantas novas amadurecem 25% mais rápido.' },
+  { ramo: 6, posicao: 2, tipo: 'horta_vida', valor: 1.5, nome: 'Regador automático', efeito: 'Plantas novas vivem 50% a mais depois de maduras.' },
+  { ramo: 6, posicao: 3, tipo: 'horta_cruza', valor: 2, nome: 'Abelha influencer', efeito: 'Cruzamento da Horta 2× mais fácil.' },
+  { ramo: 6, posicao: 4, tipo: 'horta_mult', valor: 1.5, nome: 'Agrotóxico liberado', efeito: 'Bônus das plantas ×1,5 (descontos seguem até 50%).' },
+  { ramo: 6, posicao: 5, tipo: 'morango_chance', valor: 5, nome: 'Morango do amor', efeito: 'Morango com Pescoço brota 5× mais.' },
 ];
