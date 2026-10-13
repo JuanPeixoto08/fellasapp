@@ -186,7 +186,7 @@ describe('catálogo', () => {
   });
 });
 
-describe('paridade TS × SQL', () => {
+describe('paridade TS × SQL', { timeout: 90_000 }, () => { // varreduras completas: no CI (máquina mais lenta) passam de 20 s
   it('rótulos e sabor de todas as 2160 combinações base × mistura × extra', async () => {
     const rows = await q<{ b: number; m: number; e: number; r: number[]; s: number }>(
       `select b.id as b, m.id as m, e.id as e, public.idle_cup_rotulos(b.id, m.id, e.id) as r, public.idle_cup_sabor(b.id, m.id, e.id) as s
