@@ -73,7 +73,7 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 | Nível 20 | +3% |
 | Nível 25 | +4% |
 | 1º resultado "lendário" (camisetaria: 4 notas 10; copão: nota 900+; jantar: 4,5 estrelas+) | +3% |
-| Fãs: camisetaria 10 mil fãs; copão 5 mil de galera; jantar 2 mil de reputação | +3% |
+| Fãs: camisetaria 100 mil fãs (ajustado pela simulação); copão 5 mil de galera; jantar 2 mil de reputação | +3% |
 | Volume: camisetaria 50 coleções; copão 30 copões; jantar 100 casais formados | +2% |
 
 ### 3.4 Desafio da semana
@@ -144,8 +144,8 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 
 - A produção leva 1 h (pequeno), 2 h (médio) ou 4 h (grande). Uma coleção por vez em produção ou à venda; dá para
   encerrar a venda antes (o estoque que sobra vira saldão a 50% do custo).
-- Ao ficar pronta, **4 influencers** dão nota de 1 a 10 (inteira): a página de moda de Jampa, a tia do bazar, o primo
-  que só usa camisa de time e o crítico chato. Nota de cada um = base + gosto dele + sorte (±0,5), entre 1 e 10.
+- Ao ficar pronta, **4 influencers** dão nota de 1 a 10 (inteira): @hojetemjp (a página de moda), @SuperMauro64
+  (bordado, vintage e cor forte), @mcresenha (só usa camisa de time) e @luisviton (o crítico chato), nomes do Juan. Nota de cada um = base + gosto dele + sorte (±0,5), entre 1 e 10.
 - Base (escondida, 0 a 10):
   - combinação tema × estilo (tabela escondida): ótima 9 · boa 7,5 · ok 6 · ruim 4 · péssima 2,5;
   - peça × tema: combina +1 · neutro 0 · não combina −1 (ex.: moletom −1 em quase tudo);
@@ -170,6 +170,19 @@ Os lotes 2 e 3 ganham cada um a sua spec. Lugar de lote ainda não lançado apar
 - Arte (repositório): 30 estampas 16×16 (uma por tema), os 15 estilos como tratamento por código (contorno, pixelizar,
   desbotar, spray, bordado com pontilhado...), 6 peças 24×24 com a cor trocada na hora, 4 avatares de influencer.
   A foto do pódio é a peça na cor com a estampa no estilo.
+
+### 4.4 Ajustes da implementação (parte 2)
+
+- O lugar abre com **108 cupons** (o lote médio de camiseta no nível 1); cada lugar tem `moeda_inicial` no catálogo.
+- **"O fornecedor fia"**: sem coleção ativa e sem cupom pro lote pequeno da peça, o lote pequeno sai de graça, no máximo
+  1 vez a cada 24 h (o lote fiado não devolve nada no saldão).
+- Fãs: a procura usa `1 + min(√fãs/30, 3)` (no máximo ×4) e os fãs do excesso de uma coleção têm teto de 20% do público
+  do nível; fãs pela nota = `round(público × 0,1 × (média − 6))` com média ≥ 7. Constantes: público 75, cresce 1,35,
+  preço da peça = custo × 6,5; relatório = 50 × 1,35^(nível−1).
+- Desafios de procura: 300% e 600% (150%/250% ficavam automáticos).
+- Tela: o caderninho completo (tabela 30 × 15, focos, relatório) abre no miolo do lugar; a faixa mostra o resumo.
+  Trancados aparecem como um chip "nív. N +N" por grupo. Nenhuma barra de rolagem no PC (pedido do Juan).
+- O tema Pagode virou um cavaquinho na estampa (o pandeiro não se lia em 16×16): conferir com o Juan.
 
 ## 5. Lugar 4: o copão (montar o copão)
 
@@ -302,7 +315,7 @@ As frases saem no plano, no tom das conquistas novas (humor ácido), para o Juan
   `idle_rate_at`, RLS das tabelas privadas e escondidas.
 - Simulação (como `simulacao.test.ts`), jogando 3 vezes por dia com escolhas medianas:
   - nível 10 em cerca de 1 semana e nível 25 em cerca de 6 semanas em cada lugar;
-  - nota média de quem joga "no chute" entre 5 e 6; de quem usa o caderninho, 8+ em 2 semanas;
+  - nota média de quem joga "no chute" entre 4,5 e 5,5 (era 5–6; os gostos fixos dos influencers puxam pra baixo); de quem usa o caderninho, 8+ em 2 semanas;
   - nenhum lugar rende mais de 3× outro do mesmo nível em marcos por semana.
 - Telas (jsdom): mapa com os 3 estados de pino, cada lugar, pódio, caixinhas, celular sem caixinha.
 
