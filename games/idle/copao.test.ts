@@ -303,8 +303,8 @@ describe('as noites', () => {
 });
 
 describe('movimento, vendas, lucro e galera', () => {
-  it('constantes iniciais (ajustadas na Task 2)', () => {
-    expect([PUBLICO_BASE, CRESCE, GALERA_TETO]).toEqual([40, 1.35, 3]);
+  it('constantes (ajustadas na simulação, copaoSim.test.ts)', () => {
+    expect([PUBLICO_BASE, CRESCE, GALERA_TETO]).toEqual([60, 1.25, 3]);
   });
 
   it('publico(nivel) cresce com o nível; movimento soma a galera (√galera/30, até 3)', () => {
@@ -325,31 +325,31 @@ describe('movimento, vendas, lucro e galera', () => {
 
   it('vendasNoite: um copão só vende movimento · atração (a participação é a própria atração abaixo de 1)', () => {
     const v = vendasNoite([{ base: 1, mistura: 1, nota: 999, noites: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null });
-    expect(v[0]).toBeCloseTo(40, 9);
+    expect(v[0]).toBeCloseTo(PUBLICO_BASE, 9);
     const meio = vendasNoite([{ base: 1, mistura: 1, nota: 999, noites: 5 }], { nivel: 1, galera: 0, sexta: false, dj: null });
-    expect(meio[0]).toBeCloseTo(20, 9); // novidade 0,5
+    expect(meio[0]).toBeCloseTo(PUBLICO_BASE / 2, 9); // novidade 0,5
   });
 
   it('vendasNoite: reparte pela atração; com a soma acima de 1 vende o movimento inteiro', () => {
     const c = [{ base: 1, mistura: 1, nota: 999, noites: 0 }, { base: 2, mistura: 2, nota: 999, noites: 0 }];
     const v = vendasNoite(c, { nivel: 1, galera: 0, sexta: false, dj: null });
-    expect(v[0]).toBeCloseTo(20, 9);
-    expect(v[1]).toBeCloseTo(20, 9);
+    expect(v[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
+    expect(v[1]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     // nota 999 e nota 0: o de nota 0 não vende
     const w = vendasNoite([c[0], { ...c[1], nota: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null });
-    expect(w).toEqual([40, 0]);
+    expect(w).toEqual([PUBLICO_BASE, 0]);
     expect(vendasNoite([], { nivel: 1, galera: 0, sexta: false, dj: null })).toEqual([]);
     expect(vendasNoite([{ ...c[0], nota: 0 }], { nivel: 1, galera: 0, sexta: false, dj: null })).toEqual([0]);
   });
 
   it('vendasNoite: mesma base e mistura perdem 30% cada; sexta ×2; DJ da sexta ×1,2 nos copões das bases dele', () => {
-    // dois Vodka+Energético nota 999 novos: atração 0,7 cada, soma 1,4 -> cada um vende 40·0,7/1,4·1 = 20
+    // dois Vodka+Energético nota 999 novos: atração 0,7 cada, soma 1,4 -> cada um vende público·0,7/1,4·1 = metade
     const gemeos = [{ base: 1, mistura: 1, nota: 999, noites: 0 }, { base: 1, mistura: 1, nota: 999, noites: 0 }];
-    expect(vendasNoite(gemeos, { nivel: 1, galera: 0, sexta: false, dj: null })[0]).toBeCloseTo(20, 9);
+    expect(vendasNoite(gemeos, { nivel: 1, galera: 0, sexta: false, dj: null })[0]).toBeCloseTo(PUBLICO_BASE / 2, 9);
     // sozinho com nota 500: atração (500/999)² = 0,2505 -> e o canibal só com outro no cardápio
     const um = [{ base: 1, mistura: 1, nota: 500, noites: 0 }];
     const a = vendasNoite(um, { nivel: 1, galera: 0, sexta: false, dj: null })[0];
-    expect(a).toBeCloseTo(40 * (500 / 999) ** 2, 9);
+    expect(a).toBeCloseTo(PUBLICO_BASE * (500 / 999) ** 2, 9);
     expect(vendasNoite(um, { nivel: 1, galera: 0, sexta: true, dj: null })[0]).toBeCloseTo(2 * a, 9);
     // DJ Ramemes (2) curte Vodka (1): ×1,2 só na sexta; DJ Vaqueiro (1) não curte Vodka
     expect(vendasNoite(um, { nivel: 1, galera: 0, sexta: true, dj: 2 })[0]).toBeCloseTo(2.4 * a, 9);
@@ -365,9 +365,9 @@ describe('movimento, vendas, lucro e galera', () => {
   });
 
   it('galeraNoite: sobe com média ≥ 600, cai 5% abaixo de 300, cai 15% com PT (uma vez), piso 0', () => {
-    // nível 1 (público 40), média 800: + round(40·0,02·800/999) = round(0,6406) = 1
+    // nível 1 (público 60), média 800: + round(60·0,02·800/999) = round(0,961) = 1; média 600 conta: round(0,7207) = 1
     expect(galeraNoite(100, 1, [800, 800], false)).toBe(101);
-    expect(galeraNoite(100, 1, [599, 601], false)).toBe(100);
+    expect(galeraNoite(100, 1, [599, 601], false)).toBe(101);
     expect(galeraNoite(100, 1, [599], false)).toBe(100);
     expect(galeraNoite(100, 1, [200, 300], false)).toBeCloseTo(95, 9);
     expect(galeraNoite(100, 1, [300], false)).toBe(100);

@@ -15,9 +15,9 @@ export type Rotulo = 0 | 1 | 2 | 3 | 4; // péssima, ruim, ok, boa, ótima
 /** 0 = base × mistura, 1 = base × extra, 2 = mistura × extra */
 export type TipoPar = 0 | 1 | 2;
 
-/** Ajustados na Task 2 (simulação). */
-export const PUBLICO_BASE = 40;
-export const CRESCE = 1.35;
+/** Ajustados na simulação (copaoSim.test.ts): nível 10 entre o dia 5 e o 9, nível 25 entre o dia 35 e o 49. */
+export const PUBLICO_BASE = 60;
+export const CRESCE = 1.25;
 /** Teto do bônus da galera no movimento (√galera/30 para de crescer aqui: no máximo 4× o público). */
 export const GALERA_TETO = 3;
 
