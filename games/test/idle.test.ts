@@ -67,10 +67,10 @@ describe('idle_open / idle_start', () => {
     const s = await t.rpc<Estado>('idle_open');
     expect(s.valuation).toBeCloseTo(10 + 0.51 * 100, 0);
   });
-  it('teto de 8 horas', async () => {
+  it('sem teto: 3 dias fechado rendem os 3 dias', async () => {
     await t.rpc('idle_start');
-    await recuar(A, 10 * 3600);
-    expect((await t.rpc<Estado>('idle_open')).valuation).toBeCloseTo(10 + 0.51 * 8 * 3600, 0);
+    await recuar(A, 3 * 86400);
+    expect((await t.rpc<Estado>('idle_open')).valuation / (10 + 0.51 * 3 * 86400)).toBeCloseTo(1, 6);
   });
   it('quem não abriu a empresa não acumula', async () => {
     await t.rpc('idle_open');

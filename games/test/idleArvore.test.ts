@@ -155,12 +155,13 @@ describe('o que cada ramo faz', () => {
     const depois = await t.rpc<Estado>('idle_claim_opportunity', { p_window: w });
     expect((depois.valuation - com.valuation) / (com.rate * 1800)).toBeCloseTo(1, 6);
   });
-  it('Tempo: com o jogo fechado a empresa rende até 12h (e não 8h)', async () => {
+  it('o ramo Tempo saiu: o nó 41 é o Pé de coelho e fechar a conta não para em 8h nem em 48h', async () => {
     await abrir(A);
     await ter(A, [1, 41]);
-    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '20 hours' where user_id = $1`, [A]);
+    expect((await q<{ tipo: string }>('select tipo from public.idle_cat_no where id = 41'))[0].tipo).toBe('dourado_freq');
+    await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '60 hours' where user_id = $1`, [A]);
     const s = await t.rpc<Estado>('idle_open');
-    expect(s.valuation).toBeCloseTo(0.5 * 1.02 * 1.05 * 12 * 3600, 3);
+    expect(s.valuation / (0.5 * 1.02 * 1.05 * 60 * 3600)).toBeCloseTo(1, 6);
   });
   it('Gente: contratar 25% (e 50%) mais barato, contrato de 10 dias pra quem contrata', async () => {
     await abrir(A, B);
@@ -202,13 +203,13 @@ describe('nada retroativo', () => {
     const s = await comprar(1);
     expect((s.valuation - 10) / (0.5 * 1.02 * 20000)).toBeCloseTo(1, 2);
   });
-  it('comprar o Carnaval (teto de 48h) depois de 50h fora rende só 36h, o teto de antes', async () => {
+  it('comprar um nó depois de 50h fora paga as 50h inteiras, sem teto', async () => {
     await abrir(A);
     await ter(A, [1, 41, 42, 43, 44]);
     await pontos(A, 100);
     await q(`update public.idle_state set valuation = 0, settled_at = now() - interval '50 hours' where user_id = $1`, [A]);
     const s = await comprar(45);
-    expect(s.valuation).toBeCloseTo(0.5 * 1.02 * 1.05 * 36 * 3600, 3);
+    expect(s.valuation / (0.5 * 1.02 * 1.05 * 50 * 3600)).toBeCloseTo(1, 6);
   });
 });
 
