@@ -38,6 +38,8 @@ const CONTA_MS = 1200;
 const SELO_MS = CONTA_INICIO + CONTA_MS + 150;
 /** O estilo que desenha o tema "puro" nas peças do tema (Pixel: o desenho com o contorno de adesivo). */
 const ESTILO_DO_TEMA = 3;
+/** Pediu o lugar e ele veio igual (o relógio do aparelho adiantado, a rede falhou): tenta de novo depois disso. */
+const NOVA_TENTATIVA_MS = 3000;
 
 const LISTAS: Record<Tipo, readonly { id: number; nome: string; nivel: number }[]> = { tema: TEMAS, estilo: ESTILOS, peca: PECAS, cor: CORES };
 
@@ -60,18 +62,23 @@ function pinta(c: HTMLCanvasElement, img: ImageData): void {
   c.getContext('2d')?.putImageData(img, 0, 0);
 }
 
-function lerRevelada(): number {
+/** As reveladas nesta aba: vale quando o localStorage não deixa ler ou gravar (aba anônima, bloqueado), pra a revelação
+ *  não voltar em loop. */
+const reveladasAqui = new Set<number>();
+function jaRevelou(id: number): boolean {
+  if (reveladasAqui.has(id)) return true;
   try {
-    return Number(localStorage.getItem(CHAVE_REVELADA) ?? 0);
+    return Number(localStorage.getItem(CHAVE_REVELADA) ?? 0) === id;
   } catch {
-    return 0;
+    return false;
   }
 }
 function gravarRevelada(id: number): void {
+  reveladasAqui.add(id);
   try {
     localStorage.setItem(CHAVE_REVELADA, String(id));
   } catch {
-    // sem localStorage (aba anônima): revela de novo na próxima, sem problema
+    // sem localStorage: fica só na memória desta aba
   }
 }
 const movimentoReduzido = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -154,10 +161,12 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   const pedidos = new Set<string>();
   let confirmando = false;
 
-  const pedir = (k: string) => {
+  /** Pede o lugar de novo uma vez por coisa (`k`); se 3 s depois ainda está igual (`aindaIgual`), tenta mais uma vez. */
+  const pedir = (k: string, aindaIgual: () => boolean) => {
     if (pedidos.has(k)) return;
     pedidos.add(k);
     a.recarregar?.();
+    setTimeout(() => { if (aindaIgual()) a.recarregar?.(); }, NOVA_TENTATIVA_MS);
   };
   const limparTimers = () => {
     for (const t of timers) clearTimeout(t);
@@ -204,6 +213,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   lancar.dataset.foco = 'tee-lancar';
   const aviso = el('p', 'tee-aviso');
   aviso.setAttribute('aria-live', 'polite');
+  /** Tudo que vale pro Lançar agora (o espaço de baixo mostra só o primeiro; a caixinha, todos). */
+  let avisosLancar: string[] = [];
 
   type Bancada = {
     el: HTMLElement; nivel: number; vitrine: ReturnType<typeof criarVitrine>;
@@ -265,9 +276,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
         arte.setAttribute('aria-hidden', 'true');
         if (tipo === 'tema') pinta(arte, estampa(item.id, ESTILO_DO_TEMA));
         bt.append(arte);
-        const alta = tipo === 'tema' && item.id === tendencia;
-        if (alta) bt.append(el('span', 'tee-alta', 'alta'));
-        bt.setAttribute('aria-label', alta ? `${item.nome}, em alta` : item.nome);
+        bt.setAttribute('aria-label', item.nome);
       }
       artes.push(arte);
       bt.addEventListener('click', () => escolher(tipo, item.id));
@@ -292,7 +301,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       const texto = dicaTeeTrancados(tipo, nivel);
       t.setAttribute('role', 'note');
       t.setAttribute('aria-label', texto);
-      t.append(cadeado(), el('span', 'tee-niv', `+${trancados.length}`));
+      const prox = trancados.reduce((x, y) => (y.nivel < x.nivel ? y : x));
+      t.append(cadeado(), el('span', 'tee-niv', `nív. ${prox.nivel}`), el('span', 'tee-mais', `+${trancados.length}`));
       dicas.ligar(t, `tee-${tipo}-trancados`, 'Trancado', () => dicaTeeTrancados(tipo, nivelAtual()));
       g.append(t);
     }
@@ -344,6 +354,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     });
     const fim = el('div', 'tee-fim');
     fim.append(lancar, aviso);
+    // no bloco (o botão desabilitado não recebe o mouse): todos os avisos de agora
+    dicas.ligar(fim, 'tee-lancar', 'Lançar', () => avisosLancar.join(' '));
     lado.append(b.vitrine.raiz, linhaNome, focoS, fim);
 
     // à direita: as escolhas
@@ -412,6 +424,14 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       });
       b.nomes[tipo].textContent = LISTAS[tipo][sel[tipo] - 1].nome;
     }
+    // o tema em alta da semana (vem do banco a cada desenho: a semana pode virar com a tela aberta)
+    b.botoes.tema.forEach((bt, i) => {
+      const alta = i + 1 === m.tendencia;
+      const selo = bt.querySelector('.tee-alta');
+      if (alta && !selo) bt.append(el('span', 'tee-alta', 'alta'));
+      if (!alta) selo?.remove();
+      bt.setAttribute('aria-label', alta ? `${TEMAS[i].nome}, em alta` : TEMAS[i].nome);
+    });
     // a arte dos estilos é o tema escolhido em cada estilo; a das peças, a cor escolhida
     if (b.temaArte !== sel.tema) {
       b.temaArte = sel.tema;
@@ -449,6 +469,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const custo = custoLote(sel.peca, nivel, sel.lote);
     const ultimoFiado = m.ultimo_fiado ? Date.parse(m.ultimo_fiado) : null;
     const fia = podeFiar(true, moeda, custoLote(sel.peca, nivel, 0), ultimoFiado, agora());
+    // em ordem de importância: o que impede de lançar, depois o fiado, a repetição e, sem nada, quando fica pronta
     const avisos: string[] = [];
     let pode = !ocupado && soma === 10;
     if (soma < 10) avisos.push(`Sobra ${pontos(10 - soma)} no foco.`);
@@ -459,14 +480,16 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     } else {
       pode = false;
       lancar.textContent = `Lançar por ${quantia(custo)} cupons`;
-      avisos.push(`Faltam ${quantia(Math.ceil(custo - moeda))} cupons.`);
-      if (fia) avisos.push('Sem cupom: o lote pequeno sai fiado (1 vez por dia).');
+      avisos.push(fia ? `Faltam ${quantia(Math.ceil(custo - moeda))} cupons. O lote pequeno sai fiado (1 vez por dia).`
+        : `Faltam ${quantia(Math.ceil(custo - moeda))} cupons.`);
     }
     const rep = repeticao(sel.tema, sel.estilo, m.historico);
     if (rep === 2) avisos.push('Mesmo tema e estilo de uma das 3 últimas: a nota cai.');
     else if (rep === 1) avisos.push('Mesmo tema ou estilo da última coleção: a nota cai um pouco.');
-    if (!avisos.length) avisos.push(`Fica pronta em ${producaoMs(sel.lote) / 3600_000} h e vende por 12 h.`);
-    aviso.textContent = avisos.join(' ');
+    avisos.push(`Fica pronta em ${producaoMs(sel.lote) / 3600_000} h e vende por 12 h.`);
+    avisosLancar = avisos;
+    // cabe sem rolar: o espaço embaixo do Lançar tem altura fixa e mostra só a primeira; a caixinha do Lançar mostra todas
+    aviso.textContent = avisos[0];
     aviso.classList.toggle('alerta', !pode && !ocupado);
     lancar.disabled = !pode;
     sortear.disabled = ocupado;
@@ -514,7 +537,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       if (resta > 0) conta.textContent = tempo(resta);
       else {
         falta.textContent = 'Pronta! Chamando os influencers…';
-        pedir(`${c.id}:pronta`);
+        pedir(`${c.id}:pronta`, () => estado === 'producao' && ultimo?.m.ativa?.id === c.id && !ultimo.m.ativa.pronta);
       }
     };
     tick();
@@ -679,7 +702,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       const resta = fim - agora();
       acaba.textContent = resta > 0 ? `Acaba em ${tempo(resta)}` : 'Acabou';
       if (pConfirma) pConfirma.textContent = textoConfirma();
-      if (resta <= 0) pedir(`${c.id}:fim`);
+      if (resta <= 0) pedir(`${c.id}:fim`, () => estado === 'venda' && ultimo?.m.ativa?.id === c.id);
     };
     tick();
   }
@@ -715,7 +738,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   function desenhar(l: LugarEstado, m: EstadoTee) {
     const c = m.ativa;
     const novo: Estado = !c ? 'bancada' : !c.pronta || !c.notas ? 'producao'
-      : revelando === c.id || lerRevelada() !== c.id ? 'revelacao' : 'venda';
+      : revelando === c.id || !jaRevelou(c.id) ? 'revelacao' : 'venda';
     if (!vendoCaderno && novo === 'revelacao' && estado === 'revelacao' && revelando === c?.id) return; // a revelação que está passando não recomeça
     limparTimers();
     if (estado === 'bancada' && novo !== 'bancada') {

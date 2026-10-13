@@ -64,10 +64,11 @@ describe('bancada (sem coleção rodando)', () => {
     expect($$('.tee-peca')).toHaveLength(2);
     expect($$('.tee-cor')).toHaveLength(4);
     const cad = $('.tee-trancados-tema');
-    expect(cad.textContent).toBe('+24');
+    expect(cad.querySelector('.tee-niv')!.textContent).toBe('nív. 2'); // o próximo, à vista no celular (sem caixinha)
+    expect(cad.querySelector('.tee-mais')!.textContent).toBe('+24');
     expect(cad.getAttribute('aria-label')).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25.');
     expect(caixinha('tee-tema-trancados')).toBe('Próximo: Signo, no nível 2. Depois mais 23 temas até o nível 25.');
-    expect($('.tee-trancados-peca').textContent).toBe('+4');
+    expect($('.tee-trancados-peca').textContent).toBe('nív. 4+4');
     // o tema em alta da semana tem a etiqueta
     expect(temas[1].querySelector('.tee-alta')).not.toBeNull();
     expect(temas[1].getAttribute('aria-label')).toBe('Praia, em alta');
@@ -155,8 +156,7 @@ describe('bancada (sem coleção rodando)', () => {
     t.renderizar(lugar(estadoTee(), { moeda: 20 }), false, AGORA);
     const lancar = $<HTMLButtonElement>('.tee-lancar');
     expect(lancar.disabled).toBe(true);
-    expect($('.tee-aviso').textContent).toContain('Faltam 88 cupons');
-    expect($('.tee-aviso').textContent).toContain('o lote pequeno sai fiado');
+    expect($('.tee-aviso').textContent).toBe('Faltam 88 cupons. O lote pequeno sai fiado (1 vez por dia).');
     $$<HTMLButtonElement>('.tee-lote')[0].click();
     expect(lancar.disabled).toBe(false);
     expect(lancar.textContent).toBe('Lançar fiado');
@@ -181,6 +181,44 @@ describe('bancada (sem coleção rodando)', () => {
     expect($('.tee-sel-tema').textContent).toBe('Forró');
     expect($<HTMLInputElement>('.tee-nome')).toBe(nome);
     expect(document.activeElement).toBe(nome);
+  });
+  it('o aviso embaixo do Lançar mostra uma mensagem só (a mais importante); a caixinha do Lançar mostra todas', () => {
+    const { t, $, $$ } = montar();
+    const historico = [{ id: 1, nome: 'x', tema: 1, estilo: 1, peca: 1, cor: 1, notas: [5, 5, 5, 5], pct: 50 }];
+    // tudo ao mesmo tempo: foco sem fechar, sem cupom (o fiado vale no pequeno) e a repetição
+    t.renderizar(lugar(estadoTee({ historico }), { moeda: 0 }), false, AGORA);
+    $$<HTMLButtonElement>('.tee-foco-menos')[0].click();
+    expect($('.tee-aviso').textContent).toBe('Sobra 1 ponto no foco.');
+    const todas = caixinha('tee-lancar')!;
+    expect(todas).toContain('Sobra 1 ponto no foco.');
+    expect(todas).toContain('Faltam 108 cupons. O lote pequeno sai fiado (1 vez por dia).');
+    expect(todas).toContain('Mesmo tema e estilo de uma das 3 últimas: a nota cai.');
+    $$<HTMLButtonElement>('.tee-foco-mais')[0].click();
+    expect($('.tee-aviso').textContent).toBe('Faltam 108 cupons. O lote pequeno sai fiado (1 vez por dia).');
+    $$<HTMLButtonElement>('.tee-lote')[0].click();
+    expect($('.tee-aviso').textContent).toBe('Sem cupom: o fornecedor fia esse lote (1 vez por dia).');
+    // nenhum caso passa de uma mensagem
+    for (const moeda of [0, 20, 5000]) for (const lote of [0, 1, 2]) for (const menos of [0, 1]) {
+      t.renderizar(lugar(estadoTee({ historico }), { moeda }), false, AGORA);
+      $$<HTMLButtonElement>('.tee-lote')[lote].click();
+      if (menos) $$<HTMLButtonElement>('.tee-foco-menos')[0].click();
+      const texto = $('.tee-aviso').textContent!;
+      expect(caixinha('tee-lancar')!.startsWith(texto)).toBe(true);
+      expect(caixinha('tee-lancar')!.length).toBeGreaterThan(texto.length); // sempre sobra o resto pra caixinha
+      if (menos) $$<HTMLButtonElement>('.tee-foco-mais')[0].click();
+    }
+  });
+  it('o "alta" segue a tendência que vem em cada desenho (a semana vira com a tela aberta)', () => {
+    const { t, $$ } = montar();
+    t.renderizar(lugar(estadoTee({ tendencia: 2 })), false, AGORA);
+    expect($$('.tee-tema')[1].querySelector('.tee-alta')).not.toBeNull();
+    t.renderizar(lugar(estadoTee({ tendencia: 5 })), false, AGORA);
+    expect($$('.tee-alta')).toHaveLength(1);
+    expect($$('.tee-tema')[4].querySelector('.tee-alta')).not.toBeNull();
+    expect($$('.tee-tema')[4].getAttribute('aria-label')).toBe('Gato, em alta');
+    expect($$('.tee-tema')[1].getAttribute('aria-label')).toBe('Praia');
+    t.renderizar(lugar(estadoTee({ tendencia: 9 })), false, AGORA); // trancada no nível 1: nenhum
+    expect($$('.tee-alta')).toHaveLength(0);
   });
   it('repetiu a última coleção: avisa que a nota cai', () => {
     const { t, $ } = montar();
@@ -220,9 +258,21 @@ describe('produção', () => {
     vi.advanceTimersByTime(30 * 60_000);
     expect($('.tee-conta').textContent).toBe('30 min');
     expect(recarregar).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(31 * 60_000);
+    vi.advanceTimersByTime(30 * 60_000 + 1000);
     expect(recarregar).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(10_000);
+    // o lugar veio igual (nada redesenhou): mais uma tentativa 3 s depois, e só
+    vi.advanceTimersByTime(3000);
+    expect(recarregar).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(60_000);
+    expect(recarregar).toHaveBeenCalledTimes(2);
+  });
+  it('a resposta chegou com a coleção pronta: sem segunda tentativa', () => {
+    const { t } = montar();
+    t.renderizar(lugar(estadoTee({ ativa: colecao({ id: 52, pronta_em: iso(AGORA + 1000) }) })), false, AGORA);
+    vi.advanceTimersByTime(2000);
+    expect(recarregar).toHaveBeenCalledTimes(1);
+    t.renderizar(lugar(estadoTee({ ativa: pronta({ id: 52 }) })), false, AGORA + 2000);
+    vi.advanceTimersByTime(5000);
     expect(recarregar).toHaveBeenCalledTimes(1);
   });
 });
@@ -254,6 +304,19 @@ describe('revelação (uma vez por coleção)', () => {
     $<HTMLButtonElement>('.tee-ver-venda').click();
     expect(localStorage.getItem(CHAVE_REVELADA)).toBe('41');
     expect(t.elemento.dataset.estado).toBe('venda');
+  });
+  it('sem localStorage (bloqueado): revela uma vez e não volta em loop', () => {
+    const ler = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('bloqueado'); });
+    const gravar = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('bloqueado'); });
+    const { t, $ } = montar();
+    t.renderizar(lugar(estadoTee({ ativa: pronta({ id: 77 }) })), false, AGORA);
+    expect(t.elemento.dataset.estado).toBe('revelacao');
+    $<HTMLButtonElement>('.tee-ver-venda').click();
+    expect(t.elemento.dataset.estado).toBe('venda');
+    t.renderizar(lugar(estadoTee({ ativa: pronta({ id: 77 }) })), false, AGORA + 60_000);
+    expect(t.elemento.dataset.estado).toBe('venda');
+    ler.mockRestore();
+    gravar.mockRestore();
   });
   it('já viu: vai direto pra venda', () => {
     localStorage.setItem(CHAVE_REVELADA, '41');
