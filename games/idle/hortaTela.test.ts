@@ -57,6 +57,14 @@ describe('a horta na tela', () => {
     expect(dicas).toContain('Tem gente que jura que viu');
     expect(dicas).not.toContain('Inhame'); // a dica não entrega o nome
   });
+  it('com o Agrotóxico liberado (×1,5), o cartão e as sementes dizem o bônus da pessoa', () => {
+    tela.renderizar(HORTA(), 2, 1e9, false, AGORA, [], 1.5);
+    expect(document.querySelector('.horta-cartao .bom')!.textContent).toBe('Produção +1,5%');
+    const sementes = [...document.querySelectorAll('.semente .bom')].map((x) => x.textContent);
+    expect(sementes).toEqual(['Produção +1,5%', 'Geradores 1,5% mais baratos']);
+    tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
+    expect(document.querySelector('.horta-cartao .bom')!.textContent).toBe('Produção +1%');
+  });
   it('canteiro vazio: as sementes descobertas com preço; plantar manda canteiro e espécie', () => {
     tela.renderizar(HORTA(), 2, 1e9, false, AGORA);
     canteiro(6).click();

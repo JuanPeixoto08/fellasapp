@@ -13,7 +13,7 @@ import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, S
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
-import { custoMult, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
+import { custoMult, efeitosDe, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
@@ -648,7 +648,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const [bom, ruim] = efeitosTexto(id, p);
         return [{ retrato: ativos.convidado(id), titulo: `${id === TERRY ? 'Terry' : 'Vini'} ${['na frente', 'no meio', 'no canto'][cad.cadeira.indexOf(id)]}`, bonus: bom, defeito: ruim }];
       });
-      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips);
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips, efeitosDe(catalogo, s).hortaMult);
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
