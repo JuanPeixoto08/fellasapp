@@ -52,6 +52,12 @@ describe('erros da Fellas Inc.', () => {
     ['idle_prestige_low', 'Ainda não compensa vender'],
     ['idle_points_low', 'Faltam pontos de prestígio pra esse nó'],
     ['idle_node_owned', 'Você já tem esse nó'],
+    ['idle_cup_vaga', 'O cardápio tá cheio: tira um copão antes'],
+    ['idle_cup_trancado', 'Isso ainda não liberou no bar'],
+    ['idle_cup_forca', 'A força vai de 1 a 10'],
+    ['idle_cup_preco', 'Esse preço não rola: vai da metade ao dobro da referência'],
+    ['idle_cup_repetido', 'Esse copão já tá no cardápio'],
+    ['idle_cup_sem_copao', 'Esse copão não tá mais no cardápio'],
   ])('%s', (code, text) => {
     const e = toGameError({ message: code, code: 'P0001' });
     expect(e.code).toBe(code);
