@@ -126,6 +126,13 @@ describe('bar: hoje à noite e o cardápio', () => {
     t.renderizar(lugar(estado({ dj: 1, hoje: hoje({ sexta: true, dj: 2, vendido_ate_agora: 1 }) }), { server_now: iso(INI + H) }), false, INI + H);
     expect($('.cup-sexta-tit').textContent).toBe('Hoje é sexta: movimento ×2');
     expect($('.cup-sexta .cup-dj-nome').textContent).toBe('DJ Ramemes');
+    // a sexta começou sem DJ e a pessoa escolheu um depois: hoje fica sem, o escolhido vale na próxima
+    t.renderizar(lugar(estado({ dj: 1, hoje: hoje({ sexta: true, dj: null, vendido_ate_agora: 1 }) }), { server_now: iso(INI + H) }), false, INI + H);
+    expect($('.cup-sexta .cup-dj-nome').textContent).toBe('Sem DJ');
+    expect($('.cup-dj-proxima').textContent).toBe('Na próxima sexta: DJ Vaqueiro.');
+    $<HTMLButtonElement>('.cup-trocar-dj').click();
+    expect($('.cup-djs-tit .sub').textContent).toBe('A sexta de hoje já começou com o DJ dela: a troca vale a partir da próxima sexta.');
+    $<HTMLButtonElement>('.cup-djs-voltar').click();
     // sem DJ
     t.renderizar(lugar(estado({ dj: null })), false, AGORA);
     expect($('.cup-sexta .cup-dj-nome').textContent).toBe('Sem DJ');
@@ -218,7 +225,7 @@ describe('montar (vaga livre)', () => {
     misturas[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(document.activeElement).toBe(misturas[1]);
     expect($('.cup-sel-mistura').textContent).toBe('Refri de guaraná');
-    expect($<HTMLInputElement>('.cup-nome').placeholder).toBe(nomeSugerido(2, 2, 1, 0));
+    expect($<HTMLInputElement>('.cup-nome').placeholder).toBe(nomeSugerido(2, 2, 1, 2, 0));
   });
   it('a moda (alta) e as bases que o DJ da sexta curte ficam marcadas', () => {
     const { $$ } = abrir({ moda: { base: 2, mistura: 1 }, dj: 1 }); // Vaqueiro: Cachaça, Catuaba, Vinho
@@ -270,6 +277,18 @@ describe('montar (vaga livre)', () => {
     expect(Number($<HTMLInputElement>('.cup-preco-range').value)).toBe(precoFaixa(1, 5)[1]);
     expect(caixinha('cup-preco')).toContain(`Vai de ${precoFaixa(1, 5)[0]} a ${precoFaixa(1, 5)[1]} fichas`);
   });
+  it('o nome sugerido combina com o tamanho; o lucro de cada venda pequena tem uma casa', () => {
+    const { $, $$ } = abrir();
+    $$<HTMLButtonElement>('.cup-tamanho')[0].click(); // copo
+    expect($<HTMLInputElement>('.cup-nome').placeholder).not.toMatch(/^(Copão|Bald)/);
+    expect($<HTMLInputElement>('.cup-nome').placeholder).toBe(nomeSugerido(1, 1, 1, 1, 0));
+    $$<HTMLButtonElement>('.cup-base')[1].click(); // cachaça, custo 1
+    $$<HTMLButtonElement>('.cup-f')[5].click(); // força 6: referência 10,4 → 10 fichas, custo 1,1
+    expect($('.cup-preco-info').textContent).toContain('lucro de 8,9 por venda');
+    $<HTMLButtonElement>('.cup-preco-menos').click();
+    for (let i = 0; i < 10; i++) $<HTMLButtonElement>('.cup-preco-menos').click();
+    expect($('.cup-preco-info').textContent).toContain('lucro de 4,9 por venda'); // 6 fichas
+  });
   it('Pôr no cardápio manda tudo com os nomes p_*; nome em branco vai o sugerido; deu certo volta pro bar', () => {
     const { t, $, $$ } = abrir();
     $$<HTMLButtonElement>('.cup-base')[2].click();
@@ -280,7 +299,7 @@ describe('montar (vaga livre)', () => {
     por.click();
     const preco = Math.round(precoRef(2, 6));
     expect(acao).toHaveBeenCalledWith('idle_cup_por', {
-      p_base: 3, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 6, p_preco: preco, p_nome: nomeSugerido(3, 1, 1, 0),
+      p_base: 3, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 6, p_preco: preco, p_nome: nomeSugerido(3, 1, 1, 2, 0),
     });
     t.renderizar(lugar(estado({ cardapio: [novo({ id: 50, base: 3, forca: 6, preco })] })), false, AGORA);
     expect(t.elemento.dataset.estado).toBe('bar');
@@ -506,7 +525,7 @@ describe('caderninho', () => {
     t.renderizar(lugar(estado(), { caderninho: notas }), false, AGORA);
     const r = mec.caderninho(notas);
     document.body.append(r);
-    expect(r.querySelector('.cup-resumo-num')!.textContent).toBe('3 de 33 pares testados'); // 3×4 + 3×3 + 4×3
+    expect(r.querySelector('.cup-resumo-num')!.textContent).toBe('3 testados de 33 pares liberados'); // 3×4 + 3×3 + 4×3
     expect(r.querySelector('.cup-resumo-rot')!.textContent).toBe('1 ótima1 ok1 péssima');
     expect(r.querySelector('.cup-resumo-ponto')!.textContent).toBe('Ponto de força: 1 de 2 bases testadas');
     r.querySelector<HTMLButtonElement>('.cup-abrir-caderno')!.click();

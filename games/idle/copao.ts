@@ -85,6 +85,13 @@ export function liberado(tipo: 'base' | 'mistura' | 'extra' | 'tamanho' | 'dj', 
   return nivel >= nivelDe(tipo, id);
 }
 
+/** As vagas que ainda vão chegar depois do nível dado: [vaga, nível em que libera], em ordem. */
+export function vagasFuturas(nivel: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let n = vagas(nivel) + 1; NIVEL_DE.has(`vaga:${n}`); n++) out.push([n, nivelDe('vaga', n)]);
+  return out;
+}
+
 /** Vagas no cardápio no nível dado: 3, mais as que o LIBERA já trouxe (4 no nível 12, 5 no 20). */
 export function vagas(nivel: number): number {
   let n = 3;
@@ -324,13 +331,18 @@ export function galeraNoite(galera: number, nivel: number, notas: readonly numbe
   return Math.max(0, g);
 }
 
-const PREFIXO = ['Copão', 'Balde', 'Batidão', 'Bomba'];
+/** O começo do nome pelo tamanho: "Balde" só no balde; nada de "Copão" num copo. */
+const PREFIXO: Readonly<Record<number, readonly string[]>> = {
+  1: ['Copo', 'Dose', 'Batidinha', 'Bomba'],
+  2: ['Copão', 'Copão', 'Batidão', 'Bomba'],
+  3: ['Balde', 'Balde', 'Baldão', 'Bomba'],
+};
 const SUFIXO = ['', ' da Casa', ' do Grau', ' Sem Freio', ' de Respeito', ' Proibidão'];
 
 /** Nome de copão para a pessoa não ficar travada; no máximo 30 letras (cai pro sem sufixo, depois só a base). */
-export function nomeSugerido(base: number, mistura: number, extra: number, n: number): string {
+export function nomeSugerido(base: number, mistura: number, extra: number, tamanho: number, n: number): string {
   const nome = BASES[base - 1].nome;
-  const prefixo = PREFIXO[(base + n) % 4];
+  const prefixo = (PREFIXO[tamanho] ?? PREFIXO[2])[(base + n) % 4];
   const cheio = `${prefixo} de ${nome}${SUFIXO[(mistura + extra + 2 * n) % 6]}`;
   if ([...cheio].length <= 30) return cheio;
   const semSufixo = `${prefixo} de ${nome}`;
@@ -422,6 +434,16 @@ export function distanciaTexto(forca: number, v: number, ponto: number | null = 
   if (ds.length === 1) return distTexto(ds[0]);
   if (ds.length === 2) return `${Math.abs(Math.max(...ds))} acima ou ${Math.abs(Math.min(...ds))} abaixo do ponto`;
   return 'longe do ponto';
+}
+
+const curta = (d: number) => (d === 0 ? '0' : `${d > 0 ? '+' : '−'}${Math.abs(d)}`);
+/** A distância do ponto em poucas letras (o chip do caderninho): "0", "+1", "−2", "+3/−4" (um dos dois), "longe". */
+export function distanciaCurta(forca: number, v: number, ponto: number | null = null): string {
+  if (ponto !== null) return curta(forca - ponto);
+  const ds = distanciasAguenta(v);
+  if (ds.length === 1) return curta(ds[0]);
+  if (ds.length === 2) return `${curta(Math.max(...ds))}/${curta(Math.min(...ds))}`;
+  return 'longe';
 }
 
 /** O ponto da base, se o caderninho já fecha num só. */

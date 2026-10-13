@@ -54,4 +54,12 @@ describe('o chat da galera', () => {
     const msgs = chatDaNoite(noite({ copoes: [copao({ tamanho: 3, forca: 4, preco: 125, nota: 400 })], chat_seed: 3 }), 'u1');
     expect(msgs.some((m) => /fichas/.test(m.texto) || /balde/i.test(m.texto))).toBe(true);
   });
+  it('o nome do copão é texto livre: nunca vem com artigo na frente (o, a, um, do, no...)', () => {
+    for (let seed = 0; seed < 80; seed++) {
+      const cs = [copao({ nome: 'Bomba Zica', nota: [120, 450, 650, 850][seed % 4], forca: 1 + (seed % 10), tamanho: 1 + (seed % 3), pt: seed % 5 === 0 })];
+      for (const m of chatDaNoite(noite({ chat_seed: seed, copoes: cs, pt: cs[0].pt }), 'u1')) {
+        expect(m.texto).not.toMatch(/\b(o|a|um|uma|do|da|no|na|pelo|pela|segundo)\s+Bomba Zica/i);
+      }
+    }
+  });
 });

@@ -13,7 +13,7 @@ import { button, el } from '../shared/hud/hud';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
-  aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
+  aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
   NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS, vendasNoite,
   type CadernoCup, type CopaoCup, type EstadoCup, type TipoPar, type UltimaNoite,
 } from './copao';
@@ -59,6 +59,9 @@ const quantia = (n: number) => formatarValor(n).replace('F$ ', '');
 const inteiro = (n: number) => Math.round(n).toLocaleString('pt-BR');
 const comSinal = (n: number) => (n >= 0 ? `+${quantia(n)}` : `−${quantia(-n)}`);
 const minusc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+/** Fichas de uma venda: com uma casa abaixo de 10 ("0,4", "7,5"); acima, como o resto ("22", "1,2 mil"). */
+const fichasVenda = (n: number) => (n < 10 ? (Math.round(n * 10) / 10).toLocaleString('pt-BR') : quantia(n));
+
 const nomeTier = (nota: number) => `nota-${nota >= 800 ? 'top' : nota >= 600 ? 'boa' : nota >= 300 ? 'meh' : 'ruim'}`;
 const partesDe = (c: { base: number; mistura: number; extra: number; tamanho: number; forca: number }) => [c.base, c.mistura, c.extra, c.tamanho, c.forca];
 const descrever = (c: { base: number; mistura: number; extra: number; tamanho: number; forca: number }) =>
@@ -245,6 +248,12 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   const cadAtual = (): CadernoCup => cadernoCup(ultimo?.l.caderninho ?? []);
   const nivelAtual = () => ultimo?.l.nivel ?? 1;
   const djEscolhido = () => ultimo?.m.dj ?? null;
+  /** A noite de hoje já começou no último JSON (server_now depois do início): a linha dela existe e o DJ é o gravado nela. */
+  const noiteComecou = (m: EstadoCup) => servidorMs >= Date.parse(m.hoje.inicio);
+  /** A sexta de hoje já começou: o DJ dela é o gravado na noite, mesmo sem DJ; trocar agora vale a partir da próxima. */
+  const sextaComecou = (m: EstadoCup) => m.hoje.sexta && noiteComecou(m);
+  /** O DJ que vale na noite de hoje: o gravado quando ela começou; antes disso, o escolhido. */
+  const djDaNoite = (m: EstadoCup) => (noiteComecou(m) ? m.hoje.dj : m.dj);
 
   // ===================== bar =====================
   /** O que cada copão do cardápio de hoje vende, em fração do total da noite (a mesma conta do banco, com o que a tela
@@ -253,7 +262,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const ini = Date.parse(m.hoje.inicio);
     const lista = m.cardapio.filter((c) => c.revelado && c.nota !== null && Date.parse(c.primeira_noite) <= ini);
     const v = vendasNoite(lista.map((c) => ({ base: c.base, mistura: c.mistura, tamanho: c.tamanho, forca: c.forca, preco: c.preco, nota: c.nota!, noites: c.noites })),
-      { nivel: l.nivel ?? 1, galera: l.fas ?? 0, sexta: m.hoje.sexta, dj: m.hoje.dj ?? m.dj });
+      { nivel: l.nivel ?? 1, galera: l.fas ?? 0, sexta: m.hoje.sexta, dj: djDaNoite(m) });
     const soma = v.reduce((s, x) => s + x, 0);
     return new Map(lista.map((c, i) => [c.id, soma > 0 ? v[i] / soma : 0]));
   }
@@ -308,14 +317,17 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
 
     // a sexta e o DJ
     const sexta = el('div', 'cup-sexta');
-    const djId = (m.hoje.sexta && agora() >= ini && m.hoje.dj !== null ? m.hoje.dj : m.dj) ?? null;
+    const comecou = sextaComecou(m);
+    const djId = comecou ? m.hoje.dj : m.dj;
     const dj = djId ? DJS[djId - 1] : null;
     const info = el('div', 'cup-sexta-info');
     info.append(el('span', 'cup-sexta-tit', m.hoje.sexta ? 'Hoje é sexta: movimento ×2' : 'Na sexta: movimento ×2'));
     if (dj) {
       info.append(el('strong', 'cup-dj-nome', dj.nome), el('span', 'cup-dj-estilo', `${dj.estilo} · DJ da sexta`),
         el('p', 'cup-curte', `+20% em copão de ${listaBases(dj.bases)}`));
-    } else info.append(el('strong', 'cup-dj-nome', 'Sem DJ'), el('p', 'cup-curte', 'Escolhe quem toca: o DJ dá +20% nos copões das bases que combinam com o som dele.'));
+    } else info.append(el('strong', 'cup-dj-nome', 'Sem DJ'), el('p', 'cup-curte', comecou ? 'Hoje a sexta começou sem DJ.'
+      : 'Escolhe quem toca: o DJ dá +20% nos copões das bases que combinam com o som dele.'));
+    if (comecou && m.dj !== m.hoje.dj) info.append(el('p', 'cup-info cup-dj-proxima', `Na próxima sexta: ${m.dj ? DJS[m.dj - 1].nome : 'sem DJ'}.`));
     const trocar = button(dj ? 'Trocar DJ' : 'Escolher DJ', 'btn compacto cup-trocar-dj', () => {
       vista = 'djs';
       redesenhar();
@@ -421,8 +433,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       ol.append(li);
     }
     // as vagas que ainda vão chegar (4ª no nível 12, 5ª no 20)
-    for (const [vaga, nivel] of [[4, 12], [5, 20]] as const) {
-      if (vaga <= m.vagas) continue;
+    for (const [vaga, nivel] of vagasFuturas(l.nivel ?? 1)) {
       const li = el('li', 'cup-vaga trancada');
       li.setAttribute('aria-label', `${vaga}ª vaga: libera no nível ${nivel}`);
       li.append(cadeado(), el('span', 'cup-niv', `nív. ${nivel}`));
@@ -474,7 +485,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   });
   const sortear = button('Sortear', 'btn compacto cup-sortear', () => {
     sel.n++;
-    nome.value = nomeSugerido(sel.base, sel.mistura, sel.extra, sel.n);
+    nome.value = nomeSugerido(sel.base, sel.mistura, sel.extra, sel.tamanho, sel.n);
     atualizarMontar();
   });
   sortear.dataset.foco = 'cup-sortear';
@@ -763,9 +774,10 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     b.precoMais.disabled = sel.preco >= hi;
     const lucro = lucroVenda(sel);
     b.precoInfo.replaceChildren(`De ${lo} a ${hi} · ref. ${inteiro(ref)} · `,
-      el('span', lucro < 0 ? 'cup-prejuizo' : 'cup-fichas', lucro < 0 ? `prejuízo de ${quantia(-lucro)} por venda` : `lucro de ${quantia(lucro)} por venda`));
+      Math.abs(lucro) < 0.05 ? el('span', undefined, 'sem lucro por venda')
+        : el('span', lucro < 0 ? 'cup-prejuizo' : 'cup-fichas', `${lucro < 0 ? 'prejuízo' : 'lucro'} de ${fichasVenda(Math.abs(lucro))} por venda`));
     // nome e a prévia
-    nome.placeholder = nomeSugerido(sel.base, sel.mistura, sel.extra, sel.n);
+    nome.placeholder = nomeSugerido(sel.base, sel.mistura, sel.extra, sel.tamanho, sel.n);
     const nomeAgora = nome.value.trim() || nome.placeholder;
     pinta(b.foto, fotoImagem(partesDe(sel)));
     b.foto.setAttribute('aria-label', `Prévia: ${descrever(sel)}`);
@@ -817,7 +829,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const cab = el('header', 'cup-djs-cab');
     const tit = el('div', 'cup-djs-tit');
     tit.append(el('h3', 'cup-titulo', 'Quem toca na sexta'),
-      el('p', 'sub', 'Na sexta o movimento dobra, e o DJ dá +20% nos copões das bases que combinam com o som dele.'));
+      el('p', 'sub', sextaComecou(m) ? 'A sexta de hoje já começou com o DJ dela: a troca vale a partir da próxima sexta.'
+        : 'Na sexta o movimento dobra, e o DJ dá +20% nos copões das bases que combinam com o som dele.'));
     const voltar = button('Voltar', 'btn compacto cup-djs-voltar', () => {
       vista = 'bar';
       redesenhar();
@@ -1196,21 +1209,23 @@ function criarCadernoCompleto(itens: readonly NotaCaderninho[], atual: Atual | n
     for (const [f, v] of [...testes.entries()].sort((x, y) => x[0] - y[0])) {
       const txt = distanciaTexto(f, v, ponto);
       const chip = el('span', `cup-ponto-f ${v >= 170 ? 'alto' : v >= 100 ? 'medio' : 'baixo'}`);
-      chip.append(el('b', undefined, String(f)), el('span', undefined, txt.replace(' do ponto', '')));
+      chip.append(el('b', undefined, String(f)), el('span', undefined, distanciaCurta(f, v, ponto)));
       chip.setAttribute('aria-label', `Força ${f}: ${txt}, aguenta ${v}`);
+      atual?.dicas.ligar(chip, `cup-ponto-${b.id}-${f}`, `${b.nome} na força ${f}`, () => `${txt.charAt(0).toUpperCase()}${txt.slice(1)}. Aguenta ${v} de 199.`);
       fs.append(chip);
     }
     li.append(fs, el('span', `cup-ponto-res${ponto !== null ? ' achou' : ''}`, ponto !== null ? `ponto ${ponto}` : 'falta testar'));
     ul.append(li);
   }
-  if (testadas.length) pontos.append(ul);
+  if (testadas.length) {
+    pontos.append(ul, el('p', 'cup-info cup-ponto-legenda', 'Força e quão longe do ponto: 0 no ponto · +1 acima · −2 abaixo · +3/−4 um dos dois · longe = 4 ou mais acima, 5 ou mais abaixo.'));
+  }
   const nunca = bases.filter((b) => !testadas.includes(b));
   if (nunca.length) {
     pontos.append(el('p', 'cup-info cup-ponto-nunca', testadas.length ? `Ainda não testou: ${listaBases(nunca.map((b) => b.id))}.`
       : 'Nenhuma base testada ainda: a estreia de cada copão conta quão longe do ponto a força ficou.'));
   }
-  tabelas.append(legenda);
-  raiz.append(tabelas, pontos);
+  raiz.append(tabelas, legenda, pontos);
   return raiz;
 }
 
@@ -1227,7 +1242,7 @@ function criarResumoCaderninho(itens: readonly NotaCaderninho[], atual: Atual | 
   }
   const raiz = el('div', 'cup-cad-resumo');
   const linha = el('p', 'cup-resumo-num');
-  linha.append(el('b', undefined, String(rots.length)), ` de ${total} pares testados`);
+  linha.append(el('b', undefined, String(rots.length)), ` testados de ${total} pares liberados`);
   const contas = el('p', 'cup-resumo-rot');
   for (let r = 4; r >= 0; r--) {
     const n = rots.filter((x) => x === r).length;

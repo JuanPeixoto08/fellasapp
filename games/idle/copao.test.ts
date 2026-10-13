@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aBase, aguenta, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
+  abreNoite, aBase, aguenta, distanciaCurta, vagasFuturas, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
   GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
   noitesEntre, nomeSugerido, nota, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor,
   SABORES, TAMANHOS, vagas, vendasNoite, vendidoNaNoite,
@@ -405,14 +405,18 @@ describe('movimento, vendas, lucro e galera', () => {
 });
 
 describe('nome', () => {
-  it('nomeSugerido nunca passa de 30 caracteres e leva o nome da base', () => {
-    for (const b of BASES) for (const m of MISTURAS) for (const e of EXTRAS) for (let n = 0; n <= 5; n++) {
-      const nome = nomeSugerido(b.id, m.id, e.id, n);
+  it('nomeSugerido nunca passa de 30 caracteres, leva o nome da base e combina com o tamanho', () => {
+    for (const b of BASES) for (const m of MISTURAS) for (const e of EXTRAS) for (const t of TAMANHOS) for (let n = 0; n <= 5; n++) {
+      const nome = nomeSugerido(b.id, m.id, e.id, t.id, n);
       expect([...nome].length).toBeLessThanOrEqual(30);
       expect(nome).toContain(b.nome);
+      if (t.id !== 3) expect(nome).not.toMatch(/^Bald/);
+      if (t.id === 1) expect(nome).not.toMatch(/^Copão/);
     }
-    expect(nomeSugerido(1, 1, 1, 0)).toBe('Balde de Vodka do Grau');
-    expect(nomeSugerido(11, 1, 1, 0)).toBe('Bomba de Absinto do Grau');
+    expect(nomeSugerido(1, 1, 1, 2, 0)).toBe('Copão de Vodka do Grau');
+    expect(nomeSugerido(1, 1, 1, 3, 0)).toBe('Balde de Vodka do Grau');
+    expect(nomeSugerido(1, 1, 1, 1, 0)).toBe('Dose de Vodka do Grau');
+    expect(nomeSugerido(11, 1, 1, 2, 0)).toBe('Bomba de Absinto do Grau');
   });
 });
 
@@ -465,5 +469,21 @@ describe('artigo da base', () => {
     expect(aBase(4)).toBe('o Gin');
     expect(daBase(2)).toBe('da Cachaça');
     expect(daBase(8)).toBe('do Corote de pêssego');
+  });
+});
+
+describe('vagas que vão chegar e a distância curta', () => {
+  it('vagasFuturas sai do LIBERA', () => {
+    expect(vagasFuturas(1)).toEqual([[4, 12], [5, 20]]);
+    expect(vagasFuturas(12)).toEqual([[5, 20]]);
+    expect(vagasFuturas(25)).toEqual([]);
+  });
+  it('distanciaCurta: 0, +1, −2, +3/−4, longe; exata com o ponto', () => {
+    expect(distanciaCurta(5, 170)).toBe('0');
+    expect(distanciaCurta(6, 199)).toBe('+1');
+    expect(distanciaCurta(3, 105)).toBe('−2');
+    expect(distanciaCurta(8, 35)).toBe('+3/−4');
+    expect(distanciaCurta(10, 0)).toBe('longe');
+    expect(distanciaCurta(8, 35, 5)).toBe('+3');
   });
 });

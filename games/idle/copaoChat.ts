@@ -41,9 +41,9 @@ const embaralhar = <T,>(r: () => number, xs: T[]): T[] => {
 const minusculo = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 const NOTA = {
-  top: ['{nome} é patrimônio do bar. Tombem.', 'Pedi um {nome} e virei outra pessoa. Melhor.', 'Quem inventou {nome} merece estátua na praça.',
+  top: ['{nome} é patrimônio do bar. Tombem.', 'Pedi {nome} e virei outra pessoa. Melhor.', 'Quem inventou {nome} merece estátua na praça.',
     'Chorei tomando {nome}. De alegria, dessa vez.'],
-  bom: ['{nome} desceu redondo, sem drama.', '{nome} tá bom. Não é amor, mas é carinho.', 'Pedi o segundo {nome} sem nem perceber.',
+  bom: ['{nome} desceu redondo, sem drama.', '{nome} tá bom. Não é amor, mas é carinho.', 'Repeti {nome} sem nem perceber.',
     '{nome} é aquele amigo que não brilha mas nunca falha.'],
   meh: ['{nome} é ok. Tipo amizade de trabalho.', '{nome} não ofende, mas também não defende.', 'Tomei {nome} por educação.',
     '{nome} tem gosto de "tanto faz".'],
@@ -53,7 +53,7 @@ const NOTA = {
 const PAR_RUIM = ['{a} com {b}?? Quem autorizou isso?', 'Misturar {a} com {b} devia dar cadeia.', '{a} com {b} é briga de família dentro do copo.'];
 const PAR_BOM = ['{a} com {b} é casamento que deu certo.', 'Alguém finalmente juntou {a} com {b}. Obrigado.'];
 const CARO = ['{tamanho} a {preco} fichas é assalto à mão armada.', 'Paguei {preco} fichas num {tamanho}. Vou parcelar em 12 vezes.',
-  'Por {preco} fichas eu queria o {tamanho} e o copo de lembrança.'];
+  'Por {preco} fichas eu queria levar a louça de lembrança.'];
 const BARATO = ['{preco} fichas num {tamanho} desses? O dono tá maluco, aproveita.', 'Copão barato assim só pode ser lavagem de dinheiro.'];
 const FRACO = ['Isso aí é só {mistura}.', 'Tomei três {nome} e tô mais sóbrio que o motorista.', '{nome} é suco com autoestima.'];
 const FORTE = ['{nome} é {base} com um respingo de {mistura}.', 'Um gole de {nome} e eu vi meus antepassados.', '{nome} tira tinta de parede.'];
