@@ -5,9 +5,9 @@
 //   ninguém abriu;
 // * montar (numa vaga livre): base, mistura, extra, tamanho, força, preço, nome, a prévia e "Pôr no cardápio";
 // * djs: quem toca na sexta (os retratos, o som e as bases que vendem mais com cada um);
-// * provas (0069): o Provar do montar manda a galera provar a receita sem ir pro cardápio (de graça, sem limite); a lista
-//   das últimas, a que está provando com a contagem e a pronta com a nota, as 4 partes, os pares e o que a galera falou,
-//   e o "Pôr no cardápio" que leva a receita pro montar;
+// * provas (0069): o Provar do montar manda a galera provar a receita sem ir pro cardápio (de graça, sem limite no dia, uma
+//   por vez desde a 0072); a lista das últimas, a que está provando com a contagem e a pronta com a nota, as 4 partes, os
+//   pares e o que a galera falou, e o "Pôr no cardápio" que leva a receita pro montar;
 // * revelação (uma vez por copão, guardada por pessoa, quando ele vendeu a primeira noite inteira): a nota subindo com as 4
 //   partes (sabor, custo-benefício, moda, aguenta), os pares e quão longe do ponto a força ficou;
 // * chat (uma vez por noite, por pessoa): o que a galera falou da última noite que fechou, as fichas e a galera.
@@ -871,9 +871,19 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     aviso.classList.toggle('alerta', !pode && !ocupado);
     por.disabled = !pode;
     sortear.disabled = ocupado;
-    // Provar: de graça, não precisa de vaga nem de nome, sem limite (0070)
-    provar.textContent = 'Provar';
-    provar.disabled = ocupado;
+    atualizarProvar();
+  }
+
+  /** Provar: de graça, não precisa de vaga nem de nome, sem limite no dia (0070), uma por vez (0072): com uma provando, o
+   *  botão espera a nota sair e mostra quanto falta. */
+  function atualizarProvar() {
+    if (!ultimo) return;
+    const { m, ocupado } = ultimo;
+    const t = agora();
+    const fim = m.provas.map((p) => Date.parse(p.pronta_em)).filter((x) => x > t);
+    const texto = fim.length ? `Nota em ${tempo(Math.min(...fim) - t)}` : 'Provar';
+    if (provar.textContent !== texto) provar.textContent = texto;
+    provar.disabled = ocupado || fim.length > 0;
   }
 
   function abrirMontar() {
@@ -889,7 +899,8 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     if (!montar || montar.nivel !== nivel) montar = montarMontar(nivel);
     for (const t of ['base', 'mistura', 'extra', 'tamanho'] as const) if (!liberado(t, sel[t], nivel)) sel[t] = 1;
     if (raiz.firstChild !== montar.el || raiz.childNodes.length !== 1) raiz.replaceChildren(montar.el);
-    tick = null;
+    tick = atualizarProvar; // a contagem da prova que está provando
+    garantirIntervalo();
     atualizarMontar();
   }
 

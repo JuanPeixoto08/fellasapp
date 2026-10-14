@@ -1520,6 +1520,7 @@ describe('provar um copão (0069)', () => {
       const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
       c.preco = ent(r, lo, hi);
       await provar(c);
+      andar(5 * MIN); // uma prova por vez (0072)
       const p = (await provasDb()).at(-1)!;
       expect(p.nota, JSON.stringify(c)).toBe(avaliar(c, await semana()).nota);
       if (i < 3) {
@@ -1542,11 +1543,18 @@ describe('provar um copão (0069)', () => {
       expect(await provasDb()).toEqual([]);
     }
   });
-  it('sem limite: 30 provas seguidas são aceitas; cardápio cheio e receita repetida não impedem', async () => {
+  it('uma por vez: com uma provando, a próxima dá idle_cup_provas e nada grava; saiu a nota (5 min), pode de novo, sem limite no dia', async () => {
     await bar();
     for (const extra of [1, 2, 3]) await por({ extra, nome: `C${extra}` });
     await provar(); // igual ao do cardápio: pode
-    for (let k = 0; k < 29; k++) await provar({ extra: (k % 3) + 1, forca: (k % 10) + 1, preco: 24 });
+    andar(5 * MIN - 1);
+    await expect(provar({ extra: 2 })).rejects.toThrow(/idle_cup_provas/);
+    expect(await provasDb()).toHaveLength(1);
+    andar(1);
+    for (let k = 0; k < 29; k++) {
+      await provar({ extra: (k % 3) + 1, forca: (k % 10) + 1, preco: 24 });
+      andar(5 * MIN);
+    }
     expect(await provasDb()).toHaveLength(30);
     const m = (await lugar()).mecanica;
     expect(m.provas_hoje).toBe(30);
@@ -1599,19 +1607,19 @@ describe('provar um copão (0069)', () => {
   it('o JSON mostra as últimas 10 (a mais nova primeiro); B não vê as do A', async () => {
     await bar();
     for (let k = 0; k < 12; k++) {
-      andar(MIN);
+      andar(5 * MIN); // uma prova por vez (0072)
       await provar({ forca: (k % 10) + 1, preco: 24 });
     }
     const ps = await provasDb();
     const m = (await lugar()).mecanica;
     expect(m.provas.map((x) => x.id)).toEqual(ps.slice(-10).reverse().map((x) => x.id));
     expect(m.provas_hoje).toBe(12);
-    // 1 min entre elas: as feitas há 5 min ou mais estão prontas (com a nota); as outras, não
+    // 5 min entre elas: as de antes estão prontas (com a nota); a que acabou de entrar, não
     for (const x of m.provas) {
       expect(x.pronta).toBe(Date.parse(x.pronta_em) <= agora);
       expect(x.nota === null).toBe(!x.pronta);
     }
-    expect(m.provas.filter((x) => x.pronta)).toHaveLength(5); // as 4 de ontem e a de 5 min atrás
+    expect(m.provas.filter((x) => x.pronta)).toHaveLength(9);
     await t.as(B);
     await expect(t.rpc('idle_cup_provar', { p_base: 1, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 5, p_preco: 22 }))
       .rejects.toThrow(/idle_lugar_fechado/);

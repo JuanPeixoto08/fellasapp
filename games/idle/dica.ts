@@ -375,7 +375,7 @@ export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; 
 
 /** O Provar (0069): de graça, nota em 5 min, só o caderninho; sem limite (0070); diz quantas provou nas últimas 24 h. */
 export function dicaCupProvar(hoje: number): string {
-  const t = 'De graça e sem limite: a galera prova sem ir pro cardápio e a nota sai em 5 min. O caderninho anota os pares e a força; '
+  const t = 'De graça, uma por vez: a galera prova sem ir pro cardápio e a nota sai em 5 min; aí já dá pra provar outra. O caderninho anota os pares e a força; '
     + 'não vende, não entra no pódio nem nos desafios.';
   return hoje > 0 ? `${t} ${hoje === 1 ? 'Provou 1 vez' : `Provou ${hoje} vezes`} nas últimas 24 h.` : t;
 }

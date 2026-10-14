@@ -712,6 +712,18 @@ describe('provas (0069)', () => {
     expect(provar.disabled).toBe(false);
     expect(provar.textContent).toBe('Provar');
   });
+  it('uma por vez: com uma provando, Provar trava e mostra quanto falta pra nota; saiu a nota, destrava', () => {
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ provas: [prova({ id: 80 }, 2), prova({ id: 79 }, 60)], provas_hoje: 2 })), false, AGORA);
+    $<HTMLButtonElement>('.cup-montar-vaga').click();
+    const provar = $<HTMLButtonElement>('.cup-provar');
+    expect(provar.disabled).toBe(true);
+    expect(provar.textContent).toBe('Nota em 3 min');
+    expect(caixinha('cup-provar')).toContain('uma por vez');
+    t.renderizar(lugar(estado({ provas: [prova({ id: 80 }, 5), prova({ id: 79 }, 63)], provas_hoje: 2 })), false, AGORA + 3 * 60_000);
+    expect($<HTMLButtonElement>('.cup-provar').disabled).toBe(false);
+    expect($<HTMLButtonElement>('.cup-provar').textContent).toBe('Provar');
+  });
   it('pronta: a nota, as 4 partes, os pares, a força e 2 ou 3 falas da galera (inventada); Pôr no cardápio leva a receita pro montar', () => {
     const p = prova({ id: 70, base: 2, mistura: 1, extra: 1, tamanho: 2, forca: 4, preco: 18 });
     const { t, $, $$ } = montar();

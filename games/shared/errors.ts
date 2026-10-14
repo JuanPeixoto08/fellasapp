@@ -101,7 +101,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_cup_preco: 'Esse preço não rola: vai da metade ao dobro da referência',
   idle_cup_repetido: 'Esse copão já tá no cardápio',
   idle_cup_sem_copao: 'Esse copão não tá mais no cardápio',
-  idle_cup_provas: 'Já provou 6 hoje. A galera precisa de um descanso',
+  idle_cup_provas: 'A galera ainda tá provando a outra. Espera sair a nota',
   idle_opp_cap: 'Chega de oportunidade por hoje',
   idle_hire_self: 'Não dá pra se contratar',
   idle_hire_twice: 'Essa pessoa já trabalha pra você',

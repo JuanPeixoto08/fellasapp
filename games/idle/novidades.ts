@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-14-copao-uma-prova',
+    titulo: 'Copão: uma prova por vez',
+    data: '2026-10-14',
+    itens: [
+      'A galera agora prova um copão por vez. Mandou provar, o botão mostra quanto falta pra nota (5 min) e destrava quando ela sai.',
+      'Continua de graça e sem limite no dia.',
+    ],
+  },
+  {
     id: '2026-10-14-bolsa-melhorias',
     titulo: 'Bolsa: melhorias pelo preço da tela',
     data: '2026-10-14',
