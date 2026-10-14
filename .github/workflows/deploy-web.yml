@@ -4,6 +4,9 @@
 #   CLOUDFLARE_ACCOUNT_ID      ID da conta Cloudflare
 #   EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY   mesmos valores do .env (entram no bundle)
 #   EXPO_PUBLIC_LASTFM_API_KEY   API key do Last.fm (aba Música; entra no bundle)
+#
+# Os testes do app, os testes dos jogos e o build rodam ao mesmo tempo; só publica se tudo passou.
+# Os testes dos jogos (os mais demorados) só rodam quando o push mexe em games/ ou supabase/.
 name: Deploy web
 
 on:
@@ -19,39 +22,93 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  mudou:
+    runs-on: ubuntu-latest
+    outputs:
+      jogos: ${{ steps.f.outputs.jogos }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            jogos:
+              - 'games/**'
+              - 'supabase/**'
+              - '.github/workflows/deploy-web.yml'
+
+  testes-app:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24 # o mesmo do dev: a potência do V8 muda na última casa entre versões e a 0033 foi gerada no 24
+          node-version: 24
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            games/package-lock.json
-
+          cache-dependency-path: package-lock.json
       - run: npm ci
-
       # não publica se o app não compila ou os testes quebram
       - run: npx tsc --noEmit
       - run: npm test -- --ci
 
+  testes-jogos:
+    needs: mudou
+    # manual (workflow_dispatch) roda sempre; push só quando mexeu nos jogos ou no banco
+    if: needs.mudou.outputs.jogos == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # o mesmo do dev: a potência do V8 muda na última casa entre versões e a 0033 foi gerada no 24
+          cache: npm
+          cache-dependency-path: games/package-lock.json
+      - run: npm ci --prefix games
+      - run: npm test --prefix games
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            games/package-lock.json
+      - run: npm ci
       - run: npm run build:web
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_LASTFM_API_KEY: ${{ secrets.EXPO_PUBLIC_LASTFM_API_KEY }}
-
       # mesas dos Fellas Games (Vite + Three.js) em dist/games/<jogo>/, no mesmo deploy do app
       - run: npm ci --prefix games
-      - run: npm test --prefix games
       - run: npm run build --prefix games
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
 
+  publicar:
+    needs: [testes-app, testes-jogos, build]
+    # testes-jogos pode ter sido pulado (push sem mudança nos jogos): conta como ok; falhou ou cancelou, não publica
+    if: >-
+      always() &&
+      needs.testes-app.result == 'success' &&
+      needs.build.result == 'success' &&
+      (needs.testes-jogos.result == 'success' || needs.testes-jogos.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
