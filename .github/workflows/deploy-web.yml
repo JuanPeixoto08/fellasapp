@@ -16,7 +16,8 @@ on:
 
 concurrency:
   group: deploy-web
-  cancel-in-progress: true
+  # sem cancelar: com os testes dos jogos condicionais, um push cancelado podia publicar mudança dos jogos sem teste
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -94,12 +95,14 @@ jobs:
           name: dist
           path: dist
           retention-days: 1
+          include-hidden-files: true # dist/.well-known/assetlinks.json (o app Android depende dele)
 
   publicar:
-    needs: [testes-app, testes-jogos, build]
+    needs: [mudou, testes-app, testes-jogos, build]
     # testes-jogos pode ter sido pulado (push sem mudança nos jogos): conta como ok; falhou ou cancelou, não publica
     if: >-
       always() &&
+      needs.mudou.result == 'success' &&
       needs.testes-app.result == 'success' &&
       needs.build.result == 'success' &&
       (needs.testes-jogos.result == 'success' || needs.testes-jogos.result == 'skipped')
