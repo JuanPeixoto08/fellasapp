@@ -4,6 +4,18 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-14-mapa-ritmo',
+    titulo: 'Mapa do rolê mais rápido',
+    data: '2026-10-14',
+    itens: [
+      'Camisetaria em minutos: o lote fica pronto em 2, 5 ou 10 min e vende em meia hora. Dá pra testar combinação até cansar os influencers. Sexta e sábado à noite a venda continua em dobro.',
+      'A coleção que já estava rodando segue no horário antigo. As novas já saem no ritmo novo.',
+      'Subir de nível na camisetaria ficou mais caro, porque agora dá pra lançar muito mais coleção por dia.',
+      'Copão: botão Provar no montar. A galera prova a receita sem ir pro cardápio e a nota sai em 5 min, de graça, 6 por dia. O caderninho anota os pares e a força, e a galera solta o que achou.',
+      'Gostou da prova? Põe no cardápio direto dela. As vendas, o pódio e os desafios do copão continuam sendo coisa da noite, das 18h às 2h.',
+    ],
+  },
+  {
     id: '2026-10-13-mapa-do-role',
     titulo: 'Mapa do rolê',
     data: '2026-10-13',

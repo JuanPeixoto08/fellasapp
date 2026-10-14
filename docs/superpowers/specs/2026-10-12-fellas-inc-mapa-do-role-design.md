@@ -201,6 +201,16 @@ com lote 2, `lancado` false) até a parte 4 ficar pronta. A seção 6 continua v
 - Tela: o caderninho completo (tabela 30 × 15, focos, relatório) abre no miolo do lugar; a faixa mostra o resumo.
   Trancados aparecem como um chip "nív. N +N" por grupo. Nenhuma barra de rolagem no PC (pedido do Juan).
 - O tema Pagode virou um cavaquinho na estampa (o pandeiro não se lia em 16×16): conferir com o Juan.
+- **Ritmo em minutos (0069, pós-lançamento, estilo Game Dev Tycoon):** a produção leva **2 min** (pequeno), **5 min**
+  (médio) ou **10 min** (grande) e a venda dura **30 min** (era 1/2/4 h e 12 h). Sexta e sábado das 18h às 2h continuam
+  pesando 2× (o peso reparte a venda dentro dos 30 min). A coleção que já rodava no deploy guarda os horários dela: a venda
+  reparte-se até o `fim_em` de cada uma (`idle_tee_vendido_ate` com o fim). Constantes de novo na simulação, com duas
+  pessoas: "3 visitas" (9h, 14h, 21h) e "ativo" (as 3 visitas + 12h–13h e 20h–22h com uma visita a cada 6 min): o lote
+  cresce **1,32** por nível (era 1,35), o nível da camisetaria custa **450** × 1,55^(nível−1) (era 100), público 75 e
+  preço 6,5× ficam. Resultado (16 sementes, caderninho): ativo chega no nível 10 nos dias 2,8–3,4 e no 25 nos dias
+  26,8–31,9; 3 visitas, no 10 nos dias 6,6–8,6 (e termina as 8 semanas no nível 22–23); nota ≥ 8 depois do dia 7 (ativo
+  9,3); chute 4,7–4,8; % de procura no máximo 834%; o fiado continua 1×/24 h. O marco de fãs subiu para **115 mil** (a
+  mediana de quem passa 3 vezes por dia chega no dia ~27; quem joga ativo, no ~11).
 
 ## 5. Lugar 4: o copão (montar o copão)
 
@@ -273,6 +283,21 @@ com lote 2, `lancado` false) até a parte 4 ficar pronta. A seção 6 continua v
   Retratos 64×64; os sem foto de referência estão marcados "a conferir".
 - Os desafios de noite contam na semana em que são conferidos; "abre o bar 5 noites", "sexta com o DJ certo" e "balde"
   pagam na hora em que acontecem.
+- **Provar (0069, pós-lançamento):** no montar, "Provar (N de 6 hoje)" ao lado de "Pôr no cardápio" manda a galera provar
+  a receita (base, mistura, extra, tamanho, força e preço) **sem ir pro cardápio**: de graça, sem vaga e sem nome, no
+  máximo **6 nas últimas 24 h** (janela que anda; `idle_cup_provas`: "Já provou 6 hoje. A galera precisa de um descanso").
+  A nota é a mesma de pôr no cardápio (moda da semana da prova) e sai em **5 min**; aí o `idle_cup_depois` anota o
+  caderninho uma vez (os 3 pares e o "aguenta" da força), igual a um copão revelado. **Sem** pódio, volume, desafios ou
+  conquistas: isso continua só da noite, e as vendas também. Tabela `idle_cup_provas`; o `idle_cup_json` traz `provas` (as
+  últimas 10; a nota, as partes e os rótulos só quando fica pronta), `provas_hoje` e `provas_max`.
+- Tela das provas (aberta pelo pé do bar, "Ver provas", ou depois de provar): a lista das últimas 6 (contagem ou nota) e a
+  prova aberta: a que está provando com a contagem; a pronta com a nota, as 4 partes, os pares, a força e 2 ou 3 falas da
+  galera inventada (`chatDaProva`; DJ nenhum fala), e "Pôr no cardápio", que leva a receita (com o preço) pro montar. O
+  Provar funciona com o cardápio cheio. Sem rolagem no PC.
+- Simulação: o caderninho prova até 2 receitas por visita (6 por 24 h), as que mais ensinam (pares e força ainda não sabidos
+  nem esperados) entre as de nota esperada boa. As metas da parte 3 seguem sem mexer em constante: nível 10 no dia ~7,9,
+  nível 25 nos dias 39,4–39,9, nota depois do dia 14 = 770 (era 731), marco de galera no dia ~27,4; cobrar o dobro continua
+  perdendo em todas as sementes.
 
 ## 6. Lugar 7: o jantar (primeiro encontro + crítico)
 

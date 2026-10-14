@@ -1765,8 +1765,13 @@ body:has(.idle) { background: #121212; }
   .idle .cup-pe-dir { justify-items: end; }
   /* montar: a prévia, o nome, a força, o preço e o Pôr à esquerda; as escolhas à direita */
   .idle .cup-montar { display: grid; height: 100%; grid-template-columns: 318px minmax(0, 1fr); gap: 22px; }
-  .idle .cup-lado { display: grid; grid-template-rows: minmax(0, 1fr) auto auto auto auto; gap: 10px; min-height: 0; }
-  .idle .cup-previa { min-height: 0; }
+  .idle .cup-lado { display: grid; grid-template-rows: minmax(0, 1fr) auto auto auto auto; gap: 6px; min-height: 0; }
+  .idle .btn.cup-por { min-height: 44px; font-size: 22px; }
+  .idle .cup-fim-bts { gap: 6px; }
+  /* a prévia encolhe com o espaço que sobra (o Provar ganhou uma linha), sempre em escala inteira (48 × n) */
+  .idle .cup-previa { min-height: 0; container-type: size; }
+  .idle .cup-foto-previa { width: calc(max(48px, round(down, min(100cqw, 100cqh, 144px) * var(--zoom, 1), 48px)) / var(--zoom, 1));
+    height: calc(max(48px, round(down, min(100cqw, 100cqh, 144px) * var(--zoom, 1), 48px)) / var(--zoom, 1)); }
   .idle .cup-escolhas { display: flex; flex-direction: column; gap: 9px; }
   .idle .cup-moda-montar { margin-top: auto; }
   .idle .cup-item { width: 44px; height: 44px; }
@@ -1797,8 +1802,7 @@ body:has(.idle) { background: #121212; }
   .idle .cup-provas { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
   .idle .cup-provas-corpo { grid-template-columns: 300px minmax(0, 1fr); gap: 22px; min-height: 0; }
   .idle .cup-prova-det { grid-template-columns: 230px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 22px; min-height: 0; }
-  .idle .cup-prova-lado { grid-template-rows: minmax(0, 1fr) auto auto auto; min-height: 0; }
-  .idle .cup-prova-palco { min-height: 0; }
+  .idle .cup-prova-palco { min-height: 168px; }
   .idle .cup-prova-painel { min-height: 0; overflow: hidden; }
   .idle .cup-prova-chat { gap: 10px; }
   .idle .cup-prova-chat .cup-msg { margin-bottom: 4px; padding: 4px 8px 6px; }
