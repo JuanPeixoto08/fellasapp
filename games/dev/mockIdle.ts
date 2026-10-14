@@ -260,6 +260,11 @@ wc.__faixaAgora = async () => {
       await dono(`update public.idle_place_state set aberto_em = aberto_em - interval '1 day' where user_id = $1 and lugar = 4`, [ME]);
       document.dispatchEvent(new Event('visibilitychange'));
     }],
+    // copão: as provas andam 5 min (a que estava provando fica pronta) ou 1 dia (o limite de 6 libera)
+    ...([['Provas +5 min', '5 minutes'], ['Provas +1 dia', '1 day']] as const).map(([nome, quanto]): [string, () => Promise<void>] => [nome, async () => {
+      await dono(`update public.idle_cup_provas set criado_em = criado_em - $2::interval, pronta_em = pronta_em - $2::interval where user_id = $1`, [ME, quanto]);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }]),
   ];
   for (const [nome, f] of mapa) {
     const b = document.createElement('button');

@@ -5,6 +5,9 @@
 //   ninguém abriu;
 // * montar (numa vaga livre): base, mistura, extra, tamanho, força, preço, nome, a prévia e "Pôr no cardápio";
 // * djs: quem toca na sexta (os retratos, o som e as bases que vendem mais com cada um);
+// * provas (0069): o Provar do montar manda a galera provar a receita sem ir pro cardápio (de graça, 6 por 24 h); a lista
+//   das últimas, a que está provando com a contagem e a pronta com a nota, as 4 partes, os pares e o que a galera falou,
+//   e o "Pôr no cardápio" que leva a receita pro montar;
 // * revelação (uma vez por copão, guardada por pessoa, quando ele vendeu a primeira noite inteira): a nota subindo com as 4
 //   partes (sabor, custo-benefício, moda, aguenta), os pares e quão longe do ponto a força ficou;
 // * chat (uma vez por noite, por pessoa): o que a galera falou da última noite que fechou, as fichas e a galera.
@@ -15,13 +18,13 @@ import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
   aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
-  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS,
-  type CadernoCup, type CopaoCup, type EstadoCup, type TipoPar, type UltimaNoite,
+  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, provasRestantes, proximaNoite, proximaProva, rotulos, TAMANHOS,
+  type CadernoCup, type CopaoCup, type EstadoCup, type ProvaCup, type TipoPar, type UltimaNoite,
 } from './copao';
 import { balao, canvasDe, COR_BASE, COR_MISTURA, extraImagem, fotoImagem, fundoBar, LADO_FOTO, recipiente } from './copaoArte';
-import { chatDaNoite } from './copaoChat';
+import { chatDaNoite, chatDaProva } from './copaoChat';
 import {
-  dicaCupBase, dicaCupDj, dicaCupExtra, dicaCupForca, dicaCupMistura, dicaCupPreco, dicaCupTamanho, dicaCupTrancados, dicaCupVaga,
+  dicaCupBase, dicaCupDj, dicaCupExtra, dicaCupForca, dicaCupMistura, dicaCupPreco, dicaCupProvar, dicaCupTamanho, dicaCupTrancados, dicaCupVaga,
 } from './dica';
 import { criarFoco } from './foco';
 import { formatarValor } from './formatar';
@@ -35,7 +38,7 @@ export const chaveNoite = (uid: string | null) => `${CHAVE_NOITE}:${uid ?? 'anon
 const MAX_VISTOS = 40;
 
 type Tipo = 'base' | 'mistura' | 'extra' | 'tamanho';
-type Vista = 'bar' | 'montar' | 'djs';
+type Vista = 'bar' | 'montar' | 'djs' | 'provas';
 type Estado = 'carregando' | Vista | 'revelacao' | 'chat' | 'caderno';
 type Atual = { a: AcoesMecanica; dicas: Dicas; l: LugarEstado; m: EstadoCup; ocupado: boolean; abrirCaderno(): void };
 
@@ -100,6 +103,21 @@ function tituloNoite(ini: number, agora: number): string {
   const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
   return `Na noite de ${DIAS[d.getUTCDay()]} (${dd}/${mm})`;
 }
+
+/** "21h40" (Brasília) de um instante. */
+function horaBR(ms: number): string {
+  const d = new Date(ms - 3 * H);
+  return `${d.getUTCHours()}h${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+const criadas = (m: EstadoCup) => m.provas.map((p) => Date.parse(p.criado_em));
+/** Quantas provas ainda cabem agora (a janela de 24 h anda com o relógio). */
+const provasRestam = (m: EstadoCup, agoraMs: number) => Math.min(m.provas_max, provasRestantes(criadas(m), agoraMs));
+/** Quando a próxima prova libera, em palavras ("hoje às 21h40"); null = já pode. */
+function provaLibera(m: EstadoCup, agoraMs: number): string | null {
+  const t = proximaProva(criadas(m), agoraMs);
+  return t === null ? null : `${quando(t, agoraMs)} às ${horaBR(t)}`;
+}
+const descreverCurto = (c: { base: number; tamanho: number; forca: number }) => `${TAMANHOS[c.tamanho - 1].nome} de ${BASES[c.base - 1].nome}, força ${c.forca}`;
 
 function pinta(c: HTMLCanvasElement, img: ImageData): void {
   c.width = img.width;
@@ -223,6 +241,10 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
   let tirando: number | null = null;
   /** Os copões do cardápio quando abriu o montar: apareceu um novo = deu certo, volta pro bar. */
   let idsAoMontar: Set<number> | null = null;
+  /** As provas quando apertou Provar: apareceu uma nova = deu certo, vai pras provas com ela aberta. */
+  let idsAoProvar: Set<number> | null = null;
+  /** A prova aberta nas provas (null = a mais nova). */
+  let provaSel: number | null = null;
   const uid = () => a.usuario?.() ?? null;
 
   const pedir = (k: string, aindaIgual: () => boolean) => {
@@ -415,6 +437,37 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     return li;
   }
 
+  /** As provas no pé do bar: quantas restam, a que está provando (contagem) ou a nota da última, e o botão que abre as provas. */
+  function blocoProvas(m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
+    const b = el('div', 'cup-provas-pe');
+    const linha = el('p', 'cup-provas-linha');
+    const estado = el('span', 'cup-provas-estado');
+    linha.append(el('span', 'cup-pe-rot', 'Provas'), estado);
+    const ver = button(m.provas.length ? 'Ver provas' : 'Provar', 'btn compacto cup-ver-provas', () => abrirProvas(null));
+    ver.dataset.foco = 'cup-ver-provas';
+    ver.disabled = ocupado && !m.provas.length;
+    b.append(linha, ver);
+    atualizar.push(() => {
+      const t = agora();
+      const provando = m.provas.filter((p) => Date.parse(p.pronta_em) > t);
+      const pronta = m.provas.find((p) => p.pronta && p.nota !== null);
+      const restam = `${provasRestam(m, t)} de ${m.provas_max} hoje`;
+      if (provando.length) estado.textContent = `provando, pronta em ${tempo(Math.min(...provando.map((p) => Date.parse(p.pronta_em))) - t)} · ${restam}`;
+      else if (pronta) estado.replaceChildren('última: nota ', el('b', nomeTier(pronta.nota!), String(pronta.nota)), ` · ${restam}`);
+      else estado.textContent = `nota em 5 min, de graça · ${restam}`;
+      vigiarProvas(m, t);
+    });
+    return b;
+  }
+  /** A prova que ficou pronta: busca o lugar de novo (a nota só vem do banco), uma vez por prova. */
+  function vigiarProvas(m: EstadoCup, t: number) {
+    for (const p of m.provas) {
+      if (!p.pronta && Date.parse(p.pronta_em) <= t) {
+        pedir(`prova:${p.id}`, () => !!ultimo?.m.provas.some((x) => x.id === p.id && !x.pronta));
+      }
+    }
+  }
+
   function desenharBar(l: LugarEstado, m: EstadoCup, ocupado: boolean) {
     const atualizar: (() => void)[] = [];
     const s = el('div', 'cup-bar');
@@ -451,7 +504,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     moda.append(el('span', 'cup-pe-rot', 'Moda da semana'),
       `${BASES[m.moda.base - 1].nome} + ${minusc(MISTURAS[m.moda.mistura - 1].nome)}`,
       el('span', 'cup-pe-sub', 'vale pra quem entrar no cardápio esta semana'));
-    pe.append(moda);
+    pe.append(moda, blocoProvas(m, ocupado, atualizar));
     const u = m.ultima_noite;
     const fechada = m.noite_fechada;
     if (u || fechada) {
@@ -508,6 +561,14 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     });
   });
   por.dataset.foco = 'cup-por';
+  const provar = button('Provar', 'btn cup-provar', () => {
+    if (!ultimo) return;
+    idsAoProvar = new Set(ultimo.m.provas.map((p) => p.id));
+    a.acao('idle_cup_provar', {
+      p_base: sel.base, p_mistura: sel.mistura, p_extra: sel.extra, p_tamanho: sel.tamanho, p_forca: sel.forca, p_preco: sel.preco,
+    });
+  });
+  provar.dataset.foco = 'cup-provar';
   const voltarMontar = button('Voltar', 'btn compacto cup-voltar', () => {
     vista = 'bar';
     idsAoMontar = null;
@@ -677,9 +738,13 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
 
     const fim = el('div', 'cup-fim');
     const bts = el('div', 'cup-fim-bts');
-    bts.append(voltarMontar, por);
+    bts.append(voltarMontar, provar, por);
     fim.append(bts, aviso);
-    dicas.ligar(fim, 'cup-por', 'Pôr no cardápio', () => avisosPor.join(' '));
+    dicas.ligar(por, 'cup-por', 'Pôr no cardápio', () => avisosPor.join(' '));
+    dicas.ligar(provar, 'cup-provar', 'Provar', () => {
+      const m = ultimo?.m;
+      return m ? dicaCupProvar(provasRestam(m, agora()), m.provas_max, provaLibera(m, agora())) : null;
+    });
     lado.append(previa, linhaNome, forcaS, precoS, fim);
 
     // à direita: as escolhas
@@ -813,6 +878,11 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     aviso.classList.toggle('alerta', !pode && !ocupado);
     por.disabled = !pode;
     sortear.disabled = ocupado;
+    // Provar: de graça, não precisa de vaga nem de nome; só o limite de 6 em 24 h
+    const restam = provasRestam(m, agora());
+    const libera = restam <= 0 ? provaLibera(m, agora()) : null;
+    provar.textContent = libera ? `Próxima prova ${libera}` : `Provar (${restam} de ${m.provas_max} hoje)`;
+    provar.disabled = ocupado || restam <= 0;
   }
 
   function abrirMontar() {
@@ -830,6 +900,173 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     if (raiz.firstChild !== montar.el || raiz.childNodes.length !== 1) raiz.replaceChildren(montar.el);
     tick = null;
     atualizarMontar();
+  }
+
+  // ===================== provas =====================
+  function abrirProvas(id: number | null) {
+    vista = 'provas';
+    provaSel = id;
+    redesenhar();
+    raiz.querySelector<HTMLElement>('.cup-prova-item[aria-current="true"], .cup-provas-provar')?.focus();
+  }
+  /** Leva a receita da prova pro montar (o preço vem junto, como foi provado). */
+  function provaProMontar(p: ProvaCup) {
+    if (!ultimo) return;
+    Object.assign(sel, { base: p.base, mistura: p.mistura, extra: p.extra, tamanho: p.tamanho, forca: p.forca, preco: p.preco, precoMexido: true });
+    abrirMontar();
+  }
+
+  function detalheProva(p: ProvaCup, m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
+    const s = el('section', 'cup-prova-det');
+    s.setAttribute('aria-label', `Prova: ${descrever(p)}`);
+    const palco = el('div', 'cup-prova-palco');
+    parede(palco);
+    palco.append(fotoCanvas('cup-foto-prova', partesDe(p), descrever(p)));
+    const lado = el('div', 'cup-prova-lado');
+    lado.append(palco);
+    const painel = el('div', 'cup-prova-painel');
+    const receita = el('p', 'cup-prova-receita');
+    receita.append(el('strong', undefined, descreverCurto(p)),
+      `${MISTURAS[p.mistura - 1].nome} · ${EXTRAS[p.extra - 1].nome} · ${p.preco} fichas`);
+    if (!p.pronta || p.nota === null) {
+      const conta = el('b', 'cup-prova-conta');
+      const topo = el('div', 'cup-prova-topo');
+      topo.append(el('span', 'cup-status', 'A galera tá provando'), conta);
+      lado.append(topo);
+      painel.append(receita, el('p', 'cup-info', 'A nota sai em 5 min e o caderninho anota os pares e a força. Não vende nem entra no pódio.'));
+      atualizar.push(() => {
+        const resta = Date.parse(p.pronta_em) - agora();
+        conta.textContent = resta > 0 ? `Pronta em ${tempo(resta)}` : 'Pronta! Chamando a galera…';
+      });
+      s.append(lado, painel);
+      return s;
+    }
+    const topo = el('div', 'cup-prova-topo');
+    const nota = el('b', `cup-rev-nota ${nomeTier(p.nota)}`, String(p.nota));
+    nota.setAttribute('aria-label', `nota ${p.nota} de 999`);
+    topo.append(nota, el('span', 'cup-rev-de', 'de 999'));
+    lado.append(topo);
+    const cheio = m.cardapio.length >= m.vagas;
+    const repetido = m.cardapio.some((c) => c.base === p.base && c.mistura === p.mistura && c.extra === p.extra && c.tamanho === p.tamanho);
+    const pBot = button('Pôr no cardápio', 'btn main cup-prova-por', () => provaProMontar(p));
+    pBot.dataset.foco = `cup-prova-por-${p.id}`;
+    pBot.disabled = ocupado || cheio || repetido;
+    lado.append(pBot);
+    if (repetido) lado.append(el('p', 'cup-info', 'Essa receita já tá no cardápio.'));
+    else if (cheio) lado.append(el('p', 'cup-info', 'O cardápio tá cheio: tira um copão antes.'));
+    const partes = el('ul', 'cup-partes');
+    for (const [rot, k, max] of PARTES) {
+      const v = (p[k] as number | null) ?? 0;
+      const li = el('li', 'cup-parte entrou');
+      const barra = el('span', 'cup-parte-barra');
+      const i = el('i');
+      i.style.width = `${Math.max(0, Math.min(1, v / max)) * 100}%`;
+      barra.append(i);
+      li.append(el('span', 'cup-parte-rot', rot), barra, el('b', 'cup-parte-valor', String(v)), el('span', 'cup-parte-max', `/${max}`));
+      li.setAttribute('aria-label', `${rot}: ${v} de ${max}`);
+      partes.append(li);
+    }
+    const rs = p.rotulos ?? rotulos(p.base, p.mistura, p.extra);
+    const pares = el('ul', 'cup-rev-pares');
+    const nomesPar: [string, string][] = [
+      [BASES[p.base - 1].nome, minusc(MISTURAS[p.mistura - 1].nome)], [BASES[p.base - 1].nome, minusc(EXTRAS[p.extra - 1].nome)],
+      [MISTURAS[p.mistura - 1].nome, minusc(EXTRAS[p.extra - 1].nome)],
+    ];
+    rs.forEach((rt, k) => {
+      const li = el('li', `cup-par rot-${rt}`);
+      li.append(el('i'), `${nomesPar[k][0]} + ${nomesPar[k][1]}: `, el('b', undefined, NOME_ROTULO[rt]));
+      pares.append(li);
+    });
+    const distancia = forcaTestada(cadAtual(), p.base, p.forca)?.texto ?? distanciaTexto(p.forca, p.aguenta ?? 0);
+    const forca = el('p', 'cup-prova-forca', `Força ${p.forca}: ${distancia} ${daBase(p.base)}.`);
+    const chat = el('ol', 'cup-prova-chat');
+    chat.setAttribute('aria-label', 'O que a galera falou');
+    chatDaProva({ ...p, nota: p.nota }, uid()).forEach((x, k) => {
+      const ladoMsg = k % 2 ? 'dir' : 'esq';
+      const li = el('li', `cup-msg ${x.tipo} ${ladoMsg} entrou`);
+      const c = cauda(x.tipo, ladoMsg);
+      if (c) li.style.setProperty('--cauda', `url(${c})`);
+      li.append(el('span', 'cup-autor', x.autor), el('p', undefined, x.texto));
+      chat.append(li);
+    });
+    painel.append(receita, partes, pares, forca, chat);
+    s.append(lado, painel);
+    return s;
+  }
+
+  function desenharProvas(m: EstadoCup, ocupado: boolean) {
+    const atualizar: (() => void)[] = [];
+    const s = el('div', 'cup-provas');
+    const cab = el('header', 'cup-provas-cab');
+    const tit = el('div', 'cup-provas-tit');
+    tit.append(el('h3', 'cup-titulo', 'Provas'),
+      el('p', 'sub', 'A galera prova a receita sem ela ir pro cardápio. Nota em 5 min, de graça, 6 por dia.'));
+    const bts = el('div', 'cup-provas-bts');
+    const voltar = button('Voltar', 'btn compacto cup-provas-voltar', () => {
+      vista = 'bar';
+      redesenhar();
+      raiz.querySelector<HTMLElement>('.cup-ver-provas')?.focus();
+    });
+    voltar.dataset.foco = 'cup-provas-voltar';
+    const outra = button('', 'btn compacto cup-provas-provar', () => abrirMontar());
+    outra.dataset.foco = 'cup-provas-provar';
+    outra.disabled = ocupado;
+    bts.append(voltar, outra);
+    cab.append(tit, bts);
+    atualizar.push(() => {
+      const restam = provasRestam(m, agora());
+      outra.textContent = m.provas.length ? `Provar outra (${restam} de ${m.provas_max})` : 'Montar e provar';
+    });
+
+    const corpo = el('div', 'cup-provas-corpo');
+    if (!m.provas.length) {
+      corpo.append(el('p', 'cup-provas-vazio', 'Nenhuma prova ainda. Monta um copão e chama a galera pra provar antes de pôr no cardápio.'));
+    } else {
+      const atual = m.provas.find((p) => p.id === provaSel) ?? m.provas[0];
+      const lista = el('ol', 'cup-provas-lista');
+      lista.setAttribute('aria-label', 'Últimas provas');
+      const itens: HTMLButtonElement[] = [];
+      m.provas.slice(0, 6).forEach((p, k) => {
+        const li = el('li');
+        const bt = el('button', 'cup-prova-item');
+        bt.type = 'button';
+        bt.dataset.foco = `cup-prova-${p.id}`;
+        bt.setAttribute('aria-current', String(p.id === atual.id));
+        bt.tabIndex = p.id === atual.id ? 0 : -1;
+        const fim = el('span', 'cup-prova-fim');
+        bt.append(fotoCanvas('cup-foto-mini', partesDe(p), null), el('span', 'cup-prova-nome', descreverCurto(p)), fim);
+        if (p.pronta && p.nota !== null) {
+          fim.append(el('b', `cup-mini-nota ${nomeTier(p.nota)}`, String(p.nota)));
+          bt.setAttribute('aria-label', `${descrever(p)}: nota ${p.nota}`);
+        } else {
+          fim.classList.add('provando');
+          atualizar.push(() => { fim.textContent = tempo(Math.max(0, Date.parse(p.pronta_em) - agora())); });
+          bt.setAttribute('aria-label', `${descrever(p)}: provando`);
+        }
+        bt.addEventListener('click', () => {
+          provaSel = p.id;
+          redesenhar();
+          raiz.querySelector<HTMLElement>(`[data-foco="cup-prova-${p.id}"]`)?.focus();
+        });
+        bt.addEventListener('keydown', (e) => {
+          const passo = ({ ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 } as Record<string, number>)[e.key];
+          if (!passo) return;
+          e.preventDefault();
+          itens[(k + passo + itens.length) % itens.length].click();
+        });
+        itens.push(bt);
+        li.append(bt);
+        lista.append(li);
+      });
+      corpo.append(lista, detalheProva(atual, m, ocupado, atualizar));
+    }
+    s.append(cab, corpo);
+    raiz.replaceChildren(s);
+    tick = () => {
+      for (const f of atualizar) f();
+      vigiarProvas(m, agora());
+    };
+    tick();
   }
 
   // ===================== DJs =====================
@@ -1100,6 +1337,12 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       sel.n++;
       sel.precoMexido = false;
     }
+    // deu certo o Provar (apareceu uma prova nova): vai pras provas com ela aberta
+    if (idsAoProvar && m.provas.some((p) => !idsAoProvar!.has(p.id))) {
+      provaSel = m.provas.find((p) => !idsAoProvar!.has(p.id))!.id;
+      idsAoProvar = null;
+      vista = 'provas';
+    }
     if (tirando !== null && !m.cardapio.some((c) => c.id === tirando)) tirando = null;
     const revs = vista === 'bar' ? aRevelar(m) : [];
     const chat = vista === 'bar' && !revs.length ? chatPendente(m) : null;
@@ -1117,6 +1360,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     else if (novo === 'chat') desenharChat(chat!);
     else if (novo === 'montar') desenharMontar(l);
     else if (novo === 'djs') desenharDjs(l, m, ocupado);
+    else if (novo === 'provas') desenharProvas(m, ocupado);
     else desenharBar(l, m, ocupado);
     foco.devolver(chave);
     garantirIntervalo();

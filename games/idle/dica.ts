@@ -373,6 +373,14 @@ export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; 
     + 'Mais caro que a referência vende menos e a nota cai; mais barato vende mais.';
 }
 
+/** O Provar (0069): de graça, nota em 5 min, só o caderninho; quantas restam e quando a próxima libera. */
+export function dicaCupProvar(restam: number, max: number, liberaEm: string | null): string {
+  const t = 'De graça: a galera prova sem ir pro cardápio e a nota sai em 5 min. O caderninho anota os pares e a força; '
+    + 'não vende, não entra no pódio nem nos desafios.';
+  if (restam > 0) return `${t} ${restam === 1 ? 'Resta 1 prova' : `Restam ${restam} provas`} de ${max} nas últimas 24 h.`;
+  return `${t} Já provou ${max} nas últimas 24 h${liberaEm ? `: a próxima libera ${liberaEm}` : ''}.`;
+}
+
 /** Um copão do cardápio: a nota e as partes (se já estreou), a novidade e o que vendeu. */
 export function dicaCupVaga(c: CopaoCup): string {
   const nov = Math.round(novidadeCup(c.noites) * 100);

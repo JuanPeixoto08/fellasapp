@@ -579,9 +579,8 @@ describe('a venda (avancar)', () => {
       // 15 min com um peso e 15 com o outro: 45 "minutos" de peso no total
       expect(rel(v[5], (total * 5 * antes) / 45)).toBeLessThan(1e-12);
       expect(rel(v[20] - v[15], (total * 5 * depois) / 45)).toBeLessThan(1e-9);
-      expect(v[30]).toBe(total);
-      expect(v[31]).toBe(total);
-      expect(v[60]).toBe(total);
+      // no fim, o total (total × peso / peso: igual até o último bit, ou quase)
+      for (const m of [30, 31, 60]) expect(rel(v[m], total), `${rotulo} ${m} min`).toBeLessThan(1e-15);
       expect(rel((await cupons()) - m0, total * precoPeca(1) + saldao(c.custo, c.pecas, total, false))).toBeLessThan(1e-12);
       agora = pronta + 8 * H - 5 * MIN; // a próxima: sábado 01h40
       vi.setSystemTime(agora);

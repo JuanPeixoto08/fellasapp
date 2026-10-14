@@ -80,6 +80,61 @@ const ENCHE = ['Quem levou meu isqueiro devolve.', 'Alguém viu a tampa do isopo
   'Meu uber cancelou três vezes. Fico mais um.', 'O gelo acabou às 23h. Tragédia nacional.', 'Jurei que ia embora cedo. Mentira.',
   'Perdi meu amigo. Se achar, devolve no balcão.', 'Quem tá pagando a próxima rodada? Ninguém? Entendi.'];
 
+// ----- a prova (0069): 2 ou 3 falas curtas da galera que provou, pela nota e pelas partes -----
+const PROVA_NOTA = {
+  top: ['Põe isso no cardápio hoje. Hoje!', 'Provei e já quero pagar a próxima rodada.', 'Isso aqui vai virar lenda do bar.'],
+  bom: ['Bom. Põe no cardápio que eu volto.', 'Desce bem. Não muda nada, só põe gelo.', 'Aprovado pela comissão do isopor.'],
+  meh: ['Dá pra beber. Dá pra melhorar também.', 'Provei por educação. Faltou alguma coisa.', 'Nem bom nem ruim: copão de segunda-feira.'],
+  ruim: ['Provei e me arrependi em tempo real.', 'Joguei o resto na planta. Desculpa, planta.', 'Isso não é copão, é castigo.'],
+};
+const PROVA_FRACO = ['Tem {base} aqui? Achei não.', 'Isso aí é só {mistura} com esperança.'];
+const PROVA_FORTE = ['Um gole e eu vi meus antepassados.', 'Isso é {base} com um respingo de {mistura}.'];
+const PROVA_PONTO = ['A força tá na medida: dá pra tomar a noite toda.'];
+
+/** O que a galera falou de uma prova pronta (2 ou 3 mensagens), igual toda vez pra mesma prova e a mesma pessoa. A galera
+ *  é a inventada; DJ nenhum aparece aqui. */
+export function chatDaProva(
+  p: { id: number; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number },
+  usuario: string | null,
+): MensagemChat[] {
+  const r = sorte(p.id * 7 + 3, usuario);
+  const v: Record<string, string> = {
+    base: BASES[p.base - 1].nome, mistura: minusculo(MISTURAS[p.mistura - 1].nome), tamanho: minusculo(TAMANHOS[p.tamanho - 1].nome),
+    preco: String(p.preco),
+  };
+  const encher = (t: string, extra: Record<string, string> = {}) => t.replace(/\{(\w+)\}/g, (_, k: string) => extra[k] ?? v[k] ?? '');
+  const falas: string[] = [];
+  const nota = p.nota >= 800 ? PROVA_NOTA.top : p.nota >= 600 ? PROVA_NOTA.bom : p.nota >= 300 ? PROVA_NOTA.meh : PROVA_NOTA.ruim;
+  falas.push(pegar(r, nota));
+  const extras: string[] = [];
+  const rs = rotulos(p.base, p.mistura, p.extra);
+  const nomes: [string, string][] = [
+    [BASES[p.base - 1].nome, minusculo(MISTURAS[p.mistura - 1].nome)],
+    [BASES[p.base - 1].nome, minusculo(EXTRAS[p.extra - 1].nome)],
+    [MISTURAS[p.mistura - 1].nome, minusculo(EXTRAS[p.extra - 1].nome)],
+  ];
+  const pior = rs.indexOf(Math.min(...rs) as never);
+  const melhor = rs.indexOf(Math.max(...rs) as never);
+  if (rs[pior] <= 1) extras.push(encher(pegar(r, PAR_RUIM), { a: nomes[pior][0], b: nomes[pior][1] }));
+  else if (rs[melhor] === 4) extras.push(encher(pegar(r, PAR_BOM), { a: nomes[melhor][0], b: nomes[melhor][1] }));
+  const d = p.forca - BASES[p.base - 1].ponto;
+  if (d <= -2) extras.push(encher(pegar(r, PROVA_FRACO)));
+  else if (d >= 2) extras.push(encher(pegar(r, PROVA_FORTE)));
+  else if (aguenta(p.forca, BASES[p.base - 1].ponto) >= 170) extras.push(pegar(r, PROVA_PONTO));
+  const cb = custoBeneficio(p.base, p.tamanho, p.forca, p.preco);
+  if (cb <= 60) extras.push(encher(pegar(r, CARO)));
+  else if (cb >= 220) extras.push(encher(pegar(r, BARATO)));
+  falas.push(...embaralhar(r, extras).slice(0, 2));
+  if (falas.length < 2) falas.push(pegar(r, ENCHE));
+  let antes = '';
+  return falas.map((texto) => {
+    let autor = pegar(r, GALERA);
+    while (autor === antes) autor = pegar(r, GALERA);
+    antes = autor;
+    return { autor, texto: texto.charAt(0).toUpperCase() + texto.slice(1), tipo: 'galera' as const };
+  });
+}
+
 function preencher(t: string, c: CopaoNaNoite | null, extra: Record<string, string> = {}): string {
   const v: Record<string, string> = c ? {
     nome: c.nome, base: BASES[c.base - 1].nome, mistura: minusculo(MISTURAS[c.mistura - 1].nome), extra: minusculo(EXTRAS[c.extra - 1].nome),

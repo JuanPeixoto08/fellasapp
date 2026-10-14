@@ -8,15 +8,18 @@
 // fecha com ele no cardápio.
 // Estratégias:
 //  - "no chute": base, mistura, extra e tamanho aleatórios entre o liberado, força 5, preço = referência; DJ aleatório na sexta.
-//  - "com caderninho": lembra os rótulos dos pares e o "aguenta" que viu, sabe o copão da moda da semana (público) e monta o
+//  - "com caderninho": lembra os rótulos dos pares e o "aguenta" que viu (das estreias e das provas), sabe o copão da moda da
+//    semana (público) e monta o
 //    copão que mais vende com lucro: a nota esperada (par nunca visto vale um pouco mais que "ok") dá a fatia da noite, e a
 //    base, o tamanho e o preço dão o que cada venda rende. O preço final é o inteiro válido que dá mais lucro ao cardápio
 //    inteiro (o copão novo barato tira venda dos outros), com o que ela já viu das vendas: o custo-benefício que aparece na
 //    revelação e o quanto o preço espanta a galera (ELASTICIDADE). Força: o ponto da base só vale como sabido depois de ver
 //    o "aguenta" em duas forças diferentes; até lá testa (5 primeiro, depois outra força perto do palpite); sabido, põe no
 //    ponto (ponto+1 em no máximo um copão do cardápio: o risco de PT que ela aceita). DJ: o que curte as bases do cardápio
-//    (as bases de cada DJ aparecem na caixinha dele). Nunca olha tabela escondida.
-//  - "no dobro" e "no barato": iguais ao caderninho, mas sempre cobram 2× a referência / 60% da referência.
+//    (as bases de cada DJ aparecem na caixinha dele). Nunca olha tabela escondida. Prova (0069): depois de mexer no
+//    cardápio, prova até 2 receitas por visita (6 em 24 h), as que mais ensinam (pares e força que ela ainda não sabe nem
+//    está esperando) entre as de nota esperada boa; a nota da prova sai em 5 min e ela lê na visita seguinte.
+//  - "no dobro" e "no barato": iguais ao caderninho (provas também), mas sempre cobram 2× a referência / 60% da referência.
 //    Servem para conferir que o preço certo é o que mais rende.
 //  - "repõe toda manhã": igual ao caderninho, mas na visita das 9h tira cada copão e põe de novo o mesmo (o truque de
 //    tirar e repor pra zerar a novidade, que a novidade por receita desarma).
@@ -28,7 +31,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aguenta, ALFA, avaliar, BASES, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
+  abreNoite, aguenta, ALFA, avaliar, BASES, PROVA_MS, provasRestantes, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
   lucroVenda, MISTURAS, moda, NOITE_MS, noiteIdx, noitesEntre, novidade, PONTOS, precoFaixa, precoRef, sementePT, TAMANHOS, vagas, vendasNoite,
   type Copao, type Rotulo,
 } from './copao';
@@ -66,6 +69,8 @@ type Resultado = {
   noites: { dia: number; aberta: boolean; lucro: number; pt: boolean; galeraAntes: number; galeraDepois: number }[];
   /** fichas ganhas (somando as vendas) até o dia DIA_FICHAS */
   fichasAte: number;
+  /** quantas provas fez e o maior número delas numa janela de 24 h */
+  provas: number; provasMax24h: number;
 };
 
 /** mulberry32: aleatório com semente. */
@@ -154,6 +159,10 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
   const vistos = new Map<number, { forca: number; aguenta: number }[]>(); // base → "aguenta" revelado em cada força
   /** receita → noites abertas em que um copão dela estava no cardápio (a novidade é da receita) */
   const historia = new Map<string, number>();
+  // provas: as que ainda não leu e quando fez cada uma
+  const provando: { t: number; c: Copao }[] = [];
+  const provasFeitas: number[] = [];
+  const usaProva = estrategia !== 'chute';
 
   /** Pontos que batem com tudo o que viu da base. */
   const candidatos = (base: number) => FORCAS.filter((p) => (vistos.get(base) ?? []).every((o) => aguenta(o.forca, p) === o.aguenta));
@@ -165,16 +174,93 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
     return cs.length === 1 ? cs[0] : undefined;
   }
 
-  /** A revelação: rótulos e "aguenta" de quem fechou a primeira noite aberta no cardápio. */
-  function revelar(c: NoBar): void {
-    c.revelado = true;
-    const a = avaliar(c, semanaDe(c.primeira));
+  /** O caderninho de um copão revelado ou de uma prova pronta: os 3 pares e o "aguenta" da força. */
+  function aprender(c: Copao, semana: string): void {
+    const a = avaliar(c, semana);
     const [bm, be, me] = a.rotulos;
     pares.set(`0-${c.base}-${c.mistura}`, bm);
     pares.set(`1-${c.base}-${c.extra}`, be);
     pares.set(`2-${c.mistura}-${c.extra}`, me);
     const os = vistos.get(c.base) ?? [];
     if (!os.some((o) => o.forca === c.forca)) vistos.set(c.base, [...os, { forca: c.forca, aguenta: a.aguenta }]);
+  }
+
+  /** A revelação: rótulos e "aguenta" de quem fechou a primeira noite aberta no cardápio. */
+  function revelar(c: NoBar): void {
+    c.revelado = true;
+    aprender(c, semanaDe(c.primeira));
+  }
+
+  /** As provas prontas (5 min depois) entram no caderninho na visita. */
+  function lerProvas(t: number): void {
+    for (let i = 0; i < provando.length;) {
+      const p = provando[i];
+      if (p.t + PROVA_MS > t) i++;
+      else {
+        provando.splice(i, 1);
+        aprender(p.c, semanaDe(p.t));
+      }
+    }
+  }
+
+  /** O que já vai aparecer no caderninho (copão no cardápio sem nota e prova sem ler): a prova não gasta com isso. */
+  function esperando(): { pares: Set<string>; forcas: Set<string> } {
+    const pares = new Set<string>();
+    const forcas = new Set<string>();
+    for (const c of [...cardapio.filter((x) => !x.revelado), ...provando.map((p) => p.c)]) {
+      pares.add(`0-${c.base}-${c.mistura}`).add(`1-${c.base}-${c.extra}`).add(`2-${c.mistura}-${c.extra}`);
+      forcas.add(`${c.base}-${c.forca}`);
+    }
+    return { pares, forcas };
+  }
+
+  /** A receita que mais ensina entre as de nota esperada boa: pares e força ainda não sabidos nem esperados. */
+  function escolherProva(t: number): Copao | null {
+    const semana = semanaDe(t);
+    const esp = esperando();
+    const novo = (k: string) => !pares.has(k) && !esp.pares.has(k);
+    const par = (k: string) => {
+      const r = pares.get(k);
+      return r === undefined ? PAR_NOVO : PONTOS[r];
+    };
+    const tamanho = ids(TAMANHOS, 'tamanho', nivel).includes(2) ? 2 : 1;
+    let melhor: Copao | null = null;
+    let melhorV = -Infinity;
+    for (const base of ids(BASES, 'base', nivel)) {
+      // a força: o ponto se já sabe; senão uma força ainda não testada nem esperada, perto do palpite
+      const p = pontoSabido(base);
+      const testadas = new Set((vistos.get(base) ?? []).map((o) => o.forca));
+      const cs = candidatos(base);
+      const palpite = cs[Math.floor(cs.length / 2)] ?? 5;
+      const forca = p ?? [palpite, palpite + 1, palpite - 1, palpite + 2, palpite - 2, ...FORCAS]
+        .find((f) => f >= 1 && f <= 10 && !testadas.has(f) && !esp.forcas.has(`${base}-${f}`)) ?? palpite;
+      const forcaNova = p === undefined && !testadas.has(forca) && !esp.forcas.has(`${base}-${forca}`);
+      const ag = p !== undefined ? aguenta(forca, p) : AGUENTA_NOVO;
+      for (const mistura of ids(MISTURAS, 'mistura', nivel)) {
+        for (const extra of ids(EXTRAS, 'extra', nivel)) {
+          const ks = [`0-${base}-${mistura}`, `1-${base}-${extra}`, `2-${mistura}-${extra}`];
+          const novos = ks.filter(novo).length + (forcaNova ? 1 : 0);
+          if (!novos) continue;
+          const v = ks.reduce((soma, k) => soma + par(k), 0) + ag + moda(base, mistura, semana) + 40 * novos + sorte() * 0.01;
+          if (v > melhorV) {
+            const [lo, hi] = precoFaixa(base, tamanho, forca);
+            [melhor, melhorV] = [{ base, mistura, extra, tamanho, forca, preco: Math.min(hi, Math.max(lo, Math.round(precoRef(base, tamanho, forca)))) }, v];
+          }
+        }
+      }
+    }
+    return melhor;
+  }
+
+  /** Até 2 provas por visita, sem passar de 6 em 24 h. */
+  function provar(t: number): void {
+    if (!usaProva) return;
+    for (let k = 0; k < 2 && provasRestantes(provasFeitas, t) > 0; k++) {
+      const c = escolherProva(t);
+      if (!c) return;
+      provando.push({ t, c });
+      provasFeitas.push(t);
+    }
   }
 
   function fechar(n: NoiteSim): void {
@@ -386,14 +472,17 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
       if (pula(dia, h)) continue;
       const t = INICIO + dia * DIA + h * H;
       avancar(t);
+      lerProvas(t);
       if (Number.isNaN(fichasAte) && t >= INICIO + DIA_FICHAS * DIA) fichasAte = ganho;
       subir(t);
       mexer(t);
+      provar(t);
       visto = t;
       galeraNoDia.push({ dia: (t - INICIO) / DIA, galera });
     }
   }
-  return { nivelEm, notas, nivelFinal: nivel, galeraNoDia, noites, fichasAte };
+  const provasMax24h = Math.max(0, ...provasFeitas.map((a) => provasFeitas.filter((b) => b >= a && b < a + DIA).length));
+  return { nivelEm, notas, nivelFinal: nivel, galeraNoDia, noites, fichasAte, provas: provasFeitas.length, provasMax24h };
 }
 
 const media = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
@@ -421,7 +510,7 @@ describe('balanceamento do copão (simulação)', () => {
         const semanas = Array.from({ length: 8 }, (_, w) => mediaEntre(r, 7 * w, 7 * w + 7).toFixed(0)).join(' ');
         const g = (d: number) => r.galeraNoDia.find((x) => x.dia >= d)?.galera.toFixed(0);
         const pts = r.noites.filter((n) => n.pt).length;
-        console.log(`${nome} s${SEMENTES[k]}: n5 ${r.nivelEm.get(5)?.toFixed(1)} n10 ${r.nivelEm.get(10)?.toFixed(1)} n15 ${r.nivelEm.get(15)?.toFixed(1)} n20 ${r.nivelEm.get(20)?.toFixed(1)} n25 ${r.nivelEm.get(25)?.toFixed(1)} final ${r.nivelFinal} | notas ${semanas} | tudo ${mediaEntre(r, 0, 49).toFixed(0)} 14+ ${mediaEntre(r, 14, 49).toFixed(0)} | galera d14 ${g(14)} d28 ${g(28)} d42 ${g(42)} marco ${diaDaGalera(r).toFixed(1)} | PT ${pts} | fichas d${DIA_FICHAS} ${r.fichasAte.toFixed(0)} | menor lucro ${Math.min(...r.noites.filter((n) => n.aberta).map((n) => n.lucro)).toFixed(0)}`);
+        console.log(`${nome} s${SEMENTES[k]}: provas ${r.provas} n5 ${r.nivelEm.get(5)?.toFixed(1)} n10 ${r.nivelEm.get(10)?.toFixed(1)} n15 ${r.nivelEm.get(15)?.toFixed(1)} n20 ${r.nivelEm.get(20)?.toFixed(1)} n25 ${r.nivelEm.get(25)?.toFixed(1)} final ${r.nivelFinal} | notas ${semanas} | tudo ${mediaEntre(r, 0, 49).toFixed(0)} 14+ ${mediaEntre(r, 14, 49).toFixed(0)} | galera d14 ${g(14)} d28 ${g(28)} d42 ${g(42)} marco ${diaDaGalera(r).toFixed(1)} | PT ${pts} | fichas d${DIA_FICHAS} ${r.fichasAte.toFixed(0)} | menor lucro ${Math.min(...r.noites.filter((n) => n.aberta).map((n) => n.lucro)).toFixed(0)}`);
       }
     }
     const partes = caderninho.flatMap((r) => r.notas.filter((n) => n.dia >= 14 && n.dia < 49));
@@ -533,6 +622,15 @@ describe('balanceamento do copão (simulação)', () => {
     const mediana = (dias[7] + dias[8]) / 2;
     expect(mediana).toBeGreaterThanOrEqual(25);
     expect(mediana).toBeLessThanOrEqual(31);
+  });
+
+  // Provar (0069): quem usa o caderninho prova até 6 por 24 h e aprende mais rápido; quem chuta não prova.
+  it('com caderninho: prova todo dia, nunca mais que 6 em 24 h; no chute, nenhuma', () => {
+    for (const r of caderninho) {
+      expect(r.provas).toBeGreaterThan(5 * DIAS);
+      expect(r.provasMax24h).toBeLessThanOrEqual(6);
+    }
+    for (const r of chute) expect(r.provas).toBe(0);
   });
 
   it('visitando 9h, 14h e 21h, toda noite abre', () => {

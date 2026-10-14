@@ -129,7 +129,7 @@ let nomesLugar = new Map<string, string>(); // user_id -> nome de quem aparece n
 let timerMapa: ReturnType<typeof setInterval> | null = null;
 const RECARREGA_MAPA = ['idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max', 'idle_locked', 'idle_cant_afford',
   'idle_tee_ocupada', 'idle_tee_trancado', 'idle_tee_foco', 'idle_tee_sem_lancar', 'idle_tee_sem_venda',
-  'idle_cup_vaga', 'idle_cup_trancado', 'idle_cup_forca', 'idle_cup_preco', 'idle_cup_repetido', 'idle_cup_sem_copao'];
+  'idle_cup_vaga', 'idle_cup_trancado', 'idle_cup_forca', 'idle_cup_preco', 'idle_cup_repetido', 'idle_cup_sem_copao', 'idle_cup_provas'];
 async function carregarMapa() {
   if (!mapaAberto) return;
   try {

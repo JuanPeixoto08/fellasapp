@@ -38,8 +38,13 @@ type CopaoLinha = {
 type NoCardapioJson = Record<string, unknown> & {
   id: number; nome: string; revelado: boolean; nota: number | null; vendido_hoje: number | null; fichas_hoje: number | null;
 };
+type ProvaJson = Record<string, unknown> & {
+  id: number; pronta: boolean; nota: number | null; sabor: number | null; cb: number | null; moda: number | null; aguenta: number | null;
+  rotulos: number[] | null; criado_em: string; pronta_em: string;
+};
 type Cup = {
   moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: NoCardapioJson[];
+  provas: ProvaJson[]; provas_hoje: number; provas_max: number;
   hoje: { aberta: boolean; inicio: string; fim: string; sexta: boolean; dj: number | null; vendido_ate_agora: number; fichas_ate_agora: number };
   ultima_noite: (Record<string, unknown> & { copoes: Record<string, unknown>[] }) | null;
   noite_fechada: { inicio: string; fim: string } | null;
@@ -139,10 +144,10 @@ describe('catálogo', () => {
       [412, 'cup_nota', 850, 'Copão com nota 850 ou mais', 'legado', 3],
     ]);
   });
-  it('catálogo, copões, noites e ajudantes ficam escondidos de quem joga; só as 3 RPCs para authenticated', async () => {
+  it('catálogo, copões, noites, provas e ajudantes ficam escondidos de quem joga; só as 4 RPCs para authenticated', async () => {
     for (const tab of ['idle_cup_cat_base', 'idle_cup_cat_mistura', 'idle_cup_cat_extra', 'idle_cup_cat_tamanho', 'idle_cup_cat_dj',
       'idle_cup_cat_vaga', 'idle_cup_cat_conflito', 'idle_cup_const', 'idle_cup_copoes', 'idle_cup_noites', 'idle_cup_noite_copoes',
-      'idle_cup_estado']) {
+      'idle_cup_estado', 'idle_cup_provas']) {
       await expect(t.asRole('authenticated', `select * from public.${tab}`), tab).rejects.toThrow(/permission denied/);
       await expect(t.asRole('anon', `select * from public.${tab}`), tab).rejects.toThrow(/permission denied/);
     }
@@ -172,7 +177,8 @@ describe('catálogo', () => {
               has_function_privilege('authenticated', p.oid, 'execute') as auth
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname like 'idle\\_cup\\_%' order by 1`);
-    const rpcs = ['idle_cup_dj(integer)', 'idle_cup_por(integer,integer,integer,integer,integer,integer,text)', 'idle_cup_tirar(bigint)'];
+    const rpcs = ['idle_cup_dj(integer)', 'idle_cup_por(integer,integer,integer,integer,integer,integer,text)',
+      'idle_cup_provar(integer,integer,integer,integer,integer,integer)', 'idle_cup_tirar(bigint)'];
     expect(ajud.length).toBeGreaterThan(30);
     for (const x of ajud) {
       const rpc = rpcs.includes(x.f);
@@ -633,6 +639,7 @@ describe('o JSON do copão', () => {
     const ini = inicioNoite(iso(agora).slice(0, 10));
     expect(m).toMatchObject({
       moda: modaDaSemana(await semana()), dj: null, vagas: 3, cardapio: [], ultima_noite: null, noite_fechada: null, historico: [],
+      provas: [], provas_hoje: 0, provas_max: 6,
     });
     expect(m.hoje).toMatchObject({ aberta: true, sexta: false, dj: null, vendido_ate_agora: 0, fichas_ate_agora: 0 });
     expect(Date.parse(m.hoje.inicio)).toBe(ini);
@@ -1452,5 +1459,174 @@ describe('desafios do copão', () => {
       ir(agora + 20 * H);
     }
     expect(await feitos()).toEqual([401]);
+  });
+});
+
+// ===== 0069: provar o copão (a galera prova sem ir pro cardápio; a nota sai em 5 min e só anota o caderninho) =====
+
+type ProvaLinha = {
+  id: number; base: number; mistura: number; extra: number; tamanho: number; forca: number; preco: number; nota: number; sabor: number;
+  cb: number; moda: number; aguenta: number; rotulos: number[]; criado_em: Date; pronta_em: Date; revelada: boolean;
+};
+const MIN = 60_000;
+type OpcoesProva = Omit<Opcoes, 'nome'>;
+const provar = (o: Partial<OpcoesProva> = {}) => {
+  const x = { ...PADRAO, ...o };
+  return t.rpc<Resp>('idle_cup_provar', {
+    p_base: x.base, p_mistura: x.mistura, p_extra: x.extra, p_tamanho: x.tamanho, p_forca: x.forca, p_preco: x.preco,
+  });
+};
+const provasDb = (user = A) => q<ProvaLinha>(
+  `select id::int as id, base, mistura, extra, tamanho, forca, preco, nota, sabor, cb, moda, aguenta, rotulos, criado_em, pronta_em, revelada
+     from public.idle_cup_provas where user_id = $1 order by criado_em, id`, [user]);
+const desafiosFeitos = () => q('select desafio from public.idle_place_challenges where user_id = $1 and lugar = 4', [A]);
+
+describe('provar um copão (0069)', () => {
+  it('grava a prova com a nota de pôr no cardápio (moda da semana), não cobra nada, pronta em 5 min e não mexe no cardápio', async () => {
+    await bar();
+    const resp = await provar();
+    const [p] = await provasDb();
+    const c = { base: 1, mistura: 1, extra: 1, tamanho: 2, forca: 5, preco: 22 };
+    const a = avaliar(c, await semana());
+    expect(p).toMatchObject({
+      ...c, nota: a.nota, sabor: a.sabor, cb: a.custoBeneficio, moda: a.moda, aguenta: a.aguenta, rotulos: a.rotulos, revelada: false,
+    });
+    expect(p.criado_em.getTime()).toBe(agora);
+    expect(p.pronta_em.getTime()).toBe(agora + 5 * MIN);
+    expect(await copoes()).toEqual([]);
+    expect(await fichas()).toBe(0);
+    const m = resp.lugar.mecanica;
+    expect(m.cardapio).toEqual([]);
+    expect(m.provas_hoje).toBe(1);
+    expect(m.provas_max).toBe(6);
+    // a receita aparece; a nota, as partes e os rótulos só quando fica pronta
+    expect(m.provas).toHaveLength(1);
+    expect(m.provas[0]).toMatchObject({ id: p.id, ...c, pronta: false, nota: null, sabor: null, cb: null, moda: null, aguenta: null, rotulos: null });
+    expect(Date.parse(m.provas[0].pronta_em)).toBe(agora + 5 * MIN);
+    expect(Date.parse(m.provas[0].criado_em)).toBe(agora);
+    andar(5 * MIN - 1);
+    expect((await lugar()).mecanica.provas[0]).toMatchObject({ pronta: false, nota: null });
+    expect(await notasCad()).toEqual([]);
+    andar(1);
+    expect((await lugar()).mecanica.provas[0]).toMatchObject({
+      pronta: true, nota: a.nota, sabor: a.sabor, cb: a.custoBeneficio, moda: a.moda, aguenta: a.aguenta, rotulos: a.rotulos,
+    });
+  });
+  it('a nota da prova é a mesma de pôr a receita no cardápio na mesma semana', async () => {
+    await bar(25);
+    const r = rng(69);
+    for (let i = 0; i < 12; i++) {
+      const c = { base: ent(r, 1, 12), mistura: ent(r, 1, 15), extra: ent(r, 1, 12), tamanho: ent(r, 1, 3), forca: ent(r, 1, 10), preco: 0 };
+      const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
+      c.preco = ent(r, lo, hi);
+      if (i % 6 === 0) await q('delete from public.idle_cup_provas where user_id = $1', [A]); // o limite de 6 em 24 h
+      await provar(c);
+      const p = (await provasDb()).at(-1)!;
+      expect(p.nota, JSON.stringify(c)).toBe(avaliar(c, await semana()).nota);
+      if (i < 3) {
+        await por({ ...c, nome: `Teste ${i}` });
+        expect((await copoes()).at(-1)!.nota).toBe(p.nota);
+      }
+    }
+  });
+  it('recusas com o erro certo e nada gravado (as mesmas de pôr: lugar, opção, trancado, força, preço)', async () => {
+    await expect(provar()).rejects.toThrow(/idle_lugar_fechado/);
+    await bar();
+    for (const [o, erro] of [
+      [{ base: 4 }, /idle_cup_trancado/], [{ mistura: 5 }, /idle_cup_trancado/], [{ extra: 4 }, /idle_cup_trancado/],
+      [{ tamanho: 3, preco: 75 }, /idle_cup_trancado/],
+      [{ base: 13 }, /idle_bad_choice/], [{ mistura: 0 }, /idle_bad_choice/], [{ extra: 13 }, /idle_bad_choice/], [{ tamanho: 4 }, /idle_bad_choice/],
+      [{ forca: 0 }, /idle_cup_forca/], [{ forca: 11 }, /idle_cup_forca/], [{ forca: null }, /idle_cup_forca/],
+      [{ preco: 15 }, /idle_cup_preco/], [{ preco: 64 }, /idle_cup_preco/], [{ preco: null }, /idle_cup_preco/],
+    ] as [Partial<OpcoesProva>, RegExp][]) {
+      await expect(provar(o), JSON.stringify(o)).rejects.toThrow(erro);
+      expect(await provasDb()).toEqual([]);
+    }
+  });
+  it('no máximo 6 em 24 h (a janela anda: a mais antiga libera 24 h depois); cardápio cheio e receita repetida não impedem', async () => {
+    await bar();
+    for (const extra of [1, 2, 3]) await por({ extra, nome: `C${extra}` });
+    await provar(); // igual ao do cardápio: pode
+    for (let k = 0; k < 5; k++) {
+      andar(H);
+      await provar({ extra: (k % 3) + 1, forca: 4 + k, preco: 24 });
+    }
+    expect(await provasDb()).toHaveLength(6);
+    andar(H);
+    await expect(provar()).rejects.toThrow(/idle_cup_provas/);
+    expect((await lugar()).mecanica.provas_hoje).toBe(6);
+    expect(await provasDb()).toHaveLength(6);
+    // a primeira foi há 6 h: libera 24 h depois dela (18 h a mais menos 1 ms ainda não)
+    andar(18 * H - 1);
+    await expect(provar()).rejects.toThrow(/idle_cup_provas/);
+    andar(1);
+    const resp = await provar();
+    expect(resp.lugar.mecanica.provas_hoje).toBe(6);
+    expect(await provasDb()).toHaveLength(7);
+  });
+  it('pronta: o depois anota o caderninho igual a um copão revelado, uma vez, sem pódio, volume, desafio nem conquista', async () => {
+    await bar();
+    await provar({ forca: 4, preco: 20 });
+    const [p] = await provasDb();
+    andar(4 * MIN);
+    await lugar();
+    expect(await notasCad()).toEqual([]);
+    expect((await provasDb())[0].revelada).toBe(false);
+    andar(MIN);
+    const v0 = await valuation();
+    const resp = await lugar();
+    expect((await provasDb())[0].revelada).toBe(true);
+    const esperado = [
+      { tipo: 'aguenta', a: 1, b: 4, rotulo: p.aguenta },
+      { tipo: 'par', a: 1 * 100 + 1, b: 0, rotulo: p.rotulos[0] },
+      { tipo: 'par', a: 10000 + 1 * 100 + 1, b: 0, rotulo: p.rotulos[1] },
+      { tipo: 'par', a: 20000 + 1 * 100 + 1, b: 0, rotulo: p.rotulos[2] },
+    ];
+    expect(await notasCad()).toEqual(esperado);
+    expect(resp.caderninho).toEqual(expect.arrayContaining(esperado.map((x) => ({ tipo: x.tipo, a: x.a, b: x.b, rotulo: x.rotulo }))));
+    expect(await prods()).toEqual([]);
+    expect(await estadoBar()).toMatchObject({ volume: 0, lendario: false, marcos: [] });
+    expect(await desafiosFeitos()).toEqual([]);
+    expect((await conquistas()).filter((c) => [89, 115].includes(c))).toEqual([]);
+    expect(await valuation()).toBe(v0);
+    // de novo: nada muda
+    andar(H);
+    await lugar();
+    expect(await notasCad()).toEqual(esperado);
+  });
+  it('prova com nota 999 não dá lendário nem a conquista da nota; o desafio da nota não paga', async () => {
+    await bar();
+    await provar();
+    const [p] = await provasDb();
+    await q('update public.idle_cup_provas set nota = 999, sabor = 399 where id = $1', [p.id]);
+    andar(5 * MIN);
+    await lugar();
+    expect((await provasDb())[0].revelada).toBe(true);
+    expect(await estadoBar()).toMatchObject({ volume: 0, lendario: false, marcos: [] });
+    expect(await conquistas()).not.toContain(89);
+    expect(await desafiosFeitos()).toEqual([]);
+    expect(await prods()).toEqual([]);
+  });
+  it('o JSON mostra as últimas 10 (a mais nova primeiro); B não vê as do A', async () => {
+    await bar();
+    for (let k = 0; k < 12; k++) {
+      if (k % 6 === 0 && k) andar(DIA); // o limite de 6 em 24 h
+      andar(MIN);
+      await provar({ forca: (k % 10) + 1, preco: 24 });
+    }
+    const ps = await provasDb();
+    const m = (await lugar()).mecanica;
+    expect(m.provas.map((x) => x.id)).toEqual(ps.slice(-10).reverse().map((x) => x.id));
+    expect(m.provas_hoje).toBe(6);
+    // 1 min entre elas: as feitas há 5 min ou mais estão prontas (com a nota); as outras, não
+    for (const x of m.provas) {
+      expect(x.pronta).toBe(Date.parse(x.pronta_em) <= agora);
+      expect(x.nota === null).toBe(!x.pronta);
+    }
+    expect(m.provas.filter((x) => x.pronta)).toHaveLength(5); // as 4 de ontem e a de 5 min atrás
+    await t.as(B);
+    await expect(t.rpc('idle_cup_provar', { p_base: 1, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 5, p_preco: 22 }))
+      .rejects.toThrow(/idle_lugar_fechado/);
+    expect(await provasDb(B)).toEqual([]);
   });
 });

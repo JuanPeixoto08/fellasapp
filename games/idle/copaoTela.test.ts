@@ -2,8 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import {
-  avaliar, BASES, DJS, nomeSugerido, precoFaixa, precoRef, type CopaoCup, type CopaoNaNoite, type EstadoCup, type HojeCup, type UltimaNoite,
+  avaliar, BASES, DJS, nomeSugerido, precoFaixa, precoRef, type CopaoCup, type CopaoNaNoite, type EstadoCup, type HojeCup, type ProvaCup,
+  type UltimaNoite,
 } from './copao';
+import { GALERA } from './copaoChat';
 import { chaveNoite, chaveRevelado, criarCopao, vendidoHoje } from './copaoTela';
 import { MECANICAS } from './mecanicas';
 
@@ -43,8 +45,20 @@ const ultima = (cs: CopaoCup[], x: Partial<UltimaNoite> = {}): UltimaNoite => ({
   copoes: cs.map((c) => naNoite(c)), saiu_antes: 0, ...x,
 });
 const estado = (x: Partial<EstadoCup> = {}): EstadoCup => ({
-  moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, noite_fechada: null, historico: [], ...x,
+  moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, noite_fechada: null, historico: [],
+  provas: [], provas_hoje: 0, provas_max: 6, ...x,
 });
+/** Uma prova pronta (feita há `idadeMin` minutos), com a nota da conta de verdade; com menos de 5 min, ainda provando. */
+const prova = (x: Partial<ProvaCup> = {}, idadeMin = 30): ProvaCup => {
+  const base = x.base ?? 2, mistura = x.mistura ?? 1, extra = x.extra ?? 1, tamanho = x.tamanho ?? 2, forca = x.forca ?? 5, preco = x.preco ?? 20;
+  const av = avaliar({ base, mistura, extra, tamanho, forca, preco }, '2026-10-12');
+  const pronta = idadeMin >= 5;
+  return {
+    id: proxId++, base, mistura, extra, tamanho, forca, preco, criado_em: iso(AGORA - idadeMin * 60_000), pronta_em: iso(AGORA - (idadeMin - 5) * 60_000),
+    pronta, nota: pronta ? av.nota : null, sabor: pronta ? av.sabor : null, cb: pronta ? av.custoBeneficio : null, moda: pronta ? av.moda : null,
+    aguenta: pronta ? av.aguenta : null, rotulos: pronta ? av.rotulos : null, ...x,
+  };
+};
 const lugar = (mec: EstadoCup | null, x: Partial<LugarEstado> = {}): LugarEstado => ({
   id: 4, moeda_nome: 'ficha', numero: 'nota', lancado: true, nome: null, frase: null, icone: null,
   aberto: true, nivel: 1, moeda: 0, fas: 0, volume: 0, lendario: false, marcos: [], preco_nivel: 300,
@@ -650,5 +664,106 @@ describe('contas da tela e a mecânica registrada', () => {
     expect([f.width, f.height]).toEqual([48, 48]);
     expect(m.foto([1]).width).toBe(48);
     expect(BASES[1].ponto).toBe(4);
+  });
+});
+
+describe('provas (0069)', () => {
+  it('no montar: Provar ao lado do Pôr com quantas restam; manda a receita com os nomes p_*; deu certo abre as provas', () => {
+    const { t, $, $$ } = montar();
+    t.renderizar(lugar(estado({ provas: [prova({}, 60), prova({ extra: 2 }, 120)], provas_hoje: 2 })), false, AGORA);
+    $<HTMLButtonElement>('.cup-montar-vaga').click();
+    $$<HTMLButtonElement>('.cup-base')[2].click();
+    const provar = $<HTMLButtonElement>('.cup-provar');
+    expect(provar.textContent).toBe('Provar (4 de 6 hoje)');
+    expect(provar.disabled).toBe(false);
+    expect(caixinha('cup-provar')).toContain('a nota sai em 5 min');
+    expect(caixinha('cup-provar')).toContain('Restam 4 provas de 6');
+    provar.click();
+    expect(acao).toHaveBeenCalledWith('idle_cup_provar', {
+      p_base: 3, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 5, p_preco: Math.round(precoRef(3, 2, 5)),
+    });
+    const nova = prova({ id: 900, base: 3, preco: Math.round(precoRef(3, 2, 5)) }, 0);
+    t.renderizar(lugar(estado({ provas: [nova, prova({}, 60), prova({ extra: 2 }, 120)], provas_hoje: 3 })), false, AGORA);
+    expect(t.elemento.dataset.estado).toBe('provas');
+    expect($('.cup-prova-item[aria-current="true"]').dataset.foco).toBe('cup-prova-900');
+    expect($('.cup-prova-conta').textContent).toBe('Pronta em 5 min');
+    expect($('.cup-rev-nota')).toBeNull();
+  });
+  it('cardápio cheio não impede de provar (o Pôr é que fica travado)', () => {
+    const cs = [copao({ id: 1 }), copao({ id: 2, base: 3 }), copao({ id: 3, extra: 2 })];
+    viu([1, 2, 3]);
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ cardapio: cs })), false, AGORA);
+    expect($('.cup-montar-vaga')).toBeNull();
+    $<HTMLButtonElement>('.cup-ver-provas').click();
+    expect(t.elemento.dataset.estado).toBe('provas');
+    expect($('.cup-provas-vazio').textContent).toContain('Nenhuma prova ainda');
+    $<HTMLButtonElement>('.cup-provas-provar').click();
+    expect(t.elemento.dataset.estado).toBe('montar');
+    expect($<HTMLButtonElement>('.cup-por').disabled).toBe(true);
+    expect($<HTMLButtonElement>('.cup-provar').disabled).toBe(false);
+  });
+  it('6 nas últimas 24 h: Provar travado dizendo quando libera; a janela anda', () => {
+    const ps = [10, 60, 120, 180, 240, 23 * 60].map((m) => prova({ extra: (m % 3) + 1 }, m));
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ provas: ps, provas_hoje: 6 })), false, AGORA);
+    $<HTMLButtonElement>('.cup-montar-vaga').click();
+    const provar = $<HTMLButtonElement>('.cup-provar');
+    expect(provar.disabled).toBe(true);
+    // a mais antiga foi há 23 h (13h de Brasília de ontem): libera hoje às 13h
+    expect(provar.textContent).toBe('Próxima prova hoje às 13h00');
+    expect(caixinha('cup-provar')).toContain('Já provou 6 nas últimas 24 h: a próxima libera hoje às 13h00');
+    vi.setSystemTime(AGORA + 60 * 60_000);
+    t.renderizar(lugar(estado({ provas: ps, provas_hoje: 5 }), { server_now: iso(AGORA + 60 * 60_000) }), false, AGORA + 60 * 60_000);
+    expect($<HTMLButtonElement>('.cup-provar').textContent).toBe('Provar (1 de 6 hoje)');
+  });
+  it('pronta: a nota, as 4 partes, os pares, a força e 2 ou 3 falas da galera (inventada); Pôr no cardápio leva a receita pro montar', () => {
+    const p = prova({ id: 70, base: 2, mistura: 1, extra: 1, tamanho: 2, forca: 4, preco: 18 });
+    const { t, $, $$ } = montar();
+    t.renderizar(lugar(estado({ provas: [p, prova({ id: 71, extra: 2 }, 2)], provas_hoje: 2 })), false, AGORA);
+    expect($('.cup-provas-estado').textContent).toBe('provando, pronta em 3 min · 4 de 6 hoje');
+    $<HTMLButtonElement>('.cup-ver-provas').click();
+    expect(t.elemento.dataset.estado).toBe('provas');
+    // a lista: a pronta com a nota, a que está provando com a contagem
+    const itens = $$('.cup-prova-item');
+    expect(itens.map((x) => x.querySelector('.cup-prova-fim')!.textContent)).toEqual([String(p.nota), '3 min']);
+    itens[0].click();
+    expect($('.cup-rev-nota').textContent).toBe(String(p.nota));
+    expect($$('.cup-parte').map((x) => x.getAttribute('aria-label'))).toEqual([
+      `Sabor: ${p.sabor} de 399`, `Custo-benefício: ${p.cb} de 250`, `Moda: ${p.moda} de 150`, `Aguenta: ${p.aguenta} de 199`]);
+    expect($$('.cup-par')).toHaveLength(3);
+    expect($('.cup-prova-forca').textContent).toContain('Força 4');
+    const msgs = $$('.cup-prova-chat .cup-msg');
+    expect(msgs.length).toBeGreaterThanOrEqual(2);
+    expect(msgs.length).toBeLessThanOrEqual(3);
+    for (const m of msgs) {
+      expect(GALERA).toContain(m.querySelector('.cup-autor')!.textContent);
+      for (const d of DJS) expect(m.textContent).not.toContain(d.nome);
+    }
+    $<HTMLButtonElement>('.cup-prova-por').click();
+    expect(t.elemento.dataset.estado).toBe('montar');
+    expect($('.cup-sel-base').textContent).toBe(BASES[1].nome);
+    expect($('.cup-rot-valor').textContent).toBe('4');
+    expect($<HTMLInputElement>('.cup-preco-range').value).toBe('18');
+  });
+  it('a prova ficou pronta: pede o lugar de novo uma vez (a nota só vem do banco)', () => {
+    const { t } = montar();
+    t.renderizar(lugar(estado({ provas: [prova({ id: 80 }, 4)], provas_hoje: 1 })), false, AGORA);
+    expect(recarregar).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(61_000);
+    expect(recarregar).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(recarregar).toHaveBeenCalledTimes(1);
+  });
+  it('receita já no cardápio: a prova não deixa pôr de novo e diz por quê', () => {
+    const c = copao({ id: 5, base: 2, mistura: 1, extra: 1, tamanho: 2 });
+    viu([5]);
+    const { t, $ } = montar();
+    t.renderizar(lugar(estado({ cardapio: [c], provas: [prova({ id: 81 })], provas_hoje: 1 })), false, AGORA);
+    $<HTMLButtonElement>('.cup-ver-provas').click();
+    expect($<HTMLButtonElement>('.cup-prova-por').disabled).toBe(true);
+    expect($('.cup-prova-lado').textContent).toContain('Essa receita já tá no cardápio.');
+    $<HTMLButtonElement>('.cup-provas-voltar').click();
+    expect(t.elemento.dataset.estado).toBe('bar');
   });
 });
