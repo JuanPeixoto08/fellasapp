@@ -283,9 +283,9 @@ com lote 2, `lancado` false) até a parte 4 ficar pronta. A seção 6 continua v
   Retratos 64×64; os sem foto de referência estão marcados "a conferir".
 - Os desafios de noite contam na semana em que são conferidos; "abre o bar 5 noites", "sexta com o DJ certo" e "balde"
   pagam na hora em que acontecem.
-- **Provar (0069, pós-lançamento):** no montar, "Provar (N de 6 hoje)" ao lado de "Pôr no cardápio" manda a galera provar
-  a receita (base, mistura, extra, tamanho, força e preço) **sem ir pro cardápio**: de graça, sem vaga e sem nome, no
-  máximo **6 nas últimas 24 h** (janela que anda; `idle_cup_provas`: "Já provou 6 hoje. A galera precisa de um descanso").
+- **Provar (0069, pós-lançamento):** no montar, "Provar" ao lado de "Pôr no cardápio" manda a galera provar
+  a receita (base, mistura, extra, tamanho, força e preço) **sem ir pro cardápio**: de graça, sem vaga e sem nome e
+  **sem limite** (a 0070 tirou o teto de 6 por 24 h; `provas_max` vem null e a tela só diz "Provar") (o erro `idle_cup_provas` ficou mapeado, mas nunca mais é levantado).
   A nota é a mesma de pôr no cardápio (moda da semana da prova) e sai em **5 min**; aí o `idle_cup_depois` anota o
   caderninho uma vez (os 3 pares e o "aguenta" da força), igual a um copão revelado. **Sem** pódio, volume, desafios ou
   conquistas: isso continua só da noite, e as vendas também. Tabela `idle_cup_provas`; o `idle_cup_json` traz `provas` (as
@@ -294,7 +294,7 @@ com lote 2, `lancado` false) até a parte 4 ficar pronta. A seção 6 continua v
   prova aberta: a que está provando com a contagem; a pronta com a nota, as 4 partes, os pares, a força e 2 ou 3 falas da
   galera inventada (`chatDaProva`; DJ nenhum fala), e "Pôr no cardápio", que leva a receita (com o preço) pro montar. O
   Provar funciona com o cardápio cheio. Sem rolagem no PC.
-- Simulação: o caderninho prova até 2 receitas por visita (6 por 24 h), as que mais ensinam (pares e força ainda não sabidos
+- Simulação: o caderninho prova até 2 receitas por visita (até 20 por 24 h por hábito da simulação), as que mais ensinam (pares e força ainda não sabidos
   nem esperados) entre as de nota esperada boa. As metas da parte 3 seguem sem mexer em constante: nível 10 no dia ~7,9,
   nível 25 nos dias 39,4–39,9, nota depois do dia 14 = 770 (era 731), marco de galera no dia ~27,4; cobrar o dobro continua
   perdendo em todas as sementes.

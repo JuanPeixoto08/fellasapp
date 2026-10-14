@@ -44,7 +44,7 @@ type ProvaJson = Record<string, unknown> & {
 };
 type Cup = {
   moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: NoCardapioJson[];
-  provas: ProvaJson[]; provas_hoje: number; provas_max: number;
+  provas: ProvaJson[]; provas_hoje: number; provas_max: number | null;
   hoje: { aberta: boolean; inicio: string; fim: string; sexta: boolean; dj: number | null; vendido_ate_agora: number; fichas_ate_agora: number };
   ultima_noite: (Record<string, unknown> & { copoes: Record<string, unknown>[] }) | null;
   noite_fechada: { inicio: string; fim: string } | null;
@@ -639,7 +639,7 @@ describe('o JSON do copão', () => {
     const ini = inicioNoite(iso(agora).slice(0, 10));
     expect(m).toMatchObject({
       moda: modaDaSemana(await semana()), dj: null, vagas: 3, cardapio: [], ultima_noite: null, noite_fechada: null, historico: [],
-      provas: [], provas_hoje: 0, provas_max: 6,
+      provas: [], provas_hoje: 0, provas_max: null,
     });
     expect(m.hoje).toMatchObject({ aberta: true, sexta: false, dj: null, vendido_ate_agora: 0, fichas_ate_agora: 0 });
     expect(Date.parse(m.hoje.inicio)).toBe(ini);
@@ -1498,7 +1498,7 @@ describe('provar um copão (0069)', () => {
     const m = resp.lugar.mecanica;
     expect(m.cardapio).toEqual([]);
     expect(m.provas_hoje).toBe(1);
-    expect(m.provas_max).toBe(6);
+    expect(m.provas_max).toBeNull();
     // a receita aparece; a nota, as partes e os rótulos só quando fica pronta
     expect(m.provas).toHaveLength(1);
     expect(m.provas[0]).toMatchObject({ id: p.id, ...c, pronta: false, nota: null, sabor: null, cb: null, moda: null, aguenta: null, rotulos: null });
@@ -1519,7 +1519,6 @@ describe('provar um copão (0069)', () => {
       const c = { base: ent(r, 1, 12), mistura: ent(r, 1, 15), extra: ent(r, 1, 12), tamanho: ent(r, 1, 3), forca: ent(r, 1, 10), preco: 0 };
       const [lo, hi] = precoFaixa(c.base, c.tamanho, c.forca);
       c.preco = ent(r, lo, hi);
-      if (i % 6 === 0) await q('delete from public.idle_cup_provas where user_id = $1', [A]); // o limite de 6 em 24 h
       await provar(c);
       const p = (await provasDb()).at(-1)!;
       expect(p.nota, JSON.stringify(c)).toBe(avaliar(c, await semana()).nota);
@@ -1543,27 +1542,17 @@ describe('provar um copão (0069)', () => {
       expect(await provasDb()).toEqual([]);
     }
   });
-  it('no máximo 6 em 24 h (a janela anda: a mais antiga libera 24 h depois); cardápio cheio e receita repetida não impedem', async () => {
+  it('sem limite: 30 provas seguidas são aceitas; cardápio cheio e receita repetida não impedem', async () => {
     await bar();
     for (const extra of [1, 2, 3]) await por({ extra, nome: `C${extra}` });
     await provar(); // igual ao do cardápio: pode
-    for (let k = 0; k < 5; k++) {
-      andar(H);
-      await provar({ extra: (k % 3) + 1, forca: 4 + k, preco: 24 });
-    }
-    expect(await provasDb()).toHaveLength(6);
-    andar(H);
-    await expect(provar()).rejects.toThrow(/idle_cup_provas/);
-    expect((await lugar()).mecanica.provas_hoje).toBe(6);
-    expect(await provasDb()).toHaveLength(6);
-    // a primeira foi há 6 h: libera 24 h depois dela (18 h a mais menos 1 ms ainda não)
-    andar(18 * H - 1);
-    await expect(provar()).rejects.toThrow(/idle_cup_provas/);
-    andar(1);
-    const resp = await provar();
-    expect(resp.lugar.mecanica.provas_hoje).toBe(6);
-    expect(await provasDb()).toHaveLength(7);
+    for (let k = 0; k < 29; k++) await provar({ extra: (k % 3) + 1, forca: (k % 10) + 1, preco: 24 });
+    expect(await provasDb()).toHaveLength(30);
+    const m = (await lugar()).mecanica;
+    expect(m.provas_hoje).toBe(30);
+    expect(m.provas_max).toBeNull();
   });
+
   it('pronta: o depois anota o caderninho igual a um copão revelado, uma vez, sem pódio, volume, desafio nem conquista', async () => {
     await bar();
     await provar({ forca: 4, preco: 20 });
@@ -1610,14 +1599,13 @@ describe('provar um copão (0069)', () => {
   it('o JSON mostra as últimas 10 (a mais nova primeiro); B não vê as do A', async () => {
     await bar();
     for (let k = 0; k < 12; k++) {
-      if (k % 6 === 0 && k) andar(DIA); // o limite de 6 em 24 h
       andar(MIN);
       await provar({ forca: (k % 10) + 1, preco: 24 });
     }
     const ps = await provasDb();
     const m = (await lugar()).mecanica;
     expect(m.provas.map((x) => x.id)).toEqual(ps.slice(-10).reverse().map((x) => x.id));
-    expect(m.provas_hoje).toBe(6);
+    expect(m.provas_hoje).toBe(12);
     // 1 min entre elas: as feitas há 5 min ou mais estão prontas (com a nota); as outras, não
     for (const x of m.provas) {
       expect(x.pronta).toBe(Date.parse(x.pronta_em) <= agora);

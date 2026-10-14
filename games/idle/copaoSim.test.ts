@@ -17,7 +17,7 @@
 //    o "aguenta" em duas forças diferentes; até lá testa (5 primeiro, depois outra força perto do palpite); sabido, põe no
 //    ponto (ponto+1 em no máximo um copão do cardápio: o risco de PT que ela aceita). DJ: o que curte as bases do cardápio
 //    (as bases de cada DJ aparecem na caixinha dele). Nunca olha tabela escondida. Prova (0069): depois de mexer no
-//    cardápio, prova até 2 receitas por visita (6 em 24 h), as que mais ensinam (pares e força que ela ainda não sabe nem
+//    cardápio, prova até 2 receitas por visita (até 20 em 24 h, hábito da simulação), as que mais ensinam (pares e força que ela ainda não sabe nem
 //    está esperando) entre as de nota esperada boa; a nota da prova sai em 5 min e ela lê na visita seguinte.
 //  - "no dobro" e "no barato": iguais ao caderninho (provas também), mas sempre cobram 2× a referência / 60% da referência.
 //    Servem para conferir que o preço certo é o que mais rende.
@@ -31,7 +31,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  abreNoite, aguenta, ALFA, avaliar, BASES, PROVA_MS, provasRestantes, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
+  abreNoite, aguenta, ALFA, avaliar, BASES, PROVA_MS, chancePT, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, galeraNoite, liberado,
   lucroVenda, MISTURAS, moda, NOITE_MS, noiteIdx, noitesEntre, novidade, PONTOS, precoFaixa, precoRef, sementePT, TAMANHOS, vagas, vendasNoite,
   type Copao, type Rotulo,
 } from './copao';
@@ -39,6 +39,8 @@ import { custoNivel, LUGARES, MARCOS, NIVEL_MAX } from './mapa';
 
 const H = 3600_000;
 const DIA = 24 * H;
+/** Teto de provas da jogadora simulada em 24 h (o jogo não tem limite; sem mudar constante nenhuma). */
+const PROVAS_SIM_24H = 20;
 /** Segunda, 12/10/2026, 00h de Brasília (UTC−3). */
 const INICIO = Date.UTC(2026, 9, 12, 3);
 const VISITAS = [9, 14, 21];
@@ -252,10 +254,10 @@ function simular(estrategia: Estrategia, semente: number, pula: (dia: number, h:
     return melhor;
   }
 
-  /** Até 2 provas por visita, sem passar de 6 em 24 h. */
+  /** Até 2 provas por visita, sem passar de PROVAS_SIM_24H em 24 h (o jogo não tem limite desde a 0070; é o hábito da jogadora simulada). */
   function provar(t: number): void {
     if (!usaProva) return;
-    for (let k = 0; k < 2 && provasRestantes(provasFeitas, t) > 0; k++) {
+    for (let k = 0; k < 2 && provasFeitas.filter((x) => x > t - DIA).length < PROVAS_SIM_24H; k++) {
       const c = escolherProva(t);
       if (!c) return;
       provando.push({ t, c });
@@ -624,11 +626,11 @@ describe('balanceamento do copão (simulação)', () => {
     expect(mediana).toBeLessThanOrEqual(31);
   });
 
-  // Provar (0069): quem usa o caderninho prova até 6 por 24 h e aprende mais rápido; quem chuta não prova.
-  it('com caderninho: prova todo dia, nunca mais que 6 em 24 h; no chute, nenhuma', () => {
+  // Provar (0069): quem usa o caderninho prova até 20 por 24 h e aprende mais rápido; quem chuta não prova.
+  it('com caderninho: prova todo dia, nunca mais que o hábito da simulação em 24 h; no chute, nenhuma', () => {
     for (const r of caderninho) {
       expect(r.provas).toBeGreaterThan(5 * DIAS);
-      expect(r.provasMax24h).toBeLessThanOrEqual(6);
+      expect(r.provasMax24h).toBeLessThanOrEqual(PROVAS_SIM_24H);
     }
     for (const r of chute) expect(r.provas).toBe(0);
   });

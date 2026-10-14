@@ -5,7 +5,7 @@
 //   ninguém abriu;
 // * montar (numa vaga livre): base, mistura, extra, tamanho, força, preço, nome, a prévia e "Pôr no cardápio";
 // * djs: quem toca na sexta (os retratos, o som e as bases que vendem mais com cada um);
-// * provas (0069): o Provar do montar manda a galera provar a receita sem ir pro cardápio (de graça, 6 por 24 h); a lista
+// * provas (0069): o Provar do montar manda a galera provar a receita sem ir pro cardápio (de graça, sem limite); a lista
 //   das últimas, a que está provando com a contagem e a pronta com a nota, as 4 partes, os pares e o que a galera falou,
 //   e o "Pôr no cardápio" que leva a receita pro montar;
 // * revelação (uma vez por copão, guardada por pessoa, quando ele vendeu a primeira noite inteira): a nota subindo com as 4
@@ -18,7 +18,7 @@ import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
   aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
-  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, provasRestantes, proximaNoite, proximaProva, rotulos, TAMANHOS,
+  NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS,
   type CadernoCup, type CopaoCup, type EstadoCup, type ProvaCup, type TipoPar, type UltimaNoite,
 } from './copao';
 import { balao, canvasDe, COR_BASE, COR_MISTURA, extraImagem, fotoImagem, fundoBar, LADO_FOTO, recipiente } from './copaoArte';
@@ -110,13 +110,6 @@ function horaBR(ms: number): string {
   return `${d.getUTCHours()}h${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 const criadas = (m: EstadoCup) => m.provas.map((p) => Date.parse(p.criado_em));
-/** Quantas provas ainda cabem agora (a janela de 24 h anda com o relógio). */
-const provasRestam = (m: EstadoCup, agoraMs: number) => Math.min(m.provas_max, provasRestantes(criadas(m), agoraMs));
-/** Quando a próxima prova libera, em palavras ("hoje às 21h40"); null = já pode. */
-function provaLibera(m: EstadoCup, agoraMs: number): string | null {
-  const t = proximaProva(criadas(m), agoraMs);
-  return t === null ? null : `${quando(t, agoraMs)} às ${horaBR(t)}`;
-}
 const descreverCurto = (c: { base: number; tamanho: number; forca: number }) => `${TAMANHOS[c.tamanho - 1].nome} de ${BASES[c.base - 1].nome}, força ${c.forca}`;
 
 function pinta(c: HTMLCanvasElement, img: ImageData): void {
@@ -437,7 +430,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     return li;
   }
 
-  /** As provas no pé do bar: quantas restam, a que está provando (contagem) ou a nota da última, e o botão que abre as provas. */
+  /** As provas no pé do bar: a que está provando (contagem) ou a nota da última, e o botão que abre as provas. */
   function blocoProvas(m: EstadoCup, ocupado: boolean, atualizar: (() => void)[]): HTMLElement {
     const b = el('div', 'cup-provas-pe');
     const linha = el('p', 'cup-provas-linha');
@@ -451,10 +444,10 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
       const t = agora();
       const provando = m.provas.filter((p) => Date.parse(p.pronta_em) > t);
       const pronta = m.provas.find((p) => p.pronta && p.nota !== null);
-      const restam = `${provasRestam(m, t)} de ${m.provas_max} hoje`;
-      if (provando.length) estado.textContent = `provando, pronta em ${tempo(Math.min(...provando.map((p) => Date.parse(p.pronta_em))) - t)} · ${restam}`;
-      else if (pronta) estado.replaceChildren('última: nota ', el('b', nomeTier(pronta.nota!), String(pronta.nota)), ` · ${restam}`);
-      else estado.textContent = `nota em 5 min, de graça · ${restam}`;
+      const restam = m.provas_hoje > 0 ? ` · ${m.provas_hoje} hoje` : '';
+      if (provando.length) estado.textContent = `provando, pronta em ${tempo(Math.min(...provando.map((p) => Date.parse(p.pronta_em))) - t)}${restam}`;
+      else if (pronta) estado.replaceChildren('última: nota ', el('b', nomeTier(pronta.nota!), String(pronta.nota)), restam);
+      else estado.textContent = `nota em 5 min, de graça${restam}`;
       vigiarProvas(m, t);
     });
     return b;
@@ -743,7 +736,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     dicas.ligar(por, 'cup-por', 'Pôr no cardápio', () => avisosPor.join(' '));
     dicas.ligar(provar, 'cup-provar', 'Provar', () => {
       const m = ultimo?.m;
-      return m ? dicaCupProvar(provasRestam(m, agora()), m.provas_max, provaLibera(m, agora())) : null;
+      return m ? dicaCupProvar(m.provas_hoje) : null;
     });
     lado.append(previa, linhaNome, forcaS, precoS, fim);
 
@@ -878,11 +871,9 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     aviso.classList.toggle('alerta', !pode && !ocupado);
     por.disabled = !pode;
     sortear.disabled = ocupado;
-    // Provar: de graça, não precisa de vaga nem de nome; só o limite de 6 em 24 h
-    const restam = provasRestam(m, agora());
-    const libera = restam <= 0 ? provaLibera(m, agora()) : null;
-    provar.textContent = libera ? `Próxima prova ${libera}` : `Provar (${restam} de ${m.provas_max} hoje)`;
-    provar.disabled = ocupado || restam <= 0;
+    // Provar: de graça, não precisa de vaga nem de nome, sem limite (0070)
+    provar.textContent = 'Provar';
+    provar.disabled = ocupado;
   }
 
   function abrirMontar() {
@@ -1000,7 +991,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const cab = el('header', 'cup-provas-cab');
     const tit = el('div', 'cup-provas-tit');
     tit.append(el('h3', 'cup-titulo', 'Provas'),
-      el('p', 'sub', 'A galera prova a receita sem ela ir pro cardápio. Nota em 5 min, de graça, 6 por dia.'));
+      el('p', 'sub', 'A galera prova a receita sem ela ir pro cardápio. Nota em 5 min, de graça, quantas vezes quiser.'));
     const bts = el('div', 'cup-provas-bts');
     const voltar = button('Voltar', 'btn compacto cup-provas-voltar', () => {
       vista = 'bar';
@@ -1014,8 +1005,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     bts.append(voltar, outra);
     cab.append(tit, bts);
     atualizar.push(() => {
-      const restam = provasRestam(m, agora());
-      outra.textContent = m.provas.length ? `Provar outra (${restam} de ${m.provas_max})` : 'Montar e provar';
+      outra.textContent = m.provas.length ? 'Provar outra' : 'Montar e provar';
     });
 
     const corpo = el('div', 'cup-provas-corpo');

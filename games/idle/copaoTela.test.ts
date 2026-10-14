@@ -46,7 +46,7 @@ const ultima = (cs: CopaoCup[], x: Partial<UltimaNoite> = {}): UltimaNoite => ({
 });
 const estado = (x: Partial<EstadoCup> = {}): EstadoCup => ({
   moda: { base: 4, mistura: 3 }, dj: 1, vagas: 3, cardapio: [], hoje: hoje(), ultima_noite: null, noite_fechada: null, historico: [],
-  provas: [], provas_hoje: 0, provas_max: 6, ...x,
+  provas: [], provas_hoje: 0, provas_max: null, ...x,
 });
 /** Uma prova pronta (feita há `idadeMin` minutos), com a nota da conta de verdade; com menos de 5 min, ainda provando. */
 const prova = (x: Partial<ProvaCup> = {}, idadeMin = 30): ProvaCup => {
@@ -674,10 +674,10 @@ describe('provas (0069)', () => {
     $<HTMLButtonElement>('.cup-montar-vaga').click();
     $$<HTMLButtonElement>('.cup-base')[2].click();
     const provar = $<HTMLButtonElement>('.cup-provar');
-    expect(provar.textContent).toBe('Provar (4 de 6 hoje)');
+    expect(provar.textContent).toBe('Provar');
     expect(provar.disabled).toBe(false);
     expect(caixinha('cup-provar')).toContain('a nota sai em 5 min');
-    expect(caixinha('cup-provar')).toContain('Restam 4 provas de 6');
+    expect(caixinha('cup-provar')).toContain('Provou 2 vezes nas últimas 24 h');
     provar.click();
     expect(acao).toHaveBeenCalledWith('idle_cup_provar', {
       p_base: 3, p_mistura: 1, p_extra: 1, p_tamanho: 2, p_forca: 5, p_preco: Math.round(precoRef(3, 2, 5)),
@@ -703,25 +703,20 @@ describe('provas (0069)', () => {
     expect($<HTMLButtonElement>('.cup-por').disabled).toBe(true);
     expect($<HTMLButtonElement>('.cup-provar').disabled).toBe(false);
   });
-  it('6 nas últimas 24 h: Provar travado dizendo quando libera; a janela anda', () => {
-    const ps = [10, 60, 120, 180, 240, 23 * 60].map((m) => prova({ extra: (m % 3) + 1 }, m));
+  it('sem limite: Provar nunca trava, mesmo com 50 provas nas últimas 24 h', () => {
+    const ps = Array.from({ length: 50 }, (_, i) => prova({ extra: (i % 3) + 1 }, 10 + i));
     const { t, $ } = montar();
-    t.renderizar(lugar(estado({ provas: ps, provas_hoje: 6 })), false, AGORA);
+    t.renderizar(lugar(estado({ provas: ps, provas_hoje: 50 })), false, AGORA);
     $<HTMLButtonElement>('.cup-montar-vaga').click();
     const provar = $<HTMLButtonElement>('.cup-provar');
-    expect(provar.disabled).toBe(true);
-    // a mais antiga foi há 23 h (13h de Brasília de ontem): libera hoje às 13h
-    expect(provar.textContent).toBe('Próxima prova hoje às 13h00');
-    expect(caixinha('cup-provar')).toContain('Já provou 6 nas últimas 24 h: a próxima libera hoje às 13h00');
-    vi.setSystemTime(AGORA + 60 * 60_000);
-    t.renderizar(lugar(estado({ provas: ps, provas_hoje: 5 }), { server_now: iso(AGORA + 60 * 60_000) }), false, AGORA + 60 * 60_000);
-    expect($<HTMLButtonElement>('.cup-provar').textContent).toBe('Provar (1 de 6 hoje)');
+    expect(provar.disabled).toBe(false);
+    expect(provar.textContent).toBe('Provar');
   });
   it('pronta: a nota, as 4 partes, os pares, a força e 2 ou 3 falas da galera (inventada); Pôr no cardápio leva a receita pro montar', () => {
     const p = prova({ id: 70, base: 2, mistura: 1, extra: 1, tamanho: 2, forca: 4, preco: 18 });
     const { t, $, $$ } = montar();
     t.renderizar(lugar(estado({ provas: [p, prova({ id: 71, extra: 2 }, 2)], provas_hoje: 2 })), false, AGORA);
-    expect($('.cup-provas-estado').textContent).toBe('provando, pronta em 3 min · 4 de 6 hoje');
+    expect($('.cup-provas-estado').textContent).toBe('provando, pronta em 3 min · 2 hoje');
     $<HTMLButtonElement>('.cup-ver-provas').click();
     expect(t.elemento.dataset.estado).toBe('provas');
     // a lista: a pronta com a nota, a que está provando com a contagem

@@ -251,23 +251,8 @@ export function nota(c: Copao, semana: string): number {
 
 const H = 3600_000;
 const DIA = 24 * H;
-/** Quantas provas cabem em 24 h (a janela anda: a prova de ontem às 21h libera hoje às 21h). */
-export const PROVAS_MAX = 6;
 /** A nota da prova sai 5 min depois. */
 export const PROVA_MS = 5 * 60_000;
-export const PROVA_JANELA_MS = DIA;
-
-/** Quantas provas a pessoa ainda pode fazer agora: PROVAS_MAX menos as feitas nas últimas 24 h (`criadas` em ms). */
-export function provasRestantes(criadas: readonly number[], agoraMs: number): number {
-  return Math.max(0, PROVAS_MAX - criadas.filter((t) => t > agoraMs - PROVA_JANELA_MS && t <= agoraMs).length);
-}
-
-/** Quando a próxima prova libera (ms), com o limite cheio: 24 h depois da mais antiga das últimas 24 h. null = já pode. */
-export function proximaProva(criadas: readonly number[], agoraMs: number): number | null {
-  const janela = criadas.filter((t) => t > agoraMs - PROVA_JANELA_MS && t <= agoraMs);
-  if (janela.length < PROVAS_MAX) return null;
-  return Math.min(...janela) + PROVA_JANELA_MS;
-}
 
 // ===== as noites: o bar abre das 18h às 2h de Brasília (UTC−3 fixo), todo dia =====
 
@@ -444,11 +429,11 @@ export type ProvaCup = {
 };
 /** `LugarEstado.mecanica` do lugar 4 (idle_cup_json). moda = o copão da moda desta semana; dj = o DJ escolhido pra sexta;
  *  noite_fechada = a última noite que fechou sem ninguém abrir o bar, se é mais nova que a ultima_noite. provas = as
- *  últimas 10; provas_hoje = as feitas nas últimas 24 h; provas_max = quantas cabem em 24 h. */
+ *  últimas 10; provas_hoje = as feitas nas últimas 24 h; provas_max = null (sem limite, 0070). */
 export type EstadoCup = {
   moda: { base: number; mistura: number }; dj: number | null; vagas: number; cardapio: CopaoCup[]; hoje: HojeCup;
   ultima_noite: UltimaNoite | null; noite_fechada: { inicio: string; fim: string } | null; historico: HistoricoCup[];
-  provas: ProvaCup[]; provas_hoje: number; provas_max: number;
+  provas: ProvaCup[]; provas_hoje: number; provas_max: number | null;
 };
 
 export const NOME_ROTULO: readonly string[] = ['péssima', 'ruim', 'ok', 'boa', 'ótima'];
