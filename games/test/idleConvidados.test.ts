@@ -298,6 +298,17 @@ describe('Bolsa: Vorcaro e VSauce', () => {
     const depois = (await negociar(1, 'vender', 0)).valuation;
     expect(depois).toBeLessThan(antes); // só perdeu a corretagem
   });
+  it('as melhorias da Bolsa custam o preço da tela (a produção sem os convidados), com o Cristiano sentado', async () => {
+    await sentar(0, 1); // produção ×1,15
+    await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    const r = (await q<{ v: { r: number } }>('select public.idle_bolsa_estado($1, $2) as v', [A, T]))[0].v.r;
+    const antes = await valuation();
+    const depois = (await q<{ v: { valuation: number } }>('select public.idle_bolsa_melhorar_em($1, $2, $3, $4) as v', [A, 'corretor', 1, T]))[0].v.valuation;
+    expect(antes - depois).toBeCloseTo(1800 * r, 3);
+    // com F$ pro preço da tela (e não pro preço com o Cristiano), compra
+    await q('update public.idle_state set valuation = $2 where user_id = $1', [A, 3600 * r * 1.01]);
+    await expect(q('select public.idle_bolsa_melhorar_em($1, $2, $3, $4)', [A, 'corretor', 2, T])).resolves.toBeDefined();
+  });
   it('o humor de cada empresa só vem com o VSauce sentado', async () => {
     expect((await estado()).empresas[0].humor ?? null).toBeNull();
     await sentar(1, 11);

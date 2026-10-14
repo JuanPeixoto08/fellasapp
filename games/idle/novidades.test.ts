@@ -22,9 +22,9 @@ describe('patch notes', () => {
   it('a nota da Bolsa explica a ligação com os geradores', () => {
     expect(NOVIDADES.find((n) => n.id === '2026-10-11-bolsa')!.itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
   });
-  it('a mais nova é o Mapa do rolê mais rápido; antes, o Mapa do rolê, os ×5 que somam, o dobro e a Era 6, as oportunidades que empilham, a árvore e as conquistas', () => {
-    expect(NOVIDADES[0]).toMatchObject({ id: '2026-10-14-mapa-ritmo', titulo: 'Mapa do rolê mais rápido' });
-    expect(NOVIDADES.slice(1, 7).map((n) => n.id)).toEqual(['2026-10-13-mapa-do-role', '2026-10-13-somam', '2026-10-13-dobro', '2026-10-13-empilha', '2026-10-13-arvore', '2026-10-12-conquistas']);
+  it('a mais nova é a das melhorias da Bolsa; antes, o Mapa do rolê mais rápido, o Mapa do rolê, os ×5 que somam, o dobro e a Era 6, as oportunidades que empilham, a árvore e as conquistas', () => {
+    expect(NOVIDADES[0]).toMatchObject({ id: '2026-10-14-bolsa-melhorias', titulo: 'Bolsa: melhorias pelo preço da tela' });
+    expect(NOVIDADES.slice(1, 8).map((n) => n.id)).toEqual(['2026-10-14-mapa-ritmo', '2026-10-13-mapa-do-role', '2026-10-13-somam', '2026-10-13-dobro', '2026-10-13-empilha', '2026-10-13-arvore', '2026-10-12-conquistas']);
   });
   it('data em pt-BR curta', () => {
     expect(dataNovidade('2026-10-11')).toBe('11/10/2026');

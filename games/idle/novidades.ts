@@ -4,6 +4,14 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-14-bolsa-melhorias',
+    titulo: 'Bolsa: melhorias pelo preço da tela',
+    data: '2026-10-14',
+    itens: [
+      'Corretor e Escritório cobravam mais do que o botão mostrava (contavam os convidados) e davam "Valuation não cobre essa compra" mesmo com o F$ na mão. Agora custam o que está escrito no botão.',
+    ],
+  },
+  {
     id: '2026-10-14-mapa-ritmo',
     titulo: 'Mapa do rolê mais rápido',
     data: '2026-10-14',
