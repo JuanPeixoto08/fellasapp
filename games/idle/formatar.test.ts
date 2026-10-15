@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatarTaxa, formatarValor } from './formatar';
+import { formatarTaxa, formatarValor, nomeGrupo } from './formatar';
 
 describe('formatarValor', () => {
   it.each([
@@ -26,5 +26,31 @@ describe('valores inválidos', () => {
       expect(formatarValor(n)).toBe('F$ 0');
       expect(formatarTaxa(n)).toBe('+F$ 0/s');
     }
+  });
+});
+
+describe('números gigantes (eras 6+)', () => {
+  it('depois de "deci", os nomes saem por regra (prefixo + dezena) até o centilhão', () => {
+    expect(Array.from({ length: 11 }, (_, i) => nomeGrupo(i))).toEqual(
+      ['mil', 'mi', 'bi', 'tri', 'quatri', 'quinti', 'sexti', 'septi', 'octi', 'noni', 'deci']);
+    expect(Array.from({ length: 10 }, (_, i) => nomeGrupo(11 + i))).toEqual(
+      ['undeci', 'duodeci', 'tredeci', 'quatordeci', 'quindeci', 'sexdeci', 'septendeci', 'octodeci', 'novendeci', 'viginti']);
+    expect([nomeGrupo(21), nomeGrupo(30), nomeGrupo(32), nomeGrupo(99), nomeGrupo(100)])
+      .toEqual(['unviginti', 'triginti', 'duotriginti', 'novennonaginti', 'centi']);
+    expect(new Set(Array.from({ length: 101 }, (_, i) => nomeGrupo(i))).size).toBe(101);
+  });
+  it.each([
+    [1e36, 'F$ 1 undeci'], [4.5e63, 'F$ 4,5 viginti'], [1e99, 'F$ 1 duotriginti'], [2.5e100, 'F$ 2,5 googol'],
+    [1e102, 'F$ 100 googol'], [9.999999999999999e102, 'F$ 999 googol'], [1e103, 'F$ 10 tretriginti'], [1e303, 'F$ 1 centi'],
+    [9.99e305, 'F$ 999 centi'], [1.2e306, 'F$ 1,2 × 10³⁰⁶'], [Number.MAX_VALUE, 'F$ 1,79 × 10³⁰⁸'],
+  ])('%s → %s', (n, s) => expect(formatarValor(n)).toBe(s));
+  it('trunca na borda de cada faixa (nunca mostra mais do que tem)', () => {
+    expect(formatarValor(9.999999999999999e98)).toBe('F$ 999 untriginti');
+    expect(formatarValor(9.999999999999999e99)).toBe('F$ 9,99 duotriginti');
+    expect(formatarValor(9.99999e305)).toBe('F$ 999 centi');
+  });
+  it('a taxa usa os mesmos nomes', () => {
+    expect(formatarTaxa(2.5e100)).toBe('+F$ 2,5 googol/s');
+    expect(formatarTaxa(3e306)).toBe('+F$ 3 × 10³⁰⁶/s');
   });
 });
