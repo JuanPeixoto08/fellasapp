@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { catalogo } from './catalogo';
+import { catalogo, PARAMETROS_ESPACO, PRECO_NIVEL } from './catalogo';
 import { K_PRESTIGIO, pontosTotais, SEM_BONUS } from './economia';
-import { gastar, primeiraVenda, simular, volta } from './simulacao';
+import { FIM_ERA_12, gastar, primeiraVenda, RITMO_ERAS, simular, volta } from './simulacao';
 import { mediaOportunidade, RODA_OPP_HOJE, RODA_OPP_NOVA } from './valorMedio';
 
 const H = 3600;
@@ -91,5 +91,48 @@ describe('ritmo com as oportunidades novas (entrega 5)', () => {
     const p = pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa);
     expect(p).toBeGreaterThanOrEqual(16);
     expect(p).toBeLessThanOrEqual(18);
+  });
+});
+
+// Entrega 1 das eras 6–12 (15/10): os geradores 31–42 seguem o 2º trecho da curva (catalogo.ts PARAMETROS_ESPACO), as
+// gerais e o legado (nomes.ts GERAL_6/GERAL_7/LEGADO_P) e as estratégias ×2. Medido ao planejar, 20 dias: era 6 em 10,5 d
+// e era 7 em 16,0 d (oportunidades de ~20,4 min) ou 16,7 d (15 min); gerador 30 no dia 8. Se sair do alvo: ajuste SÓ
+// esses números (nunca PARAMETROS, que é preço em produção), regere a 0077 com ATUALIZAR_CATALOGO e avise o Juan.
+describe('ritmo das eras 6 e 7', () => {
+  const sem = { horta: false, bolsa: false };
+  const minutos = 15 * (mediaOportunidade(RODA_OPP_NOVA, sem) / mediaOportunidade(RODA_OPP_HOJE, sem));
+  const m = simular(catalogo, 20, SEM_BONUS, [], minutos);
+  const antigo = simular(catalogo, 20);
+  it('era 6 por volta do dia 10 (entre 9 e 12 dias de jogo)', () => {
+    expect(m.era[6]).not.toBeNull();
+    expect(m.era[6]!).toBeGreaterThanOrEqual(9 * DIA);
+    expect(m.era[6]!).toBeLessThan(12 * DIA);
+  });
+  it('era 7 por volta do dia 16 (entre 15 e 18 dias de jogo)', () => {
+    expect(m.era[7]).not.toBeNull();
+    expect(m.era[7]!).toBeGreaterThanOrEqual(15 * DIA);
+    expect(m.era[7]!).toBeLessThan(18 * DIA);
+  });
+  it('com as oportunidades de antes (15 min), as mesmas faixas', () => {
+    expect(antigo.era[6]!).toBeGreaterThanOrEqual(9 * DIA);
+    expect(antigo.era[6]!).toBeLessThan(12 * DIA);
+    expect(antigo.era[7]!).toBeGreaterThanOrEqual(15 * DIA);
+    expect(antigo.era[7]!).toBeLessThan(18 * DIA);
+  });
+  it('a era 6 não sai antes do gerador 30 (o Foguete segue sendo a porta do espaço)', () => {
+    expect(m.gerador30).not.toBeNull();
+    expect(m.era[6]!).toBeGreaterThan(m.gerador30!);
+  });
+  it('a régua das 12 eras fica registrada (as 8+ são alvo das próximas entregas)', () => {
+    expect(RITMO_ERAS).toEqual({ 6: 10, 7: 16, 8: 24, 9: 31, 10: 38, 11: 45, 12: 52 });
+    expect(FIM_ERA_12).toBe(60);
+  });
+});
+
+describe('os números cabem no double até a era 12', () => {
+  it('a curva do 2º trecho até o gerador 72, com 300 unidades e a melhoria mais cara, fica longe de 1e308', () => {
+    const q = PARAMETROS_ESPACO;
+    const custo72 = q.custoInicial * q.crescimentoCusto ** (72 - q.aPartirDe);
+    expect(custo72 * 1.15 ** 300 * PRECO_NIVEL[7]).toBeLessThan(1e100);
   });
 });

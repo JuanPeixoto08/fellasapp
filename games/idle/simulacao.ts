@@ -32,10 +32,10 @@ export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BON
   const ef = efeitosArvore(cat, bonus.arvore);
   const ini = abertura(cat, ef, gerais);
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
-  const s: Estado = { generators: [...ini.generators, ...Array(Math.max(0, cat.geradores.length - ini.generators.length)).fill(0)], upgrades: ini.upgrades, strategies: [-1, -1, -1, -1], social: SOLO, bonus };
+  const s: Estado = { generators: [...ini.generators, ...Array(Math.max(0, cat.geradores.length - ini.generators.length)).fill(0)], upgrades: ini.upgrades, strategies: [-1, -1, -1, -1, -1, -1], social: SOLO, bonus };
   let v = ini.valuation;
   let relogio = 0;
-  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null, amostras: [] };
+  const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null, 6: null, 7: null }, compras1h: 0, gerador30: null, amostras: [] };
   let oppHoje = 0;
   let dia = 0;
 
@@ -143,3 +143,9 @@ export function volta(
   const m2 = simular(cat, dias, { arvore, conquistas: 0 }, venda.gerais);
   return { era: venda.era, primeira: m1.era[venda.era]!, segunda: m2.era[venda.era] ?? Infinity, arvore, gastos: ganhos - sobra };
 }
+
+/** Régua das 12 eras (spec das eras 6–7, seção 7): o dia em que o jogador da simulação chega em cada era. As 6 e 7 saem
+ *  do catálogo e simulacao.test.ts trava; da 8 em diante é o alvo das próximas entregas (ainda sem catálogo). A spec pede
+ *  "8–9 dias por era" e "era 12 no dia 52": do dia 16 ao 52 dá ~7 por era, e a 12 dura 8 (até o dia 60). */
+export const RITMO_ERAS: Readonly<Record<number, number>> = { 6: 10, 7: 16, 8: 24, 9: 31, 10: 38, 11: 45, 12: 52 };
+export const FIM_ERA_12 = 60;
