@@ -161,7 +161,10 @@
 .idle .painel { overflow: auto; padding-bottom: 24px; width: 100%; max-width: 560px; justify-self: center; box-shadow: none; }
 .idle .abas { display: flex; gap: 6px; padding: 12px 14px 8px; position: sticky; top: 0; z-index: 1; background: #121212; }
 .idle .aba { flex: 1; min-height: 44px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; color: var(--i-mudo); font: 400 20px var(--i-pixel); cursor: pointer; }
-.idle .aba.ativa { color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda); }
+/* a aba ativa é lugar, não ação: painel aceso com o traço lilás embaixo (o roxo cheio fica pros botões principais) */
+.idle .aba.ativa { color: var(--paper); background: var(--i-ativo); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 var(--i-lilas); }
+.idle .aba:hover:not(.ativa) { color: var(--paper); }
 .idle .seg-loja { margin: 4px 14px 0; }
 .idle .lista { display: grid; gap: 10px; padding: 12px 14px; margin: 0; list-style: none; }
 
@@ -324,7 +327,9 @@
 .idle .chave { flex: none; min-width: 112px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
   font: 400 19px var(--i-pixel); color: var(--i-mudo); background: var(--i-fundo2); --c: var(--i-borda2);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
-.idle .chave.ligada { color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda); }
+/* ligada: acesa (texto claro, traço lilás embaixo), sem o roxo cheio dos botões de ação */
+.idle .chave.ligada { color: var(--paper); background: var(--i-ativo); --c: var(--i-lilas); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c),
+  -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 var(--i-lilas); }
 /* volume da música: barra de pixel (trilho afundado, pegador quadrado roxo) */
 .idle .config-volume .rotulo { flex: none; }
 .idle .volume { flex: 1; min-width: 0; height: 40px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; accent-color: var(--i-roxo); }
@@ -551,6 +556,8 @@
 .idle .bts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .idle .bts .rot2 { grid-column: 1 / -1; margin-bottom: -4px; font: 400 16px var(--i-pixel); color: var(--i-mudo); }
 .idle .bts .btn { flex: none; }
+/* comprar: contorno do destaque (no lugar com tema, a cor dele), sem encher; vender fica com o contorno comum */
+.idle .bts .btn.compra { --c: var(--i-roxo-borda); color: var(--paper); }
 .idle .conta-limite { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--i-mudo); }
 .idle .mini-gerador { flex: none; width: 32px; height: 32px; background: no-repeat 0 0 / 128px 32px; image-rendering: pixelated; }
 .idle .bolsa-detalhe .aviso { margin: 0; font-size: 12px; color: var(--i-mudo); }

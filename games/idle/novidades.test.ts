@@ -22,12 +22,13 @@ describe('patch notes', () => {
   it('a nota da Bolsa explica a ligação com os geradores', () => {
     expect(NOVIDADES.find((n) => n.id === '2026-10-11-bolsa')!.itens).toContain('Cada empresa da Bolsa é ligada a um gerador: quanto mais dele, mais ações você pode ter.');
   });
-  it('a mais nova é a do quarto das 3h06 maior; antes, o Jogo do Brasil sem clique perdido, as eras 1 a 5, o copão com uma prova por vez, as melhorias da Bolsa, o Mapa do rolê mais rápido, o Mapa do rolê, os ×5 que somam, o dobro e a Era 6, as oportunidades que empilham, a árvore e as conquistas', () => {
-    expect(NOVIDADES[0]).toMatchObject({ id: '2026-10-15-quarto-inicio', titulo: 'O quarto das 3h06 ficou maior' });
-    expect(NOVIDADES[1]).toMatchObject({ id: '2026-10-15-jogo-do-brasil-trava', titulo: 'Jogo do Brasil sem clique perdido' });
-    expect(NOVIDADES[2]).toMatchObject({ id: '2026-10-14-eras-1-5', titulo: 'As eras 1 a 5 ganharam vida' });
-    expect(NOVIDADES[3]).toMatchObject({ id: '2026-10-14-copao-uma-prova', titulo: 'Copão: uma prova por vez' });
-    expect(NOVIDADES.slice(4, 12).map((n) => n.id)).toEqual(['2026-10-14-bolsa-melhorias','2026-10-14-mapa-ritmo', '2026-10-13-mapa-do-role', '2026-10-13-somam', '2026-10-13-dobro', '2026-10-13-empilha', '2026-10-13-arvore', '2026-10-12-conquistas']);
+  it('a mais nova é a do roxo só no que é pra apertar; antes, o quarto das 3h06 maior, o Jogo do Brasil sem clique perdido, as eras 1 a 5, o copão com uma prova por vez, as melhorias da Bolsa, o Mapa do rolê mais rápido, o Mapa do rolê, os ×5 que somam, o dobro e a Era 6, as oportunidades que empilham, a árvore e as conquistas', () => {
+    expect(NOVIDADES[0]).toMatchObject({ id: '2026-10-15-menos-roxo', titulo: 'Roxo só no que é pra apertar' });
+    expect(NOVIDADES[1]).toMatchObject({ id: '2026-10-15-quarto-inicio', titulo: 'O quarto das 3h06 ficou maior' });
+    expect(NOVIDADES[2]).toMatchObject({ id: '2026-10-15-jogo-do-brasil-trava', titulo: 'Jogo do Brasil sem clique perdido' });
+    expect(NOVIDADES[3]).toMatchObject({ id: '2026-10-14-eras-1-5', titulo: 'As eras 1 a 5 ganharam vida' });
+    expect(NOVIDADES[4]).toMatchObject({ id: '2026-10-14-copao-uma-prova', titulo: 'Copão: uma prova por vez' });
+    expect(NOVIDADES.slice(5, 13).map((n) => n.id)).toEqual(['2026-10-14-bolsa-melhorias','2026-10-14-mapa-ritmo', '2026-10-13-mapa-do-role', '2026-10-13-somam', '2026-10-13-dobro', '2026-10-13-empilha', '2026-10-13-arvore', '2026-10-12-conquistas']);
   });
   it('data em pt-BR curta', () => {
     expect(dataNovidade('2026-10-11')).toBe('11/10/2026');

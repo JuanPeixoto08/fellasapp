@@ -4,6 +4,14 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-menos-roxo',
+    titulo: 'Roxo só no que é pra apertar',
+    data: '2026-10-15',
+    itens: [
+      'A aba aberta, a chave ligada e os botões de comprar da Bolsa largaram o roxo cheio. Agora o roxo só aparece no botão principal de cada tela, e dá pra achar de primeira.',
+    ],
+  },
+  {
     id: '2026-10-15-quarto-inicio',
     titulo: 'O quarto das 3h06 ficou maior',
     data: '2026-10-15',
