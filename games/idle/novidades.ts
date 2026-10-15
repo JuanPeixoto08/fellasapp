@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-som-volta',
+    titulo: 'O som não some mais',
+    data: '2026-10-15',
+    itens: [
+      'O jogo tenta ligar o som assim que abre, sem esperar um clique. Aba que o navegador restaurou sozinho agora toca os dourados (quando o navegador deixa; se não deixar, um clique em qualquer lugar liga).',
+      'Se o som parar sozinho, depois de o PC dormir, de trocar o fone ou de muito tempo com a aba no fundo, ele volta sem precisar recarregar a página.',
+    ],
+  },
+  {
     id: '2026-10-15-dourados-caixinha',
     titulo: 'Dourados novos e uma Caixinha mais cheia',
     data: '2026-10-15',
