@@ -128,4 +128,24 @@ describe('eventos de era na tela', () => {
     t.tick(130_000);
     expect(o.aoPegar).not.toHaveBeenCalled();
   });
+  it('aoGol a cada gol (o som do gol); aoBotao no clique da caixa (Shopee e call tocam aí, não ao aparecer)', () => {
+    const raiz = document.createElement('div');
+    const aoGol = vi.fn();
+    const aoBotao = vi.fn();
+    const t = criarEventoEraTela(raiz, { ...opcoes(), aoGol, aoBotao });
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
+    expect(aoGol).not.toHaveBeenCalled();
+    for (let i = 0; i < 7; i++) raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
+    expect(aoGol).toHaveBeenCalledTimes(7);
+    expect(aoGol.mock.calls.map((c) => c[0])).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    t.mostrar({ seg: 200, tipo: 2, agoraMs: 200_000 });
+    expect(aoBotao).not.toHaveBeenCalled();
+    raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    expect(aoBotao).toHaveBeenCalledWith(2);
+    t.mostrar({ seg: 300, tipo: 3, agoraMs: 300_000 });
+    raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    raiz.querySelector<HTMLButtonElement>('.evento-era button')?.click(); // já saiu: não toca de novo
+    expect(aoBotao).toHaveBeenLastCalledWith(3);
+    expect(aoBotao).toHaveBeenCalledTimes(2);
+  });
 });

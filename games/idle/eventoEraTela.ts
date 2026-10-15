@@ -59,6 +59,10 @@ export type OpcoesEventoEra = {
   dica(el: HTMLElement, chave: string, tipo: TipoEventoEra): void;
   /** onde fica (fração da tela); `i` = o pulo da bola */
   posicao(seg: number, i: number): Ponto;
+  /** cada gol do Jogo do Brasil (o som do gol); `gols` = quantos já */
+  aoGol?(gols: number): void;
+  /** clicou no botão da caixa (Abrir pacote, Sair da call…): o som da ação */
+  aoBotao?(tipo: 1 | 2 | 3 | 4): void;
 };
 /** Quantos pulos de 1,5 s a bola já deu, `agoraMs` depois do segundo `seg`. */
 /** Bola acima disto (fração da tela, do topo): o placar vai pra baixo dela, senão sairia da tela/cobriria o topo. */
@@ -129,6 +133,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
           if (!atual || atual.seg !== e.seg) return;
           atual.gols++;
           contar(atual.gols);
+          o.aoGol?.(atual.gols);
           if (atual.gols >= MAX_GOLS) encerrar(true); // o 7º: o texto sobe onde a bola levou o chute
           else pularBola();
         });
@@ -146,7 +151,9 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         b.textContent = BOTAO[t];
         b.setAttribute('aria-label', `${BOTAO[t]} (${NOME_EVENTO_ERA[t]})`);
         b.addEventListener('click', () => {
-          if (atual?.seg === e.seg) encerrar(true);
+          if (atual?.seg !== e.seg) return;
+          o.aoBotao?.(t);
+          encerrar(true);
         });
         caixa.append(icone(t), balao, b);
         posicionar(caixa, pos);

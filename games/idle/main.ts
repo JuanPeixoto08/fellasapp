@@ -715,7 +715,8 @@ setInterval(() => {
       const t = eventoEraEm(ancora.estado.user_id, x, ancora.estado.era);
       if (t !== null && !eventoEm(ancora.estado, x) && !tela.eventosEra.ativo()) {
         tela.eventosEra.mostrar({ seg: x, tipo: t, agoraMs });
-        if (tela.eventosEra.ativo()) audio.tocar(({ 1: 'mae', 2: 'shopee', 3: 'call', 4: 'telaAzul', 5: 'gol' } as const)[t]);
+        // a mãe e a tela azul soam ao aparecer; a Shopee, a call e os gols soam na ação (tela.ts)
+        if (tela.eventosEra.ativo() && (t === 1 || t === 4)) audio.tocar(t === 1 ? 'mae' : 'telaAzul');
       }
     }
     segVistoEra = seg;
