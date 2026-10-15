@@ -25,6 +25,12 @@ const ICONES: Record<TipoEventoEra, readonly string[]> = {
   // a bola: branca com os gomos pretos
   5: ['...KKKKKK...', '..KWWKKWWK..', '.KWWWWWWWWK.', 'KWWWWKKWWWWK', 'KKWWKKKKWWKK', 'KKWWKKKKWWKK',
       'KWWWWKKWWWWK', 'KWWWWWWWWWWK', 'KWKKWWWWKKWK', '.KKKWWWWKKK.', '..KWWWWWWK..', '...KKKKKK...'],
+  // o destroço: pedaço de satélite com os painéis azuis, rodando (eras 6–7)
+  6: ['............', '.KKKK.......', '.KCAK..K....', '.KACKKKKK...', '.KCAKNWNK...', '.KKKKNNNKKK.',
+      '.....KNNKCK.', '...K.KKKKAK.', '.........KK.', '..K.........', '.......K....', '............'],
+  // o alarme: a sirene vermelha com a luz saindo
+  7: ['............', 'O....WW....O', '.O..KKKK..O.', '...KRRWRK...', '..KRRRHRRK..', 'OOKRRRHRRKOO',
+      '..KRRRRRRK..', '.KKKKKKKKKK.', '.KNNNNNNNNK.', '.KKKKKKKKKK.', '............', '............'],
 };
 const BOTAO: Record<1 | 2 | 3 | 4, string> = { 1: 'Já vou!', 2: 'Abrir pacote', 3: 'Sair da call', 4: 'Reiniciar' };
 const BALAO: Record<1 | 2 | 3 | 4, string> = {
@@ -143,6 +149,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
 
   return {
     mostrar(e: { seg: number; tipo: TipoEventoEra; agoraMs: number }) {
+      if (e.tipo === 6 || e.tipo === 7) return; // Lixo espacial e Houston: a tela deles chega com o desenho (até lá não aparecem)
       const ateMs = (e.seg + JANELA_EVENTO_S[e.tipo]) * 1000;
       if (atual || encerrados.has(e.seg) || e.agoraMs >= ateMs) return;
       const caixa = document.createElement('div');

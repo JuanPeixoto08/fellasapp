@@ -47,7 +47,7 @@ export const idleClaim = (window: number) => call<IdleState>('select public.idle
 export const idleDouradoPegar = (seg: number, lado: number, moedas = 0) =>
   call<IdleState>('select public.idle_dourado_pegar($1, $2, $3) as v', [seg, lado, moedas]);
 export const idleDouradoChamar = () => call<IdleState>('select public.idle_dourado_chamar() as v');
-export const idleEventoPegar = (seg: number, gols: number) => call<IdleState>('select public.idle_evento_pegar($1, $2) as v', [seg, gols]);
+export const idleEventoPegar = (seg: number, gols: number, tipo?: number) => call<IdleState>('select public.idle_evento_pegar($1, $2, $3) as v', [seg, gols, tipo ?? null]);
 type ComHorta = IdleState & { horta: HortaEstado; descobriu?: number | null };
 export const idleHorta = () => call<HortaEstado>('select public.idle_horta() as v');
 export const idleHortaPlantar = (canteiro: number, especie: number) => call<ComHorta>('select public.idle_horta_plantar($1, $2) as v', [canteiro, especie]);

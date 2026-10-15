@@ -5,16 +5,23 @@ import type { EventoPago } from '../shared/types';
 import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
-export type TipoEventoEra = 1 | 2 | 3 | 4 | 5;
-/** A última era que tem evento (as eras 6+ trazem os delas nas entregas seguintes). */
-export const ULTIMA_ERA_COM_EVENTO = 5;
+export type TipoEventoEra = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** A última era que tem evento (as eras 8+ trazem os delas nas entregas seguintes). */
+export const ULTIMA_ERA_COM_EVENTO = 7;
 export const CHANCE_EVENTO = 1800; // 1 em 1800 por segundo
 export const NOME_EVENTO_ERA: Record<TipoEventoEra, string> = {
   1: 'Desce pra almoçar!', 2: 'Pacote da Shopee', 3: 'Reunião que podia ser um e-mail', 4: 'Tela azul', 5: 'Jogo do Brasil',
+  6: 'Lixo espacial', 7: 'Houston, temos um problema',
 };
 /** Quanto tempo cada um fica na tela (s); o banco aceita 3 s a mais (rede). */
-export const JANELA_EVENTO_S: Record<TipoEventoEra, number> = { 1: 8, 2: 12, 3: 12, 4: 5, 5: 30 };
+export const JANELA_EVENTO_S: Record<TipoEventoEra, number> = { 1: 8, 2: 12, 3: 12, 4: 5, 5: 30, 6: 10, 7: 8 };
 export const MAX_GOLS = 7;
+/** Lixo espacial (era 6): quantos destroços passam, um de cada vez, e quanto cada desvio vale (s de produção). */
+export const MAX_DESVIOS = 3;
+export const DESVIO_S = 600;
+/** Houston (era 7): o Silver tape multiplica a produção por 4 por 2 min (outro com um valendo soma 2 min no fim). */
+export const SILVER_MULT = 4;
+export const SILVER_S = 120;
 
 const P = 2147483647n;
 const K = 1013904223n;
@@ -59,11 +66,19 @@ const vale = (iso: string | null | undefined, agoraMs: number) => !!iso && Date.
 export const marmitaAtiva = (s: { marmita_ate?: string | null }, agoraMs: number) => vale(s.marmita_ate, agoraMs);
 /** Atualização instalada valendo (melhorias −25%). */
 export const descontoAtivo = (s: { upg_desc_ate?: string | null }, agoraMs: number) => vale(s.upg_desc_ate, agoraMs);
+/** Silver tape do Houston valendo (produção ×4). */
+export const silverAtivo = (s: { silver_ate?: string | null }, agoraMs: number) => vale(s.silver_ate, agoraMs);
 
 // ---------- textos ----------
-/** Quanto entra em F$ na hora, com a produção `rate` de agora: Shopee (se sair F$), a call e 1 gol. */
+/** Quanto entra em F$ na hora, com a produção `rate` de agora: Shopee (se sair F$), a call, 1 gol, 1 destroço desviado; no
+ *  Houston, o que o ×4 dá a mais nos 2 min. */
 export function ganhoEventoAgora(tipo: TipoEventoEra, rate: number): number {
-  return tipo === 2 ? rate * 3600 * 0.8 : tipo === 3 ? rate * 1800 : tipo === 5 ? rate * 300 : 0;
+  if (tipo === 2) return rate * 3600 * 0.8;
+  if (tipo === 3) return rate * 1800;
+  if (tipo === 5) return rate * 300;
+  if (tipo === 6) return rate * DESVIO_S;
+  if (tipo === 7) return rate * SILVER_S * (SILVER_MULT - 1);
+  return 0;
 }
 
 /** O texto que sobe quando pega (com o que o banco mandou em `evento`). */
@@ -76,5 +91,7 @@ export function textoEventoPegou(e: EventoPago): string {
   }
   if (e.tipo === 3) return `Fugiu da call! +${formatarValor(e.ganho)}`;
   if (e.tipo === 4) return 'Atualização instalada! Melhorias −25%';
+  if (e.tipo === 6) return `${e.gols} ${e.gols === 1 ? 'destroço desviado' : 'destroços desviados'}! +${formatarValor(e.ganho)}`;
+  if (e.tipo === 7) return `Consertado com silver tape! ×${SILVER_MULT} por 2 min`;
   return `${e.gols} ${e.gols === 1 ? 'gol' : 'gols'}! +${formatarValor(e.ganho)}`;
 }

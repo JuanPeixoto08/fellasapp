@@ -4,6 +4,7 @@ import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas, type FatorTempo, VIRAL_MS } from './economia';
 import { COMBO_MULT } from './dourados';
+import { SILVER_MULT } from './eventosEra';
 import { CAIXA_PADRAO, type Caixa } from './oportunidades';
 import type { NomeCena } from './palco';
 import { ERAS } from './nomes';
@@ -22,11 +23,13 @@ export const efeitos = (estado: IdleState) => efeitosDe(catalogo, estado);
 /** A caixinha de oportunidades: o tamanho vem da árvore; a validade é sempre a padrão (4h). */
 export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).caixinha, validadeS: CAIXA_PADRAO.validadeS });
 
-/** Os bônus com tempo do estado que multiplicam a produção toda (0076): LinkedIn (o mult que o banco congelou) e Combo. */
-export function fatoresTempo(s: Pick<IdleState, 'linkedin_ate' | 'linkedin_mult' | 'combo_ate'>): FatorTempo[] {
+/** Os bônus com tempo do estado que multiplicam a produção toda: LinkedIn (o mult que o banco congelou) e Combo (0076) e o
+ *  Silver tape do Houston (0078). */
+export function fatoresTempo(s: Pick<IdleState, 'linkedin_ate' | 'linkedin_mult' | 'combo_ate' | 'silver_ate'>): FatorTempo[] {
   const out: FatorTempo[] = [];
   if (s.linkedin_ate && s.linkedin_mult) out.push({ ateMs: Date.parse(s.linkedin_ate), mult: s.linkedin_mult });
   if (s.combo_ate) out.push({ ateMs: Date.parse(s.combo_ate), mult: COMBO_MULT });
+  if (s.silver_ate) out.push({ ateMs: Date.parse(s.silver_ate), mult: SILVER_MULT });
   return out;
 }
 

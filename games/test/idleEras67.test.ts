@@ -6,7 +6,8 @@ import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
-import { custoMult, taxa, type Estado } from '../idle/economia';
+import { custoMult, produzido, taxa, VIRAL_MS, type Estado } from '../idle/economia';
+import { eventoEraEm } from '../idle/eventosEra';
 import { freshDb, type TestDb } from './db';
 
 const A = '4a681416-b4ee-4976-8cdd-540cc816f28c';
@@ -142,5 +143,203 @@ describe('estado, escolha e compra (0078 parte A)', () => {
     expect((await t.rpc<J>('idle_open')).silver_ate).not.toBeNull();
     await q(`update public.idle_state set silver_ate = now() - interval '1 second' where user_id = $1`, [A]);
     expect((await t.rpc<J>('idle_open')).silver_ate).toBeNull();
+  });
+});
+
+const taxaA = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+const tem = async (id: number) => (await q('select 1 from public.idle_conquistas where user_id = $1 and conquista_id = $2', [A, id])).length > 0;
+
+describe('a sorte das eras 6 e 7 (paridade com eventosEra.ts)', () => {
+  beforeEach(async () => { t = await freshDb({ conquistas: false }); });
+  it('os mesmos segundos e tipos em 200 mil segundos, eras 6 e 7', async () => {
+    const ini = 1_760_000_000;
+    for (const era of [6, 7]) {
+      const sql = await q<{ s: string; e: number }>(
+        `select s::text, e from (select s, public.idle_evento_era($1::uuid, s, $4) as e from generate_series($2::bigint, $3::bigint) s) x
+          where e is not null order by s`, [A, ini, ini + 200_000 - 1, era]);
+      const ts: { s: string; e: number }[] = [];
+      for (let s = ini; s < ini + 200_000; s++) {
+        const e = eventoEraEm(A, s, era);
+        if (e !== null) ts.push({ s: String(s), e });
+      }
+      expect(ts.length).toBeGreaterThan(60);
+      expect(sql).toEqual(ts);
+    }
+  });
+});
+
+describe('Silver tape na conta (0078 parte B)', () => {
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    await q('update public.idle_state set valuation = 1e12, generators[1] = 50, generators[2] = 20 where user_id = $1', [A]);
+  });
+  it('fechar a conta com o Silver tape é igual a produzido, sozinho e junto de ×5, Viralizou, Marmita, LinkedIn e Combo', async () => {
+    const casos = [
+      { boost: null, viral: null, marmita: null, linkedin: null, combo: null },
+      { boost: 20, viral: 60, marmita: 30, linkedin: 50, combo: 70 },
+    ];
+    for (const c of casos) {
+      await q(`update public.idle_state set settled_at = now(), silver_ate = now() + interval '40 seconds',
+                 boost_ate = case when $2::int is null then '{}' else array[now() + make_interval(secs => $2)] end,
+                 viral_ate = case when $3::int is null then '{}' else array[now() + make_interval(secs => $3)] end,
+                 marmita_ate = case when $4::int is null then null else now() + make_interval(secs => $4) end,
+                 linkedin_ate = case when $5::int is null then null else now() + make_interval(secs => $5) end, linkedin_mult = 2.5,
+                 combo_ate = case when $6::int is null then null else now() + make_interval(secs => $6) end
+               where user_id = $1`, [A, c.boost, c.viral, c.marmita, c.linkedin, c.combo]);
+      const r = await taxaA();
+      const [{ v0, v1 }] = await q<{ v0: number; v1: number }>(
+        `select s.valuation as v0, (public.idle_settle(s, s.settled_at + interval '100 seconds')).valuation as v1
+           from public.idle_state s where user_id = $1`, [A]);
+      const outros = [
+        ...(c.linkedin === null ? [] : [{ ateMs: c.linkedin * 1000, mult: 2.5 }]),
+        ...(c.combo === null ? [] : [{ ateMs: c.combo * 1000, mult: 7 }]),
+        { ateMs: 40_000, mult: 4 },
+      ];
+      const esperado = produzido(r, 0, 100_000, c.boost === null ? null : [c.boost * 1000], c.viral === null ? [] : [c.viral * 1000],
+        VIRAL_MS, c.marmita === null ? null : c.marmita * 1000, outros);
+      expect(v1 - v0).toBeCloseTo(esperado, 0);
+    }
+  });
+});
+
+describe('pegar os eventos das eras 6 e 7 (0078 parte C)', () => {
+  type JE = J & { eventos_era: Record<string, number>; evento: { tipo: number; ganho: number; gols: number } };
+  const agoraSeg = async () => Number((await q<{ s: string }>('select floor(extract(epoch from now()))::bigint::text as s'))[0].s);
+  /** O tipo do segundo `seg`; com `era`, só pra essa era (a anterior pode sortear outro tipo no mesmo segundo). */
+  const evento = (seg: number, tipo: number, era: number | null = null) => q('insert into public.teste_evento67 values ($1, $2, $3)', [seg, era, tipo]);
+  const pegar = (seg: number, gols = 0, tipo: number | null = null) => t.rpc<JE>('idle_evento_pegar', { p_seg: seg, p_gols: gols, p_tipo: tipo });
+  const valor = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+
+  beforeEach(async () => {
+    t = await freshDb(); // com o catálogo das conquistas (156, 157)
+    await t.db.exec(`
+      create table public.teste_evento67 (s bigint, era int, tipo int);
+      create or replace function public.idle_evento_era(u uuid, s bigint, era int) returns int language sql stable as
+        'select x.tipo from public.teste_evento67 x where x.s = idle_evento_era.s and (x.era is null or x.era = idle_evento_era.era)
+          order by x.era nulls last limit 1';`);
+    await t.member(A);
+    await t.member(B, { isMember: false });
+    await t.as(A);
+    await t.rpc('idle_start');
+    // era 7 (1 de cada gerador), estratégias escolhidas, e a conta parada (o settle não mexe no valuation)
+    await q(`update public.idle_state set valuation = 1e12, generators[1:42] = array_fill(1, array[42]), strategies = '{0,0,0,0,0,0}',
+               settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+  });
+
+  it('Lixo: 10 min de produção por destroço; 4 vira 3, negativo vira 0; 2 desvios não dão a conquista, 3 dão', async () => {
+    const seg = await agoraSeg();
+    await evento(seg, 6);
+    let r = await taxaA();
+    let antes = await valor();
+    const s2 = await pegar(seg, 2);
+    expect(s2.valuation - antes).toBeCloseTo(r * 600 * 2, 2);
+    expect(await tem(156)).toBe(false);
+    await evento(seg - 1, 6);
+    r = await taxaA();
+    antes = await valor();
+    const s = await pegar(seg - 1, 4);
+    expect(s.valuation - antes).toBeCloseTo(r * 600 * 3, 2);
+    expect(s.evento).toMatchObject({ tipo: 6, gols: 3 });
+    expect(s.eventos_era).toMatchObject({ lixo: 2 });
+    expect(await tem(156)).toBe(true);
+    await evento(seg - 2, 6);
+    antes = await valor();
+    expect((await pegar(seg - 2, -5)).valuation - antes).toBeCloseTo(0, 6);
+  });
+  it('Houston: Silver tape ×4 por 2 min; outro com um valendo soma 2 min; o 10º dá "Silver tape resolve"', async () => {
+    const seg = await agoraSeg();
+    await q(`update public.idle_state set eventos_era = '{"houston": 8}' where user_id = $1`, [A]);
+    await evento(seg, 7);
+    const s = await pegar(seg);
+    const agora = Date.parse((await q<{ n: string }>('select now()::text as n'))[0].n);
+    expect(Date.parse(s.silver_ate!) - agora).toBeCloseTo(120_000, -3);
+    expect(s.evento).toMatchObject({ tipo: 7, ganho: 0 });
+    expect(await tem(157)).toBe(false);
+    await evento(seg - 1, 7);
+    const s2 = await pegar(seg - 1);
+    expect(Date.parse(s2.silver_ate!) - agora).toBeCloseTo(240_000, -3);
+    expect(s2.eventos_era).toMatchObject({ houston: 10 });
+    expect(await tem(157)).toBe(true);
+  });
+  it('janelas: Lixo até 10 + 3 s, Houston até 8 + 3 s', async () => {
+    const seg = await agoraSeg();
+    await evento(seg - 14, 6);
+    await expect(pegar(seg - 14, 1)).rejects.toThrow(/idle_evento_gone/);
+    await evento(seg - 11, 6); // 11 s (+ o que passou do segundo) < 13 s
+    await expect(pegar(seg - 11, 1)).resolves.toBeTruthy();
+    await evento(seg - 13, 7);
+    await expect(pegar(seg - 13)).rejects.toThrow(/idle_evento_gone/);
+    await evento(seg - 9, 7);
+    await expect(pegar(seg - 9)).resolves.toBeTruthy();
+  });
+  it('a era mudou entre aparecer e clicar: vale o tipo da era anterior que a página mostrou; outro tipo é gone; sem p_tipo, o de agora', async () => {
+    const seg = await agoraSeg();
+    await evento(seg, 5, 6); // com a era 6 o segundo sorteia o Jogo do Brasil…
+    await evento(seg, 7, 7); // …e com a 7 (a de agora) o Houston
+    const r = await taxaA();
+    const antes = await valor();
+    const s = await pegar(seg, 2, 5);
+    expect(s.evento).toMatchObject({ tipo: 5, gols: 2 });
+    expect(s.valuation - antes).toBeCloseTo(r * 300 * 2, 2);
+    await evento(seg - 1, 3, 6);
+    await evento(seg - 1, 7, 7);
+    await expect(pegar(seg - 1, 0, 1)).rejects.toThrow(/idle_evento_gone/);
+    await evento(seg - 2, 5, 6);
+    await evento(seg - 2, 7, 7);
+    expect((await pegar(seg - 2)).evento).toMatchObject({ tipo: 7 });
+  });
+  it('quem não é membro não pega', async () => {
+    await t.as(B);
+    await expect(pegar(await agoraSeg())).rejects.toThrow(/not_member/);
+  });
+});
+
+describe('conquistas das eras 6 e 7 (0078 parte C)', () => {
+  beforeEach(async () => {
+    t = await freshDb();
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    await q(`update public.idle_state set valuation = 1e40, strategies = '{0,0,0,0,0,0}', generators[1:30] = array_fill(1, array[30])
+              where user_id = $1`, [A]);
+  });
+  it('a 100ª unidade do gerador 31 dá a 140 (não a 31)', async () => {
+    await q('update public.idle_state set generators[31] = 100 where user_id = $1', [A]);
+    await t.rpc('idle_open');
+    expect(await tem(140)).toBe(true);
+  });
+  it('o monolito (158) aparece com 1 de cada gerador da era 7; faltando um, não', async () => {
+    await q('update public.idle_state set generators[31:42] = array[1,1,1,1,1,1,1,1,1,1,1,0] where user_id = $1', [A]);
+    await t.rpc('idle_open');
+    expect(await tem(158)).toBe(false);
+    await q('update public.idle_state set generators[42] = 1 where user_id = $1', [A]);
+    await t.rpc('idle_open');
+    expect(await tem(158)).toBe(true);
+  });
+  it('300 de cada gerador da era 6 (152); todas as 57 melhorias da era 6 (154: 48 de gerador, 4 gerais, 5 de legado)', async () => {
+    await q('update public.idle_state set generators[31:36] = array[300,300,300,300,300,299] where user_id = $1', [A]);
+    await t.rpc('idle_open');
+    expect(await tem(152)).toBe(false);
+    await q('update public.idle_state set generators[36] = 300 where user_id = $1', [A]);
+    await t.rpc('idle_open');
+    expect(await tem(152)).toBe(true);
+    const todas = (await q<{ id: number }>(
+      `select u.id from public.idle_cat_upg u left join public.idle_cat_gen g on g.id = u.gerador
+        where (u.tipo = 'gerador' and g.era = 6) or (u.tipo in ('geral', 'legado') and u.requer_era = 6)`)).map((x) => x.id);
+    expect(todas).toHaveLength(57);
+    await q('update public.idle_state set upgrades = $2 where user_id = $1', [A, todas.filter((id) => id !== 3005)]);
+    await t.rpc('idle_open');
+    expect(await tem(154)).toBe(false);
+    await q('update public.idle_state set upgrades = $2 where user_id = $1', [A, todas]);
+    await t.rpc('idle_open');
+    expect(await tem(154)).toBe(true);
+  });
+  it('Daisy, Daisy (159): comprar a última melhoria do HAL', async () => {
+    await q('update public.idle_state set generators[31:34] = array[1,1,1,300] where user_id = $1', [A]);
+    await t.rpc('idle_buy', { p_kind: 'melhoria', p_id: 348, p_qty: 1 });
+    expect(await tem(159)).toBe(true);
   });
 });

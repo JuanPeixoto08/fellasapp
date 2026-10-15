@@ -440,3 +440,282 @@ begin
     'silver_ate', case when s.silver_ate > now() then s.silver_ate end);
 end;
 $$;
+
+-- ===== parte B: Houston, temos um problema (Silver tape: produção ×4 até silver_ate) =====
+-- fechar a conta (a da 0076) com o Silver tape do Houston (×4, 0078), como a Marmita: multiplica por cima, só o fim importa
+create or replace function public.idle_settle(s public.idle_state, ts timestamptz default now())
+returns public.idle_state language plpgsql stable set search_path = public as $$
+declare
+  v_fim  timestamptz;
+  v_a    timestamptz;
+  v_b    timestamptz;
+  v_p    timestamptz;
+  v_q    timestamptz;
+  v_meio timestamptz;
+  v_rate double precision;
+  v_mult double precision;
+  v_k    int;
+  v_kb   int;
+  v_dur  interval := make_interval(secs => 60 * public.idle_arv(s.user_id, 'dourado_duracao', 'max', 1)); -- Hype: o dobro
+begin
+  if not s.started or ts <= s.settled_at then
+    s.settled_at := greatest(s.settled_at, ts);
+    return s;
+  end if;
+  v_fim := ts; -- sem teto desde a 0061: o jogo fechado rende tudo
+  v_a := s.settled_at;
+  for v_b in
+    select x from (select c.ends_at as x from public.idle_contracts c
+                    where (c.employer_id = s.user_id or c.employee_id = s.user_id)
+                      and c.ends_at > s.settled_at and c.ends_at < v_fim
+                   union
+                   select m from public.idle_horta_mudancas(s.user_id, s.settled_at, v_fim) m
+                   union
+                   select m from public.idle_conv_mudancas(s, s.settled_at, v_fim) m
+                   union
+                   select v_fim) y
+     order by x
+  loop
+    v_rate := public.idle_rate_at(s, v_a);
+    v_p := v_a;
+    for v_q in
+      select x from (select b as x from unnest(s.boost_ate) b where b > v_a and b < v_b
+                     union select v - v_dur from unnest(s.viral_ate) v
+                            where v - v_dur > v_a and v - v_dur < v_b
+                     union select v from unnest(s.viral_ate) v where v > v_a and v < v_b
+                     union select s.marmita_ate where s.marmita_ate > v_a and s.marmita_ate < v_b
+                     union select s.linkedin_ate where s.linkedin_ate > v_a and s.linkedin_ate < v_b
+                     union select s.combo_ate where s.combo_ate > v_a and s.combo_ate < v_b
+                     union select s.silver_ate where s.silver_ate > v_a and s.silver_ate < v_b
+                     union select v_b) y
+       order by x
+    loop
+      v_meio := v_p + (v_q - v_p) / 2;
+      v_k := (select count(*) from unnest(s.viral_ate) v where v - v_dur <= v_meio and v > v_meio);
+      -- os ×5 da oportunidade no ar SOMAM (dois = ×10, três = ×15) e o total multiplica com os Viralizou (×10 cada, sem
+      -- teto): dois ×5 com dois Viralizou = ×1.000. Todo ×5 começou antes de settled_at (pegar fecha a conta antes), então
+      -- só o fim importa.
+      v_kb := (select count(*) from unnest(s.boost_ate) b where b > v_meio);
+      -- a Marmita da mãe (×3, 0074) multiplica por cima; começou antes de settled_at (pegar fecha a conta), só o fim importa
+      v_mult := (case when v_kb > 0 then 5 * v_kb else 1 end) * 10 ^ v_k
+                * (case when s.marmita_ate > v_meio then 3 else 1 end)
+                -- LinkedIn e Combo (0076): começaram antes de settled_at (pegar fecha a conta), só o fim importa
+                * (case when s.linkedin_ate > v_meio then coalesce(s.linkedin_mult, 1) else 1 end)
+                * (case when s.combo_ate > v_meio then 7 else 1 end)
+                -- Silver tape do Houston (0078): começou antes de settled_at (pegar fecha a conta), só o fim importa
+                * (case when s.silver_ate > v_meio then 4 else 1 end);
+      s.valuation := s.valuation + v_rate * v_mult * extract(epoch from v_q - v_p);
+      v_p := v_q;
+    end loop;
+    v_a := v_b;
+  end loop;
+  s.settled_at := ts;
+  return s;
+end;
+$$;
+revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;
+
+-- ===== parte C: os eventos das eras 6 e 7 e as conquistas =====
+-- o evento do segundo s pra quem está na era `era` (a da 0074, agora de 1 a 7; acima de 7 conta como 7), ou null. O da
+-- era atual pesa 3, os antigos 1 (igual a eventoEraEm)
+create or replace function public.idle_evento_era(u uuid, s bigint, era int)
+returns int language plpgsql immutable set search_path = public as $$
+declare
+  p   constant numeric := 2147483647;
+  k   constant numeric := 1013904223;
+  h   numeric;
+  v_ate int := greatest(1, least(era, 7));
+  r   int;
+  e   int;
+begin
+  h := mod(s::numeric * s * 16807 + s::numeric * 69621 + public.idle_opp_seed(u)::numeric * 48271 + 4242, p);
+  h := mod(h * h + k, p);
+  if mod(h, 1800) <> 0 then
+    return null;
+  end if;
+  r := mod(mod(h * h + k, p), v_ate - 1 + 3)::int;
+  for e in 1 .. v_ate loop
+    r := r - case when e = v_ate then 3 else 1 end;
+    if r < 0 then
+      return e;
+    end if;
+  end loop;
+  return v_ate;
+end;
+$$;
+revoke all on function public.idle_evento_era(uuid, bigint, int) from public, anon, authenticated;
+
+-- pegar o evento de era (o da 0074) com as eras 6 e 7: Lixo espacial (10 min de produção por destroço desviado; a página
+-- manda quantos no fim, em p_gols, e o banco aceita 0 a 3) e "Houston, temos um problema" (Silver tape: produção ×4 por 2
+-- min; outro com um valendo soma 2 min no fim). p_tipo = o tipo que a página mostrou: vale se ele sai com a era de agora
+-- ou com a anterior (comprou o 1º gerador da era seguinte com o evento na tela); outro tipo é gone; sem p_tipo (página
+-- velha), o da era de agora. Devolve o estado + "evento": {tipo, premio, ganho, gols (no Lixo, os desvios)}.
+drop function if exists public.idle_evento_pegar(bigint, int);
+create or replace function public.idle_evento_pegar(p_seg bigint, p_gols int default 0, p_tipo int default null)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  v_me    uuid := auth.uid();
+  v_era   int;
+  v_tipo  int;
+  v_ini   timestamptz;
+  v_rate  double precision;
+  v_ganho double precision := 0;
+  v_premio int;
+  v_gols  int := 0;
+  v_chave text;
+  v_n     int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 60 then
+    raise exception 'idle_evento_gone' using errcode = 'P0001';
+  end if;
+  v_era := public.idle_era(s.generators);
+  v_tipo := public.idle_evento_era(v_me, p_seg, v_era);
+  if p_tipo is not null and p_tipo is distinct from v_tipo then
+    if v_era > 1 and p_tipo = public.idle_evento_era(v_me, p_seg, v_era - 1) then
+      v_tipo := p_tipo; -- a página mostrou com a era anterior
+    else
+      raise exception 'idle_evento_gone' using errcode = 'P0001';
+    end if;
+  end if;
+  v_ini := to_timestamp(p_seg);
+  -- na tela: 8 / 12 / 12 / 5 / 30 / 10 / 8 s (igual a JANELA_EVENTO_S); o banco aceita 3 s a mais (rede)
+  if v_tipo is null or now() < v_ini - interval '2 seconds'
+     or now() > v_ini + make_interval(secs => (array[8, 12, 12, 5, 30, 10, 8])[v_tipo] + 3) then
+    raise exception 'idle_evento_gone' using errcode = 'P0001';
+  end if;
+  delete from public.idle_eventos_pegos where user_id = v_me and pegou_em < now() - interval '1 hour';
+  insert into public.idle_eventos_pegos (user_id, seg) values (v_me, p_seg) on conflict do nothing;
+  if not found then
+    raise exception 'idle_evento_pego' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_rate := public.idle_rate(s);
+  case v_tipo
+    when 1 then -- Desce pra almoçar!: Marmita da mãe, ×3 por 3 min (outra soma no fim)
+      s.marmita_ate := greatest(coalesce(s.marmita_ate, now()), now()) + interval '3 minutes';
+    when 2 then -- Pacote da Shopee
+      v_premio := public.idle_evento_shopee(v_me, p_seg);
+      if v_premio = 0 then
+        v_ganho := v_rate * 3600 * 0.8; -- Taxa das blusinhas: −20%
+      elsif v_premio = 1 then
+        s.promo_ate := greatest(coalesce(s.promo_ate, now()), now() + interval '1 minute');
+      else
+        s.boost_ate := array(select b from unnest(s.boost_ate) b where b > now()) || (now() + interval '2 minutes');
+      end if;
+    when 3 then -- Reunião que podia ser um e-mail: o tempo que você ia perder
+      v_ganho := v_rate * 1800;
+    when 4 then -- Tela azul: Atualização instalada, melhorias −25% por 2 min
+      s.upg_desc_ate := greatest(coalesce(s.upg_desc_ate, now()), now()) + interval '2 minutes';
+    when 5 then -- Jogo do Brasil: 5 min de produção por gol, até 7
+      v_gols := least(greatest(coalesce(p_gols, 0), 0), 7);
+      v_ganho := v_rate * 300 * v_gols;
+    when 6 then -- Lixo espacial: 10 min de produção por destroço desviado, até 3
+      v_gols := least(greatest(coalesce(p_gols, 0), 0), 3);
+      v_ganho := v_rate * 600 * v_gols;
+    else -- Houston, temos um problema: Silver tape, produção ×4 por 2 min (outro com um valendo soma 2 min no fim)
+      s.silver_ate := greatest(coalesce(s.silver_ate, now()), now()) + interval '2 minutes';
+  end case;
+  s.valuation := s.valuation + v_ganho;
+  v_chave := (array['mae', 'shopee', 'call', 'tela', 'jogos', 'lixo', 'houston'])[v_tipo];
+  v_n := coalesce((s.eventos_era ->> v_chave)::int, 0) + 1;
+  s.eventos_era := coalesce(s.eventos_era, '{}'::jsonb) || jsonb_build_object(v_chave, v_n);
+  perform public.idle_ganhar(v_me, (array['evt_mae', 'evt_shopee', 'evt_call', 'evt_tela', 'evt_gols', 'evt_lixo', 'evt_houston'])[v_tipo],
+                             case when v_tipo in (5, 6) then v_gols else v_n end);
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('evento', jsonb_build_object(
+    'tipo', v_tipo, 'premio', v_premio, 'ganho', v_ganho, 'gols', v_gols));
+end;
+$$;
+revoke all on function public.idle_evento_pegar(bigint, int, int) from public, anon;
+grant execute on function public.idle_evento_pegar(bigint, int, int) to authenticated;
+
+-- conquistas de estado (a da 0074) com o monolito (1 de cada gerador da era 7) e o legado em "todas as melhorias da era" (0078)
+create or replace function public.idle_check_conquistas(p_user uuid)
+returns int[] language plpgsql volatile set search_path = public as $$
+declare
+  s       public.idle_state;
+  v_rate  double precision;
+  v_era   int;
+  v_novas int[];
+  n       int;
+begin
+  select * into s from public.idle_state where user_id = p_user;
+  if not found then
+    return '{}';
+  end if;
+  v_rate := public.idle_rate(s);
+  v_era := public.idle_era(s.generators);
+  n := cardinality(s.opp_recent);
+  with novas as (
+    insert into public.idle_conquistas (user_id, conquista_id)
+    select p_user, c.id
+      from public.idle_cat_conquista c
+     where case
+             when exists (select 1 from public.idle_conquistas x where x.user_id = p_user and x.conquista_id = c.id) then false
+             when c.tipo = 'gerador' then s.generators[c.alvo] >= c.valor
+             when c.tipo = 'fez_o_l' then s.generators[c.alvo] >= c.valor and s.valuation >= 13e9
+             when c.tipo = 'gerador_exato' then c.valor::int = any (s.generators)
+             when c.tipo = 'taxa' then v_rate >= c.valor
+             when c.tipo = 'era' then v_era >= c.valor
+             when c.tipo = 'melhoria' then c.alvo = any (s.upgrades)
+             when c.tipo = 'melhorias' then s.upg_total >= c.valor
+             when c.tipo = 'oportunidades' then s.opp_total >= c.valor
+             when c.tipo = 'vendas' then s.prestige_count >= c.valor
+             when c.tipo = 'contratei' then s.hire_total >= c.valor
+             when c.tipo = 'contratado' then s.hired_total >= c.valor
+             -- as 3 opções de alguma era (era com opção desligada não conta)
+             when c.tipo = 'estrategia_era' then exists (
+               select 1 from public.idle_cat_est e group by e.era
+               having count(*) = count(*) filter (where e.era * 10 + e.opcao = any (s.est_usadas)))
+             -- todas as ligadas
+             when c.tipo = 'estrategia_todas' then not exists (
+               select 1 from public.idle_cat_est e where e.ativa and not (e.era * 10 + e.opcao = any (s.est_usadas)))
+             -- 3 oportunidades em menos de c.valor segundos
+             when c.tipo = 'brainrot' then n >= 3 and s.opp_recent[n] - s.opp_recent[n - 2] < make_interval(secs => c.valor)
+             -- 1º no placar (F$/s), com mais alguém com empresa aberta e ninguém com mais
+             when c.tipo = 'aura' then s.started and v_rate > 0
+               and exists (select 1 from public.idle_state o where o.started and o.user_id <> p_user)
+               and not exists (select 1 from public.idle_state o
+                                where o.started and o.user_id <> p_user and public.idle_rate(o) >= v_rate)
+             -- horta (0048)
+             when c.tipo = 'horta_plantou' then s.horta_plantou >= c.valor
+             when c.tipo = 'horta_colheu' then s.horta_colheu >= c.valor
+             when c.tipo = 'horta_morreu' then s.horta_morreu >= c.valor
+             when c.tipo = 'horta_morango' then s.horta_morangos >= 1
+             when c.tipo = 'horta_colecao' then 2 + (select count(*) from public.idle_horta_descobertas d
+                                                       where d.user_id = p_user and d.especie not in (1, 2)) >= c.valor
+             -- convidados (0051)
+             when c.tipo = 'conv_vistos' then cardinality(s.conv_vistos) >= c.valor
+             when c.tipo = 'conv_fgc' then s.conv_fgc
+             when c.tipo = 'conv_kojima' then public.idle_conv_peso(s, 5) > 0 and public.idle_conv_desde(s, 5) <= now() - interval '24 hours'
+             when c.tipo = 'conv_derrubada' then public.idle_conv_derrubadas(s, now()) >= c.valor
+             when c.tipo = 'conv_toby' then public.idle_conv_peso(s, 10) > 0 and public.idle_conv_desde(s, 10) <= now() - interval '20 hours'
+             -- eras 1–5 (0074): 300 de cada gerador da era; todas as melhorias da era (as dos geradores dela + as gerais dela)
+             when c.tipo = 'era_300' then not exists (
+               select 1 from public.idle_cat_gen g where g.era = c.alvo and coalesce(s.generators[g.id], 0) < 300)
+             when c.tipo = 'era_melhorias' then not exists (
+               select 1 from public.idle_cat_upg u left join public.idle_cat_gen g on g.id = u.gerador
+                where ((u.tipo = 'gerador' and g.era = c.alvo) or (u.tipo in ('geral', 'legado') and u.requer_era = c.alvo))
+                  and not (u.id = any (s.upgrades)))
+             -- eras 6–7 (0078): o monolito aparece com 1 de cada gerador da era 7
+             when c.tipo = 'monolito' then not exists (
+               select 1 from public.idle_cat_gen g where g.era = 7 and coalesce(s.generators[g.id], 0) < 1)
+             else false
+           end
+    on conflict do nothing
+    returning conquista_id
+  )
+  select coalesce(array_agg(conquista_id order by conquista_id), '{}') into v_novas from novas;
+  return v_novas;
+end;
+$$;
+revoke all on function public.idle_check_conquistas(uuid) from public, anon, authenticated;

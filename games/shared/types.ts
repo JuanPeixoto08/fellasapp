@@ -128,6 +128,8 @@ export type IdleState = {
   marmita_ate?: string | null;
   /** Atualização instalada (evento de era 4): melhorias 25% mais baratas até aqui. */
   upg_desc_ate?: string | null;
+  /** Silver tape do Houston (evento de era 7): produção ×4 até aqui. Ausente/null = sem (0078). */
+  silver_ate?: string | null;
   /** Quantas vezes pegou cada evento de era ({"mae": 3, "shopee": 1, ...}); não zera na venda. */
   eventos_era?: Record<string, number>;
   /** Só na resposta de idle_evento_pegar: o que saiu. */

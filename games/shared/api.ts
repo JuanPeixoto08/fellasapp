@@ -65,7 +65,7 @@ export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportun
 export const idleDouradoPegar = (seg: number, lado: number, moedas = 0) =>
   rpc<IdleState>('idle_dourado_pegar', moedas > 0 ? { p_seg: seg, p_lado: lado, p_moedas: moedas } : { p_seg: seg, p_lado: lado }); // sem p_moedas quando é 0: banco velho (sem o parâmetro) ainda atende
 export const idleDouradoChamar = () => rpc<IdleState>('idle_dourado_chamar');
-export const idleEventoPegar = (seg: number, gols: number) => rpc<IdleState>('idle_evento_pegar', { p_seg: seg, p_gols: gols });
+export const idleEventoPegar = (seg: number, gols: number, tipo?: number) => rpc<IdleState>('idle_evento_pegar', { p_seg: seg, p_gols: gols, p_tipo: tipo ?? null });
 type ComHorta = IdleState & { horta: HortaEstado; descobriu?: number | null };
 export const idleHorta = () => rpc<HortaEstado>('idle_horta');
 export const idleHortaPlantar = (canteiro: number, especie: number) => rpc<ComHorta>('idle_horta_plantar', { p_canteiro: canteiro, p_especie: especie });

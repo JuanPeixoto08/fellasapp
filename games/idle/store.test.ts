@@ -108,6 +108,10 @@ describe('vencimento de contrato', () => {
 });
 
 describe('fatoresTempo (0076)', () => {
+  it('Silver tape do Houston: ×4 até o fim (0078)', () => {
+    expect(fatoresTempo({ silver_ate: '2026-10-15T12:02:00Z' } as IdleState)).toEqual([{ ateMs: Date.parse('2026-10-15T12:02:00Z'), mult: 4 }]);
+    expect(fatoresTempo({ silver_ate: null } as IdleState)).toEqual([]);
+  });
   it('LinkedIn com o mult do banco e Combo ×7; ausentes (página nova, banco velho) não contam', () => {
     const s = { linkedin_ate: '2026-10-15T12:01:00Z', linkedin_mult: 4.5, combo_ate: '2026-10-15T12:00:30Z' } as IdleState;
     expect(fatoresTempo(s)).toEqual([
