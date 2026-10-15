@@ -41,6 +41,17 @@ describe('efeitos', () => {
     expect(pode('compra', 30)).toBe(true);
     expect(pode('clique', 60)).toBe(true);
   });
+  it('clique, abrir e fechar são um "toc" com nota, sem chiado de ruído (o chiado parecia choque)', () => {
+    for (const id of ['clique', 'abrir', 'fechar'] as const) {
+      const { c, dura } = tocar(id);
+      expect(c.osciladores().every((o) => o.buffer === null), id).toBe(true);
+      expect(dura, id).toBeLessThanOrEqual(0.15);
+      const picos = c.ganhos().flatMap((g) => g.gain.eventos.map((e) => e[1]));
+      expect(Math.max(...picos), id).toBeLessThanOrEqual(0.12);
+    }
+    const f = tocar('clique').c.osciladores()[0].frequency.eventos;
+    expect(f[f.length - 1][1]).toBeLessThan(f[0][1]); // cai: "toc", não "pi"
+  });
   it('momentos grandes', () => {
     expect([...GRANDES].sort()).toEqual(['cnpj', 'conquista', 'douradoPego', 'era', 'venda']);
   });

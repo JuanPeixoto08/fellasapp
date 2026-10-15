@@ -20,7 +20,23 @@ const FA6_PIANO = [57, 60, 62]; // Lá, Dó, Ré
 function acorde(ctx: BaseAudioContext, d: AudioNode, t: number, notas: number[], dur: number, forca: number, toque = metais) {
   for (const n of notas) toque(ctx, d, t, n, dur, forca);
 }
-/** Ruído curto filtrado: clique (passa-alta) ou "fuu" (passa-banda que corre de `de` até `ate`). */
+/** "Toc" de botão: uma nota senoidal curta que escorrega de `de` até `ate` Hz, ataque de 3 ms e queda rápida. Sem ruído:
+ *  o chiado de antes (ruído passa-alta) soava como choque (o Juan, 15/10). */
+function toc(ctx: BaseAudioContext, d: AudioNode, t: number, de: number, ate: number, dura: number, pico: number) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(pico, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dura);
+  g.connect(d);
+  const o = ctx.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(de, t);
+  o.frequency.exponentialRampToValueAtTime(ate, t + dura);
+  o.connect(g);
+  o.start(t);
+  o.stop(t + dura + 0.02);
+}
+/** Ruído curto filtrado: "fuu" (passa-banda que corre de `de` até `ate`) ou chiado (passa-baixa/alta). */
 function ruidoFiltrado(ctx: BaseAudioContext, d: AudioNode, t: number, tipo: BiquadFilterType, de: number, ate: number, dura: number, pico: number) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
@@ -139,17 +155,19 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     o.stop(t + 0.16);
     return 0.3;
   },
-  clique: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'highpass', 2500, 2500, 0.03, 0.07);
-    return 0.05;
+  clique: (c, d, t) => { // toc de madeira: grave, curtinho e baixo
+    toc(c, d, t, 900, 450, 0.05, 0.09);
+    return 0.06;
   },
-  abrir: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'bandpass', 600, 2400, 0.18, 0.08);
-    return 0.2;
+  abrir: (c, d, t) => { // duas notinhas subindo (Dó → Fá)
+    toc(c, d, t, 523, 500, 0.06, 0.07);
+    toc(c, d, t + 0.05, 698, 670, 0.07, 0.07);
+    return 0.13;
   },
-  fechar: (c, d, t) => {
-    ruidoFiltrado(c, d, t, 'bandpass', 2400, 600, 0.18, 0.08);
-    return 0.2;
+  fechar: (c, d, t) => { // as mesmas descendo (Fá → Dó)
+    toc(c, d, t, 698, 670, 0.06, 0.07);
+    toc(c, d, t + 0.05, 523, 500, 0.07, 0.07);
+    return 0.13;
   },
   dourado: (c, d, t) => {
     [77, 81, 84, 89, 93, 96].forEach((m, i) => sininho(c, d, t + i * 0.07, m, 0.2, 0.75));
