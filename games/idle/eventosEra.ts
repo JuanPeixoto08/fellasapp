@@ -48,3 +48,12 @@ export function posicaoEvento(uid: string, s: number, i = 0): { x: number; y: nu
   const h = Number(mistura(mistura(h2(uid, s) + BigInt(i * 7919 + 1))));
   return { x: 0.1 + ((h % 1000) / 1000) * 0.7, y: 0.18 + ((Math.floor(h / 1000) % 1000) / 1000) * 0.6 };
 }
+
+// ---------- o que está valendo ----------
+export const MARMITA_MULT = 3;
+export const DESCONTO_MELHORIA = 0.75;
+const vale = (iso: string | null | undefined, agoraMs: number) => !!iso && Date.parse(iso) > agoraMs;
+/** Marmita da mãe valendo (produção ×3). */
+export const marmitaAtiva = (s: { marmita_ate?: string | null }, agoraMs: number) => vale(s.marmita_ate, agoraMs);
+/** Atualização instalada valendo (melhorias −25%). */
+export const descontoAtivo = (s: { upg_desc_ate?: string | null }, agoraMs: number) => vale(s.upg_desc_ate, agoraMs);

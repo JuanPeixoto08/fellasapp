@@ -25,7 +25,9 @@ export function valuationAgora(a: Ancora, clienteMs: number): number {
   // os ×5 no ar (0062: cada um conta); a resposta de antes da 0062 só tem o boost_until
   const boost = a.estado.boosts ? a.estado.boosts.map(Date.parse) : a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
   const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
-  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais, VIRAL_MS * efeitos(a.estado).douradoDuracao);
+  const marmita = a.estado.marmita_ate ? Date.parse(a.estado.marmita_ate) : null; // Marmita da mãe: ×3 (0074)
+  return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais,
+    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita);
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {

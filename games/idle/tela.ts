@@ -26,6 +26,7 @@ import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
 import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
+import { DESCONTO_MELHORIA, descontoAtivo } from './eventosEra';
 import { ganhoInvestidor, promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
@@ -443,7 +444,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const custoAgora = (s: IdleState) => custoMult(catalogo, s) * (promoAtiva(s, agoraTela) ? 0.5 : 1);
   // a horta: geradores e melhorias mais baratos (o banco aplica igual)
   const custoGerador = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.geradores ?? 0)) * custosConv(s).geradores;
-  const custoMelhoria = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.melhorias ?? 0)) * custosConv(s).melhorias;
+  const custoMelhoria = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.melhorias ?? 0)) * custosConv(s).melhorias
+    * (descontoAtivo(s, agoraTela) ? DESCONTO_MELHORIA : 1); // Atualização instalada (o banco aplica igual)
   const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
 
   function linhaGerador(s: IdleState, gid: number) {

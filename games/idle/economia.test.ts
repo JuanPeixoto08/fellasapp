@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogo as cat } from './catalogo';
 import {
   abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
-  pontosTotais, precoContrato, preco, taxa, taxaPorUnidade, type Estado,
+  pontosTotais, precoContrato, preco, produzido, taxa, taxaPorUnidade, type Estado, VIRAL_MS,
 } from './economia';
 
 const vazio = (): Estado => ({ generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1] });
@@ -242,5 +242,20 @@ describe('árvore de habilidades e conquistas', () => {
       expect(pontosTotais(n ** 3 * 1e6)).toBe(n);
       expect(pontosTotais(n ** 3 * 1e6 * (1 - 1e-12))).toBe(n - 1);
     }
+  });
+});
+
+describe('Marmita da mãe (×3) no produzido', () => {
+  it('×3 até o fim da marmita, multiplicando com ×5 e Viralizou', () => {
+    // r = 1/s, de 0 a 100 s, marmita até 40 s: 40·3 + 60 = 180
+    expect(produzido(1, 0, 100_000, null, [], VIRAL_MS, 40_000)).toBeCloseTo(180, 6);
+    // com um ×5 até 20 s: 20·15 + 20·3 + 60 = 420
+    expect(produzido(1, 0, 100_000, [20_000], [], VIRAL_MS, 40_000)).toBeCloseTo(420, 6);
+    // com um Viralizou de 0 a 60 s (fim 60 s): 40·30 + 20·10 + 40 = 1440
+    expect(produzido(1, 0, 100_000, null, [60_000], VIRAL_MS, 40_000)).toBeCloseTo(1440, 6);
+  });
+  it('sem marmita (null ou já passou) é a conta de antes', () => {
+    expect(produzido(2, 0, 10_000, null, [], VIRAL_MS, null)).toBeCloseTo(20, 6);
+    expect(produzido(2, 50_000, 60_000, null, [], VIRAL_MS, 40_000)).toBeCloseTo(20, 6);
   });
 });

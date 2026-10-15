@@ -227,16 +227,18 @@ const listaBoosts = (b: Boosts): readonly number[] => (b === null ? [] : typeof 
 /**
  * r × Σ(multiplicador × tempo) entre `a` e `b` (ms): os ×5 das oportunidades no ar SOMAM entre si (dois = ×10, três =
  * ×15) e o total multiplica com os Viralizou (×10 cada, dois = ×100), sem teto (dois ×5 com dois Viralizou = ×1.000);
- * divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0064. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
+ * divide nos pontos em que um começa ou acaba. Igual a idle_settle na 0074. Os ×5 começaram antes de `a` (pegar fecha a conta), então só o fim de cada um importa.
  */
 export function produzido(
   r: number, a: number, b: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
+  marmitaAteMs: number | null = null,
 ): number {
   if (b <= a) return 0;
   const boosts = listaBoosts(boostAteMs);
   const pontos = [a, b];
   for (const f of boosts) if (f > a && f < b) pontos.push(f);
   for (const f of virais) for (const x of [f - viralMs, f]) if (x > a && x < b) pontos.push(x);
+  if (marmitaAteMs !== null && marmitaAteMs > a && marmitaAteMs < b) pontos.push(marmitaAteMs);
   pontos.sort((x, y) => x - y);
   let total = 0;
   for (let i = 0; i + 1 < pontos.length; i++) {
@@ -246,7 +248,9 @@ export function produzido(
     const meio = (p + q) / 2;
     const k = virais.filter((f) => f - viralMs <= meio && f > meio).length;
     const kb = boosts.filter((f) => f > meio).length;
-    const m = (kb ? 5 * kb : 1) * 10 ** k; // ×5 somam (×10, ×15); Viralizou multiplica (×100, ×1000); ×5 e ×10 = ×50
+    // ×5 somam (×10, ×15); Viralizou multiplica (×100, ×1000); a Marmita (×3) multiplica por cima. A marmita começou
+    // antes de `a` (pegar fecha a conta), então só o fim importa.
+    const m = (kb ? 5 * kb : 1) * 10 ** k * (marmitaAteMs !== null && marmitaAteMs > meio ? 3 : 1);
     total += (r * m * (q - p)) / 1000;
   }
   return total;
@@ -256,8 +260,9 @@ export function produzido(
  *  do bônus que vai até `boostAteMs`; ×10 por Viralizou ativo (`virais` = os fins, cada um dura `viralMs`). */
 export function acumular(
   v: number, r: number, desdeMs: number, ateMs: number, boostAteMs: Boosts, virais: readonly number[] = [], viralMs = VIRAL_MS,
+  marmitaAteMs: number | null = null,
 ): number {
-  return v + produzido(r, desdeMs, Math.max(ateMs, desdeMs), boostAteMs, virais, viralMs);
+  return v + produzido(r, desdeMs, Math.max(ateMs, desdeMs), boostAteMs, virais, viralMs, marmitaAteMs);
 }
 
 /**
@@ -266,12 +271,12 @@ export function acumular(
  */
 export function acumularTrechos(
   v: number, trechos: { desdeMs: number; r: number }[], desdeMs: number, ateMs: number, boostAteMs: Boosts,
-  virais: readonly number[] = [], viralMs = VIRAL_MS,
+  virais: readonly number[] = [], viralMs = VIRAL_MS, marmitaAteMs: number | null = null,
 ): number {
   for (let i = 0; i < trechos.length; i++) {
     const a = Math.max(trechos[i].desdeMs, desdeMs);
     const b = Math.min(i + 1 < trechos.length ? trechos[i + 1].desdeMs : ateMs, ateMs);
-    v += produzido(trechos[i].r, a, b, boostAteMs, virais, viralMs);
+    v += produzido(trechos[i].r, a, b, boostAteMs, virais, viralMs, marmitaAteMs);
   }
   return v;
 }

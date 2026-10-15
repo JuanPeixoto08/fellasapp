@@ -8,6 +8,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, Lug
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
+import { descontoAtivo } from './eventosEra';
 import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
@@ -86,6 +87,7 @@ function voltouDoFundo() {
   audio.cancelarAgendados();
 }
 let promoValia = false;
+let descValia = false;
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
@@ -688,6 +690,11 @@ setInterval(() => {
   const promo = promoAtiva(ancora.estado, agoraMs);
   if (promo !== promoValia) {
     promoValia = promo;
+    render();
+  }
+  const desc = descontoAtivo(ancora.estado, agoraMs);
+  if (desc !== descValia) {
+    descValia = desc;
     render();
   }
   if (bolsaAberta && bolsa) tela.relogioBolsa(faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()));

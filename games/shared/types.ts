@@ -124,6 +124,14 @@ export type IdleState = {
   boosts?: string[]; meias?: number;
   /** Eventos na tela (0045): fim da Promoção relâmpago (null = não está valendo) e os fins dos Viralizou ativos. */
   promo_ate: string | null; viral: string[];
+  /** Marmita da mãe (evento de era 1): produção ×3 até aqui. Ausente/null = sem (0074). */
+  marmita_ate?: string | null;
+  /** Atualização instalada (evento de era 4): melhorias 25% mais baratas até aqui. */
+  upg_desc_ate?: string | null;
+  /** Quantas vezes pegou cada evento de era ({"mae": 3, "shopee": 1, ...}); não zera na venda. */
+  eventos_era?: Record<string, number>;
+  /** Só na resposta de idle_evento_pegar: o que saiu. */
+  evento?: EventoPago;
   /** Bônus da horta agora (0048); a página aplica nos preços. */
   horta_bonus?: BonusHorta;
   /** Mapa do rolê (0066): o multiplicador dos lugares (marcos e estratégias) que já está na taxa; a página multiplica o "cada". */
@@ -222,3 +230,5 @@ export type LugarEstado = {
   /** Só na resposta do idle_lugar: o depois mexeu na empresa (desafio, conquista) e a tela busca o estado dela de novo. */
   estado_mudou?: boolean;
 };
+
+export type EventoPago = { tipo: number; premio: number | null; ganho: number; gols: number };
