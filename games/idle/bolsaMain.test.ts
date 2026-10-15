@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
+import { buscarBolsaAgora, faltaVirar, gavetasParaRecarregar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 
 describe('o main e a Bolsa', () => {
   it('busca de novo logo depois da virada do minuto', () => {
@@ -17,6 +17,11 @@ describe('o main e a Bolsa', () => {
     expect(buscarBolsaAgora(true, true, true)).toBe(false); // já tem busca marcada ou no caminho
     expect(buscarBolsaAgora(true, false, false)).toBe(false); // sem trader não busca
     expect(buscarBolsaAgora(false, true, false)).toBe(false); // gaveta fechada
+  });
+  it('pegou uma oportunidade: só as gavetas abertas buscam de novo (Adubo na Horta, Informação na Bolsa)', () => {
+    expect(gavetasParaRecarregar(true, false)).toEqual(['horta']);
+    expect(gavetasParaRecarregar(false, true)).toEqual(['bolsa']);
+    expect(gavetasParaRecarregar(false, false)).toEqual([]);
   });
   it('recusas que pedem o mercado de novo', () => {
     expect(RECARREGA_BOLSA).toContain('idle_bolsa_preco_mudou');

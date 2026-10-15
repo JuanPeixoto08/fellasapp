@@ -705,6 +705,9 @@ begin
         v_ganho := v_rate * 1800;
       else
         v_gseg := public.idle_dourado_pix_seg(v_me, p_seg);
+        while exists (select 1 from jsonb_array_elements(coalesce(s.garantidos, '[]'::jsonb)) g where (g ->> 'seg')::bigint = v_gseg) loop
+          v_gseg := v_gseg + 1; -- já tem um garantido nesse segundo (Chamar, outro Pix): vai pro próximo livre
+        end loop;
         s.garantidos := coalesce(s.garantidos, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
           'seg', v_gseg, 'tipo', public.idle_dourado_tipo_garantido(v_me, v_gseg), 'dobro', true));
         s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'pix_dev', 1);

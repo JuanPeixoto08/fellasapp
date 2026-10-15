@@ -150,7 +150,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   const virais = s.viral.filter((t) => { const f = Date.parse(t); return f > agoraMs && f - vMs <= agoraMs; }).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   if (marmitaAtiva(s, agoraMs)) linhas.push({ texto: 'Agora: ×3 da Marmita da mãe', tom: 'bom' });
-  if (s.linkedin_ate && Date.parse(s.linkedin_ate) > agoraMs) linhas.push({ texto: `Agora: ×${num(s.linkedin_mult ?? 1)} do LinkedIn`, tom: 'bom' });
+  if (s.linkedin_ate && s.linkedin_gen && (s.linkedin_mult ?? 1) > 1 && Date.parse(s.linkedin_ate) > agoraMs) linhas.push({ texto: `Agora: ×${num(s.linkedin_mult ?? 1)} do LinkedIn`, tom: 'bom' });
   if (s.combo_ate && Date.parse(s.combo_ate) > agoraMs) linhas.push({ texto: `Agora: ×${COMBO_MULT} do Combo`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
   return { titulo: 'De onde vem sua produção', linhas };

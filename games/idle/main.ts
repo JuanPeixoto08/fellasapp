@@ -14,7 +14,7 @@ import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from
 import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, resultadoTigre, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
 import { VIRAL_MS } from './economia';
 import { eventoEm, eventosEntre, naCena } from './convidados';
-import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
+import { buscarBolsaAgora, faltaVirar, gavetasParaRecarregar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { MARCOS } from './mapa';
 import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
 import { temNovidade } from './novidades';
@@ -243,6 +243,7 @@ const tela = criarTela(document.getElementById('app')!, {
   pegar: (w) => void guard(async () => {
     aplicar(await api.idleClaim(w));
     audio.tocar('pegar');
+    for (const g of gavetasParaRecarregar(hortaAberta, bolsaAberta)) void (g === 'horta' ? carregarHorta() : carregarBolsa()); // Adubo e Informação mexem no que a gaveta aberta mostra
   }),
   trocarAba: (nova) => {
     aba = nova;
@@ -270,7 +271,10 @@ const tela = criarTela(document.getElementById('app')!, {
   // fora do guard: pegar não espera outra compra terminar (o evento some em 12 s)
   pegarDourado: (seg, lado, moedas = 0) => void (async () => {
     const s0 = ancora?.estado;
-    if (!s0 || !mostrados.has(seg)) return;
+    if (!s0 || !mostrados.has(seg)) {
+      tela.dourados.pararTigre(seg, null); // o rolo do Tigrinho, se girava, sai
+      return;
+    }
     const p = posicao(s0.user_id, seg, lado);
     try {
       const s = await api.idleDouradoPegar(seg, lado, moedas);

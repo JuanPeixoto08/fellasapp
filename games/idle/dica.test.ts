@@ -307,10 +307,19 @@ describe('cashback e os bônus novos nas caixinhas (0076)', () => {
   it('a produção mostra o LinkedIn e o Combo valendo; o Viralizou que ainda não começou não conta', () => {
     const agora = Date.parse('2026-10-12T12:00:00.000Z');
     const em = (s: number) => new Date(agora + s * 1000).toISOString();
-    const t = textos(dicaProducao(comTaxa({ generators: gens({ 1: 10 }), linkedin_ate: em(30), linkedin_mult: 4.5, combo_ate: em(20), viral: [em(30), em(90)] }), agora));
+    const t = textos(dicaProducao(comTaxa({ generators: gens({ 1: 10 }), linkedin_ate: em(30), linkedin_gen: 3, linkedin_mult: 4.5, combo_ate: em(20), viral: [em(30), em(90)] }), agora));
     expect(t).toContain('Agora: ×4,5 do LinkedIn');
     expect(t).toContain('Agora: ×7 do Combo');
     expect(t).toContain('Agora: ×10 do Viralizou');
+  });
+});
+
+describe('a produção e o LinkedIn sem gerador', () => {
+  it('sem gerador sorteado ou com ×1, a linha do LinkedIn não aparece', () => {
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const ate = new Date(agora + 30_000).toISOString();
+    const t = textos(dicaProducao(comTaxa({ generators: gens({ 1: 10 }), linkedin_ate: ate, linkedin_gen: null, linkedin_mult: 1 }), agora));
+    expect(t.some((x) => x.includes('LinkedIn'))).toBe(false);
   });
 });
 

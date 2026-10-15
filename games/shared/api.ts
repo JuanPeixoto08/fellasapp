@@ -63,7 +63,7 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
 export const idlePickStrategy = (era: number, opcao: number) => rpc<IdleState>('idle_pick_strategy', { p_era: era, p_opcao: opcao });
 export const idleClaim = (window: number) => rpc<IdleState>('idle_claim_opportunity', { p_window: window });
 export const idleDouradoPegar = (seg: number, lado: number, moedas = 0) =>
-  rpc<IdleState>('idle_dourado_pegar', { p_seg: seg, p_lado: lado, p_moedas: moedas });
+  rpc<IdleState>('idle_dourado_pegar', moedas > 0 ? { p_seg: seg, p_lado: lado, p_moedas: moedas } : { p_seg: seg, p_lado: lado }); // sem p_moedas quando é 0: banco velho (sem o parâmetro) ainda atende
 export const idleDouradoChamar = () => rpc<IdleState>('idle_dourado_chamar');
 export const idleEventoPegar = (seg: number, gols: number) => rpc<IdleState>('idle_evento_pegar', { p_seg: seg, p_gols: gols });
 type ComHorta = IdleState & { horta: HortaEstado; descobriu?: number | null };

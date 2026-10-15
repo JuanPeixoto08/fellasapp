@@ -345,6 +345,15 @@ describe('pegar os dourados novos (0076, parte C)', () => {
     expect(d.dourado).toMatchObject({ tipo: 6, lado: 1, garantido_seg: seg + 56 });
     await expect(pegar(seg - 1, 0)).rejects.toThrow(/idle_dourado_pego/);
   });
+  it('Pix devolvido que cairia num segundo que já tem garantido vai pro próximo livre (pegar um não leva o outro)', async () => {
+    const seg = await agoraSeg();
+    await dourado(seg - 1, 6);
+    await sorteio(seg - 1, 6161, 37);
+    await garantir(seg + 56, 0, false);
+    const d = await pegar(seg - 1, 1);
+    expect(d.garantidos!.map((g) => g.seg)).toEqual([seg + 56, seg + 57]);
+    expect(d.dourado).toMatchObject({ garantido_seg: seg + 57 });
+  });
   it('garantido em dobro: Investidor 2×, Viralizou em dois fins, Promoção 1 min, LinkedIn 2 min, Trend 2 min por moedinha; sai da lista', async () => {
     const seg = await agoraSeg();
     const r = await taxa();
