@@ -4,6 +4,17 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-14-eras-1-5',
+    titulo: 'As eras 1 a 5 ganharam vida',
+    data: '2026-10-14',
+    itens: [
+      'Cada gerador ganhou mais 3 melhorias, com 150, 200 e 300 unidades. Cada uma dobra o gerador.',
+      'Eventos de era: de vez em quando a sua era apronta alguma. A mãe chama pro almoço, chega pacote da Shopee, cai uma reunião que podia ser um e-mail, o PC dá tela azul e tem Jogo do Brasil. O de cada era aparece quando você chega nela e continua depois.',
+      'Marmita da mãe: produção ×3 por 3 minutos. Atualização instalada: melhorias 25% mais baratas por 2 minutos.',
+      '15 conquistas novas: dos eventos, de ter 300 de cada gerador da era e de comprar todas as melhorias da era.',
+    ],
+  },
+  {
     id: '2026-10-14-copao-uma-prova',
     titulo: 'Copão: uma prova por vez',
     data: '2026-10-14',
