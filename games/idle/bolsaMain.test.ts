@@ -21,5 +21,6 @@ describe('o main e a Bolsa', () => {
   it('recusas que pedem o mercado de novo', () => {
     expect(RECARREGA_BOLSA).toContain('idle_bolsa_preco_mudou');
     expect(RECARREGA_BOLSA).toContain('idle_bolsa_rj');
+    expect(RECARREGA_BOLSA).toContain('idle_info_ja');
   });
 });

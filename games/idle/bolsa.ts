@@ -80,4 +80,4 @@ export const faltaVirar = (viraEmMs: number, buscadoEm: number, agora: number) =
 /** Depois de uma resposta do jogo: buscar o mercado já? (gaveta aberta, com trader, e nenhuma busca marcada nem no caminho) */
 export const buscarBolsaAgora = (aberta: boolean, trader: boolean, agendada: boolean) => aberta && trader && !agendada;
 /** Recusas da Bolsa que querem o mercado (e a carteira) de novo. */
-export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada', 'idle_bolsa_nivel'];
+export const RECARREGA_BOLSA = ['idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_sem_acoes', 'idle_bolsa_fechada', 'idle_bolsa_nivel', 'idle_info_sem_credito', 'idle_info_ja'];

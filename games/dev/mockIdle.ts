@@ -74,6 +74,7 @@ export const idleBuyNode = (no: number) => call<IdleState>('select public.idle_b
 export const idleBolsa = () => call<BolsaEstado>('select public.idle_bolsa() as v');
 export const idleBolsaNegociar = (empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote = 1) =>
   call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_negociar($1, $2, $3, $4, $5) as v', [empresa, lado, qtd, tick, lote]);
+export const idleBolsaEspiar = (empresa: number) => call<IdleState & { bolsa: BolsaEstado }>('select public.idle_bolsa_espiar($1) as v', [empresa]);
 export const idleConvSentar = (cadeira: number, convidado: number) =>
   call<IdleState & { mesma_pessoa?: boolean }>('select public.idle_conv_sentar($1, $2) as v', [cadeira, convidado]);
 export const idleConvTirar = (cadeira: number) => call<IdleState>('select public.idle_conv_tirar($1) as v', [cadeira]);

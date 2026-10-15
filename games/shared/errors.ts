@@ -43,6 +43,7 @@ export type GameErrorCode =
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
   | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
   | 'idle_bolsa_preco_mudou' | 'idle_bolsa_rj' | 'idle_bolsa_limite' | 'idle_bolsa_fechada' | 'idle_bolsa_sem_acoes' | 'idle_bolsa_nivel'
+  | 'idle_info_sem_credito' | 'idle_info_ja'
   | 'unknown';
 
 export const ERROR_TEXT: Record<GameErrorCode, string> = {
@@ -120,6 +121,8 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_bolsa_limite: 'Chegou no limite de ações dessa empresa',
   idle_bolsa_fechada: 'Compra 1 Grupo de trader pra abrir a Bolsa',
   idle_bolsa_sem_acoes: 'Você não tem ações dessa empresa',
+  idle_info_sem_credito: 'Sem Informação privilegiada. Ela vem na Caixinha',
+  idle_info_ja: 'Você já está de olho nessa empresa',
   unknown: 'Deu ruim aqui. Tenta de novo.',
 };
 
@@ -173,6 +176,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
   'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
   'idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_fechada', 'idle_bolsa_sem_acoes', 'idle_bolsa_nivel',
+  'idle_info_sem_credito', 'idle_info_ja',
 ];
 
 export function toGameError(e: unknown): GameError {

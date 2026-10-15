@@ -2,15 +2,15 @@
 // a Caixinha e a Bolsa.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { catalogo } from '../idle/catalogo';
 import { derrubada } from '../idle/convidados';
 import { escolhaLinkedin, segundoPix, sorteioDourado, tigrePaga, tipoDourado, tipoGarantido } from '../idle/dourados';
 import { produzido, rendasGeradores, VIRAL_MS } from '../idle/economia';
-import { OPP_CORTE, tipo } from '../idle/oportunidades';
-import { freshDb, type TestDb } from './db';
+import { OPP_CORTE, pendentes, tipo } from '../idle/oportunidades';
+import { freshDb, quartaATarde, type TestDb } from './db';
 
 const A = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 const B = '098d04dc-bba1-433a-9ef8-0e9dd863e4ed';
@@ -537,5 +537,186 @@ describe('conquistas dos dourados (132–135, 138)', () => {
     expect(await tem(138)).toBe(true);
     await vez(seg - 6, 7, 0, undefined, 99); // perde: a 10ª derrota
     expect(await tem(134)).toBe(true);
+  });
+});
+
+describe('as oportunidades novas (0076, parte D)', () => {
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // numa quarta à tarde: a caixinha sempre tem guardadas
+    vi.setSystemTime(quartaATarde());
+    // o tipo de toda janela vem de teste_opp (o que o teste forçar)
+    await t.db.exec(`
+      create table public.teste_opp (k int);
+      create or replace function public.idle_opp_kind(u uuid, w bigint) returns int language sql stable as
+        'select coalesce((select k from public.teste_opp limit 1), 0)';`);
+    await abrir();
+  });
+  afterEach(() => vi.useRealTimers());
+  /** Pega a próxima guardada como o tipo k (zera as já pegas, pra sempre ter uma). */
+  const pegarOpp = async (k: number) => {
+    await q('delete from public.teste_opp where true');
+    await q('insert into public.teste_opp values ($1)', [k]);
+    await q(`update public.idle_state set opp_claimed = '{}', opp_count = 0 where user_id = $1`, [A]);
+    const s = await t.rpc<J>('idle_open');
+    const [w] = pendentes(A, Date.parse(s.server_now), [], Date.parse(s.week_start + 'T00:00:00-03:00'));
+    return t.rpc<J>('idle_claim_opportunity', { p_window: w });
+  };
+  const xepa = async () => {
+    const [{ id }] = await q<{ id: number }>(`select id from public.idle_cat_no where tipo = 'opp_bonus'`);
+    await q('insert into public.idle_arvore (user_id, no_id) values ($1, $2)', [A, id]);
+  };
+
+  it('Chamar: guarda 1 (2 com a Xepa), no máximo 3 (o que passa se perde)', async () => {
+    expect((await pegarOpp(3)).chamados).toBe(1);
+    await xepa();
+    expect((await pegarOpp(3)).chamados).toBe(3);
+    expect((await pegarOpp(3)).chamados).toBe(3);
+  });
+  it('Cupom: +10 (+20 com a Xepa) e conta 1 pega', async () => {
+    let s = await pegarOpp(4);
+    expect(s.cupons).toBe(10);
+    expect(s.dourados_cont.cupons).toBe(1);
+    await xepa();
+    s = await pegarOpp(4);
+    expect(s.cupons).toBe(30);
+    expect(s.dourados_cont.cupons).toBe(2);
+  });
+  it('Cashback: 2 min (4 com a Xepa), soma no fim do que já tem', async () => {
+    let s = await pegarOpp(6);
+    expect(Date.parse(s.cashback_ate!) - Date.parse(s.server_now)).toBeCloseTo(120_000, -3);
+    s = await pegarOpp(6);
+    expect(Date.parse(s.cashback_ate!) - Date.parse(s.server_now)).toBeCloseTo(240_000, -3);
+    await q('update public.idle_state set cashback_ate = null where user_id = $1', [A]);
+    await xepa();
+    s = await pegarOpp(6);
+    expect(Date.parse(s.cashback_ate!) - Date.parse(s.server_now)).toBeCloseTo(240_000, -3);
+  });
+  it('Informação: +1 crédito (2 com a Xepa) com Bolsa; sem Bolsa, 15 min de produção', async () => {
+    const r = await taxa();
+    const antes = await valor();
+    let s = await pegarOpp(7);
+    expect(s.valuation - antes).toBeCloseTo(r * 900, 2);
+    expect(s.info_creditos).toBe(0);
+    await q('update public.idle_state set generators[19] = 1 where user_id = $1', [A]);
+    s = await pegarOpp(7);
+    expect(s.info_creditos).toBe(1);
+    await xepa();
+    s = await pegarOpp(7);
+    expect(s.info_creditos).toBe(3);
+  });
+  it('Adubo: a planta crescendo mais perto de amadurecer fica madura agora; sem planta crescendo (ou sem Horta), 15 min', async () => {
+    const r0 = await taxa();
+    const antes = await valor();
+    let s = await pegarOpp(5);
+    expect(s.valuation - antes).toBeCloseTo(r0 * 900, 2); // sem Horta
+    await q('update public.idle_state set generators[11] = 1 where user_id = $1', [A]); // lado 2: canteiros 0, 1, 6, 7
+    await t.rpc('idle_horta_plantar', { p_canteiro: 0, p_especie: 1 });
+    await t.rpc('idle_horta_plantar', { p_canteiro: 1, p_especie: 1 });
+    await q(`update public.idle_horta_plantas set inicio = now() - interval '10 minutes' where user_id = $1 and canteiro = 0`, [A]);
+    await q(`update public.idle_horta_plantas set inicio = now() - interval '50 minutes' where user_id = $1 and canteiro = 1`, [A]);
+    expect((await t.rpc<J>('idle_open')).horta_crescendo).toBe(2);
+    s = await pegarOpp(5);
+    const amad = async (c: number) => (await q<{ a: number }>(
+      'select amadurece_s as a from public.idle_horta_plantas where user_id = $1 and canteiro = $2', [A, c]))[0].a;
+    expect(await amad(1)).toBeCloseTo(3000, -1); // a de 50 min (faltavam 10): madura agora
+    expect(await amad(0)).toBeCloseTo(3600, 6); // a outra continua
+    expect(s.horta_crescendo).toBe(1);
+  });
+});
+
+describe('o Espiar da Bolsa (0076, parte D)', () => {
+  type Bolsa = { info_creditos: number; empresas: { id: number; humor: number | null; espiada: boolean; muda_em: number | null }[] };
+  const T = 5000;
+  const espiar = (empresa: number, agora = T) =>
+    q<{ v: J & { bolsa: Bolsa } }>('select public.idle_bolsa_espiar_em($1, $2, $3) as v', [A, empresa, agora]).then((r) => r[0].v);
+  const estado = (agora = T) => q<{ v: Bolsa }>('select public.idle_bolsa_estado($1, $2) as v', [A, agora]).then((r) => r[0].v);
+  beforeEach(async () => {
+    await abrir();
+    await q('update public.idle_state set generators[19] = 2, generators[11] = 20 where user_id = $1', [A]);
+    await q('select public.idle_bolsa_avancar_ate($1)', [T]);
+    await q('update public.idle_bolsa_mercado set humor = 3, humor_ate = $1 where empresa = 1', [T + 7]);
+  });
+
+  it('sem crédito: idle_info_sem_credito; com 2: gasta 1 e mostra o humor e em quantos minutos ele muda', async () => {
+    await expect(espiar(1)).rejects.toThrow(/idle_info_sem_credito/);
+    await q('update public.idle_state set info_creditos = 2 where user_id = $1', [A]);
+    const r = await espiar(1);
+    expect(r.info_creditos).toBe(1);
+    expect(r.bolsa.info_creditos).toBe(1);
+    expect(r.bolsa.empresas[0]).toMatchObject({ id: 1, humor: 3, espiada: true, muda_em: 7 });
+    expect(r.bolsa.empresas[1]).toMatchObject({ humor: null, espiada: false, muda_em: null });
+  });
+  it('a mesma empresa de novo: idle_info_ja (não gasta); o humor virou: some', async () => {
+    await q('update public.idle_state set info_creditos = 2 where user_id = $1', [A]);
+    await espiar(1);
+    await expect(espiar(1)).rejects.toThrow(/idle_info_ja/);
+    expect((await t.rpc<J>('idle_open')).info_creditos).toBe(1);
+    await q('update public.idle_bolsa_mercado set humor = 4, humor_ate = $1 where empresa = 1', [T + 30]);
+    expect((await estado()).empresas[0]).toMatchObject({ humor: null, espiada: false, muda_em: null });
+  });
+  it('com o VSauce sentado o humor já aparece (sem o "muda em"); espiar acrescenta o "muda em"', async () => {
+    await q(`update public.idle_state set generators[13] = 1, conv_cadeira = '{11,null,null}',
+               conv_desde = array[now(), null, null]::timestamptz[], info_creditos = 1 where user_id = $1`, [A]);
+    expect((await estado()).empresas[0]).toMatchObject({ humor: 3, espiada: false, muda_em: null });
+    expect((await espiar(1)).bolsa.empresas[0]).toMatchObject({ humor: 3, espiada: true, muda_em: 7 });
+  });
+  it('empresa quebrada (RJ): não espia', async () => {
+    await q('update public.idle_state set info_creditos = 1 where user_id = $1', [A]);
+    await q('update public.idle_bolsa_mercado set rj_ate = $1 where empresa = 2', [T + 5]);
+    await expect(espiar(2)).rejects.toThrow(/idle_bolsa_rj/);
+  });
+});
+
+describe('conquistas da Caixinha e da Bolsa (136, 137, 139)', () => {
+  const T = 5000;
+  const negociar = (empresa: number, lado: string, qtd: number) =>
+    q('select public.idle_bolsa_negociar_em($1, $2, $3, $4, $5, $6) as v', [A, empresa, lado, qtd, T, T]);
+  const tem = async (id: number) =>
+    (await q('select 1 from public.idle_conquistas where user_id = $1 and conquista_id = $2', [A, id])).length > 0;
+  beforeEach(async () => {
+    t = await freshDb(); // com o catálogo das conquistas
+    await abrir();
+  });
+
+  it('o 25º cupom pego = Primeira compra (de novo); F$ 1 tri de cashback = Volta pra conta', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(quartaATarde());
+    try {
+      await t.db.exec(`create or replace function public.idle_opp_kind(u uuid, w bigint) returns int language sql stable as 'select 4';`);
+      await q(`update public.idle_state set dourados_cont = '{"cupons": 24}' where user_id = $1`, [A]);
+      const s = await t.rpc<J>('idle_open');
+      const [w] = pendentes(A, Date.parse(s.server_now), [], Date.parse(s.week_start + 'T00:00:00-03:00'));
+      await t.rpc('idle_claim_opportunity', { p_window: w });
+      expect(await tem(136)).toBe(true);
+      await q(`update public.idle_state set cashback_ate = now() + interval '1 minute' where user_id = $1`, [A]);
+      await t.rpc('idle_buy', { p_kind: 'gerador', p_id: 1, p_qty: 1 }); // volta 30% de um gerador: longe de F$ 1 tri
+      expect(await tem(137)).toBe(false);
+      await q(`update public.idle_state set dourados_cont = dourados_cont || '{"cashback": 999999999999}' where user_id = $1`, [A]);
+      await t.rpc('idle_buy', { p_kind: 'gerador', p_id: 1, p_qty: 1 }); // mais que F$ 1 de volta: passa de 1 tri
+      expect(await tem(137)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('Insider (shh): vender com 100% de lucro uma ação espiada nas últimas 2 h; sem espiar, ou espiada há mais de 2 h, não', async () => {
+    await q('update public.idle_state set generators[19] = 2, generators[11] = 20, info_creditos = 1 where user_id = $1', [A]);
+    await q('select public.idle_bolsa_avancar_ate($1)', [T]);
+    await q('update public.idle_bolsa_mercado set humor = 3, humor_ate = $1 where empresa in (1, 2)', [T + 50]);
+    await q('select public.idle_bolsa_espiar_em($1, 1, $2)', [A, T]);
+    await negociar(2, 'comprar', 1); // a 2 não foi espiada
+    await q('update public.idle_bolsa_mercado set valor = valor * 3 where empresa = 2');
+    await negociar(2, 'vender', 1);
+    expect(await tem(139)).toBe(false);
+    await negociar(1, 'comprar', 1);
+    await q(`update public.idle_state set espiadas = jsonb_set(espiadas, '{1,em}', to_jsonb(now() - interval '3 hours')) where user_id = $1`, [A]);
+    await q('update public.idle_bolsa_mercado set valor = valor * 3 where empresa = 1');
+    await negociar(1, 'vender', 1);
+    expect(await tem(139)).toBe(false);
+    await negociar(1, 'comprar', 1);
+    // a espiada velha saiu no idle_save da venda (mais de 2 h): espiada de novo, agora
+    await q(`update public.idle_state set espiadas = jsonb_build_object('1', jsonb_build_object('ate_tick', $2::bigint, 'em', now())) where user_id = $1`, [A, T + 50]);
+    await q('update public.idle_bolsa_mercado set valor = valor * 3 where empresa = 1');
+    await negociar(1, 'vender', 1);
+    expect(await tem(139)).toBe(true);
   });
 });

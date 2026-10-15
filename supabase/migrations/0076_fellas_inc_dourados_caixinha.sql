@@ -797,3 +797,315 @@ end;
 $$;
 revoke all on function public.idle_dourado_chamar() from public, anon;
 grant execute on function public.idle_dourado_chamar() to authenticated;
+
+-- ===== Parte D: a Caixinha nova e o Espiar da Bolsa =====
+
+-- pegar oportunidade (a da 0063) com os 5 tipos novos (0076)
+create or replace function public.idle_claim_opportunity(p_window bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_mult double precision;
+  v_rate double precision;
+  v_n    int;
+  v_tipo int;
+  v_lado int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if p_window is null or not (p_window = any (public.idle_opp_list(s))) then
+    raise exception 'idle_opp_gone' using errcode = 'P0001';
+  end if;
+  if s.opp_day is distinct from public.games_today() then
+    s.opp_day := public.games_today();
+    s.opp_count := 0;
+  end if;
+  if s.opp_count >= public.idle_opp_cap(s) then
+    raise exception 'idle_opp_cap' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1)
+            * public.idle_arv(s.user_id, 'opp_bonus', 'mult', 1);
+  v_rate := public.idle_rate(s);
+  v_n := greatest(1, round(v_mult))::int; -- "rendem o dobro": o ×5 e a metade contam como v_n pegas
+  v_tipo := public.idle_opp_kind(s.user_id, p_window);
+  v_lado := public.idle_horta_lado(coalesce(s.generators[11], 0));
+  -- quem ainda não tem: o Adubo sem Horta (ou sem planta crescendo) e a Informação sem Bolsa pagam os 15 min (o tipo 0) no
+  -- lugar; quem decide é a hora do clique
+  if (v_tipo = 5 and public.idle_horta_crescendo(s.user_id) = 0)
+     or (v_tipo = 7 and coalesce(s.generators[19], 0) < 1) then
+    v_tipo := 0;
+  end if;
+  case v_tipo
+    when 0 then s.valuation := s.valuation + v_rate * 900 * v_mult * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, v_lado, now()) b));
+    -- cada ×5 conta sozinho e dura 1 minuto; com "rendem o dobro" entram v_n de uma vez (2: ×25)
+    when 1 then s.boost_ate := array(select b from unnest(s.boost_ate) b where b > now())
+                               || array_fill(now() + interval '1 minute', array[v_n]);
+    when 2 then s.meias := s.meias + v_n; -- cada uma guardada vale uma compra; com o dobro, guarda duas
+    when 3 then s.chamados := least(3, coalesce(s.chamados, 0) + v_n); -- Chamar um dourado: no máximo 3 (o que passa se perde)
+    when 4 then -- Cupom de primeira compra: 10 compras de gerador 25% mais baratas (20 no dobro)
+      s.cupons := coalesce(s.cupons, 0) + 10 * v_n;
+      s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'cupons', 1);
+      perform public.idle_ganhar(s.user_id, 'cupons', (s.dourados_cont ->> 'cupons')::double precision);
+    when 5 then -- Adubo de farmácia: as v_n plantas crescendo mais perto de ficar maduras amadurecem agora (a conta já fechou)
+      update public.idle_horta_plantas p set amadurece_s = extract(epoch from now() - p.inicio)
+       where p.id in (select p2.id from public.idle_horta_plantas p2 join public.idle_cat_horta k on k.id = p2.especie
+                       where p2.user_id = s.user_id and p2.fim is null and p2.inicio <= now()
+                         and p2.canteiro / 6 < v_lado and p2.canteiro % 6 < v_lado
+                         and p2.inicio + make_interval(secs => coalesce(p2.amadurece_s, k.amadurece_s)) > now()
+                       order by p2.inicio + make_interval(secs => coalesce(p2.amadurece_s, k.amadurece_s)), p2.id
+                       limit v_n);
+    when 6 then -- Cashback: 30% de volta em toda compra por 2 min (4 no dobro), somando no fim do que já tem
+      s.cashback_ate := greatest(coalesce(s.cashback_ate, now()), now()) + make_interval(secs => 120 * v_n);
+    else -- Informação privilegiada: créditos de Espiar na Bolsa
+      s.info_creditos := coalesce(s.info_creditos, 0) + v_n;
+  end case;
+  s.opp_claimed := array_append(s.opp_claimed, p_window);
+  s.opp_count := s.opp_count + 1;
+  perform public.idle_ganhar(s.user_id, 'opp_dia', s.opp_count); -- "Receba!": 15 num dia
+  s.opp_total := s.opp_total + 1;
+  s.opp_recent := array_append(s.opp_recent, now());
+  s.opp_recent := s.opp_recent[greatest(1, cardinality(s.opp_recent) - 2):];
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
+grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
+
+-- a empresa m está espiada agora? (o humor espiado vale até ele virar: o mesmo humor_ate de quando espiou, sem RJ)
+create or replace function public.idle_bolsa_espiada(s public.idle_state, m public.idle_bolsa_mercado, p_agora bigint)
+returns boolean language sql immutable set search_path = public as $$
+  select coalesce(m.rj_ate is null and m.humor_ate > p_agora
+                  and (s.espiadas -> m.empresa::text ->> 'ate_tick')::bigint = m.humor_ate, false)
+$$;
+revoke all on function public.idle_bolsa_espiada(public.idle_state, public.idle_bolsa_mercado, bigint) from public, anon, authenticated;
+
+-- Espiar (Informação privilegiada): gasta 1 crédito e mostra o humor da empresa e em quantos minutos ele muda, até virar
+create or replace function public.idle_bolsa_espiar_em(p_user uuid, p_empresa int, p_agora bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  m public.idle_bolsa_mercado;
+begin
+  s := public.idle_lock(p_user);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.generators[19], 0) < 1 then
+    raise exception 'idle_bolsa_fechada' using errcode = 'P0001';
+  end if;
+  select * into m from public.idle_bolsa_mercado where empresa = p_empresa;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  if m.rj_ate is not null then
+    raise exception 'idle_bolsa_rj' using errcode = 'P0001';
+  end if;
+  if public.idle_bolsa_espiada(s, m, p_agora) then
+    raise exception 'idle_info_ja' using errcode = 'P0001';
+  end if;
+  if coalesce(s.info_creditos, 0) < 1 then
+    raise exception 'idle_info_sem_credito' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  s.info_creditos := s.info_creditos - 1;
+  s.espiadas := coalesce(s.espiadas, '{}'::jsonb)
+                || jsonb_build_object(p_empresa::text, jsonb_build_object('ate_tick', m.humor_ate, 'em', now()));
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('bolsa', public.idle_bolsa_estado(p_user, p_agora));
+end;
+$$;
+revoke all on function public.idle_bolsa_espiar_em(uuid, int, bigint) from public, anon, authenticated;
+
+create or replace function public.idle_bolsa_espiar(p_empresa int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  return public.idle_bolsa_espiar_em(auth.uid(), p_empresa, public.idle_bolsa_avancar());
+end;
+$$;
+revoke all on function public.idle_bolsa_espiar(int) from public, anon;
+grant execute on function public.idle_bolsa_espiar(int) to authenticated;
+
+-- o que a Bolsa mostra (o da 0051) + os créditos de Espiar e o humor espiado (com "muda em", 0076)
+create or replace function public.idle_bolsa_estado(p_user uuid, p_agora bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_po   jsonb;
+  v_tr   int := 0;
+  v_corr int := 0;
+  v_esc  int := 0;
+  v_vs   boolean := false;
+  v_fgc  boolean := false;
+begin
+  select * into s from public.idle_state where user_id = p_user;
+  if found then
+    v_tr := coalesce(s.generators[19], 0);
+    v_vs := public.idle_conv_peso(s, 11) > 0;
+  end if;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
+  with po as (
+    delete from public.idle_bolsa_carteira k
+     using public.idle_bolsa_mercado m
+     where k.user_id = p_user and m.empresa = k.empresa and k.geracao < m.geracao
+    returning k.empresa, k.qtd, k.alavanca
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('empresa', empresa, 'qtd', qtd) order by empresa) filter (where qtd > 0), '[]'::jsonb),
+         coalesce(bool_or(alavanca > 1 and qtd > 0), false)
+    into v_po, v_fgc from po;
+  if v_fgc then -- lote do Vorcaro virou pó: a conquista sai na próxima conta fechada (aqui pode não ter trava)
+    update public.idle_state set conv_fgc = true where user_id = p_user;
+  end if;
+  return jsonb_build_object(
+    'tick', p_agora,
+    'vira_em_ms', greatest(0, (p_agora + 1) * 60000 - floor(extract(epoch from now()) * 1000)::bigint),
+    'r', case when s.user_id is null then 0 else public.idle_rate_bolsa(s) end, -- sem os convidados (ver idle_rate_bolsa)
+    'aberta', v_tr >= 1 and coalesce(s.started, false),
+    'corretor', v_corr,
+    'escritorio', v_esc,
+    'corretagem', public.idle_bolsa_corretagem(v_corr),
+    'info_creditos', coalesce(s.info_creditos, 0),
+    'empresas', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', m.empresa, 'valor', m.valor,
+        'limite', 100 + coalesce(s.generators[c.gerador], 0) + public.idle_bolsa_escritorio(v_esc),
+        'risco', m.rj_ate is null and m.valor < 0.15 * c.repouso,
+        'rj_ate', m.rj_ate,
+        'humor', case when v_vs or public.idle_bolsa_espiada(s, m, p_agora) then m.humor end, -- VSauce sentado ou espiada
+        'espiada', public.idle_bolsa_espiada(s, m, p_agora),
+        'muda_em', case when public.idle_bolsa_espiada(s, m, p_agora) then greatest(1, m.humor_ate - p_agora) end,
+        'historico', (select coalesce(jsonb_agg(p.valor order by p.tick), '[]'::jsonb) from public.idle_bolsa_precos p
+                       where p.empresa = m.empresa and p.tick > p_agora - 60 and p.tick <= p_agora)
+      ) order by m.empresa), '[]'::jsonb)
+      from public.idle_bolsa_mercado m join public.idle_cat_bolsa c on c.id = m.empresa),
+    'carteira', (
+      select coalesce(jsonb_agg(jsonb_build_object('empresa', k.empresa, 'qtd', k.qtd, 'custo', k.custo, 'alavanca', k.alavanca)
+                            order by k.empresa, k.alavanca), '[]'::jsonb)
+        from public.idle_bolsa_carteira k where k.user_id = p_user and k.qtd > 0),
+    'viraram_po', v_po);
+end;
+$$;
+revoke all on function public.idle_bolsa_estado(uuid, bigint) from public, anon, authenticated;
+
+-- negociar (o da 0051) + a Insider (shh) na venda (0076)
+create or replace function public.idle_bolsa_negociar_em(
+  p_user uuid, p_empresa int, p_lado text, p_qtd int, p_tick bigint, p_agora bigint, p_lote double precision default 1)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s        public.idle_state;
+  c        public.idle_cat_bolsa;
+  m        public.idle_bolsa_mercado;
+  k        public.idle_bolsa_carteira;
+  v_tem    int := 0;
+  v_total  int := 0;
+  v_custo  double precision := 0;
+  v_r      double precision;
+  v_preco  double precision;
+  v_cabe   int;
+  v_n      int;
+  v_corr   int := 0;
+  v_esc    int := 0;
+  v_fee    double precision;
+  v_lote   double precision;
+  v_compra double precision;
+  v_por    double precision;
+begin
+  if p_tick is distinct from p_agora then
+    raise exception 'idle_bolsa_preco_mudou' using errcode = 'P0001';
+  end if;
+  if p_lado not in ('comprar', 'vender') or p_qtd not in (0, 1, 10) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  select * into c from public.idle_cat_bolsa where id = p_empresa;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_lock(p_user);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.generators[19], 0) < 1 then
+    raise exception 'idle_bolsa_fechada' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  select * into m from public.idle_bolsa_mercado where empresa = p_empresa;
+  if m.rj_ate is not null then
+    raise exception 'idle_bolsa_rj' using errcode = 'P0001';
+  end if;
+  -- comprar: o lote é o do Vorcaro agora (1 + peso; 1 sem ele); vender: o lote pedido
+  v_lote := case when p_lado = 'comprar' then 1 + public.idle_conv_peso(s, 2) else coalesce(p_lote, 1) end;
+  select * into k from public.idle_bolsa_carteira
+   where user_id = p_user and empresa = p_empresa and alavanca = v_lote for update;
+  if found and k.geracao = m.geracao then
+    v_tem := k.qtd;
+    v_custo := k.custo;
+  elsif found and k.alavanca > 1 and k.qtd > 0 then
+    perform public.idle_ganhar(p_user, 'conv_fgc'); -- o lote antigo virou pó (a conta já fechou acima)
+  end if;
+  select coalesce(sum(x.qtd), 0) into v_total from public.idle_bolsa_carteira x
+   where x.user_id = p_user and x.empresa = p_empresa and x.geracao = m.geracao;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
+  v_fee := 1 + public.idle_bolsa_corretagem(v_corr);
+  v_r := public.idle_rate_bolsa(s); -- sem os convidados (ver idle_rate_bolsa)
+  v_preco := m.valor * v_r;
+
+  if p_lado = 'comprar' then
+    v_cabe := 100 + coalesce(s.generators[c.gerador], 0) + public.idle_bolsa_escritorio(v_esc) - v_total;
+    if v_cabe <= 0 or (p_qtd > 0 and p_qtd > v_cabe) then
+      raise exception 'idle_bolsa_limite' using errcode = 'P0001';
+    end if;
+    if p_qtd = 0 then
+      v_n := least(v_cabe, floor(s.valuation / (v_preco * v_fee))::int);
+    else
+      v_n := p_qtd;
+    end if;
+    if v_preco <= 0 or v_n < 1 or v_n * v_preco * v_fee > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := greatest(s.valuation - v_n * v_preco * v_fee, 0);
+    insert into public.idle_bolsa_carteira (user_id, empresa, alavanca, qtd, custo, geracao)
+    values (p_user, p_empresa, v_lote, v_tem + v_n, v_custo + v_n * m.valor * v_fee, m.geracao)
+    on conflict (user_id, empresa, alavanca) do update set qtd = excluded.qtd, custo = excluded.custo, geracao = excluded.geracao;
+  else
+    if v_tem < 1 then
+      raise exception 'idle_bolsa_sem_acoes' using errcode = 'P0001';
+    end if;
+    v_n := case when p_qtd = 0 then v_tem else least(p_qtd, v_tem) end;
+    if v_lote = 1 then
+      s.valuation := s.valuation + v_n * v_preco;
+    else
+      -- lote alavancado: a diferença do preço pago (com a corretagem) conta `alavanca` vezes; perdeu tudo = pó
+      v_compra := v_custo / v_tem;
+      v_por := greatest(0, v_compra + v_lote * (m.valor - v_compra));
+      s.valuation := s.valuation + v_n * v_por * v_r;
+      if v_por = 0 then
+        perform public.idle_ganhar(p_user, 'conv_fgc');
+      end if;
+    end if;
+    -- Insider (shh), escondida (0076): vendeu com 100% de lucro (o preço da venda, por ação, no mínimo o dobro do que pagou
+    -- com a corretagem) uma ação de empresa espiada nas últimas 2 h
+    if (case when v_lote = 1 then m.valor else v_por end) >= 2 * (v_custo / v_tem)
+       and (s.espiadas -> p_empresa::text ->> 'em')::timestamptz >= now() - interval '2 hours' then
+      perform public.idle_ganhar(p_user, 'insider', 1);
+    end if;
+    update public.idle_bolsa_carteira
+       set qtd = v_tem - v_n, custo = v_custo * (v_tem - v_n) / v_tem, geracao = m.geracao
+     where user_id = p_user and empresa = p_empresa and alavanca = v_lote;
+  end if;
+
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('bolsa', public.idle_bolsa_estado(p_user, p_agora));
+end;
+$$;
+revoke all on function public.idle_bolsa_negociar_em(uuid, int, text, int, bigint, bigint, double precision) from public, anon, authenticated;

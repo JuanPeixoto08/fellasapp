@@ -206,7 +206,8 @@ export type IdleVisual = {
 };
 
 /** Bolsa da Fellas Inc. (0043 idle_bolsa_estado). Preços em segundos de produção; em F$ = valor × r. */
-export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[]; /** só com o VSauce sentado (0051) */ humor?: number | null };
+export type BolsaEmpresa = { id: number; valor: number; limite: number; risco: boolean; rj_ate: number | null; historico: number[]; /** só com o VSauce sentado (0051) */ humor?: number | null;
+  /** espiada com a Informação privilegiada (0076): o humor vale até mudar, em `muda_em` minutos */ espiada?: boolean; muda_em?: number | null };
 export type BolsaPosicao = { empresa: number; qtd: number; custo: number; /** lote do Vorcaro (1 = normal; 0051) */ alavanca?: number };
 /** Horta do Food truck (0048): os bônus das maduras agora, as plantas vivas, as descobertas. */
 export type BonusHorta = { producao: number; geradores: number; melhorias: number; oportunidades: number };
@@ -217,6 +218,7 @@ export type HortaEstado = {
 
 export type BolsaEstado = {
   tick: number; vira_em_ms: number; r: number; aberta: boolean; corretor: number; escritorio: number; corretagem: number;
+  /** créditos de Espiar (Informação privilegiada, 0076) */ info_creditos?: number;
   empresas: BolsaEmpresa[]; carteira: BolsaPosicao[]; viraram_po: { empresa: number; qtd: number }[];
 };
 export type LadoBolsa = 'comprar' | 'vender';
