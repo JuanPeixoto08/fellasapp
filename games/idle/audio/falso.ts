@@ -45,6 +45,10 @@ export class ContextoFalso {
   destination = new NoFalso();
   criados: NoFalso[] = [];
   resumidos = 0;
+  fechados = 0;
+  /** O navegador não deixa (sem gesto, ligação no celular): o resume() é recusado e o estado fica. */
+  recusar = false;
+  private ouvintes: (() => void)[] = [];
   private novo<T extends NoFalso>(n: T): T { this.criados.push(n); return n; }
   createGain() { return this.novo(new GanhoFalso()); }
   createOscillator() { return this.novo(new OscFalso()); }
@@ -52,8 +56,21 @@ export class ContextoFalso {
   createBiquadFilter() { return this.novo(new FiltroFalso()); }
   createDynamicsCompressor() { return this.novo(new CompressorFalso()); }
   createBuffer(_canais: number, n: number) { const d = new Float32Array(n); return { length: n, getChannelData: () => d }; }
-  resume() { this.resumidos++; this.state = 'running'; return Promise.resolve(); }
-  suspend() { this.state = 'suspended'; return Promise.resolve(); }
+  addEventListener(tipo: string, f: () => void) { if (tipo === 'statechange') this.ouvintes.push(f); }
+  /** Troca o estado como o navegador faria, avisando no `statechange` (mudar `state` direto não avisa ninguém). */
+  mudar(estado: AudioContextState | 'interrupted') {
+    if (this.state === estado) return;
+    this.state = estado as AudioContextState;
+    for (const f of [...this.ouvintes]) f();
+  }
+  resume() {
+    this.resumidos++;
+    if (this.recusar || this.state === 'closed') return Promise.reject(new Error('o navegador não deixou'));
+    this.mudar('running');
+    return Promise.resolve();
+  }
+  suspend() { this.mudar('suspended'); return Promise.resolve(); }
+  close() { this.fechados++; this.mudar('closed'); return Promise.resolve(); }
   osciladores() { return this.criados.filter((n): n is OscFalso => n instanceof OscFalso); }
   ganhos() { return this.criados.filter((n): n is GanhoFalso => n instanceof GanhoFalso); }
 }
