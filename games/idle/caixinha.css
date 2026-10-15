@@ -5,6 +5,11 @@
    botões principais); vai pra direita da linha quando o humor não aparece, e cola no humor quando ele aparece. */
 .idle .bolsa .espiar { align-self: center; margin-left: auto; }
 .idle .bolsa .humor-vsauce + .espiar { margin-left: 0; }
+/* apagado no minuto em que o humor vira (aria-disabled, não disabled: o foco e o mouse ainda abrem a caixinha que
+   explica); o mesmo apagado do .btn:disabled, sem acender no hover nem afundar no clique */
+.idle .bolsa .espiar[aria-disabled="true"] { opacity: 0.42; cursor: default; }
+.idle .bolsa .espiar[aria-disabled="true"]:hover { --c: var(--i-borda2); }
+.idle .bolsa .espiar[aria-disabled="true"]:active { transform: none; }
 
 /* Caixinha: o que a oportunidade paga no lugar (Adubo sem planta crescendo, Informação sem Bolsa) numa linha menor
    embaixo do nome (a coluna em pé é estreita). Mais clara que o prazo de baixo: é o que você ganha, o prazo é só a hora. */

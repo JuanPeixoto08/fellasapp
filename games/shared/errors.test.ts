@@ -59,6 +59,7 @@ describe('erros da Fellas Inc.', () => {
     ['idle_cup_repetido', 'Esse copão já tá no cardápio'],
     ['idle_cup_sem_copao', 'Esse copão não tá mais no cardápio'],
     ['idle_cup_provas', 'A galera ainda tá provando a outra. Espera sair a nota'],
+    ['idle_info_vira', 'O humor dessa empresa está virando agora. Espia no próximo minuto'],
   ])('%s', (code, text) => {
     const e = toGameError({ message: code, code: 'P0001' });
     expect(e.code).toBe(code);

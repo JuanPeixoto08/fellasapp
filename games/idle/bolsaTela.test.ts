@@ -224,19 +224,31 @@ describe('o Espiar (0076)', () => {
     tela.renderizar(B({ info_creditos: 3 }), 1e9, false); // a tela do beforeEach não tem `espiar`
     expect([...document.querySelectorAll('.bolsa-detalhe button')].some((b) => b.textContent?.startsWith('Espiar'))).toBe(false);
   });
-  it('no minuto em que a empresa sai da recuperação o humor vira na hora: o Espiar fica apagado (não gasta crédito à toa)', () => {
+  it('no minuto em que a empresa sai da recuperação o humor vira na hora: o Espiar fica apagado (não gasta crédito à toa), com a caixinha dizendo por quê', () => {
     const espiar = vi.fn();
+    const dica = vi.fn();
     document.body.innerHTML = '';
-    tela = criarBolsaTela({ negociar, melhorar, espiar }, vi.fn());
+    tela = criarBolsaTela({ negociar, melhorar, espiar }, dica);
     document.body.append(tela.elemento);
     const esp = () => [...document.querySelectorAll<HTMLButtonElement>('.bolsa-detalhe button')].find((b) => b.textContent?.startsWith('Espiar'));
+    const textosDica = (bt: HTMLElement) => (dica.mock.calls.filter((c) => c[0] === bt).at(-1)![2]() as { linhas: { texto: string }[] }).linhas.map((l) => l.texto);
     tela.renderizar(B({ info_creditos: 2 }), 1e9, false);
     linha(6).click();
     expect(esp()).toBeUndefined(); // quebrada: sem Espiar
     const saiu = (tick: number) => B({ tick, info_creditos: 2, empresas: [{ id: 6, valor: 5, limite: 100, risco: false, rj_ate: null, historico: [5] }] });
     tela.renderizar(saiu(1007), 1e9, false);
-    expect(esp()!.disabled).toBe(true);
+    // apagado sem `disabled`: o foco do teclado e o mouse ainda chegam na caixinha que explica
+    const apagado = esp()!;
+    expect(apagado.disabled).toBe(false);
+    expect(apagado.getAttribute('aria-disabled')).toBe('true');
+    apagado.click();
+    expect(espiar).not.toHaveBeenCalled();
+    expect(textosDica(apagado)).toContain('Acabou de voltar da recuperação: o humor vira neste minuto. Espia no próximo');
     tela.renderizar(saiu(1008), 1e9, false);
-    expect(esp()!.disabled).toBe(false);
+    const aceso = esp()!;
+    expect(aceso.hasAttribute('aria-disabled')).toBe(false);
+    expect(textosDica(aceso)).not.toContain('Acabou de voltar da recuperação: o humor vira neste minuto. Espia no próximo');
+    aceso.click();
+    expect(espiar).toHaveBeenCalledWith(6);
   });
 });

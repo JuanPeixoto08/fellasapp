@@ -193,8 +193,11 @@ export function criarBolsaTela(a: {
       const creditos = b.info_creditos ?? 0;
       if (a.espiar && creditos > 0 && !m.espiada) {
         const virando = fimRj.get(m.id) === b.tick; // saiu da recuperação neste minuto (ver fimRj)
-        const esp = button(`Espiar (${creditos})`, 'btn compacto espiar', () => a.espiar!(m.id));
-        esp.disabled = ocupado || virando;
+        // virando: apagado com aria-disabled (não `disabled`), pra o foco do teclado e o mouse chegarem na caixinha que
+        // explica; o clique não faz nada
+        const esp = button(`Espiar (${creditos})`, 'btn compacto espiar', () => { if (!virando) a.espiar!(m.id); });
+        esp.disabled = ocupado;
+        if (virando) esp.setAttribute('aria-disabled', 'true');
         dica?.(esp, `espiar-${m.id}`, () => {
           const d = dicaEspiar(e.nome, creditos);
           return virando ? { ...d, linhas: [...d.linhas, { texto: 'Acabou de voltar da recuperação: o humor vira neste minuto. Espia no próximo', tom: 'ruim' }] } : d;

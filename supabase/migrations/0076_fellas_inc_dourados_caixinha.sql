@@ -913,6 +913,11 @@ begin
   if coalesce(s.info_creditos, 0) < 1 then
     raise exception 'idle_info_sem_credito' using errcode = 'P0001';
   end if;
+  -- o humor vira neste minuto (humor_ate = agora: a empresa acabou de sair da RJ, ou o mercado acabou de nascer): a
+  -- espiada não valeria nada, então não gasta o crédito
+  if m.humor_ate <= p_agora then
+    raise exception 'idle_info_vira' using errcode = 'P0001';
+  end if;
   s := public.idle_settle(s);
   s.info_creditos := s.info_creditos - 1;
   s.espiadas := coalesce(s.espiadas, '{}'::jsonb)

@@ -22,5 +22,6 @@ describe('o main e a Bolsa', () => {
     expect(RECARREGA_BOLSA).toContain('idle_bolsa_preco_mudou');
     expect(RECARREGA_BOLSA).toContain('idle_bolsa_rj');
     expect(RECARREGA_BOLSA).toContain('idle_info_ja');
+    expect(RECARREGA_BOLSA).toContain('idle_info_vira'); // o humor virou: o mercado novo mostra o humor de agora
   });
 });

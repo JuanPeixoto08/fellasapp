@@ -665,6 +665,16 @@ describe('o Espiar da Bolsa (0076, parte D)', () => {
     await q('update public.idle_bolsa_mercado set rj_ate = $1 where empresa = 2', [T + 5]);
     await expect(espiar(2)).rejects.toThrow(/idle_bolsa_rj/);
   });
+  it('humor virando agora (humor_ate = agora: saiu da RJ ou mercado recém-criado): idle_info_vira, sem gastar nem guardar', async () => {
+    await q('update public.idle_state set info_creditos = 2 where user_id = $1', [A]);
+    await q('update public.idle_bolsa_mercado set humor_ate = $1 where empresa = 1', [T]);
+    await expect(espiar(1)).rejects.toThrow(/idle_info_vira/);
+    const s = await t.rpc<J>('idle_open');
+    expect(s.info_creditos).toBe(2);
+    expect(s.espiadas ?? {}).not.toHaveProperty('1');
+    await q('update public.idle_bolsa_mercado set humor_ate = $1 where empresa = 1', [T + 1]);
+    expect((await espiar(1)).bolsa.empresas[0]).toMatchObject({ espiada: true, muda_em: 1 });
+  });
 });
 
 describe('conquistas da Caixinha e da Bolsa (136, 137, 139)', () => {
