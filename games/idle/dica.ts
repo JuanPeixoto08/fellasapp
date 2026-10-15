@@ -4,7 +4,8 @@
 import type { IdleState, LugarEstado, PinoMapa } from '../shared/types';
 import type { Marco } from './mapa';
 import { catalogo, type Melhoria } from './catalogo';
-import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
+import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, partesContratos, VIRAL_MS } from './economia';
+import { COMBO_MULT } from './dourados';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import type { TipoOportunidade } from './oportunidades';
@@ -65,7 +66,7 @@ export function porUnidade(s: IdleState) {
   return f.porGerador.map((x, i) => x * f.global * (1 + hortaProd(s)) * multGerador(s, i + 1, Number.isFinite(agora) ? agora : Date.now()) * multMapaDe(s));
 }
 
-export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Dica {
+export function dicaGerador(s: IdleState, gid: number, precoProximo: number, cashback = 0): Dica {
   const cada = porUnidade(s);
   const n = s.generators[gid - 1];
   const soma = cada.reduce((a, x, i) => a + x * s.generators[i], 0);
@@ -84,11 +85,12 @@ export function dicaGerador(s: IdleState, gid: number, precoProximo: number): Di
   const mapa = multMapaDe(s);
   if (Math.abs(mapa - 1) > 1e-9) linhas.push({ texto: `Mapa do rolê: ${vezes(mapa)}`, tom: mapa >= 1 ? 'fraco' : 'ruim' });
   linhas.push({ texto: `O próximo custa ${formatarValor(precoProximo)}${emTempo(s, precoProximo)}` });
+  if (cashback > 0) linhas.push({ texto: `Cashback: volta ${formatarValor(precoProximo * cashback)}`, tom: 'bom' });
   return { titulo: catalogo.geradores[gid - 1].nome, linhas };
 }
 
 /** `preco` null = já comprada (sem preço nem quanto soma). */
-export function dicaMelhoria(s: IdleState, m: Melhoria, preco: number | null): Dica {
+export function dicaMelhoria(s: IdleState, m: Melhoria, preco: number | null, cashback = 0): Dica {
   const cada = porUnidade(s);
   const nome = (gid: number) => `"${catalogo.geradores[gid - 1].nome}"`;
   const linhas: LinhaDica[] = [];
@@ -109,6 +111,7 @@ export function dicaMelhoria(s: IdleState, m: Melhoria, preco: number | null): D
   if (preco !== null) {
     if (ganho > 0) linhas.push({ texto: `Agora: ${formatarTaxa(ganho)}`, tom: 'bom' });
     linhas.push({ texto: `Custa ${formatarValor(preco)}${emTempo(s, preco)}` });
+    if (cashback > 0) linhas.push({ texto: `Cashback: volta ${formatarValor(preco * cashback)}`, tom: 'bom' });
   } else linhas.push({ texto: 'Comprada', tom: 'fraco' });
   return { titulo: m.nome, linhas };
 }
@@ -139,9 +142,13 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   mult('Mapa do rolê', multMapaDe(s));
   const cincos = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
   if (cincos) linhas.push({ texto: `Agora: ×${num(5 * cincos, 0)} ${cincos === 1 ? 'da oportunidade' : 'das oportunidades'}`, tom: 'bom' });
-  const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
+  // só os Viralizou que já começaram (o 2º do Viralizou em dobro espera o 1º acabar)
+  const vMs = VIRAL_MS * efeitosDe(catalogo, s).douradoDuracao;
+  const virais = s.viral.filter((t) => { const f = Date.parse(t); return f > agoraMs && f - vMs <= agoraMs; }).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   if (marmitaAtiva(s, agoraMs)) linhas.push({ texto: 'Agora: ×3 da Marmita da mãe', tom: 'bom' });
+  if (s.linkedin_ate && Date.parse(s.linkedin_ate) > agoraMs) linhas.push({ texto: `Agora: ×${num(s.linkedin_mult ?? 1)} do LinkedIn`, tom: 'bom' });
+  if (s.combo_ate && Date.parse(s.combo_ate) > agoraMs) linhas.push({ texto: `Agora: ×${COMBO_MULT} do Combo`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
   return { titulo: 'De onde vem sua produção', linhas };
 }

@@ -67,6 +67,10 @@ describe('selos e textos', () => {
     expect(selosBonus({ promo_ate: null, viral: [em(15)], boosts: [em(55), em(30), em(-1)] }, T)).toEqual([
       { texto: '×10 · 0:15', ouro: false }, { texto: '×10 · 0:30', ouro: true }]);
   });
+  it('Viralizou em dobro (dois fins encadeados): só o que já começou conta no selo', () => {
+    expect(selosBonus({ promo_ate: null, viral: [em(30), em(90)] }, T)).toEqual([{ texto: '×10 · 0:30', ouro: false }]);
+    expect(selosBonus({ promo_ate: null, viral: [em(30), em(90)] }, T + 31_000)).toEqual([{ texto: '×10 · 0:59', ouro: false }]);
+  });
   it('o texto que sobe ao pegar', () => {
     expect(textoPegou(0, { ganho: 1_234_567, viral: 0 })).toBe('+F$ 1,23 mi');
     expect(textoPegou(1, { ganho: 0, viral: 0 })).toBe('Promoção! Tudo pela metade por 30 s');

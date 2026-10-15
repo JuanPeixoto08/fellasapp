@@ -271,3 +271,19 @@ describe('rendasGeradores (o sorteio do LinkedIn)', () => {
     expect(r[0] + r[1]).toBeCloseTo(taxa(cat, s), 9);
   });
 });
+
+describe('LinkedIn e Combo no produzido (0076)', () => {
+  it('cada fator multiplica tudo até o fim dele, por cima do resto', () => {
+    // r = 1/s, de 0 a 100 s; Combo ×7 até 30 s: 30·7 + 70 = 280
+    expect(produzido(1, 0, 100_000, null, [], VIRAL_MS, null, [{ ateMs: 30_000, mult: 7 }])).toBeCloseTo(280, 6);
+    // LinkedIn ×4,5 até 40 s e Combo ×7 até 30 s: 30·31,5 + 10·4,5 + 60 = 1050
+    expect(produzido(1, 0, 100_000, null, [], VIRAL_MS, null, [{ ateMs: 40_000, mult: 4.5 }, { ateMs: 30_000, mult: 7 }])).toBeCloseTo(1050, 6);
+    // ×5 até 20 s, Viralizou até 60 s, Marmita até 50 s e Combo até 30 s:
+    // 20·(5·10·3·7) + 10·(10·3·7) + 20·(10·3) + 10·10 + 40·1 = 21000 + 2100 + 600 + 100 + 40 = 23840
+    expect(produzido(1, 0, 100_000, [20_000], [60_000], VIRAL_MS, 50_000, [{ ateMs: 30_000, mult: 7 }])).toBeCloseTo(23_840, 6);
+  });
+  it('fator que já acabou (ou lista vazia) é a conta de antes', () => {
+    expect(produzido(2, 50_000, 60_000, null, [], VIRAL_MS, null, [{ ateMs: 40_000, mult: 7 }])).toBeCloseTo(20, 6);
+    expect(acumular(5, 2, 0, 10_000, null, [], VIRAL_MS, null, [])).toBeCloseTo(25, 6);
+  });
+});

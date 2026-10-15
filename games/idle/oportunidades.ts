@@ -64,6 +64,11 @@ export const CUPOM_FATOR = 0.75; // compra de gerador 25% mais barata
 export const CASHBACK = 0.3; // devolve 30% do preço
 export const CASHBACK_S = 120; // por 2 min (soma no fim do que já tem)
 export const CHAMADOS_MAX = 3;
+/** Cupom valendo na compra de gerador: tem cupom e a Promoção não está ligada (com ela o cupom fica guardado). */
+export const cupomVale = (s: { cupons?: number; promo_ate: string | null }, agoraMs: number) =>
+  (s.cupons ?? 0) > 0 && !(s.promo_ate !== null && Date.parse(s.promo_ate) > agoraMs);
+/** Cashback valendo (toda compra devolve 30%). */
+export const cashbackAtivo = (s: { cashback_ate?: string | null }, agoraMs: number) => !!s.cashback_ate && Date.parse(s.cashback_ate) > agoraMs;
 
 /** Quantas a caixinha guarda e quanto tempo (s) uma guardada dura: 3 e 4h sem a árvore (ramo Oportunidades). */
 export type Caixa = { tamanho: number; validadeS: number };

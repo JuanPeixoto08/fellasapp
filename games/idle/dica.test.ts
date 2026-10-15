@@ -295,3 +295,21 @@ describe('caixinha dos eventos de era', () => {
     expect(dicaEventoEra(1, 1000).linhas[0].texto).toBe('Produção ×3 por 3 min');
   });
 });
+
+describe('cashback e os bônus novos nas caixinhas (0076)', () => {
+  it('com o Cashback valendo, a caixinha do gerador e a da melhoria dizem quanto volta', () => {
+    const s = comTaxa({ generators: gens({ 1: 10 }) });
+    expect(textos(dicaGerador(s, 1, 1000, 0.3))).toContain(`Cashback: volta ${formatarValor(300)}`);
+    expect(textos(dicaGerador(s, 1, 1000)).some((t) => t.startsWith('Cashback'))).toBe(false);
+    const m = catalogo.melhorias.find((x) => x.id === 11)!;
+    expect(textos(dicaMelhoria(s, m, 2000, 0.3))).toContain(`Cashback: volta ${formatarValor(600)}`);
+  });
+  it('a produção mostra o LinkedIn e o Combo valendo; o Viralizou que ainda não começou não conta', () => {
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const em = (s: number) => new Date(agora + s * 1000).toISOString();
+    const t = textos(dicaProducao(comTaxa({ generators: gens({ 1: 10 }), linkedin_ate: em(30), linkedin_mult: 4.5, combo_ate: em(20), viral: [em(30), em(90)] }), agora));
+    expect(t).toContain('Agora: ×4,5 do LinkedIn');
+    expect(t).toContain('Agora: ×7 do Combo');
+    expect(t).toContain('Agora: ×10 do Viralizou');
+  });
+});

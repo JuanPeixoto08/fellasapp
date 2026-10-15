@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { aoVivo, instante, OPP_CORTE, pendentes, sai, semente, TEXTO_TIPO, tipo, VALIDADE_S } from './oportunidades';
+import { aoVivo, cashbackAtivo, cupomVale, instante, OPP_CORTE, pendentes, sai, semente, TEXTO_TIPO, tipo, VALIDADE_S } from './oportunidades';
 
 const U = '00000000-0000-0000-0000-00000000000a';
 const V = '1234abcd-0000-0000-0000-000000000000';
@@ -92,5 +92,20 @@ describe('a roda da Caixinha com o corte (0076)', () => {
       0: '15 minutos de produção na hora', 1: 'Produção ×5 por 1 minuto', 2: 'Próxima compra pela metade', 3: 'Chamar um dourado',
       4: 'Cupom de primeira compra', 5: 'Adubo de farmácia', 6: 'Cashback', 7: 'Informação privilegiada',
     });
+  });
+});
+
+describe('cupom e cashback valendo (0076)', () => {
+  const agora = Date.parse('2026-10-15T12:00:00Z');
+  it('cupom: com cupons e sem Promoção; campo ausente = sem', () => {
+    expect(cupomVale({ cupons: 3, promo_ate: null }, agora)).toBe(true);
+    expect(cupomVale({ cupons: 3, promo_ate: '2026-10-15T12:00:10Z' }, agora)).toBe(false);
+    expect(cupomVale({ cupons: 0, promo_ate: null }, agora)).toBe(false);
+    expect(cupomVale({ promo_ate: null }, agora)).toBe(false);
+  });
+  it('cashback: até o fim; ausente ou null = sem', () => {
+    expect(cashbackAtivo({ cashback_ate: '2026-10-15T12:01:00Z' }, agora)).toBe(true);
+    expect(cashbackAtivo({ cashback_ate: '2026-10-15T11:59:00Z' }, agora)).toBe(false);
+    expect(cashbackAtivo({}, agora)).toBe(false);
   });
 });

@@ -2,6 +2,7 @@
 // árvore ou o Gemaplys), pra quem está com o jogo aberto, e ele some em 12 s (24 com o Olho de lince). A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
 // (idle_dourado na 0045), que confere o clique. BigInt: os quadrados passam de 2^53.
 import type { Dica } from './dica';
+import { VIRAL_MS } from './economia';
 import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
@@ -116,13 +117,15 @@ const vezes = (k: number) => (10 ** k).toLocaleString('pt-BR');
 /** Promoção relâmpago valendo agora (o custo das compras cai pela metade). */
 export const promoAtiva = (s: { promo_ate: string | null }, agoraMs: number) => s.promo_ate !== null && Date.parse(s.promo_ate) > agoraMs;
 
-/** Os fins dos Viralizou ainda ativos (ms), em ordem. */
-export const viraisAtivos = (s: ComBonus, agoraMs: number) => (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((a, b) => a - b);
+/** Os fins dos Viralizou que estão valendo (ms), em ordem. Cada um vale [fim − viralMs, fim): o Viralizou em dobro são
+ *  dois fins encadeados e o 2º só conta quando o 1º acaba (0076). */
+export const viraisAtivos = (s: ComBonus, agoraMs: number, viralMs = VIRAL_MS) =>
+  (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs && f - viralMs <= agoraMs).sort((a, b) => a - b);
 
 /** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21". */
-export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro: boolean; dica?: Dica }[] {
+export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number } = {}): { texto: string; ouro: boolean; dica?: Dica }[] {
   const out: { texto: string; ouro: boolean; dica?: Dica }[] = [];
-  const v = viraisAtivos(s, agoraMs);
+  const v = viraisAtivos(s, agoraMs, o.viralMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
   // os ×5 da oportunidade empilhados somam (0064): ×5, ×10, ×15… até o primeiro acabar
   const b = (s.boosts ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((x, y) => x - y);

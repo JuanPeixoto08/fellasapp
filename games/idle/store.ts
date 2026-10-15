@@ -2,7 +2,8 @@
 // celular. O número anima com a mesma conta do banco (economia.ts acumular).
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
-import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas, VIRAL_MS } from './economia';
+import { acumular, efeitosArvore, efeitosDe, estrategiasAtivas, type FatorTempo, VIRAL_MS } from './economia';
+import { COMBO_MULT } from './dourados';
 import { CAIXA_PADRAO, type Caixa } from './oportunidades';
 import type { NomeCena } from './palco';
 import { ERAS } from './nomes';
@@ -21,13 +22,21 @@ export const efeitos = (estado: IdleState) => efeitosDe(catalogo, estado);
 /** A caixinha de oportunidades: o tamanho vem da árvore; a validade é sempre a padrão (4h). */
 export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).caixinha, validadeS: CAIXA_PADRAO.validadeS });
 
+/** Os bônus com tempo do estado que multiplicam a produção toda (0076): LinkedIn (o mult que o banco congelou) e Combo. */
+export function fatoresTempo(s: Pick<IdleState, 'linkedin_ate' | 'linkedin_mult' | 'combo_ate'>): FatorTempo[] {
+  const out: FatorTempo[] = [];
+  if (s.linkedin_ate && s.linkedin_mult) out.push({ ateMs: Date.parse(s.linkedin_ate), mult: s.linkedin_mult });
+  if (s.combo_ate) out.push({ ateMs: Date.parse(s.combo_ate), mult: COMBO_MULT });
+  return out;
+}
+
 export function valuationAgora(a: Ancora, clienteMs: number): number {
   // os ×5 no ar (0062: cada um conta); a resposta de antes da 0062 só tem o boost_until
   const boost = a.estado.boosts ? a.estado.boosts.map(Date.parse) : a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
   const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
   const marmita = a.estado.marmita_ate ? Date.parse(a.estado.marmita_ate) : null; // Marmita da mãe: ×3 (0074)
   return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais,
-    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita);
+    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita, fatoresTempo(a.estado));
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {

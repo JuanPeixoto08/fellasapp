@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, inicioSemana, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, fatoresTempo, inicioSemana, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -101,5 +101,16 @@ describe('vencimento de contrato', () => {
     const s = base({ muda_em: '2026-10-19T12:00:00.000Z' });
     expect(vencido(s, Date.parse('2026-10-19T11:59:59Z'))).toBe(false);
     expect(vencido(s, Date.parse('2026-10-19T12:00:00Z'))).toBe(true);
+  });
+});
+
+describe('fatoresTempo (0076)', () => {
+  it('LinkedIn com o mult do banco e Combo ×7; ausentes (página nova, banco velho) não contam', () => {
+    const s = { linkedin_ate: '2026-10-15T12:01:00Z', linkedin_mult: 4.5, combo_ate: '2026-10-15T12:00:30Z' } as IdleState;
+    expect(fatoresTempo(s)).toEqual([
+      { ateMs: Date.parse('2026-10-15T12:01:00Z'), mult: 4.5 }, { ateMs: Date.parse('2026-10-15T12:00:30Z'), mult: 7 },
+    ]);
+    expect(fatoresTempo({} as IdleState)).toEqual([]);
+    expect(fatoresTempo({ linkedin_ate: null, linkedin_mult: null, combo_ate: null } as IdleState)).toEqual([]);
   });
 });

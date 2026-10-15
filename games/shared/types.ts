@@ -132,6 +132,25 @@ export type IdleState = {
   eventos_era?: Record<string, number>;
   /** Só na resposta de idle_evento_pegar: o que saiu. */
   evento?: EventoPago;
+  /** Dourados novos e Caixinha nova (0076). Ausentes (banco de antes da 0076) = nada valendo. LinkedIn: até quando, o
+   *  gerador e o multiplicador da produção toda (1 + 29·f, congelado no clique). */
+  linkedin_ate?: string | null; linkedin_gen?: number | null; linkedin_mult?: number | null;
+  /** Combo ×7 até aqui; quantos pegos seguidos já tem e o segundo do último. */
+  combo_ate?: string | null; combo_n?: number; combo_seg?: number | null;
+  /** Dourados garantidos (Pix devolvido, Chamar) ainda por aparecer ou na tela. */
+  garantidos?: Garantido[];
+  /** Jogadas no Tigrinho hoje (0 se a última foi outro dia) e o dia da última (data de Brasília). */
+  tigre_n?: number; tigre_dia?: string | null;
+  /** O que a Caixinha guardou: dourados pra chamar (até 3), cupons, créditos de Espiar; o Cashback até quando. */
+  chamados?: number; cupons?: number; info_creditos?: number; cashback_ate?: string | null;
+  /** Ações espiadas na Bolsa e ainda válidas (ação -> { ate_tick, em }); ausente = nenhuma. */
+  espiadas?: Record<string, { ate_tick: number; em: string }>;
+  /** Contadores das conquistas (trend_max, pix_dev, tigre_perdeu, tigre_seq, combos, cupons, cashback); não zeram na venda. */
+  dourados_cont?: Record<string, number>;
+  /** Plantas crescendo nos canteiros abertos (o Adubo de farmácia precisa de uma). */
+  horta_crescendo?: number;
+  /** Só na resposta de idle_dourado_pegar: o que saiu. */
+  dourado?: DouradoPago;
   /** Bônus da horta agora (0048); a página aplica nos preços. */
   horta_bonus?: BonusHorta;
   /** Mapa do rolê (0066): o multiplicador dos lugares (marcos e estratégias) que já está na taxa; a página multiplica o "cada". */
@@ -232,3 +251,11 @@ export type LugarEstado = {
 };
 
 export type EventoPago = { tipo: number; premio: number | null; ganho: number; gols: number };
+/** Um dourado garantido (0076): o segundo em que aparece, o tipo e se rende o dobro (o do Pix devolvido). */
+export type Garantido = { seg: number; tipo: number; dobro: boolean };
+/** O que o banco pagou ao pegar um dourado (0076). `lado` é a escolha no Pix (0 ficar, 1 devolver); `gen`/`mult` o
+ *  LinkedIn; `garantido_seg` o segundo do garantido do Pix devolvido; `tigre` a jogada; `combo` = fechou um Combo agora. */
+export type DouradoPago = {
+  tipo: number; lado: number; ganho: number; dobro: boolean; moedas: number; gen: number | null; mult: number | null;
+  garantido_seg: number | null; tigre: { pagou: boolean; gratis: boolean; perdeu: number; n: number } | null; combo: boolean;
+};

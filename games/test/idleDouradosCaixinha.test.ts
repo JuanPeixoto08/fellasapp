@@ -8,7 +8,7 @@ import type { IdleState } from '../shared/types';
 import { catalogo } from '../idle/catalogo';
 import { derrubada } from '../idle/convidados';
 import { escolhaLinkedin, segundoPix, sorteioDourado, tigrePaga, tipoDourado, tipoGarantido } from '../idle/dourados';
-import { rendasGeradores } from '../idle/economia';
+import { produzido, rendasGeradores, VIRAL_MS } from '../idle/economia';
 import { OPP_CORTE, tipo } from '../idle/oportunidades';
 import { freshDb, type TestDb } from './db';
 
@@ -140,5 +140,143 @@ describe('a sorte (paridade com dourados.ts e oportunidades.ts)', () => {
     const ts = rendasGeradores(catalogo, s);
     const soma = (v: number[]) => v.reduce((a, x) => a + x, 0);
     ts.forEach((x, i) => expect(x / soma(ts)).toBeCloseTo(r[i] / soma(r), 12));
+  });
+});
+
+describe('o estado, a conta e a compra (0076, parte B)', () => {
+  beforeEach(abrir);
+  const comprar = async (kind: string, id: number, qtd = 1) => {
+    const antes = await valor();
+    const s = await t.rpc<J>('idle_buy', { p_kind: kind, p_id: id, p_qty: qtd });
+    return { gasto: antes - s.valuation, s };
+  };
+  /** Preço de k do gerador 2 agora, com o custo × fator (0,75 = cupom, 0,5 = Promoção). */
+  const precoGen = async (k: number, fator = 1) => (await q<{ p: number }>(
+    `select public.idle_price(c.custo, s.generators[2], $2, public.idle_cost_mult(s) * $3) as p
+       from public.idle_cat_gen c, public.idle_state s where c.id = 2 and s.user_id = $1`, [A, k, fator]))[0].p;
+
+  it('fechar a conta com LinkedIn e Combo é igual a produzido (sozinhos e com ×5, Viralizou e Marmita)', async () => {
+    const casos: (number | null)[][] = [
+      [40, null, null, null, null], [null, 30, null, null, null], [40, 30, 20, null, null], [40, 30, null, 60, null], [40, 30, null, null, 50],
+    ];
+    for (const [li, co, boost, viral, marmita] of casos) {
+      await q(`update public.idle_state set settled_at = now(),
+                 linkedin_ate = case when $2::int is null then null else now() + make_interval(secs => $2) end, linkedin_mult = 4.5,
+                 combo_ate = case when $3::int is null then null else now() + make_interval(secs => $3) end,
+                 boost_ate = case when $4::int is null then '{}' else array[now() + make_interval(secs => $4)] end,
+                 viral_ate = case when $5::int is null then '{}' else array[now() + make_interval(secs => $5)] end,
+                 marmita_ate = case when $6::int is null then null else now() + make_interval(secs => $6) end
+               where user_id = $1`, [A, li, co, boost, viral, marmita]);
+      const r = await taxa();
+      const [{ v0, v1 }] = await q<{ v0: number; v1: number }>(
+        `select s.valuation as v0, (public.idle_settle(s, s.settled_at + interval '100 seconds')).valuation as v1
+           from public.idle_state s where user_id = $1`, [A]);
+      const outros = [...(li === null ? [] : [{ ateMs: li * 1000, mult: 4.5 }]), ...(co === null ? [] : [{ ateMs: co * 1000, mult: 7 }])];
+      const esperado = produzido(r, 0, 100_000, boost === null ? null : [boost * 1000], viral === null ? [] : [viral * 1000], VIRAL_MS,
+        marmita === null ? null : marmita * 1000, outros);
+      expect(v1 - v0).toBeCloseTo(esperado, 0);
+    }
+  });
+  it('cupom: gerador 25% mais barato no 1 e no 10, gasta 1 por compra; melhoria não gasta', async () => {
+    await q('update public.idle_state set cupons = 2 where user_id = $1', [A]);
+    let p = await precoGen(1, 0.75);
+    let r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(p, 3);
+    expect(r.s.cupons).toBe(1);
+    p = await precoGen(10, 0.75);
+    r = await comprar('gerador', 2, 10);
+    expect(r.gasto).toBeCloseTo(p, 3);
+    expect(r.s.cupons).toBe(0);
+    p = await precoGen(1);
+    r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(p, 3);
+    await q('update public.idle_state set cupons = 1 where user_id = $1', [A]);
+    r = await comprar('melhoria', 11);
+    expect(r.s.cupons).toBe(1);
+  });
+  it('Máx com cupom: compra o que dá com o preço do cupom', async () => {
+    const tres = await precoGen(3, 0.75);
+    await q('update public.idle_state set cupons = 1, valuation = $2 where user_id = $1', [A, tres * 1.0000001]);
+    const r = await comprar('gerador', 2, 0);
+    expect(r.s.generators[1]).toBe(23);
+    expect(r.s.cupons).toBe(0);
+  });
+  it('com Promoção o cupom fica guardado; com meia-preço a compra de 1 usa a meia e o cupom também fica (até 50%)', async () => {
+    await q(`update public.idle_state set cupons = 3, promo_ate = now() + interval '30 seconds' where user_id = $1`, [A]);
+    const meio = await precoGen(1, 0.5);
+    let r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(meio, 3);
+    expect(r.s.cupons).toBe(3);
+    await q('update public.idle_state set promo_ate = null, meias = 1 where user_id = $1', [A]);
+    const metade = (await precoGen(1)) / 2;
+    r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(metade, 3);
+    expect(r.s.cupons).toBe(3);
+    expect(r.s.meias).toBe(0);
+  });
+  it('cashback: devolve 30% (gerador e melhoria) e soma no contador; com Promoção paga 35%; acabou há 0,5 s ainda vale', async () => {
+    await q(`update public.idle_state set cashback_ate = now() + interval '60 seconds' where user_id = $1`, [A]);
+    const cheio = await precoGen(1);
+    let r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(cheio * 0.7, 3);
+    const [{ upg }] = await q<{ upg: number }>('select preco as upg from public.idle_cat_upg where id = 11');
+    r = await comprar('melhoria', 11);
+    expect(r.gasto).toBeCloseTo(upg * 0.7, 3);
+    expect(r.s.dourados_cont.cashback).toBeCloseTo(0.3 * (cheio + upg), 3);
+    await q(`update public.idle_state set promo_ate = now() + interval '30 seconds' where user_id = $1`, [A]);
+    const meio = await precoGen(1, 0.5);
+    r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(meio * 0.7, 3); // 35% do cheio
+    await q(`update public.idle_state set promo_ate = null, cashback_ate = now() - interval '500 milliseconds' where user_id = $1`, [A]);
+    const deNovo = await precoGen(1);
+    r = await comprar('gerador', 2);
+    expect(r.gasto).toBeCloseTo(deNovo * 0.7, 3);
+  });
+  it('o JSON traz os campos novos e esconde o que já passou (Combo, garantido velho, jogadas de ontem)', async () => {
+    const agora = await agoraSeg();
+    await q(`update public.idle_state set linkedin_ate = now() + interval '1 minute', linkedin_gen = 2, linkedin_mult = 4.5,
+               combo_ate = now() - interval '1 second', combo_n = 2, combo_seg = $2::bigint, cashback_ate = now() + interval '1 minute',
+               garantidos = jsonb_build_array(jsonb_build_object('seg', $2::bigint - 100, 'tipo', 0, 'dobro', true),
+                                              jsonb_build_object('seg', $2::bigint + 5, 'tipo', 2, 'dobro', false)),
+               tigre_dia = public.games_today() - 1, tigre_n = 3, chamados = 2, cupons = 7, info_creditos = 1,
+               dourados_cont = '{"pix_dev": 4}' where user_id = $1`, [A, agora]);
+    const s = await t.rpc<J>('idle_open');
+    expect(s).toMatchObject({ linkedin_gen: 2, linkedin_mult: 4.5, combo_ate: null, combo_n: 2, combo_seg: agora, tigre_n: 0,
+      chamados: 2, cupons: 7, info_creditos: 1, dourados_cont: { pix_dev: 4 }, horta_crescendo: 0 });
+    expect(s.linkedin_ate).not.toBeNull();
+    expect(s.cashback_ate).not.toBeNull();
+    expect(s.garantidos).toEqual([{ seg: agora + 5, tipo: 2, dobro: false }]);
+  });
+  it('o JSON conta as jogadas do Tigrinho de hoje e só devolve as espiadas de menos de 2 h', async () => {
+    await q(`update public.idle_state set tigre_dia = public.games_today(), tigre_n = 2,
+               espiadas = jsonb_build_object('1', jsonb_build_object('ate_tick', 5, 'em', now() - interval '1 hour'),
+                                             '2', jsonb_build_object('ate_tick', 5, 'em', now() - interval '3 hours'))
+             where user_id = $1`, [A]);
+    const s = await t.rpc<J>('idle_open');
+    expect(s.tigre_n).toBe(2);
+    expect(Object.keys(s.espiadas ?? {})).toEqual(['1']);
+  });
+  it('horta_crescendo conta só as plantas ainda não maduras', async () => {
+    await q('update public.idle_state set generators[11] = 1 where user_id = $1', [A]);
+    const [e] = await q<{ id: number; amadurece_s: number }>('select id, amadurece_s from public.idle_cat_horta order by amadurece_s desc limit 1');
+    await q(`insert into public.idle_horta_plantas (user_id, canteiro, especie, inicio) values ($1, 0, $2, now()),
+               ($1, 1, $2, now() - make_interval(secs => $3 + 10))`, [A, e.id, e.amadurece_s]);
+    const s = await t.rpc<J>('idle_open');
+    expect(s.horta_crescendo).toBe(1);
+  });
+  it('vender a startup zera os bônus e os estoques novos; os contadores e o Tigrinho do dia ficam', async () => {
+    await q(`update public.idle_state set linkedin_ate = now() + interval '1 minute', linkedin_gen = 2, linkedin_mult = 4.5,
+               combo_ate = now() + interval '1 minute', combo_n = 2, combo_seg = 1, garantidos = '[{"seg": 1, "tipo": 0, "dobro": true}]',
+               tigre_dia = public.games_today(), tigre_n = 3, chamados = 2, cupons = 7, cashback_ate = now() + interval '1 minute',
+               info_creditos = 2, espiadas = jsonb_build_object('1', jsonb_build_object('ate_tick', 1, 'em', now())),
+               dourados_cont = '{"pix_dev": 4}', prestige_earned = 0, valuation = 1e30, generators[30] = 150, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    const [l] = await q<Record<string, unknown>>(
+      `select linkedin_ate, linkedin_gen, linkedin_mult, combo_ate, combo_n, combo_seg, garantidos, chamados, cupons, cashback_ate,
+              info_creditos, espiadas, dourados_cont, tigre_n, tigre_dia = public.games_today() as tigre_hoje
+         from public.idle_state where user_id = $1`, [A]);
+    expect(l).toEqual({ linkedin_ate: null, linkedin_gen: null, linkedin_mult: null, combo_ate: null, combo_n: 0, combo_seg: null,
+      garantidos: [], chamados: 0, cupons: 0, cashback_ate: null, info_creditos: 0, espiadas: {}, dourados_cont: { pix_dev: 4 },
+      tigre_n: 3, tigre_hoje: true });
   });
 });
