@@ -108,3 +108,13 @@ describe('agenda do fundo', () => {
     expect(lista.length).toBeGreaterThan(50);
   });
 });
+
+describe('selos dos eventos de era', () => {
+  it('selos da Marmita e da Atualização, com caixinha', () => {
+    const agora = Date.parse('2026-10-14T12:00:00Z');
+    const l = selosBonus({ promo_ate: null, marmita_ate: '2026-10-14T12:02:41Z', upg_desc_ate: '2026-10-14T12:01:40Z' }, agora);
+    expect(l.map((x) => x.texto)).toEqual(['Marmita ×3 · 2:41', 'Melhorias −25% · 1:40']);
+    expect(l[0].dica?.titulo).toBe('Marmita da mãe');
+    expect(l[1].dica?.titulo).toBe('Atualização instalada');
+  });
+});

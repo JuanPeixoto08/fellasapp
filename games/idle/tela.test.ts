@@ -38,6 +38,7 @@ beforeEach(() => {
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
     config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
+    pegarEventoEra: vi.fn<Acoes['pegarEventoEra']>(),
     horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
     convidados: vi.fn<Acoes['convidados']>(), sentar: vi.fn<Acoes['sentar']>(), tirar: vi.fn<Acoes['tirar']>(),
     mapa: vi.fn<Acoes['mapa']>(), lugar: vi.fn<Acoes['lugar']>(), abrirLugar: vi.fn<Acoes['abrirLugar']>(), subirNivel: vi.fn<Acoes['subirNivel']>(), lugarAcao: vi.fn<Acoes['lugarAcao']>(), lugarRecarregar: vi.fn<Acoes['lugarRecarregar']>(),
@@ -223,6 +224,25 @@ describe('tela da Fellas Inc.', () => {
     expect(selos[0].classList.contains('ouro')).toBe(true);
     tela.relogioBonus(estado(), T);
     expect(root.querySelectorAll('.selo-bonus')).toHaveLength(0);
+  });
+  it('eventos de era: o botão chama pegarEventoEra; o selo da Marmita anda no lugar (foco e caixinha ficam nele)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ estado: estado({ user_id: '4a681416-b4ee-4976-8cdd-540cc816f28c' }) }));
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    tela.eventosEra.mostrar({ seg: T / 1000, tipo: 3, agoraMs: T });
+    root.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    expect(acoes.pegarEventoEra).toHaveBeenCalledWith(T / 1000, 0);
+    expect(root.querySelector('.evento-era')).toBeNull();
+    const em = (s: number) => new Date(T + s * 1000).toISOString();
+    tela.relogioBonus(estado({ marmita_ate: em(100) }), T);
+    const selo = root.querySelector<HTMLElement>('.selo-bonus')!;
+    expect(selo.textContent).toBe('Marmita ×3 · 1:40');
+    expect(selo.tabIndex).toBe(0);
+    tela.relogioBonus(estado({ marmita_ate: em(100) }), T + 1000);
+    expect(root.querySelector('.selo-bonus')).toBe(selo);
+    expect(selo.textContent).toBe('Marmita ×3 · 1:39');
+    tela.relogioBonus(estado({ marmita_ate: em(100), upg_desc_ate: em(50) }), T + 2000);
+    expect([...root.querySelectorAll('.selo-bonus')].map((x) => x.textContent)).toEqual(['Marmita ×3 · 1:38', 'Melhorias −25% · 0:48']);
   });
   it('Promoção valendo: os preços da Loja saem pela metade (e a meia-preço da Caixinha não soma)', () => {
     const tela = criarTela(root, acoes);

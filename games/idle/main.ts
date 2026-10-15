@@ -8,7 +8,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, Lug
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { descontoAtivo } from './eventosEra';
+import { descontoAtivo, eventoEraEm, posicaoEvento, textoEventoPegou, type TipoEventoEra } from './eventosEra';
 import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
@@ -62,6 +62,7 @@ audio.chaves({ musica: volumeMusica, efeitos: chaves.efeitos });
 let vivoSoou: number | null = null;
 // eventos na tela: o último segundo já olhado e se a Promoção valia no último passo (acabou: os preços voltam)
 let segVisto = 0;
+let segVistoEra = 0; // o mesmo pros eventos de era (a mãe, a Shopee, a call, a tela azul, o Jogo do Brasil)
 const mostrados = new Map<number, TipoDourado>(); // segundo → tipo do que está/esteve na tela
 // aba escondida (PC): o som de cada evento fica agendado no relógio do áudio (a página quase não acorda); os que já
 // soaram não tocam de novo quando você volta e o ícone ainda está na tela
@@ -281,6 +282,26 @@ const tela = criarTela(document.getElementById('app')!, {
       const err = toGameError(e);
       if (err.code === 'no_session') fase = 'sem_sessao';
       else if (err.code !== 'idle_dourado_pego') {
+        audio.tocar('erro');
+        aviso = err.message;
+      }
+      await recarregar().catch(() => undefined);
+      render();
+    }
+  })(),
+  // evento de era: o banco confere o segundo e a era e paga; manda os gols no Jogo do Brasil
+  pegarEventoEra: (seg, gols) => void (async () => {
+    if (!ancora) return;
+    const p = posicaoEvento(ancora.estado.user_id, seg, 0);
+    try {
+      const s = await api.idleEventoPegar(seg, gols);
+      aplicar(s);
+      audio.tocar('douradoPego');
+      if (chaves.avisos && s.evento) tela.dourados.subirTexto(textoEventoPegou(s.evento), p.x, p.y);
+    } catch (e) {
+      const err = toGameError(e);
+      if (err.code === 'no_session') fase = 'sem_sessao';
+      else if (err.code !== 'idle_evento_pego' && err.code !== 'idle_evento_gone') { // era mudou ou já foi: sem bonk
         audio.tocar('erro');
         aviso = err.message;
       }
@@ -560,6 +581,9 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS
 if (import.meta.env.DEV) {
   (window as unknown as { __mostrarDourado: (seg: number, tipo: TipoDourado) => void }).__mostrarDourado = (seg, tipo) =>
     mostrarDourado(seg, tipo, agoraSrv(), ancora ? efeitos(ancora.estado).douradoTela : JANELA_S);
+  // __eventoEra(tipo) (dev/mockIdle.ts) força um evento de era agora
+  (window as unknown as { __mostrarEventoEra: (seg: number, tipo: TipoEventoEra) => void }).__mostrarEventoEra = (seg, tipo) =>
+    tela.eventosEra.mostrar({ seg, tipo, agoraMs: agoraSrv() });
 }
 
 function render() {
@@ -677,6 +701,7 @@ setInterval(() => {
   // eventos na tela: tira os que passaram, anda os selos e olha os segundos novos (só jogando, com a aba visível)
   const agoraMs = agoraSrv();
   tela.dourados.tick(agoraMs);
+  tela.eventosEra.tick(agoraMs);
   tela.relogioBonus(ancora.estado, agoraMs);
   const seg = Math.floor(agoraMs / 1000);
   if (fase === 'jogando' && ancora.estado.started && seg !== segVisto) {
@@ -685,6 +710,15 @@ setInterval(() => {
       const e = eventoEm(ancora.estado, x);
       if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS);
     }
+    // eventos de era: olha 30 s pra trás (a janela mais longa); um por vez, e não no segundo de um dourado
+    for (let x = Math.max(segVistoEra + 1, seg - 29); x <= seg; x++) {
+      const t = eventoEraEm(ancora.estado.user_id, x, ancora.estado.era);
+      if (t !== null && !eventoEm(ancora.estado, x) && !tela.eventosEra.ativo()) {
+        tela.eventosEra.mostrar({ seg: x, tipo: t, agoraMs });
+        if (tela.eventosEra.ativo()) audio.tocar(({ 1: 'mae', 2: 'shopee', 3: 'call', 4: 'telaAzul', 5: 'gol' } as const)[t]);
+      }
+    }
+    segVistoEra = seg;
     segVisto = seg;
   }
   const promo = promoAtiva(ancora.estado, agoraMs);

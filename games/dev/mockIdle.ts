@@ -92,7 +92,7 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 // console do dev: __rico(1e12) põe valuation na sua empresa; __meContrata() faz o primeiro bot te contratar;
 // __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres; __trader(3) abre a Bolsa (3 traders e F$ de sobra)
 const w = window as unknown as {
-  __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
+  __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __eventoEra: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -129,6 +129,21 @@ w.__dourado = async (tipo = 2) => {
   }
   await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
   (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);
+};
+// __eventoEra(5) põe um evento de era na tela agora (1 mãe, 2 Shopee, 3 call, 4 tela azul, 5 Jogo do Brasil)
+w.__eventoEra = async (tipo = 1) => {
+  const { ready } = await import('./mockDb');
+  const db = await ready;
+  const seg = Math.floor(Date.now() / 1000);
+  const ja = await db.query<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'idle_evento_era_sorte'");
+  if (!ja.rows[0].n) {
+    await db.exec(`alter function public.idle_evento_era(uuid, bigint, int) rename to idle_evento_era_sorte;
+      create table public.mock_evento (s bigint primary key, tipo int);
+      create function public.idle_evento_era(u uuid, s bigint, era int) returns int language sql stable as
+        'select coalesce((select tipo from public.mock_evento m where m.s = idle_evento_era.s), public.idle_evento_era_sorte(u, s, era))';`);
+  }
+  await db.query('insert into public.mock_evento values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
+  (window as unknown as { __mostrarEventoEra?: (seg: number, tipo: number) => void }).__mostrarEventoEra?.(seg, tipo);
 };
 /** Quantos Food trucks o mock tem agora. */
 async function dono2(): Promise<{ ft: number }> {
@@ -199,6 +214,14 @@ wc.__faixaAgora = async () => {
     b.textContent = nome;
     b.style.cssText = 'padding:6px 8px;background:#5B3FD9;color:#fff;border:0;cursor:pointer';
     b.addEventListener('click', () => void w.__dourado(tipo));
+    painel.append(b);
+  });
+  // eventos de era (1 a 5): a mãe, a Shopee, a call, a tela azul e o Jogo do Brasil
+  ['Mãe', 'Shopee', 'Call', 'Tela azul', 'Jogo do Brasil'].forEach((nome, i) => {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#2A5BD7;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void w.__eventoEra(i + 1));
     painel.append(b);
   });
   const horta: [string, () => Promise<void>][] = [

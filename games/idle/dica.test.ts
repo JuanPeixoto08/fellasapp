@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
-  dicaContratos, dicaDesafio, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
+  dicaContratos, dicaDesafio, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
   dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
 } from './dica';
 import { caderno } from './camisetaria';
 import { MARCOS } from './mapa';
 import type { LugarEstado } from '../shared/types';
 import { fatores, multContratos, taxa } from './economia';
+import { formatarValor } from './formatar';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0, generators: Array(30).fill(0),
@@ -276,5 +277,13 @@ describe('caixinha da oportunidade com "rendem o dobro" (Viralizar / Xepa: conta
   it('metade: guarda 2 de uma vez; com 1 guardada, as próximas 3', () => {
     expect(textos(dicaOportunidade(viralizar(), 2, agora)!)).toEqual(['Rendem o dobro: guarda 2 compras pela metade de uma vez']);
     expect(textos(dicaOportunidade(viralizar({ meias: 1, half_price: true }), 2, agora)!)).toEqual(['Você tem 1 guardada. Pegando esta, as próximas 3 compras saem pela metade']);
+  });
+});
+
+describe('caixinha dos eventos de era', () => {
+  it('dicaEventoEra diz o que dá agora, em números', () => {
+    expect(dicaEventoEra(3, 1000).linhas[0].texto).toBe(`Dá ${formatarValor(1_800_000)} agora`);
+    expect(dicaEventoEra(5, 1000).linhas[0].texto).toBe(`Cada gol: ${formatarValor(300_000)} (até 7)`);
+    expect(dicaEventoEra(1, 1000).linhas[0].texto).toBe('Produção ×3 por 3 min');
   });
 });

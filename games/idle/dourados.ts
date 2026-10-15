@@ -1,6 +1,7 @@
 // Eventos na tela (tipo cookie dourado): a cada segundo há chance 1/600 de aparecer um (mais com o ramo Dourados da
 // árvore ou o Gemaplys), pra quem está com o jogo aberto, e ele some em 12 s (24 com o Olho de lince). A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
 // (idle_dourado na 0045), que confere o clique. BigInt: os quadrados passam de 2^53.
+import type { Dica } from './dica';
 import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
@@ -55,7 +56,9 @@ export function posicao(uid: string, s: number, _lado = 0): { x: number; y: numb
 }
 
 // ---------- o que está valendo (selos) e os textos ----------
-type ComBonus = { promo_ate: string | null; viral?: readonly string[]; boosts?: readonly string[] };
+type ComBonus = {
+  promo_ate: string | null; viral?: readonly string[]; boosts?: readonly string[]; marmita_ate?: string | null; upg_desc_ate?: string | null;
+};
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -71,14 +74,25 @@ export const promoAtiva = (s: { promo_ate: string | null }, agoraMs: number) => 
 export const viraisAtivos = (s: ComBonus, agoraMs: number) => (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((a, b) => a - b);
 
 /** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21". */
-export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro: boolean }[] {
-  const out: { texto: string; ouro: boolean }[] = [];
+export function selosBonus(s: ComBonus, agoraMs: number): { texto: string; ouro: boolean; dica?: Dica }[] {
+  const out: { texto: string; ouro: boolean; dica?: Dica }[] = [];
   const v = viraisAtivos(s, agoraMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
   // os ×5 da oportunidade empilhados somam (0064): ×5, ×10, ×15… até o primeiro acabar
   const b = (s.boosts ?? []).map(Date.parse).filter((f) => f > agoraMs).sort((x, y) => x - y);
   if (b.length) out.push({ texto: `×${(5 * b.length).toLocaleString('pt-BR')} · ${mmss(b[0] - agoraMs)}`, ouro: b.length >= 2 });
   if (promoAtiva(s, agoraMs)) out.push({ texto: `Metade · ${mmss(Date.parse(s.promo_ate!) - agoraMs)}`, ouro: false });
+  // eventos de era (0074): a Marmita (×3) e a Atualização (melhorias −25%), cada um com a sua caixinha
+  if (s.marmita_ate && Date.parse(s.marmita_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.marmita_ate) - agoraMs);
+    out.push({ texto: `Marmita ×3 · ${falta}`, ouro: false, dica: { titulo: 'Marmita da mãe', linhas: [
+      { texto: 'Produção ×3, por cima de todo o resto' }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
+  if (s.upg_desc_ate && Date.parse(s.upg_desc_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.upg_desc_ate) - agoraMs);
+    out.push({ texto: `Melhorias −25% · ${falta}`, ouro: false, dica: { titulo: 'Atualização instalada', linhas: [
+      { texto: 'Melhorias 25% mais baratas (junta com Promoção e Horta)' }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
   return out;
 }
 

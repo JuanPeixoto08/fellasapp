@@ -7,6 +7,7 @@ import { catalogo, type Melhoria } from './catalogo';
 import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
+import { ganhoEventoAgora, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
 } from './camisetaria';
@@ -407,4 +408,16 @@ export function dicaCupTrancados(tipo: 'base' | 'mistura' | 'extra' | 'tamanho' 
   const [um, varios] = TIPO_CUP[tipo];
   const resto = falta.length - 1;
   return `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
+}
+
+/** A caixinha do evento de era na tela: o que ele dá agora, nos números da pessoa. */
+export function dicaEventoEra(tipo: TipoEventoEra, rate: number): Dica {
+  const g = ganhoEventoAgora(tipo, rate);
+  const linhas: LinhaDica[] =
+    tipo === 1 ? [{ texto: 'Produção ×3 por 3 min' }]
+    : tipo === 2 ? [{ texto: `Sorteio: ${formatarValor(g)} (1 h, menos a Taxa das blusinhas), Promoção por 1 min ou ×5 por 2 min` }]
+    : tipo === 3 ? [{ texto: `Dá ${formatarValor(g)} agora` }, { texto: '30 min da sua produção', tom: 'fraco' }]
+    : tipo === 4 ? [{ texto: 'Melhorias 25% mais baratas por 2 min' }]
+    : [{ texto: `Cada gol: ${formatarValor(g)} (até 7)` }, { texto: '5 min da sua produção por gol', tom: 'fraco' }];
+  return { titulo: NOME_EVENTO_ERA[tipo], linhas };
 }

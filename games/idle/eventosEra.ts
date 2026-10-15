@@ -1,6 +1,8 @@
 // Eventos de era (14/10): um por era, separados dos dourados. Sorte com semente (id do jogador + segundo), igual ao banco
 // (idle_evento_era na 0074), que confere o clique e paga. O evento de uma era entra na roda quando você chega nela e
 // continua depois; o da sua era atual pesa 3, os antigos 1. BigInt: os quadrados passam de 2^53.
+import type { EventoPago } from '../shared/types';
+import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
 export type TipoEventoEra = 1 | 2 | 3 | 4 | 5;
@@ -57,3 +59,22 @@ const vale = (iso: string | null | undefined, agoraMs: number) => !!iso && Date.
 export const marmitaAtiva = (s: { marmita_ate?: string | null }, agoraMs: number) => vale(s.marmita_ate, agoraMs);
 /** Atualização instalada valendo (melhorias −25%). */
 export const descontoAtivo = (s: { upg_desc_ate?: string | null }, agoraMs: number) => vale(s.upg_desc_ate, agoraMs);
+
+// ---------- textos ----------
+/** Quanto entra em F$ na hora, com a produção `rate` de agora: Shopee (se sair F$), a call e 1 gol. */
+export function ganhoEventoAgora(tipo: TipoEventoEra, rate: number): number {
+  return tipo === 2 ? rate * 3600 * 0.8 : tipo === 3 ? rate * 1800 : tipo === 5 ? rate * 300 : 0;
+}
+
+/** O texto que sobe quando pega (com o que o banco mandou em `evento`). */
+export function textoEventoPegou(e: EventoPago): string {
+  if (e.tipo === 1) return 'Marmita da mãe! ×3 por 3 min';
+  if (e.tipo === 2) {
+    if (e.premio === 1) return 'Promoção! Tudo pela metade por 1 min';
+    if (e.premio === 2) return '×5 por 2 min';
+    return `+${formatarValor(e.ganho)} (Taxa das blusinhas: −20%)`;
+  }
+  if (e.tipo === 3) return `Fugiu da call! +${formatarValor(e.ganho)}`;
+  if (e.tipo === 4) return 'Atualização instalada! Melhorias −25%';
+  return `${e.gols} ${e.gols === 1 ? 'gol' : 'gols'}! +${formatarValor(e.ganho)}`;
+}

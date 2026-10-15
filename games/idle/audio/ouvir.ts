@@ -15,6 +15,7 @@ const EFEITOS: [string, IdEfeito, OpcoesEfeito?][] = [
   ['Te contrataram', 'contratado'], ['Ações viraram pó', 'po'], ['Oportunidade nova', 'oportunidade'], ['Pegar oportunidade', 'pegar'],
   ['Abrir CNPJ', 'cnpj'], ['Erro', 'erro'], ['Clique', 'clique'], ['Abrir folha', 'abrir'], ['Fechar folha', 'fechar'],
   ['Dourado apareceu', 'dourado'], ['Pegou o dourado', 'douradoPego'],
+  ['Mãe chamando', 'mae'], ['Pacote da Shopee', 'shopee'], ['Saiu da call', 'call'], ['Tela azul', 'telaAzul'], ['Gol do Brasil', 'gol'],
 ];
 
 const raiz = document.getElementById('ouvir')!;

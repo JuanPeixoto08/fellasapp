@@ -24,9 +24,10 @@ import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
-import { dicaContratos, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
+import { criarEventoEraTela } from './eventoEraTela';
+import { dicaContratos, dicaEventoEra, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
-import { DESCONTO_MELHORIA, descontoAtivo } from './eventosEra';
+import { DESCONTO_MELHORIA, descontoAtivo, posicaoEvento } from './eventosEra';
 import { ganhoInvestidor, promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
@@ -95,11 +96,14 @@ export type Acoes = {
   lugarRecarregar(): void; // a mecânica pede o lugar de novo (chegou a hora de algo: a coleção ficou pronta)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
   pegarDourado(seg: number, lado: number): void;
+  pegarEventoEra(seg: number, gols: number): void;
 };
 export type Tela = {
   canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void;
   /** Eventos na tela (tipo cookie dourado). */
   dourados: ReturnType<typeof criarDouradoTela>;
+  /** Eventos de era (a mãe, a Shopee, a call, a tela azul, o Jogo do Brasil). */
+  eventosEra: ReturnType<typeof criarEventoEraTela>;
   /** Selos do Viralizou e da Promoção com o tempo que falta. */
   relogioBonus(s: IdleState | null, agoraMs: number): void;
   /** Oportunidade nova caiu na Caixinha: a gaveta pula e brilha (junto do "plim"). */
@@ -1048,9 +1052,45 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   // eventos na tela, por cima de tudo
   const dourados = criarDouradoTela(app, (seg, lado) => a.pegarDourado(seg, lado));
+  const eventosEraBase = criarEventoEraTela(app, {
+    aoPegar: (seg, gols) => {
+      dicas.conferir(); // o evento saiu da tela: a caixinha dele fecha
+      a.pegarEventoEra(seg, gols);
+    },
+    dica: (alvo, chave, tipo) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaEventoEra(tipo, ultimo.estado.rate) : null)),
+    posicao: (seg, i) => (ultimo?.estado ? posicaoEvento(ultimo.estado.user_id, seg, i) : { x: 0.5, y: 0.5 }),
+  });
+  const eventosEra: typeof eventosEraBase = {
+    ...eventosEraBase,
+    tick(agoraMs) {
+      const antes = eventosEraBase.ativo();
+      eventosEraBase.tick(agoraMs);
+      if (antes && !eventosEraBase.ativo()) dicas.conferir(); // acabou a janela: a caixinha dele fecha
+    },
+  };
+  // os selos andam a cada passo (100 ms): só refaz quando muda quais são; senão troca o texto no lugar (o foco do
+  // teclado e a caixinha aberta ficam no selo)
+  let selosAgora: ReturnType<typeof selosBonus> = [];
   function relogioBonus(s: IdleState | null, agoraMs: number) {
     const lista = s ? selosBonus(s, agoraMs) : [];
-    selos.replaceChildren(...lista.map((x) => el('span', `selo-bonus${x.ouro ? ' ouro' : ''}`, x.texto)));
+    const antes = selosAgora;
+    selosAgora = lista;
+    const mesmos = lista.length === antes.length && lista.every((x, i) => x.ouro === antes[i].ouro && x.dica?.titulo === antes[i].dica?.titulo);
+    if (mesmos) {
+      if (lista.every((x, i) => x.texto === antes[i].texto)) return;
+      lista.forEach((x, i) => { selos.children[i].textContent = x.texto; });
+      if (lista.some((x) => x.dica)) dicas.conferir(); // o "Acaba em" da caixinha aberta anda junto
+      return;
+    }
+    selos.replaceChildren(...lista.map((x, i) => {
+      const e = el('span', `selo-bonus${x.ouro ? ' ouro' : ''}`, x.texto);
+      if (x.dica) {
+        e.tabIndex = 0; // caixinha também no foco do teclado
+        dicas.ligar(e, `selo-${i}`, () => selosAgora[i]?.dica ?? null);
+      }
+      return e;
+    }));
+    dicas.conferir();
   }
 
   let pulo: ReturnType<typeof setTimeout> | null = null;
@@ -1062,6 +1102,6 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     pulo = setTimeout(() => caixinha.classList.remove('chegou'), 2000);
   }
 
-  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, relogioBonus, chegouOportunidade,
+  return { canvas, renderizar, atualizarValor, relogioBolsa: (ms: number) => bolsaTela.relogio(ms), fatal, dourados, eventosEra, relogioBonus, chegouOportunidade,
     recadoConvidados: (texto: string | null) => convidadosTela.recado(texto) };
 }

@@ -4,7 +4,7 @@ import { hz, INSTRUMENTOS, ruido } from './instrumentos';
 
 export const IDS_EFEITOS = [
   'compra', 'compraMuitas', 'no', 'acaoCompra', 'acaoVende', 'conquista', 'era', 'venda', 'contratado', 'po', 'oportunidade',
-  'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar',
+  'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar', 'mae', 'shopee', 'call', 'telaAzul', 'gol',
 ] as const;
 export type IdEfeito = (typeof IDS_EFEITOS)[number];
 export type OpcoesEfeito = { quantas?: number; lucro?: boolean };
@@ -155,6 +155,31 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     [77, 81, 84, 89, 93, 96].forEach((m, i) => sininho(c, d, t + i * 0.07, m, 0.2, 0.75));
     [96, 98, 96, 98, 96].forEach((m, i) => sininho(c, d, t + 0.45 + i * 0.06, m, 0.1, 0.35));
     return 1.3;
+  },
+  // eventos de era (14/10)
+  mae: (c, d, t) => { // campainha de porta: dim-dom
+    sininho(c, d, t, 84, 0.35, 0.8);
+    sininho(c, d, t + 0.3, 79, 0.5, 0.8);
+    return 0.9;
+  },
+  shopee: (c, d, t) => { // caixa caindo e abrindo
+    bumbo(c, d, t, 0, 0.12, 0.5);
+    ruidoFiltrado(c, d, t + 0.1, 'bandpass', 1800, 500, 0.15, 0.1);
+    return 0.4;
+  },
+  call: (c, d, t) => { // "tutum" de sair da call
+    sininho(c, d, t, 72, 0.12, 0.6);
+    sininho(c, d, t + 0.14, 67, 0.2, 0.6);
+    return 0.4;
+  },
+  telaAzul: (c, d, t) => { // bipe de erro do PC
+    [70, 70, 70].forEach((m, i) => sininho(c, d, t + i * 0.18, m, 0.12, 0.5));
+    return 0.6;
+  },
+  gol: (c, d, t) => { // apito + a torcida
+    [96, 96].forEach((m, i) => sininho(c, d, t + i * 0.12, m, 0.08, 0.6));
+    ruidoFiltrado(c, d, t + 0.25, 'bandpass', 900, 700, 0.6, 0.12);
+    return 0.9;
   },
   plantar: (c, d, t) => {
     // "ploc" de terra: um baque grave que cai, com um chiado curto de terra
