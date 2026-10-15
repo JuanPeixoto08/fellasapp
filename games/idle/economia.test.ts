@@ -223,7 +223,7 @@ describe('árvore de habilidades e conquistas', () => {
     expect(precoContrato(cat, s, 1)).toBeCloseTo(taxa(cat, s) * 1800 * 1.5 * 0.75, 6);
   });
   it('Abrir CNPJ com o Recomeço: dinheiro, notebooks, a era 1 inteira e as gerais mantidas', () => {
-    expect(abertura(cat, efeitosArvore(cat, []))).toEqual({ valuation: 10, generators: [1, ...Array(29).fill(0)], upgrades: [] });
+    expect(abertura(cat, efeitosArvore(cat, []))).toEqual({ valuation: 10, generators: [1, ...Array(41).fill(0)], upgrades: [] });
     const a = abertura(cat, efeitosArvore(cat, [1, 21, 22, 23, 24, 25]), [1001, 1003]);
     expect(a.valuation).toBe(1e6);
     expect(a.generators.slice(0, 7)).toEqual([10, 1, 1, 1, 1, 1, 0]);
@@ -318,5 +318,8 @@ describe('estado curto (resposta de antes da 0078, com 30 geradores)', () => {
     expect(rendasGeradores(cat, s)).toHaveLength(42);
     expect(rendasGeradores(cat, s).every(Number.isFinite)).toBe(true);
     expect(liberada(cat, cat.melhorias.find((x) => x.id === 311)!, s)).toBe(false);
+  });
+  it('a empresa nova (abertura) nasce com os 42 geradores, como o banco', () => {
+    expect(abertura(cat, efeitosArvore(cat, [])).generators).toHaveLength(42);
   });
 });

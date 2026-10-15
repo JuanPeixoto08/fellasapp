@@ -113,7 +113,7 @@ export function pontosTotais(r: number): number {
 /** A empresa do "Abrir CNPJ" com os nós do Recomeço (igual a idle_start na 0041). `gerais`: as melhorias gerais que a
  *  venda manteve (só com "Leva o crachá"). */
 export function abertura(cat: Catalogo, ef: EfeitosArvore, gerais: readonly number[] = []): { valuation: number; generators: number[]; upgrades: number[] } {
-  const generators = Array(30).fill(0);
+  const generators = Array(cat.geradores.length).fill(0);
   generators[0] = ef.inicioNotebooks;
   if (ef.inicioEra1) for (const g of cat.geradores) if (g.era === 1) generators[g.id - 1] = Math.max(generators[g.id - 1], 1);
   return { valuation: ef.inicioValuation, generators, upgrades: ef.manterGerais ? [...gerais] : [] };

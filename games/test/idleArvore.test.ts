@@ -226,6 +226,6 @@ describe('paridade da abertura (economia.ts x idle_start)', () => {
     const esperado = abertura(catalogo, efeitosArvore(catalogo, nos));
     const s = await t.rpc<Estado>('idle_start');
     expect(s.valuation).toBe(esperado.valuation);
-    expect(s.generators.slice(0, 30)).toEqual(esperado.generators.slice(0, s.generators.length));
+    expect(s.generators).toEqual(esperado.generators); // 42 nos dois (0078)
   });
 });

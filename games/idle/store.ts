@@ -51,7 +51,8 @@ export function cenaDoEstado(estado: IdleState, fase: Fase): NomeCena {
 }
 
 export function estrategiaPendente(estado: IdleState): number | null {
-  return estado.started && estado.era >= 2 && estado.strategies[estado.era - 2] < 0 ? estado.era : null;
+  // posição que falta (resposta de antes da 0078, com 4 estratégias) conta como não escolhida
+  return estado.started && estado.era >= 2 && (estado.strategies[estado.era - 2] ?? -1) < 0 ? estado.era : null;
 }
 
 /** O editor de personagem abre sozinho até o primeiro "Bora": sem avatar salvo, sem fechar no X nesta sessão, sem rascunho

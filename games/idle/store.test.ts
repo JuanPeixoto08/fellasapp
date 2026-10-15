@@ -86,6 +86,9 @@ describe('fase e cena', () => {
     expect(estrategiaPendente(base({ era: 1 }))).toBeNull();
     expect(estrategiaPendente(base({ era: 2 }))).toBe(2);
     expect(estrategiaPendente(base({ era: 2, strategies: [0, -1, -1, -1] }))).toBeNull();
+    expect(estrategiaPendente(base({ era: 6, strategies: [0, 0, 0, 0] }))).toBe(6); // lista curta: a era 6 ainda não escolheu
+    expect(estrategiaPendente(base({ era: 6, strategies: [0, 0, 0, 0, 1, -1] }))).toBeNull();
+    expect(estrategiaPendente(base({ era: 7, strategies: [0, 0, 0, 0, 1, -1] }))).toBe(7);
   });
   it('Rolê eterno: oportunidade fica 30 s', () => {
     expect(segundosOportunidade(base())).toBe(10);

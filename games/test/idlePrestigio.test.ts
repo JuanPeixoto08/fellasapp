@@ -125,10 +125,10 @@ describe('vender a startup', () => {
     expect(antes.opp_left).toBe(9); // Viralizar: 13 por dia
     const s = await vender();
     expect(s).toMatchObject({
-      started: false, valuation: 0, upgrades: [], strategies: [-1, -1, -1, -1], boost_until: null, half_price: false,
+      started: false, valuation: 0, upgrades: [], strategies: [-1, -1, -1, -1, -1, -1], boost_until: null, half_price: false,
       era: 1, vendas: 1, pontos_venda: 0, avatar: V,
     });
-    expect(s.generators).toEqual(Array(30).fill(0));
+    expect(s.generators).toEqual(Array(42).fill(0));
     expect(s).toMatchObject({ pontos: P, pontos_vida: P, bonus: { arvore: [1, 11] } });
     expect(s.recorde).toBeCloseTo(antes.rate, 6);
     expect(s.opp_left).toBe(10); // a cota do dia recomeça com a empresa nova (10 sem estratégia)
@@ -219,8 +219,8 @@ describe('vender a startup', () => {
       [A],
     );
     const vendida = await vender();
-    expect(vendida).toMatchObject({ started: false, valuation: 0, boost_until: null, half_price: false, strategies: [-1, -1, -1, -1] });
-    expect(vendida.generators).toEqual(Array(30).fill(0));
+    expect(vendida).toMatchObject({ started: false, valuation: 0, boost_until: null, half_price: false, strategies: [-1, -1, -1, -1, -1, -1] });
+    expect(vendida.generators).toEqual(Array(42).fill(0));
     const gerais = catalogo.melhorias.filter((m) => m.tipo === 'geral').map((m) => m.id);
     const mantidas = nos.includes(23) ? [1001, 1002] : [];
     expect(vendida.upgrades.map(Number).sort()).toEqual(mantidas);
@@ -229,7 +229,7 @@ describe('vender a startup', () => {
     expect(s.valuation).toBe(esperado.valuation);
     expect(s.generators).toEqual(esperado.generators);
     expect(s.upgrades.map(Number).sort()).toEqual([...esperado.upgrades].sort());
-    expect(s).toMatchObject({ boost_until: null, half_price: false, strategies: [-1, -1, -1, -1], era: 1 });
+    expect(s).toMatchObject({ boost_until: null, half_price: false, strategies: [-1, -1, -1, -1, -1, -1], era: 1 });
   });
   it('ninguém escreve nos pontos nem nas conquistas (nem nos próprios); as funções internas estão fechadas', async () => {
     await abrir(A);

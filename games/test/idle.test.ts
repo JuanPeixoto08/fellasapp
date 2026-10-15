@@ -43,8 +43,8 @@ const recuar = (uid: string, segundos: number) =>
 describe('idle_open / idle_start', () => {
   it('primeira vez cria o estado da semana sem empresa aberta', async () => {
     const s = await t.rpc<Estado>('idle_open');
-    expect(s).toMatchObject({ user_id: A, started: false, valuation: 0, rate: 0, era: 1, strategies: [-1, -1, -1, -1], upgrades: [], half_price: false });
-    expect(s.generators).toEqual(Array(30).fill(0));
+    expect(s).toMatchObject({ user_id: A, started: false, valuation: 0, rate: 0, era: 1, strategies: [-1, -1, -1, -1, -1, -1], upgrades: [], half_price: false });
+    expect(s.generators).toEqual(Array(42).fill(0));
   });
   it('idle_open duas vezes seguidas devolve a mesma linha (user_id preenchido)', async () => {
     expect((await t.rpc<Estado>('idle_open')).user_id).toBe(A);
@@ -158,7 +158,7 @@ describe('estratégia por era', () => {
   });
   it('escolhe uma vez; repetir é idle_strategy_set; opção que não existe é idle_bad_choice; era futura é idle_locked', async () => {
     await expect(pick(2, 5)).rejects.toThrow(/idle_bad_choice/);
-    expect((await pick(2, 0)).strategies).toEqual([0, -1, -1, -1]);
+    expect((await pick(2, 0)).strategies).toEqual([0, -1, -1, -1, -1, -1]);
     await expect(pick(2, 1)).rejects.toThrow(/idle_strategy_set/);
     await expect(pick(3, 0)).rejects.toThrow(/idle_locked/);
     await buy('gerador', 1);
