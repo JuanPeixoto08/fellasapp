@@ -145,6 +145,8 @@
 .idle .icone.geral { background-size: 42px 42px; }
 .idle .icone.bronze { border-color: #C98A4B; } .idle .icone.prata { border-color: #B4B0BC; } .idle .icone.ouro { border-color: #FFD25E; }
 .idle .icone.roxo { border-color: #B8A2FF; } .idle .icone.diamante { border-color: #5EC8FF; }
+.idle .icone.rubi { border-color: #E0454B; } .idle .icone.esmeralda { border-color: #5FD38D; }
+.idle .icone.cosmo { border-color: #F2D27A; box-shadow: 0 0 0 1px #B8A2FF; }
 .idle .icone.sinergia { display: flex; }
 .idle .icone .mini { flex: 1; background: no-repeat 0 0 / 84px 21px; image-rendering: pixelated; }
 

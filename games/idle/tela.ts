@@ -111,7 +111,7 @@ export type Tela = {
 const VAZIA: BolsaEstado = { tick: 0, vira_em_ms: 0, r: 0, aberta: false, corretor: 0, escritorio: 0, corretagem: 0.05, empresas: [], carteira: [], viraram_po: [] };
 const mostrar = (n: HTMLElement, sim: boolean) => (sim ? n.removeAttribute('hidden') : n.setAttribute('hidden', ''));
 const ERRO_GALERA = 'Não deu pra carregar a galera. Tenta de novo.';
-const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante'];
+const NIVEL = ['bronze', 'prata', 'ouro', 'roxo', 'diamante', 'rubi', 'esmeralda', 'cosmo'];
 
 
 /** "Some em 3h12" / "Some em 40 min": quanto falta pra oportunidade guardada sumir. */

@@ -17,14 +17,22 @@ describe('catálogo', () => {
     }
   });
 
-  it('melhorias: 150 de gerador, 20 gerais, 30 sinergias, ids únicos', () => {
+  it('melhorias: 240 de gerador, 20 gerais, 30 sinergias, ids únicos', () => {
     const m = catalogo.melhorias;
-    expect(m.filter((x) => x.tipo === 'gerador')).toHaveLength(150);
+    expect(m.filter((x) => x.tipo === 'gerador')).toHaveLength(240);
     expect(m.filter((x) => x.tipo === 'geral')).toHaveLength(20);
     expect(m.filter((x) => x.tipo === 'sinergia')).toHaveLength(30);
-    expect(new Set(m.map((x) => x.id)).size).toBe(200);
+    expect(new Set(m.map((x) => x.id)).size).toBe(290);
     expect(m.find((x) => x.id === 71)).toMatchObject({ tipo: 'gerador', gerador: 7, nivel: 1, requer: 1, nome: 'Crachá com foto' });
     expect(m.find((x) => x.id === 305)).toMatchObject({ gerador: 30, nivel: 5, requer: 100 });
+    expect(m.find((x) => x.id === 16)).toMatchObject({ gerador: 1, nivel: 6, requer: 150, nome: 'ChatGPT fazendo o TCC' });
+    expect(m.find((x) => x.id === 138)).toMatchObject({ gerador: 13, nivel: 8, requer: 300, nome: 'Mensagem subliminar no episódio' });
+    expect(m.find((x) => x.id === 308)).toMatchObject({ gerador: 30, nivel: 8, requer: 300, nome: 'Passagem só de ida' });
+    // cada nível novo custa mais que o anterior do mesmo gerador
+    for (let g = 1; g <= 30; g++) {
+      const precos = [1, 2, 3, 4, 5, 6, 7, 8].map((k) => m.find((x) => x.id === g * 10 + k)!.preco);
+      for (let k = 1; k < 8; k++) expect(precos[k]).toBeGreaterThan(precos[k - 1]);
+    }
   });
 
   it('12 estratégias; todas ligadas (Marca forte e Monopólio dependem dos lugares)', () => {
@@ -46,10 +54,10 @@ describe('catálogo', () => {
     expect(catalogo.cargos).toContain('CEO de nada');
   });
 
-  it('conquistas: 89 visíveis e 14 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
+  it('conquistas: 104 visíveis e 15 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
     const c = catalogo.conquistas;
-    expect(c.filter((x) => !x.escondida)).toHaveLength(89);
-    expect(c.filter((x) => x.escondida)).toHaveLength(14);
+    expect(c.filter((x) => !x.escondida)).toHaveLength(104);
+    expect(c.filter((x) => x.escondida)).toHaveLength(15);
     expect(new Set(c.map((x) => x.id)).size).toBe(c.length);
     for (let g = 1; g <= 30; g++) expect(c.find((x) => x.id === g)).toMatchObject({ tipo: 'gerador', alvo: g, valor: 100, escondida: false });
     expect(c.find((x) => x.id === 7)!.nome).toBe('Estágio não remunerado em escala');
@@ -60,10 +68,19 @@ describe('catálogo', () => {
       expect(x.condicao.length, x.nome).toBeGreaterThan(0);
     }
   });
+  it('as conquistas das eras 1–5 (116–131)', () => {
+    const c = catalogo.conquistas;
+    expect(c.find((x) => x.id === 120)).toMatchObject({ tipo: 'evt_gols', valor: 7, nome: '7 a 1 (pra nós)', escondida: false });
+    for (let e = 1; e <= 5; e++) {
+      expect(c.find((x) => x.id === 120 + e)).toMatchObject({ tipo: 'era_300', alvo: e });
+      expect(c.find((x) => x.id === 125 + e)).toMatchObject({ tipo: 'era_melhorias', alvo: e });
+    }
+    expect(c.find((x) => x.id === 131)).toMatchObject({ tipo: 'melhoria', alvo: 138, escondida: true });
+  });
   it('escondidas: as da spec; a Guiana Brasileira é a Filial em Portugal (a melhoria 283, que mudou de nome)', () => {
     expect(catalogo.conquistas.filter((x) => x.escondida).map((x) => x.nome)).toEqual([
       '6-7', 'Farmou aura', 'Aura negativa', 'Tá saindo da jaula', 'Guiana Brasileira', 'Fez o L', '3h06',
-      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?', 'Coleção encalhada', 'Deu PT',
+      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?', 'Coleção encalhada', 'Deu PT', 'Embaixo do lago prateado',
     ]);
     expect(catalogo.melhorias.find((m) => m.id === 283)).toMatchObject({ nome: 'Filial em Portugal', gerador: 28, requer: 25 });
     expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });

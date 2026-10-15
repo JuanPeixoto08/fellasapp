@@ -45,6 +45,7 @@ export const MIGRATIONS: string[] = [
   '0070_fellas_inc_copao_provas_livres.sql',
   '0071_fellas_inc_bolsa_melhoria_preco.sql',
   '0072_fellas_inc_copao_uma_prova.sql',
+  '0073_fellas_inc_catalogo_eras_1_5.sql',
 ];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;

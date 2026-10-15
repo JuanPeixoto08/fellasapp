@@ -13,38 +13,38 @@ export const GERADORES: readonly string[] = [
   'Foguete pra Marte',
 ];
 
-/** As 5 melhorias de cada gerador (níveis 1, 10, 25, 50 e 100 unidades); cada uma dobra o gerador. */
-export const MELHORIAS_GERADOR: readonly (readonly [string, string, string, string, string])[] = [
-  ['Carregador original', 'Wi-Fi da biblioteca', 'Segundo monitor', 'Café de máquina', 'Noite virada'],
-  ['Foto de terno', 'Textão com emoji', 'Selo de "open to work"', 'Post às 7h da manhã', 'Viralizou no feed'],
-  ['PROCV', 'Tabela dinâmica', 'Macro que ninguém entende', 'Gráfico colorido', 'Planilha que ninguém mexe'],
-  ['Áudio de 3 minutos', 'Figurinha de bom dia', 'Desconto de família', 'Fiado da tia', 'Tia influencer'],
-  ['Cinco estrelas', 'Entrega no mesmo dia', 'Cliente gringo', 'Pacote premium', 'Top Rated'],
-  ['Microfone bom', 'Overlay animado', 'Raid surpresa', 'Sub de 1 real', 'Live de 12 horas'],
-  ['Crachá com foto', 'Vale-transporte', 'Cafeteira só dele', 'Hora extra (não paga)', 'Efetivação (talvez)'],
-  ['Filamento roxo', 'Bico novo', 'Imprimindo a noite toda', 'Segunda impressora', 'Fazenda de impressoras'],
-  ['Lista de transmissão', 'Mensagem fixada', 'Status com preço', 'Grupo 2 (lotado)', 'Grupo 3 (VIP)'],
-  ['Fornecedor que responde', 'Frete em 40 dias', 'Anúncio no story', 'Loja com domínio próprio', 'Fornecedor nacional'],
-  ['Molho da casa', 'Ponto na orla', 'Cardápio no QR', 'Segundo truck', 'Fila dobrando a esquina'],
-  ['Frete grátis', 'Medalha amarela', 'Medalha verde', 'MercadoLíder', 'Full'],
-  ['Microfone condensador', 'Corte pro TikTok', 'Convidado famoso', 'Episódio de 4 horas', 'Patrocínio de energético'],
-  ['Publi com cupom', 'Arroba marcado', 'Recebidos', 'Stories de 15 em 15', 'Collab'],
-  ['Ícone bonito', 'Modo escuro', 'Avaliação 4,9', 'Notificação na hora certa', 'App do Ano'],
-  ['Aula bônus', 'Certificado com selo', 'Comunidade no Discord', 'Mentoria em grupo', 'Turma esgotada'],
-  ['Mídia kit', 'Cliente fixo', 'Reels toda semana', 'Prêmio de agência', 'Conta grande'],
-  ['Café liberado', 'Sala de reunião de vidro', 'Pufe colorido', 'Lista de espera', 'Segunda unidade'],
-  ['Gráfico de velas', 'Alerta no celular', 'Stop no lugar certo', 'Bot de sinais', 'Mesa proprietária'],
-  ['Pitch de 3 minutos', 'Café com investidor', 'Cheque assinado', 'Investidor que indica outro', 'Conselho consultivo'],
-  ['Ar-condicionado', 'Nobreak', 'Rack novo', 'Refrigeração líquida', 'Data center próprio'],
-  ['Deck bonito', 'Valuation pré-money', 'Lead investor', 'Rodada estendida', 'Série B à vista'],
-  ['Post-its na parede', 'Design thinking', 'Hackathon', 'Patente registrada', 'Protótipo que funciona'],
-  ['Due diligence', 'Aperto de mão', 'Sinergias (de verdade)', 'Logo novo', 'Monopólio (quase)'],
-  ['Pulseira VIP', 'Open bar', 'DJ famoso', 'Camarote', 'Line-up internacional'],
-  ['Virar SAF', 'Contratar técnico português', 'Patrocínio master', 'Estádio reformado', 'Título do Brasileirão'],
-  ['Píer', 'Heliponto', 'Resort', 'Festa na ilha', 'Ilha vizinha'],
-  ['Escritório no arranha-céu', 'Carro de luxo da firma', 'Filial em Portugal', 'Parceiro xeique', 'Torre própria'],
-  ['Tocar o sino', 'Ação em alta', 'Dividendos', 'Índice da bolsa', 'Bilionário na capa'],
-  ['Motor reutilizável', 'Lançamento sem explodir', 'Estação em órbita', 'Base na Lua', 'Colônia em Marte'],
+/** As 8 melhorias de cada gerador (níveis 1, 10, 25, 50, 100, 150, 200 e 300 unidades); cada uma dobra o gerador. */
+export const MELHORIAS_GERADOR: readonly (readonly [string, string, string, string, string, string, string, string])[] = [
+  ['Carregador original', 'Wi-Fi da biblioteca', 'Segundo monitor', 'Café de máquina', 'Noite virada', 'ChatGPT fazendo o TCC', 'Starlink no quarto', 'Aviso de despejo em 5 dias'],
+  ['Foto de terno', 'Textão com emoji', 'Selo de "open to work"', 'Post às 7h da manhã', 'Viralizou no feed', 'Carrossel de 10 slides', 'Selfie chorando depois do layoff', 'Selo de Top Voice'],
+  ['PROCV', 'Tabela dinâmica', 'Macro que ninguém entende', 'Gráfico colorido', 'Planilha que ninguém mexe', 'PROCX', 'Copilot na planilha', 'Planilha que roda Doom'],
+  ['Áudio de 3 minutos', 'Figurinha de bom dia', 'Desconto de família', 'Fiado da tia', 'Tia influencer', 'Encaminhada com frequência', 'Corrente com link de pagamento', 'Ceia de Natal com maquininha'],
+  ['Cinco estrelas', 'Entrega no mesmo dia', 'Cliente gringo', 'Pacote premium', 'Top Rated', 'Cliente que paga em "visibilidade"', 'Logo de 5 dólares em 24 h', 'Contrato em dólar'],
+  ['Microfone bom', 'Overlay animado', 'Raid surpresa', 'Sub de 1 real', 'Live de 12 horas', 'Emote próprio', 'Doação com voz de robô', 'Subathon de 30 dias'],
+  ['Crachá com foto', 'Vale-transporte', 'Cafeteira só dele', 'Hora extra (não paga)', 'Efetivação (talvez)', 'Vale-refeição de F$ 12', 'Mesa perto da janela', 'Estagiário do ano (sem vínculo)'],
+  ['Filamento roxo', 'Bico novo', 'Imprimindo a noite toda', 'Segunda impressora', 'Fazenda de impressoras', 'Imprimiu a peça que quebrou', 'Action figure do chefe', 'Imprimiu uma casa'],
+  ['Lista de transmissão', 'Mensagem fixada', 'Status com preço', 'Grupo 2 (lotado)', 'Grupo 3 (VIP)', 'Comunidade com 50 grupos', 'Canal com selo verde', 'Bot que manda bom dia'],
+  ['Fornecedor que responde', 'Frete em 40 dias', 'Anúncio no story', 'Loja com domínio próprio', 'Fornecedor nacional', 'Remessa Conforme', 'Fornecedor da Temu', 'Galpão no Paraguai'],
+  ['Molho da casa', 'Ponto na orla', 'Cardápio no QR', 'Segundo truck', 'Fila dobrando a esquina', 'Smash burger', 'Fila por causa do TikTok', 'Ponto fixo no estádio'],
+  ['Frete grátis', 'Medalha amarela', 'Medalha verde', 'MercadoLíder', 'Full', 'Anúncio patrocinado', 'Chega amanhã', 'Avião de carga próprio'],
+  ['Microfone condensador', 'Corte pro TikTok', 'Convidado famoso', 'Episódio de 4 horas', 'Patrocínio de energético', 'Corte com legenda amarela', 'Mesa com 7 microfones', 'Mensagem subliminar no episódio'],
+  ['Publi com cupom', 'Arroba marcado', 'Recebidos', 'Stories de 15 em 15', 'Collab', 'Publi de bet', 'Recebido de carro', 'Depoimento na CPI'],
+  ['Ícone bonito', 'Modo escuro', 'Avaliação 4,9', 'Notificação na hora certa', 'App do Ano', 'Pop-up pedindo 5 estrelas', 'Assinatura sem botão de cancelar', 'Termos de uso de 90 páginas'],
+  ['Aula bônus', 'Certificado com selo', 'Comunidade no Discord', 'Mentoria em grupo', 'Turma esgotada', 'Método com nome em inglês', 'Imersão num resort', 'Mentoria de F$ 50 mil'],
+  ['Mídia kit', 'Cliente fixo', 'Reels toda semana', 'Prêmio de agência', 'Conta grande', 'Trend da dancinha', 'Briefing em áudio de 7 min', 'Comercial no intervalo do BBB'],
+  ['Café liberado', 'Sala de reunião de vidro', 'Pufe colorido', 'Lista de espera', 'Segunda unidade', 'Kombucha na torneira', 'Cabine de ligação', 'Endereço na Faria Lima'],
+  ['Gráfico de velas', 'Alerta no celular', 'Stop no lugar certo', 'Bot de sinais', 'Mesa proprietária', 'Tigrinho no intervalo', 'Print de lucro editado', 'Corretora nas Bahamas'],
+  ['Pitch de 3 minutos', 'Café com investidor', 'Cheque assinado', 'Investidor que indica outro', 'Conselho consultivo', 'Term sheet no guardanapo', 'Anjo do Shark Tank', 'Anjo com jatinho'],
+  ['Ar-condicionado', 'Nobreak', 'Rack novo', 'Refrigeração líquida', 'Data center próprio', 'GPU com fila de espera', 'Servidor na Islândia', 'Data center no fundo do mar'],
+  ['Deck bonito', 'Valuation pré-money', 'Lead investor', 'Rodada estendida', 'Série B à vista', 'Down round disfarçado', 'Valuation de unicórnio', 'Cheque do SoftBank'],
+  ['Post-its na parede', 'Design thinking', 'Hackathon', 'Patente registrada', 'Protótipo que funciona', 'Óculos de realidade virtual', 'Metaverso (abandonado)', 'IA que faz os slides'],
+  ['Due diligence', 'Aperto de mão', 'Sinergias (de verdade)', 'Logo novo', 'Monopólio (quase)', 'Aprovado pelo Cade', 'Demissão em massa por vídeo', 'Nome novo de três letras'],
+  ['Pulseira VIP', 'Open bar', 'DJ famoso', 'Camarote', 'Line-up internacional', 'Copão de 2 litros', 'Água a F$ 25', 'Festival que vira documentário'],
+  ['Virar SAF', 'Contratar técnico português', 'Patrocínio master', 'Estádio reformado', 'Título do Brasileirão', 'Bet na camisa', 'Craque de volta aos 36', 'Libertadores'],
+  ['Píer', 'Heliponto', 'Resort', 'Festa na ilha', 'Ilha vizinha', 'Gerador a diesel', 'Bunker embaixo da piscina', 'Bunker pra ascender'],
+  ['Escritório no arranha-céu', 'Carro de luxo da firma', 'Filial em Portugal', 'Parceiro xeique', 'Torre própria', 'Chocolate de Dubai', 'Lamborghini da polícia', 'Apartamento na Palm'],
+  ['Tocar o sino', 'Ação em alta', 'Dividendos', 'Índice da bolsa', 'Bilionário na capa', 'Circuit breaker', 'Ação meme', 'Recompra de ações'],
+  ['Motor reutilizável', 'Lançamento sem explodir', 'Estação em órbita', 'Base na Lua', 'Colônia em Marte', 'Foguete pego com hashi', 'Carro esportivo em órbita', 'Passagem só de ida'],
 ];
 
 /** Melhorias gerais: 4 por era, +% em toda a produção. */
@@ -170,7 +170,9 @@ export type TipoConquista =
   | 'mapa_abriu' | 'mapa_dono' | 'mapa_podio'
   // camisetaria (evento): procura da coleção, nota 10 dos 4 influencers, coleção encalhada
   | 'tee_pct' | 'tee_quatro_dez' | 'tee_encalhe'
-  | 'cup_nota' | 'cup_pt';
+  | 'cup_nota' | 'cup_pt'
+  // eras 1–5 (0074): eventos de era (evento) e "a era inteira" (estado)
+  | 'evt_mae' | 'evt_shopee' | 'evt_call' | 'evt_tela' | 'evt_gols' | 'era_300' | 'era_melhorias';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -276,6 +278,22 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 87, tipo: 'tee_pct', valor: 200, nome: 'Esgotou', frase: 'Esgotou. O fornecedor já subiu o preço.', condicao: 'Coleção com 200% de procura' },
   { id: 88, tipo: 'tee_quatro_dez', nome: 'Quatro dez', frase: 'Até o @luisviton deu dez. Print e emoldura.', condicao: 'Coleção com nota 10 dos 4 influencers' },
   { id: 89, tipo: 'cup_nota', valor: 900, nome: 'Nota mil (quase)', frase: 'Faltou 99 pra perfeição. Faltou a dignidade também.', condicao: 'Copão com nota 900 ou mais' },
+  // eras 1–5 (0073): eventos de era, 300 de cada gerador da era, todas as melhorias da era
+  { id: 116, tipo: 'evt_mae', valor: 10, nome: 'Já vou, mãe!', frase: 'Disse "já vou" dez vezes. Ela sabe que é mentira.', condicao: 'Atender a mãe 10 vezes' },
+  { id: 117, tipo: 'evt_shopee', valor: 10, nome: 'Taxa das blusinhas', frase: 'Pagou imposto em dez pacotes de coisa que você nem lembra que comprou.', condicao: 'Abrir 10 pacotes da Shopee' },
+  { id: 118, tipo: 'evt_call', valor: 25, nome: 'Podia ser um e-mail', frase: 'Fugiu de vinte e cinco reuniões. Ninguém percebeu, nem quando você estava nelas.', condicao: 'Sair de 25 reuniões' },
+  { id: 119, tipo: 'evt_tela', valor: 10, nome: 'Já tentou desligar e ligar?', frase: 'Dez telas azuis. O TI mandou abrir chamado.', condicao: 'Reiniciar 10 telas azuis' },
+  { id: 120, tipo: 'evt_gols', valor: 7, nome: '7 a 1 (pra nós)', frase: 'Agora sim. Ninguém do grupo lembra de 2014.', condicao: 'Fazer os 7 gols num Jogo do Brasil' },
+  { id: 121, tipo: 'era_300', alvo: 1, nome: 'Quarto lotado', frase: 'Trezentos de cada coisa e a cama ainda é um colchão no chão.', condicao: 'Ter 300 de cada gerador da era 1' },
+  { id: 122, tipo: 'era_300', alvo: 2, nome: 'A garagem não fecha mais', frase: 'O carro do seu pai dorme na rua há dois anos.', condicao: 'Ter 300 de cada gerador da era 2' },
+  { id: 123, tipo: 'era_300', alvo: 3, nome: 'Open space', frase: 'Sem parede, sem privacidade, sem saída.', condicao: 'Ter 300 de cada gerador da era 3' },
+  { id: 124, tipo: 'era_300', alvo: 4, nome: 'A Faria Lima é minha', frase: 'Cada colete da avenida tem o seu logo.', condicao: 'Ter 300 de cada gerador da era 4' },
+  { id: 125, tipo: 'era_300', alvo: 5, nome: 'Holding das holdings', frase: 'Uma empresa dona da outra, e nenhuma paga imposto.', condicao: 'Ter 300 de cada gerador da era 5' },
+  { id: 126, tipo: 'era_melhorias', alvo: 1, nome: 'Setup completo', frase: 'Tudo comprado. Agora só falta sair do quarto.', condicao: 'Comprar todas as melhorias da era 1' },
+  { id: 127, tipo: 'era_melhorias', alvo: 2, nome: 'Garagem tunada', frase: 'Melhoria de sobra e o portão ainda é manual.', condicao: 'Comprar todas as melhorias da era 2' },
+  { id: 128, tipo: 'era_melhorias', alvo: 3, nome: 'Escritório premium', frase: 'Até a cadeira da reunião faz massagem. A reunião continua inútil.', condicao: 'Comprar todas as melhorias da era 3' },
+  { id: 129, tipo: 'era_melhorias', alvo: 4, nome: 'Andar de luxo', frase: 'Banheiro novo pra estagiário chorar com conforto.', condicao: 'Comprar todas as melhorias da era 4' },
+  { id: 130, tipo: 'era_melhorias', alvo: 5, nome: 'Sede cinco estrelas', frase: 'Heliponto, academia e um RH que não responde.', condicao: 'Comprar todas as melhorias da era 5' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -290,6 +308,7 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 113, escondida: true, tipo: 'conv_mesma', nome: 'São a mesma pessoa?', frase: 'Nunca foram vistos juntos.', condicao: 'Tentar sentar o Gemaplys e o MC V.V juntos' },
   { id: 114, escondida: true, tipo: 'tee_encalhe', nome: 'Coleção encalhada', frase: 'Vai virar pano de chão de luxo.', condicao: 'Coleção com menos de 20% de procura' },
   { id: 115, escondida: true, tipo: 'cup_pt', nome: 'Deu PT', frase: 'A galera foi embora carregada. Literalmente.', condicao: 'Ter PT numa noite' },
+  { id: 131, escondida: true, tipo: 'melhoria', alvo: 138, nome: 'Embaixo do lago prateado', frase: 'Toda música tem uma mensagem escondida. Essa também.', condicao: 'Comprar "Mensagem subliminar no episódio"' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os ramos (o Tempo virou Dourados e a Horta entrou em 13/10). */

@@ -14,9 +14,10 @@ export type { TipoConquista, TipoNo } from './nomes';
 export const PARAMETROS = { custoInicial: 15, crescimentoCusto: 2.6, retornoInicial: 30, crescimentoRetorno: 1.58 };
 export type Parametros = typeof PARAMETROS;
 
-/** Quantas unidades liberam cada nível de melhoria de gerador, e o preço (× custo base do gerador). */
-export const NIVEIS = [1, 10, 25, 50, 100] as const;
-export const PRECO_NIVEL = [10, 50, 500, 50_000, 5_000_000] as const;
+/** Quantas unidades liberam cada nível de melhoria de gerador, e o preço (× custo base do gerador). 150/200/300 desde
+ *  14/10 (eras 1–5); os preços dos três novos saíram da simulação (simulacao.test.ts). */
+export const NIVEIS = [1, 10, 25, 50, 100, 150, 200, 300] as const;
+export const PRECO_NIVEL = [10, 50, 500, 50_000, 5_000_000, 5e9, 5e12, 5e18] as const;
 /** Preço das gerais (× custo do primeiro gerador da era), na ordem em que aparecem na era. */
 export const PRECO_GERAL = [20, 40, 80, 160] as const;
 /** Sinergia: preço (× custo do alvo) e quantas unidades de cada lado pedem. */

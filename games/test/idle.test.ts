@@ -22,7 +22,7 @@ describe('catálogo no banco', () => {
   it('tem os mesmos números do catalogo.ts', async () => {
     const gens = await q<{ id: number; custo: number; renda: number }>('select id, custo, renda from public.idle_cat_gen order by id');
     expect(gens.map((g) => [g.id, g.custo, g.renda])).toEqual(catalogo.geradores.map((g) => [g.id, g.custo, g.renda]));
-    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(200);
+    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(290);
     expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(12);
   });
   it('membro lê; anônimo não', async () => {
