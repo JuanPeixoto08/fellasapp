@@ -1,6 +1,6 @@
 // Convidados do PPP Podcast (minigame 3): o catálogo e as contas da página (puro). Quem decide é o banco (0051, mesmas
 // contas: teste de paridade); aqui só se mostra. Spec: docs/superpowers/specs/2026-10-11-fellas-inc-convidados-design.md.
-import type { IdleVisual } from '../shared/types';
+import type { Garantido, IdleVisual } from '../shared/types';
 import { catalogo } from './catalogo';
 import { douradoEm, janelaS, tipoDourado, type TipoDourado } from './dourados';
 import { efeitosArvore } from './economia';
@@ -127,19 +127,30 @@ export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): Tip
   return t === 7 ? 0 : t; // a faixa nunca é Tigrinho (0076)
 }
 
-type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras; bonus?: { arvore: number[] } };
+type ComCadeiras = {
+  user_id: string; generators: number[]; convidados?: Cadeiras; bonus?: { arvore: number[] }; garantidos?: readonly Garantido[];
+};
 export const SEM_CADEIRAS: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
 const SEM = SEM_CADEIRAS;
 const ctx = (s: ComCadeiras) => ({ c: s.convidados ?? SEM, ppp: s.generators[12] ?? 0 });
 
-/** O evento do segundo `seg` pra esse estado (a sorte, com o Gemaplys e o ramo Dourados, ou a faixa do MC V.V) e quanto
- *  fica na tela. A frequência da árvore entra como peso a mais no extra do Gemaplys (igual a idle_dourado_pegar na 0061). */
-export function eventoEm(s: ComCadeiras, seg: number): { tipo: TipoDourado; janelaS: number } | null {
+export type EventoDourado = { tipo: TipoDourado; janelaS: number; dobro: boolean };
+/** O evento da sorte do segundo `seg` (a sorte com o Gemaplys e o ramo Dourados, ou a faixa do MC V.V), sem os garantidos,
+ *  e quanto fica na tela. A frequência da árvore entra como peso a mais no extra do Gemaplys (igual a idle_dourado_pegar). */
+export function eventoDaSorte(s: ComCadeiras, seg: number): EventoDourado | null {
   const { c, ppp } = ctx(s);
   const gema = peso(c, ppp, GEMAPLYS);
   const ef = efeitosArvore(catalogo, s.bonus?.arvore ?? []);
   const tipo = douradoEm(s.user_id, seg, gema + ef.douradoFreq - 1) ?? faixaEm(s.user_id, c, ppp, seg);
-  return tipo === null ? null : { tipo, janelaS: janelaS(gema, ef.douradoTela) };
+  return tipo === null ? null : { tipo, janelaS: janelaS(gema, ef.douradoTela), dobro: false };
+}
+/** O evento do segundo `seg`: um garantido (Pix devolvido, Chamar; 0076) primeiro, com o tipo e o dobro dele; senão a sorte. */
+export function eventoEm(s: ComCadeiras, seg: number): EventoDourado | null {
+  const g = s.garantidos?.find((x) => x.seg === seg);
+  if (!g) return eventoDaSorte(s, seg);
+  const { c, ppp } = ctx(s);
+  const ef = efeitosArvore(catalogo, s.bonus?.arvore ?? []);
+  return { tipo: g.tipo as TipoDourado, janelaS: janelaS(peso(c, ppp, GEMAPLYS), ef.douradoTela), dobro: g.dobro };
 }
 /** Os eventos de [de, ate) (s), pra agendar o som com a aba escondida. */
 export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: number; tipo: TipoDourado }[] {

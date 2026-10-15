@@ -37,7 +37,7 @@ beforeEach(() => {
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
     bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
-    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(),
+    config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(), chamarDourado: vi.fn<Acoes['chamarDourado']>(),
     pegarEventoEra: vi.fn<Acoes['pegarEventoEra']>(),
     horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
     convidados: vi.fn<Acoes['convidados']>(), sentar: vi.fn<Acoes['sentar']>(), tirar: vi.fn<Acoes['tirar']>(),
@@ -237,6 +237,37 @@ describe('tela da Fellas Inc.', () => {
     expect(selos[0].classList.contains('ouro')).toBe(true);
     tela.relogioBonus(estado(), T);
     expect(root.querySelectorAll('.selo-bonus')).toHaveLength(0);
+  });
+  it('selos novos: o Chamar é um botão (chamarDourado); Cupom e Cashback com o tempo', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    const em = (s: number) => new Date(T + s * 1000).toISOString();
+    tela.relogioBonus(estado({ chamados: 2, cupons: 7, cashback_ate: em(100) }), T);
+    expect([...root.querySelectorAll('.selo-bonus')].map((x) => x.textContent)).toEqual(['Cupom · 7 restantes', 'Cashback 30% · 1:40', 'Chamar dourado (2)']);
+    root.querySelector<HTMLButtonElement>('button.selo-acao')!.click();
+    expect(acoes.chamarDourado).toHaveBeenCalledTimes(1);
+  });
+  it('com o Hype, o selo ×10 vale o Viralizou inteiro (2 min), não só o último minuto', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    const em = (s: number) => new Date(T + s * 1000).toISOString();
+    tela.relogioBonus(estado({ viral: [em(90)] }), T);
+    expect(root.querySelectorAll('.selo-bonus')).toHaveLength(0); // sem o Hype, 60 s: ainda não começou
+    tela.relogioBonus(estado({ viral: [em(90)], bonus: { arvore: [1, 41, 42, 43, 44], conquistas: 0 } }), T);
+    expect([...root.querySelectorAll('.selo-bonus')].map((x) => x.textContent)).toEqual(['×10 · 1:30']);
+  });
+  it('as bolinhas do combo em andamento: nome pro leitor de tela', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo());
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    tela.relogioBonus(estado({ combo_n: 2, combo_seg: T / 1000 }), T);
+    const b = root.querySelector<HTMLElement>('.selos .combo-bolinhas')!;
+    expect(b.classList.contains('selo-bonus')).toBe(false); // não é selo: só os pontos
+    expect(b.textContent).toBe('●●○');
+    expect(b.tabIndex).toBe(0);
+    expect(b.getAttribute('aria-label')).toBe('Combo: 2 de 3');
   });
   it('eventos de era: o botão chama pegarEventoEra; o selo da Marmita anda no lugar (foco e caixinha ficam nele)', () => {
     const tela = criarTela(root, acoes);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
-  dicaContratos, dicaDesafio, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
+  dicaContratos, dicaDesafio, dicaDourado, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
   dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
 } from './dica';
 import { caderno } from './camisetaria';
@@ -312,4 +312,28 @@ describe('cashback e os bônus novos nas caixinhas (0076)', () => {
     expect(t).toContain('Agora: ×7 do Combo');
     expect(t).toContain('Agora: ×10 do Viralizou');
   });
+});
+
+describe('a caixinha dos dourados novos na tela (0076)', () => {
+  const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
+  it('Trend: até 20 min de produção, quanto vale cada moedinha (no dobro, 40 min)', () => {
+    const s = estado({ user_id: U, rate: 1000 });
+    expect(textos(dicaDourado(4, s, { seg: 1 })!)[0]).toBe(`Até 20 min de produção: ${formatarValor(60_000)} por moedinha`);
+    expect(textos(dicaDourado(4, s, { seg: 1, dobro: true })!)[0]).toBe(`Até 40 min de produção: ${formatarValor(120_000)} por moedinha`);
+  });
+  it('LinkedIn: o gerador que sai e quanto a produção sobe', () => {
+    const s = comTaxa({ user_id: U, generators: gens({ 1: 10 }) }); // um gerador só: f = 1
+    expect(textos(dicaDourado(5, s, { seg: 1_760_000_000 })!)).toEqual([`${catalogo.geradores[0].nome} ×30 por 1 min: produção +2.900%`]);
+    expect(textos(dicaDourado(5, s, { seg: 1_760_000_000, dobro: true })!)).toEqual([`${catalogo.geradores[0].nome} ×30 por 2 min: produção +2.900%`]);
+    expect(dicaDourado(5, estado({ user_id: U }), { seg: 1 })).toBeNull(); // nada rendendo: o LinkedIn não tem o que bombar
+  });
+  it('Pix: ficar agora × devolver', () => {
+    expect(textos(dicaDourado(6, estado({ user_id: U, rate: 1000 }), { seg: 1 })!)).toEqual([`Ficar: ${formatarValor(1_800_000)} agora · Devolver: um dourado em dobro`]);
+  });
+  it('Tigrinho: as jogadas grátis de hoje; depois, a chance e quanto ganha ou perde', () => {
+    expect(textos(dicaDourado(7, estado({ user_id: U, rate: 1000, tigre_n: 1 }), { seg: 1 })!)).toEqual(['Jogadas grátis hoje: 2 de 3', `Paga ${formatarValor(1_800_000)}`]);
+    expect(textos(dicaDourado(7, estado({ user_id: U, rate: 1000, tigre_n: 3 }), { seg: 1 })!)).toEqual([
+      'A casa paga 3 em cada 10', `Ganha ${formatarValor(1_800_000)} · perde ${formatarValor(900_000)}`]);
+  });
+  it('os de antes não têm caixinha', () => expect(dicaDourado(0, estado({ user_id: U }), { seg: 1 })).toBeNull());
 });

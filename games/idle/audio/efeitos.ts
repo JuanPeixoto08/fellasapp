@@ -5,11 +5,12 @@ import { hz, INSTRUMENTOS, ruido } from './instrumentos';
 export const IDS_EFEITOS = [
   'compra', 'compraMuitas', 'no', 'acaoCompra', 'acaoVende', 'conquista', 'era', 'venda', 'contratado', 'po', 'oportunidade',
   'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar', 'mae', 'shopee', 'call', 'telaAzul', 'gol',
+  'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo',
 ] as const;
 export type IdEfeito = (typeof IDS_EFEITOS)[number];
 export type OpcoesEfeito = { quantas?: number; lucro?: boolean };
 /** Momentos grandes: a música abaixa enquanto tocam. */
-export const GRANDES: ReadonlySet<IdEfeito> = new Set<IdEfeito>(['conquista', 'era', 'venda', 'cnpj', 'douradoPego']);
+export const GRANDES: ReadonlySet<IdEfeito> = new Set<IdEfeito>(['conquista', 'era', 'venda', 'cnpj', 'douradoPego', 'combo']);
 export const INTERVALO_MS = 60;
 
 type Receita = (ctx: BaseAudioContext, d: AudioNode, t: number, o: OpcoesEfeito) => number;
@@ -209,6 +210,44 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     acorde(c, d, t, [69, 72, 77], 0.5, 0.9);
     [89, 93, 96, 101].forEach((m, i) => sininho(c, d, t + i * 0.05, m, 0.2, 0.7));
     return 1.1;
+  },
+  // dourados novos (0076), afinados em Fá
+  trend: (c, d, t) => { // moedinha curta, uma por clique
+    moeda(c, d, t, 89, 0.08, 0.6);
+    return 0.15;
+  },
+  linkedin: (c, d, t) => { // plim de notificação
+    sininho(c, d, t, 84, 0.12, 0.7);
+    sininho(c, d, t + 0.09, 89, 0.3, 0.7);
+    return 0.5;
+  },
+  pix: (c, d, t) => { // caixa registradora: o trinco e as moedas
+    caixa(c, d, t, 0, 0.06, 0.5);
+    moeda(c, d, t + 0.06, 96, 0.2, 0.8);
+    moeda(c, d, t + 0.13, 101, 0.3, 0.7);
+    return 0.5;
+  },
+  tigreGira: (c, d, t) => { // o rolo: notinhas subindo e voltando
+    [77, 81, 84, 89, 84, 81, 77, 81, 84, 89].forEach((m, i) => moeda(c, d, t + i * 0.13, m, 0.06, 0.35));
+    return 1.4;
+  },
+  tigrePaga: (c, d, t) => {
+    acorde(c, d, t, [77, 81, 84], 0.4, 0.8);
+    [89, 93, 96, 101].forEach((m, i) => sininho(c, d, t + 0.1 + i * 0.06, m, 0.25, 0.6));
+    return 1.0;
+  },
+  tigreCome: (c, d, t) => { // trombone descendo
+    metais(c, d, t, 70, 0.22, 0.6);
+    metais(c, d, t + 0.24, 65, 0.5, 0.6);
+    return 0.8;
+  },
+  combo: (c, d, t) => { // fanfarra curta: Fá, Si bemol, Dó, Fá
+    acorde(c, d, t, [65, 69, 72], 0.1, 0.8);
+    acorde(c, d, t + 0.12, [70, 74, 77], 0.1, 0.8);
+    acorde(c, d, t + 0.24, [72, 76, 79], 0.1, 0.85);
+    acorde(c, d, t + 0.38, [77, 81, 84], 0.7, 1);
+    sininho(c, d, t + 0.38, 96, 0.5, 0.6);
+    return 1.2;
   },
 };
 

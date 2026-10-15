@@ -118,7 +118,8 @@ w.__pontos = async (n) => {
   await dono('update public.idle_state set prestige_earned = prestige_spent + $2 where user_id = $1', [ME, n]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
 };
-// __dourado(2) põe um evento na tela agora (0 Investidor, 1 Promoção, 2 Viralizou, 3 dupla); o banco do mock aceita
+// __dourado(2) põe um evento na tela agora (0 Investidor, 1 Promoção, 2 Viralizou, 3 dupla, 4 Trend, 5 LinkedIn, 6 Pix,
+// 7 Tigrinho); o banco do mock aceita
 w.__dourado = async (tipo = 2) => {
   const { ready } = await import('./mockDb');
   const db = await ready;
@@ -211,7 +212,7 @@ wc.__faixaAgora = async () => {
 {
   const painel = document.createElement('div');
   painel.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99;justify-content:flex-end;max-width:70vw;display:flex;gap:6px;flex-wrap:wrap;padding:6px;background:#000c;font:12px sans-serif';
-  const nomes = ['Investidor', 'Promoção', 'Viralizou', 'Dupla ×100'];
+  const nomes = ['Investidor', 'Promoção', 'Viralizou', 'Dupla ×100', 'Trend', 'LinkedIn', 'Pix', 'Tigrinho'];
   nomes.forEach((nome, tipo) => {
     const b = document.createElement('button');
     b.textContent = nome;
@@ -219,6 +220,20 @@ wc.__faixaAgora = async () => {
     b.addEventListener('click', () => void w.__dourado(tipo));
     painel.append(b);
   });
+  // Combo (o próximo pego fecha), 3 dourados pra chamar e um garantido em dobro no segundo seguinte
+  const extras: [string, () => Promise<void>][] = [
+    ['Combo: falta 1', () => dono('update public.idle_state set combo_n = 2, combo_seg = $2 where user_id = $1', [ME, Math.floor(Date.now() / 1000) - 1]).then(() => { avisar(); })],
+    ['Chamar ×3', () => dono('update public.idle_state set chamados = 3 where user_id = $1', [ME]).then(() => { avisar(); })],
+    ['Garantido em dobro', () => dono(`update public.idle_state set garantidos = coalesce(garantidos, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('seg', $2::bigint, 'tipo', 0, 'dobro', true)) where user_id = $1`,
+      [ME, Math.floor(Date.now() / 1000) + 2]).then(() => { avisar(); })],
+  ];
+  for (const [nome, f] of extras) {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#5B3FD9;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void f());
+    painel.append(b);
+  }
   // eventos de era (1 a 5): a mãe, a Shopee, a call, a tela azul e o Jogo do Brasil
   ['Mãe', 'Shopee', 'Call', 'Tela azul', 'Jogo do Brasil'].forEach((nome, i) => {
     const b = document.createElement('button');

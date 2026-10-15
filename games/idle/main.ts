@@ -1,6 +1,7 @@
 // Fellas Inc.: liga banco, tela e palco. O banco decide tudo; aqui só se pede, se mostra e se anima o número.
 import '../shared/hud/hud.css';
 import './idle.css';
+import './dourados.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
@@ -9,7 +10,8 @@ import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from './eventosEra';
-import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
+import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
+import { VIRAL_MS } from './economia';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
 import { MARCOS } from './mapa';
@@ -31,7 +33,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleEventoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'idleMapa' | 'idleLugar' | 'idleLugarAbrir' | 'idleLugarNivel' | 'idleLugarAcao' | 'fellas' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleDouradoChamar' | 'idleEventoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'idleMapa' | 'idleLugar' | 'idleLugarAbrir' | 'idleLugarNivel' | 'idleLugarAcao' | 'fellas' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -39,7 +41,7 @@ const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has
 const RECARREGA = [
   'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
   'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open', 'idle_prestige_low', 'idle_points_low',
-  'idle_node_owned', 'idle_dourado_pego',
+  'idle_node_owned', 'idle_dourado_pego', 'idle_chamar_vazio',
 ];
 // contratar recusado: o placar (quem já trabalha pra quem) também ficou velho
 const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];
@@ -264,21 +266,35 @@ const tela = criarTela(document.getElementById('app')!, {
   },
   efeito: (id) => audio.tocar(id),
   // fora do guard: pegar não espera outra compra terminar (o evento some em 12 s)
-  pegarDourado: (seg, lado) => void (async () => {
+  pegarDourado: (seg, lado, moedas = 0) => void (async () => {
     const s0 = ancora?.estado;
-    const tipo = mostrados.get(seg) ?? null;
-    if (!s0 || tipo === null) return;
+    if (!s0 || !mostrados.has(seg)) return;
     const p = posicao(s0.user_id, seg, lado);
     try {
-      const s = await api.idleDouradoPegar(seg, lado);
+      const s = await api.idleDouradoPegar(seg, lado, moedas);
       aplicar(s);
-      audio.tocar('douradoPego');
+      const d = s.dourado;
       const ef = efeitos(s0); // Investidor anjo e Hype mudam o que o texto diz
-      if (chaves.avisos) {
-        const ganho = ganhoInvestidor(s0.rate, ef.douradoInvestidor, s0.horta_bonus?.oportunidades ?? 0);
-        tela.dourados.subirTexto(textoPegou(tipo, { ganho, viral: s.viral.length, duracao: ef.douradoDuracao }), p.x, p.y);
+      const texto = d ? textoDourado(d, { viral: viraisAtivos(s, Date.parse(s.server_now), VIRAL_MS * ef.douradoDuracao).length,
+        duracao: ef.douradoDuracao, frase: fraseLinkedin(s0.user_id, seg) }) : null;
+      const subir = () => { if (chaves.avisos && texto) tela.dourados.subirTexto(texto, p.x, p.y); };
+      if (d?.tipo === 7) {
+        // o rolo para no resultado: só aí toca e sobe o texto
+        tela.dourados.pararTigre(seg, !!d.tigre?.pagou, () => {
+          audio.tocar(d.tigre?.pagou ? 'tigrePaga' : 'tigreCome');
+          subir();
+        });
+      } else {
+        audio.tocar(d?.tipo === 5 ? 'linkedin' : d?.tipo === 6 ? 'pix' : 'douradoPego');
+        subir();
+      }
+      if (d?.combo) {
+        audio.tocar('combo');
+        const min = ef.douradoDuracao === 1 ? '1 min' : `${ef.douradoDuracao.toLocaleString('pt-BR')} min`;
+        if (chaves.avisos) tela.dourados.subirTexto(`C-C-C-Combo! ×${COMBO_MULT} por ${min}`, p.x, Math.min(0.85, p.y + 0.08));
       }
     } catch (e) {
+      tela.dourados.pararTigre(seg, null);
       const err = toGameError(e);
       if (err.code === 'no_session') fase = 'sem_sessao';
       else if (err.code !== 'idle_dourado_pego') {
@@ -289,6 +305,10 @@ const tela = criarTela(document.getElementById('app')!, {
       render();
     }
   })(),
+  chamarDourado: () => void guard(async () => {
+    aplicar(await api.idleDouradoChamar());
+    audio.tocar('pegar');
+  }),
   // evento de era: o banco confere o segundo e a era e paga; manda os gols no Jogo do Brasil
   pegarEventoEra: (seg, gols, p) => void (async () => {
     if (!ancora) return;
@@ -564,7 +584,7 @@ function vivoAgora(s: IdleState, agora: number): number | null {
 }
 
 /** Um evento na tela (a dupla são dois ícones lado a lado) e o som característico. */
-function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS = JANELA_S) {
+function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS = JANELA_S, dobro = false) {
   const uid = ancora?.estado.user_id;
   if (!uid) return;
   mostrados.set(seg, tipo);
@@ -572,7 +592,7 @@ function mostrarDourado(seg: number, tipo: TipoDourado, agoraMs: number, janelaS
   for (const k of mostrados.keys()) if (k < seg - 60) mostrados.delete(k);
   for (const lado of tipo === 3 ? [0, 1] : [0]) {
     const p = posicao(uid, seg, lado);
-    tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs, janelaS });
+    tela.dourados.mostrar({ seg, lado, tipo, x: p.x, y: p.y, agoraMs, janelaS, dobro });
   }
   if (!soou) audio.tocar('dourado');
 }
@@ -708,7 +728,14 @@ setInterval(() => {
     const tela0 = efeitos(ancora.estado).douradoTela; // 12 s, 24 com o Olho de lince: olha pra trás o tanto que fica na tela
     for (let x = Math.max(segVisto + 1, seg - (tela0 - 1)); x <= seg; x++) {
       const e = eventoEm(ancora.estado, x);
-      if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS);
+      if (e) mostrarDourado(x, e.tipo, agoraMs, e.janelaS, e.dobro);
+    }
+    // garantidos (Pix devolvido, Chamar) que chegaram depois do segundo deles: aparecem mesmo assim, até a janela passar
+    // (um que já passou e ainda está no estado guardado não toca o som de novo a cada minuto)
+    for (const g of ancora.estado.garantidos ?? []) {
+      if (g.seg > seg || mostrados.has(g.seg)) continue;
+      const e = eventoEm(ancora.estado, g.seg);
+      if (e && agoraMs < (g.seg + e.janelaS) * 1000) mostrarDourado(g.seg, e.tipo, agoraMs, e.janelaS, e.dobro);
     }
     // eventos de era: olha 30 s pra trás (a janela mais longa); um por vez, e não no segundo de um dourado
     for (let x = Math.max(segVistoEra + 1, seg - 29); x <= seg; x++) {

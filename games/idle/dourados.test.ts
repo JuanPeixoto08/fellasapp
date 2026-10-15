@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  COMBO_MULT, COMBO_PRECISA, CHUVA_S, douradoEm, douradosEntre, escolhaLinkedin, ganhoInvestidor, JANELA_S, janelaS, LINKEDIN_MULT, MOEDINHA_S,
+  COMBO_MULT, COMBO_PRECISA, CHUVA_S, douradoEm, FRASES_LINKEDIN, fraseLinkedin, douradosEntre, escolhaLinkedin, ganhoInvestidor, JANELA_S, janelaS, LINKEDIN_MULT, MOEDINHA_S,
   PIX_FICAR_S, posicao, promoAtiva, segundoPix, selosBonus, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, tigrePaga, TIPOS_DOURADO,
-  tipoDourado, tipoGarantido, TREND_MAX, textoPegou,
+  textoDourado, tipoDourado, tipoGarantido, TREND_MAX, textoPegou,
 } from './dourados';
+import { catalogo } from './catalogo';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -157,5 +158,56 @@ describe('os sorteios dos dourados novos (iguais ao banco: idle_dourado_sorteio)
       TREND_MAX: 20, CHUVA_S: 8, MOEDINHA_S: 60, PIX_FICAR_S: 1800, TIGRE_GRATIS: 3, TIGRE_CHANCE: 30, TIGRE_PAGA_S: 1800, TIGRE_COME_S: 900,
       LINKEDIN_MULT: 30, COMBO_MULT: 7, COMBO_PRECISA: 3,
     });
+  });
+});
+
+describe('selos dos dourados novos e da Caixinha (0076)', () => {
+  const T = Date.parse('2026-10-15T12:00:00Z');
+  const em = (s: number) => new Date(T + s * 1000).toISOString();
+  it('LinkedIn com o nome do gerador, Combo dourado, as bolinhas, Cupom, Cashback e o Chamar (botão), cada um com caixinha', () => {
+    const l = selosBonus({ promo_ate: null, linkedin_ate: em(42), linkedin_gen: 2, linkedin_mult: 4.5, combo_ate: em(51), cupons: 7,
+      cashback_ate: em(100), chamados: 2 }, T, { combo: 2 });
+    expect(l.map((x) => x.texto)).toEqual([
+      `${catalogo.geradores[1].nome} ×30 · 0:42`, 'Combo ×7 · 0:51', 'Cupom · 7 restantes', 'Cashback 30% · 1:40', '●●○', 'Chamar dourado (2)',
+    ]);
+    expect(l[1].ouro).toBe(true);
+    expect(l[4]).toMatchObject({ classe: 'combo-bolinhas', dica: { titulo: 'Combo em andamento' } });
+    expect(l[4].dica!.linhas[0].texto).toBe('Pegue mais 1 sem deixar nenhum sumir: produção ×7 por 1 min');
+    // o Chamar é o único botão: roxo cheio (ação), não dourado
+    expect(l[5]).toMatchObject({ acao: 'chamar', ouro: false });
+    expect(l.every((x) => x.dica)).toBe(true);
+  });
+  it('1 cupom: "1 restante"; combo 0 ou já feito: sem bolinhas; com o Hype as bolinhas dizem 2 min', () => {
+    expect(selosBonus({ promo_ate: null, cupons: 1 }, T).map((x) => x.texto)).toEqual(['Cupom · 1 restante']);
+    expect(selosBonus({ promo_ate: null }, T, { combo: 0 })).toEqual([]);
+    expect(selosBonus({ promo_ate: null }, T, { combo: 3 })).toEqual([]);
+    expect(selosBonus({ promo_ate: null }, T, { combo: 1, duracao: 2 })[0].dica!.linhas[0].texto)
+      .toBe('Pegue mais 2 sem deixar nenhum sumir: produção ×7 por 2 min');
+  });
+  it('LinkedIn sem gerador rendendo (o banco grava gen null e mult 1): sem selo', () => {
+    expect(selosBonus({ promo_ate: null, linkedin_ate: em(42), linkedin_gen: null, linkedin_mult: 1 }, T)).toEqual([]);
+    expect(selosBonus({ promo_ate: null, linkedin_ate: em(42), linkedin_gen: 3, linkedin_mult: 1 }, T)).toEqual([]);
+    expect(selosBonus({ promo_ate: null, linkedin_ate: em(-1), linkedin_gen: 3, linkedin_mult: 5 }, T)).toEqual([]);
+  });
+});
+
+describe('o texto que sobe com os dourados novos', () => {
+  const base = { lado: 0, ganho: 0, dobro: false, moedas: 0, gen: null, mult: null, garantido_seg: null, tigre: null, combo: false };
+  const o = { viral: 1, duracao: 1, frase: FRASES_LINKEDIN[1] };
+  it('Trend, LinkedIn, Pix, Tigrinho e o dobro', () => {
+    expect(textoDourado({ ...base, tipo: 4, moedas: 14, ganho: 1_200_000 }, o)).toBe('14 moedinhas! +F$ 1,2 mi');
+    expect(textoDourado({ ...base, tipo: 4, moedas: 1, ganho: 60 }, o)).toBe('1 moedinha! +F$ 60');
+    expect(textoDourado({ ...base, tipo: 5 }, o)).toBe('Fui demitido. Melhor coisa que me aconteceu. #gratidão');
+    expect(textoDourado({ ...base, tipo: 6, lado: 1 }, o)).toBe('Devolveu! Deus te pague (em até 2 min)');
+    expect(textoDourado({ ...base, tipo: 6, ganho: 1_200_000 }, o)).toBe('+F$ 1,2 mi (ninguém viu)');
+    expect(textoDourado({ ...base, tipo: 7, ganho: 2_000_000, tigre: { pagou: true, gratis: true, perdeu: 0, n: 1 } }, o)).toBe('Pagou! +F$ 2 mi');
+    expect(textoDourado({ ...base, tipo: 7, tigre: { pagou: false, gratis: false, perdeu: 980_000, n: 5 } }, o)).toBe('O tigre comeu F$ 980 mil. Só mais uma?');
+    expect(textoDourado({ ...base, tipo: 2, dobro: true }, o)).toBe('Viralizou! ×10 por 2 min');
+    expect(textoDourado({ ...base, tipo: 0, ganho: 1_234_567 }, o)).toBe('+F$ 1,23 mi');
+  });
+  it('a frase do LinkedIn sai do segundo (uma das quatro, todas aparecem)', () => {
+    const vistas = new Set<string>();
+    for (let s = 1_760_000_000; s < 1_760_000_200; s++) vistas.add(fraseLinkedin(U, s));
+    expect([...vistas].sort()).toEqual([...FRASES_LINKEDIN].sort());
   });
 });

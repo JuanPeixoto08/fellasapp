@@ -1,0 +1,74 @@
+/* Dourados novos e selos novos (entrega 5, 0076). Fora do idle.css; usa os tokens dele (--i-*, --gold, --paper) e os
+   cantos de pixel (contorno por 4 sombras sem desfoque). As peças ficam na camada .dourados (fixa, por cima de tudo); a
+   posição usa o mesmo --x/top do .dourado e um clamp que prende dentro da tela. Hex só onde não há token (a paleta dos
+   ícones). */
+
+/* garantido do Pix devolvido: o "2×" no canto do ícone */
+.idle .dourado .dobro-selo { position: absolute; right: -2px; top: -2px; padding: 0 4px; font: 400 16px/1.1 var(--i-pixel); color: #2A1D05;
+  background: var(--gold); box-shadow: 0 0 0 2px var(--i-fundo2); pointer-events: none; }
+
+/* Trend: a chuva cobre a tela (trava os cliques de trás por 8 s) e as moedinhas caem uma atrás da outra */
+.idle .chuva { position: absolute; inset: 0; overflow: hidden; pointer-events: auto; background: color-mix(in srgb, var(--i-fundo2) 28%, transparent); }
+.idle .chuva-placar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 2px 12px; white-space: nowrap;
+  font: 400 24px var(--i-pixel); color: var(--gold); background: var(--i-fundo2); font-variant-numeric: tabular-nums; --c: var(--gold);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); pointer-events: none; }
+.idle .moedinha { position: absolute; top: -10%; width: 44px; height: 44px; margin-left: -22px; padding: 2px; border: 0; background: none;
+  cursor: pointer; animation: moedinha-cai 2.4s linear forwards; }
+.idle .moedinha .icone-dourado { display: block; width: 40px; height: 40px; filter: drop-shadow(0 0 4px var(--gold-soft)); }
+.idle .moedinha:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
+@keyframes moedinha-cai { from { top: -10%; } to { top: 110%; } }
+
+/* Pix: a caixa de diálogo do jogo (moldura dupla de pixel, como a do Abrir CNPJ) no ponto do ícone; as duas escolhas
+   com o mesmo peso (é escolha de consciência, o jogo não empurra nenhuma) e o cursor de pixel na do mouse/foco */
+.idle .pix-escolha { position: absolute; left: clamp(140px, var(--x, 50%), calc(100% - 140px)); transform: translate(-50%, -50%);
+  display: grid; gap: 10px; width: max-content; max-width: min(280px, calc(100vw - 32px)); padding: 12px 16px 14px; pointer-events: auto;
+  background: var(--i-fundo2); color: var(--paper); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 0 0 3px var(--i-fundo2), inset 0 0 0 5px var(--i-borda);
+  animation: pix-abre 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes pix-abre { from { opacity: 0; margin-top: 8px; } }
+.idle .pix-escolha .fala { margin: 0; font: 400 22px/1.1 var(--i-pixel); text-wrap: balance; }
+.idle .pix-escolha .escolhas { display: flex; gap: 8px 22px; padding-left: 18px; }
+.idle .pix-escolha .btn { position: relative; flex: none; }
+.idle .pix-escolha .btn::before { content: ''; position: absolute; left: -18px; top: 50%; width: 8px; height: 14px; margin-top: -7px;
+  background: var(--paper); visibility: hidden; animation: cursor-pisca 1s steps(2, jump-none) infinite;
+  clip-path: polygon(0 0, 2px 0, 2px 2px, 4px 2px, 4px 4px, 6px 4px, 6px 6px, 8px 6px, 8px 8px, 6px 8px, 6px 10px, 4px 10px,
+    4px 12px, 2px 12px, 2px 14px, 0 14px); }
+.idle .pix-escolha .btn:is(:hover, :focus-visible)::before { visibility: visible; }
+
+/* Tigrinho: três rolos de caça-níquel girando; param em PAGOU (dourado) ou COMEU (vermelho), escrito por extenso */
+.idle .tigre-rolo { position: absolute; left: clamp(80px, var(--x, 50%), calc(100% - 80px)); transform: translate(-50%, -50%);
+  display: flex; justify-content: center; align-items: center; gap: 4px; min-width: 132px; height: 52px; padding: 0 6px;
+  font: 400 30px/40px var(--i-pixel); color: var(--gold); background: var(--i-fundo2); --c: #F07A2A;
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); pointer-events: none; }
+.idle .tigre-rolo .rolo { width: 36px; height: 40px; overflow: hidden; text-align: center; background: var(--i-painel2); }
+.idle .tigre-rolo .rolo-faixa { display: flex; flex-direction: column; }
+.idle .tigre-rolo .rolo-faixa > span { height: 40px; }
+.idle .tigre-rolo.girando .rolo-faixa { animation: rolo-gira 0.24s steps(3) infinite; }
+@keyframes rolo-gira { to { transform: translateY(-120px); } }
+.idle .tigre-rolo.pagou { --c: var(--gold); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 0 18px var(--gold-soft); }
+.idle .tigre-rolo.comeu { color: #E0454B; --c: #E0454B; }
+
+/* selos (todos, os de antes também): o F$ é o protagonista, então os selos são etiquetas de mesmo peso, só contorno fino
+   e texto, sem fundo cheio. O que é "dourado" (×100, Combo) muda só a cor do contorno e do texto. A fileira quebra linha
+   dentro do placar (nada sai da caixa). O Chamar é o único botão: roxo cheio com o chanfro do .btn.main. As bolinhas do
+   combo não são selo: pontos soltos, pequenos, depois dos selos. */
+.idle .selos { gap: 4px 6px; align-items: center; min-width: 0; max-width: 100%; }
+.idle .selo-bonus, .idle .selo-bonus.ouro { padding: 0 6px; font: 400 16px/20px var(--i-pixel); color: var(--i-lilas); background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--i-lilas) 60%, transparent); white-space: nowrap; }
+.idle .selo-bonus.ouro { color: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 70%, transparent); }
+.idle .combo-bolinhas { font: 400 14px/20px var(--i-pixel); color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+.idle .combo-bolinhas:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
+.idle button.selo-bonus.selo-acao { min-height: 24px; padding: 0 8px; border: 0; border-radius: 0; cursor: pointer;
+  color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda);
+  box-shadow: 0 -1px 0 0 var(--c), 0 1px 0 0 var(--c), -1px 0 0 0 var(--c), 1px 0 0 0 var(--c), inset 0 -2px 0 var(--i-roxo-e); }
+.idle button.selo-bonus.selo-acao:hover { --c: #fff; }
+.idle button.selo-bonus.selo-acao:active { transform: translateY(1px); }
+.idle button.selo-bonus.selo-acao:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+@media (pointer: coarse) { .idle button.selo-bonus.selo-acao { min-height: 36px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .idle .moedinha { animation: none; top: var(--y, 50%); }
+  .idle .tigre-rolo.girando .rolo-faixa { animation: none; }
+  .idle .pix-escolha, .idle .pix-escolha .btn::before { animation: none; }
+  .idle button.selo-bonus.selo-acao:active { transform: none; }
+}

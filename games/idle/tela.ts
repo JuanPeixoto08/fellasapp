@@ -18,15 +18,17 @@ import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, S
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
-import { custoMult, efeitosDe, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade } from './economia';
+import { custoMult, efeitosDe, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade, VIRAL_MS } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
 import type { IdEfeito } from './audio';
 import { iconeEngrenagem, iconeFechar } from './icones';
 import { criarDouradoTela } from './douradoTela';
+import { comboAgora } from './combo';
+import { desenharSelo, rotuloCombo } from './selosTela';
 import { criarEventoEraTela } from './eventoEraTela';
-import { dicaContratos, dicaEventoEra, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
+import { dicaContratos, dicaDourado, dicaEventoEra, dicaGerador, dicaMelhoria, dicaOportunidade, dicaProducao } from './dica';
 import { criarDicas } from './dicaTela';
 import { DESCONTO_MELHORIA, descontoAtivo, posicaoEvento } from './eventosEra';
 import { ganhoInvestidor, promoAtiva, selosBonus } from './dourados';
@@ -96,7 +98,7 @@ export type Acoes = {
   lugarAcao(fn: string, args: Record<string, unknown>): void; // mecânica de lugar (partes 2 a 4)
   lugarRecarregar(): void; // a mecânica pede o lugar de novo (chegou a hora de algo: a coleção ficou pronta)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
-  pegarDourado(seg: number, lado: number): void;
+  pegarDourado(seg: number, lado: number, moedas?: number): void; chamarDourado(): void;
   pegarEventoEra(seg: number, gols: number, pos: { x: number; y: number }): void; // pos: onde estava (o texto sobe dali)
 };
 export type Tela = {
@@ -1095,7 +1097,14 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   }
 
   // eventos na tela, por cima de tudo
-  const dourados = criarDouradoTela(app, (seg, lado) => a.pegarDourado(seg, lado));
+  const dourados = criarDouradoTela(app, (seg, lado, moedas) => {
+    dicas.conferir(); // o ícone saiu: a caixinha dele fecha
+    if (moedas === undefined) a.pegarDourado(seg, lado);
+    else a.pegarDourado(seg, lado, moedas);
+  }, {
+    dica: (alvo, chave, tipo, seg, dobro) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaDourado(tipo, ultimo.estado, { seg, dobro }) : null)),
+    som: (id) => a.efeito(id),
+  });
   const eventosEraBase = criarEventoEraTela(app, {
     aoPegar: (seg, gols, pos) => {
       dicas.conferir(); // o evento saiu da tela: a caixinha dele fecha
@@ -1121,22 +1130,25 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   // teclado e a caixinha aberta ficam no selo)
   let selosAgora: ReturnType<typeof selosBonus> = [];
   function relogioBonus(s: IdleState | null, agoraMs: number) {
-    const lista = s ? selosBonus(s, agoraMs) : [];
+    // o Hype dobra o Viralizou (o selo ×10 vale o tempo todo) e o Combo; as bolinhas do combo em andamento (combo.ts)
+    const dur = s ? efeitosDe(catalogo, s).douradoDuracao : 1;
+    const lista = s ? selosBonus(s, agoraMs, { viralMs: VIRAL_MS * dur, combo: comboAgora(s, agoraMs), duracao: dur }) : [];
     const antes = selosAgora;
     selosAgora = lista;
-    const mesmos = lista.length === antes.length && lista.every((x, i) => x.ouro === antes[i].ouro && x.dica?.titulo === antes[i].dica?.titulo);
+    const mesmos = lista.length === antes.length && lista.every((x, i) => x.ouro === antes[i].ouro && x.dica?.titulo === antes[i].dica?.titulo
+      && x.acao === antes[i].acao && x.classe === antes[i].classe);
     if (mesmos) {
       if (lista.every((x, i) => x.texto === antes[i].texto)) return;
-      lista.forEach((x, i) => { selos.children[i].textContent = x.texto; });
+      lista.forEach((x, i) => {
+        selos.children[i].textContent = x.texto;
+        if (x.classe === 'combo-bolinhas') selos.children[i].setAttribute('aria-label', rotuloCombo(x.texto));
+      });
       if (lista.some((x) => x.dica)) dicas.conferir(); // o "Acaba em" da caixinha aberta anda junto
       return;
     }
     selos.replaceChildren(...lista.map((x, i) => {
-      const e = el('span', `selo-bonus${x.ouro ? ' ouro' : ''}`, x.texto);
-      if (x.dica) {
-        e.tabIndex = 0; // caixinha também no foco do teclado
-        dicas.ligar(e, `selo-${i}`, () => selosAgora[i]?.dica ?? null);
-      }
+      const e = desenharSelo(x, () => a.chamarDourado());
+      if (x.dica) dicas.ligar(e, `selo-${i}`, () => selosAgora[i]?.dica ?? null);
       return e;
     }));
     dicas.conferir();

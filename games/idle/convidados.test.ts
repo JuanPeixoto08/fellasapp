@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubada, derrubadaAte, destrancada, efeitosTexto, eventoEm, faixaEm, GABE, GEMAPLYS, kojimaMult,
+  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubada, derrubadaAte, destrancada, efeitosTexto, eventoDaSorte, eventoEm, faixaEm, GABE, GEMAPLYS, kojimaMult,
   LUVA, MCVV, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
 } from './convidados';
 import { tipoDourado } from './dourados';
@@ -139,5 +139,19 @@ describe('a faixa do MC V.V com a roda nova (0076)', () => {
     while (tipoDourado(uid, seg) !== 7 || derrubada(uid, seg - 7200, 1)) seg++;
     const c = { cadeira: [MCVV, null, null], desde: [new Date((seg - 7200) * 1000).toISOString(), null, null], trocas: 3, trocas_t: null };
     expect(faixaEm(uid, c, 1, seg)).toBe(0);
+  });
+});
+
+describe('eventos com os garantidos (0076)', () => {
+  const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
+  const base = { user_id: U, generators: Array(30).fill(0) };
+  it('o garantido vem primeiro, com o tipo e o dobro dele; sem garantido, a sorte', () => {
+    let x = 1_760_000_000;
+    while (eventoDaSorte(base, x) !== null) x++; // um segundo sem dourado da sorte
+    expect(eventoEm(base, x)).toBeNull();
+    expect(eventoEm({ ...base, garantidos: [{ seg: x, tipo: 2, dobro: true }] }, x)).toEqual({ tipo: 2, janelaS: 12, dobro: true });
+    let y = x;
+    while (eventoDaSorte(base, y) === null) y++;
+    expect(eventoEm(base, y)).toEqual({ ...eventoDaSorte(base, y)!, dobro: false });
   });
 });

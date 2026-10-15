@@ -4,8 +4,11 @@
 import type { IdleState, LugarEstado, PinoMapa } from '../shared/types';
 import type { Marco } from './mapa';
 import { catalogo, type Melhoria } from './catalogo';
-import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, partesContratos, VIRAL_MS } from './economia';
-import { COMBO_MULT } from './dourados';
+import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, partesContratos, rendasGeradores, VIRAL_MS } from './economia';
+import {
+  CHUVA_S, COMBO_MULT, escolhaLinkedin, LINKEDIN_MULT, MOEDINHA_S, PIX_FICAR_S, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, TREND_MAX,
+  type TipoDourado,
+} from './dourados';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import type { TipoOportunidade } from './oportunidades';
@@ -429,4 +432,34 @@ export function dicaEventoEra(tipo: TipoEventoEra, rate: number): Dica {
     : tipo === 4 ? [{ texto: 'Melhorias 25% mais baratas por 2 min' }]
     : [{ texto: `Cada gol: ${formatarValor(g)} (até 7)` }, { texto: '5 min da sua produção por gol', tom: 'fraco' }];
   return { titulo: NOME_EVENTO_ERA[tipo], linhas };
+}
+
+/** A caixinha dos dourados novos na tela (Trend, LinkedIn, Pix, Tigrinho; 0076): o que dá agora, nos números da pessoa.
+ *  Os de antes (Investidor, Promoção, Viralizou) não têm. `dobro` = o garantido do Pix devolvido: o Trend paga o dobro e o LinkedIn dura o dobro (o garantido nunca é
+ *  Pix nem Tigrinho; esses não dobram no banco). */
+export function dicaDourado(tipo: TipoDourado, s: IdleState, o: { seg: number; dobro?: boolean }): Dica | null {
+  const d = o.dobro ? 2 : 1;
+  if (tipo === 4) {
+    return { titulo: 'Trend do TikTok', linhas: [
+      { texto: `Até ${TREND_MAX * d} min de produção: ${formatarValor(s.rate * MOEDINHA_S * d)} por moedinha` },
+      { texto: `Chovem moedinhas por ${CHUVA_S} s: clique nelas`, tom: 'fraco' }] };
+  }
+  if (tipo === 5) {
+    const e = escolhaLinkedin(s.user_id, o.seg, rendasGeradores(catalogo, s));
+    if (!e) return null;
+    const min = efeitosDe(catalogo, s).douradoDuracao * d;
+    return { titulo: 'Bombou no LinkedIn', linhas: [
+      { texto: `${catalogo.geradores[e.gen - 1].nome} ×${LINKEDIN_MULT} por ${num(min)} min: produção +${num((LINKEDIN_MULT - 1) * e.f * 100, 0)}%` }] };
+  }
+  if (tipo === 6) {
+    return { titulo: 'Pix errado', linhas: [{ texto: `Ficar: ${formatarValor(s.rate * PIX_FICAR_S)} agora · Devolver: um dourado em dobro` }] };
+  }
+  if (tipo === 7) {
+    const gratis = Math.max(0, TIGRE_GRATIS - (s.tigre_n ?? 0));
+    const ganha = formatarValor(s.rate * TIGRE_PAGA_S);
+    return { titulo: 'Tigrinho', linhas: gratis > 0
+      ? [{ texto: `Jogadas grátis hoje: ${gratis} de ${TIGRE_GRATIS}` }, { texto: `Paga ${ganha}`, tom: 'bom' }]
+      : [{ texto: `A casa paga ${TIGRE_CHANCE / 10} em cada 10` }, { texto: `Ganha ${ganha} · perde ${formatarValor(s.rate * TIGRE_COME_S)}`, tom: 'ruim' }] };
+  }
+  return null;
 }

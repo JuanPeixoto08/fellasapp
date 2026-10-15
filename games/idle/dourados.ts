@@ -1,10 +1,12 @@
 // Eventos na tela (tipo cookie dourado): a cada segundo há chance 1/600 de aparecer um (mais com o ramo Dourados da
 // árvore ou o Gemaplys), pra quem está com o jogo aberto, e ele some em 12 s (24 com o Olho de lince). A sorte tem semente (id do jogador + segundo) e é a mesma conta do banco
 // (idle_dourado na 0045), que confere o clique. BigInt: os quadrados passam de 2^53.
+import type { DouradoPago } from '../shared/types';
+import { catalogo } from './catalogo';
 import type { Dica } from './dica';
 import { VIRAL_MS } from './economia';
 import { formatarValor } from './formatar';
-import { semente } from './oportunidades';
+import { CHAMADOS_MAX, semente } from './oportunidades';
 
 export const TIPOS_DOURADO = ['investidor', 'promocao', 'viralizou', 'dupla', 'trend', 'linkedin', 'pix', 'tigrinho'] as const;
 /** 0 Investidor apressado · 1 Promoção relâmpago · 2 Viralizou · 3 dupla de Viralizou · 4 Trend do TikTok · 5 Bombou no
@@ -105,6 +107,8 @@ export function posicao(uid: string, s: number, _lado = 0): { x: number; y: numb
 // ---------- o que está valendo (selos) e os textos ----------
 type ComBonus = {
   promo_ate: string | null; viral?: readonly string[]; boosts?: readonly string[]; marmita_ate?: string | null; upg_desc_ate?: string | null;
+  linkedin_ate?: string | null; linkedin_gen?: number | null; linkedin_mult?: number | null; combo_ate?: string | null; cupons?: number;
+  cashback_ate?: string | null; chamados?: number;
 };
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -122,9 +126,15 @@ export const promoAtiva = (s: { promo_ate: string | null }, agoraMs: number) => 
 export const viraisAtivos = (s: ComBonus, agoraMs: number, viralMs = VIRAL_MS) =>
   (s.viral ?? []).map(Date.parse).filter((f) => f > agoraMs && f - viralMs <= agoraMs).sort((a, b) => a - b);
 
-/** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21". */
-export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number } = {}): { texto: string; ouro: boolean; dica?: Dica }[] {
-  const out: { texto: string; ouro: boolean; dica?: Dica }[] = [];
+/** Um selo ao lado do F$: o texto, se é dourado, a caixinha, se é botão (o Chamar) e uma classe a mais (as bolinhas). */
+export type Selo = { texto: string; ouro: boolean; dica?: Dica; acao?: 'chamar'; classe?: string };
+const dois = (x: number) => (Math.round(x * 100) / 100).toLocaleString('pt-BR');
+
+/** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21",
+ *  e os de 0076. `viralMs` = quanto dura um Viralizou (o Hype dobra), `combo` = o combo em andamento (combo.ts),
+ *  `duracao` = o Hype (o Combo dura isso em min). */
+export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; combo?: number; duracao?: number } = {}): Selo[] {
+  const out: Selo[] = [];
   const v = viraisAtivos(s, agoraMs, o.viralMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
   // os ×5 da oportunidade empilhados somam (0064): ×5, ×10, ×15… até o primeiro acabar
@@ -142,6 +152,47 @@ export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number }
     out.push({ texto: `Melhorias −25% · ${falta}`, ouro: false, dica: { titulo: 'Atualização instalada', linhas: [
       { texto: 'Melhorias 25% mais baratas (junta com Promoção e Horta)' }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
   }
+  // dourados novos e Caixinha (0076): LinkedIn, Combo (e as bolinhas do que está em andamento), Cupom, Cashback e o Chamar.
+  // LinkedIn sem gerador rendendo: o banco grava gen null e mult 1 (e o fim); aí não tem o que mostrar
+  if (s.linkedin_ate && s.linkedin_gen && (s.linkedin_mult ?? 1) > 1 && Date.parse(s.linkedin_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.linkedin_ate) - agoraMs);
+    const nome = catalogo.geradores[s.linkedin_gen - 1]?.nome ?? 'Gerador';
+    out.push({ texto: `${nome} ×${LINKEDIN_MULT} · ${falta}`, ouro: false, dica: { titulo: 'Bombou no LinkedIn', linhas: [
+      { texto: `${nome} rende ×${LINKEDIN_MULT}` }, { texto: `Produção ×${dois(s.linkedin_mult!)} no total` },
+      { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
+  if (s.combo_ate && Date.parse(s.combo_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.combo_ate) - agoraMs);
+    out.push({ texto: `Combo ×${COMBO_MULT} · ${falta}`, ouro: true, dica: { titulo: 'Combo', linhas: [
+      { texto: `Produção ×${COMBO_MULT}, por cima de todo o resto` }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
+  const cupons = s.cupons ?? 0;
+  if (cupons > 0) {
+    out.push({ texto: `Cupom · ${cupons} ${cupons === 1 ? 'restante' : 'restantes'}`, ouro: false, dica: { titulo: 'Cupom de primeira compra', linhas: [
+      { texto: 'Cada compra de gerador (1, 10 ou Máx) sai 25% mais barata' },
+      { texto: `Faltam ${cupons} ${cupons === 1 ? 'compra' : 'compras'}` },
+      { texto: 'Com Promoção ou meia-preço o cupom fica guardado', tom: 'fraco' }] } });
+  }
+  if (s.cashback_ate && Date.parse(s.cashback_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.cashback_ate) - agoraMs);
+    out.push({ texto: `Cashback 30% · ${falta}`, ouro: false, dica: { titulo: 'Cashback', linhas: [
+      { texto: 'Toda compra devolve 30% do preço na hora' }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
+  // as bolinhas do combo em andamento: pontos soltos depois dos selos (não são selo; tela: selosTela)
+  const n = o.combo ?? 0;
+  if (n > 0 && n < COMBO_PRECISA) {
+    const resta = COMBO_PRECISA - n;
+    const dur = o.duracao ?? 1;
+    out.push({ texto: '●'.repeat(n) + '○'.repeat(resta), ouro: false, classe: 'combo-bolinhas', dica: { titulo: 'Combo em andamento', linhas: [
+      { texto: `Pegue mais ${resta} sem deixar nenhum sumir: produção ×${COMBO_MULT} por ${dois(dur)} min` }] } });
+  }
+  // o único selo que é botão: roxo cheio (ação), não dourado
+  const chamados = s.chamados ?? 0;
+  if (chamados > 0) {
+    out.push({ texto: `Chamar dourado (${chamados})`, ouro: false, acao: 'chamar', dica: { titulo: 'Chamar um dourado', linhas: [
+      { texto: 'Clique: um dourado aparece no segundo seguinte (sem Pix nem Tigrinho)' },
+      { texto: `Você tem ${chamados} de ${CHAMADOS_MAX}`, tom: 'fraco' }] } });
+  }
   return out;
 }
 
@@ -156,4 +207,22 @@ export function textoPegou(tipo: TipoDourado, o: { ganho: number; viral: number;
   if (tipo === 0) return `+${formatarValor(o.ganho)}`;
   if (tipo === 1) return `Promoção! Tudo pela metade por ${d === 1 ? '30 s' : `${(d / 2).toLocaleString('pt-BR')} min`}`;
   return o.viral >= 2 ? `×${vezes(o.viral)}!` : `Viralizou! ×10 por ${d.toLocaleString('pt-BR')} min`;
+}
+
+/** As frases do post de coach que sobem com o LinkedIn (uma por sorteio). */
+export const FRASES_LINKEDIN = [
+  'O Estagiário me ensinou mais sobre liderança do que meu MBA',
+  'Fui demitido. Melhor coisa que me aconteceu. #gratidão',
+  'Acordo às 4h. Meu concorrente ainda está dormindo',
+  'Recusei uma oferta do Google pra seguir meu propósito',
+] as const;
+export const fraseLinkedin = (uid: string, seg: number): string => FRASES_LINKEDIN[sorteioDourado(uid, seg, SAL.frase, FRASES_LINKEDIN.length)];
+
+/** O texto que sobe quando pega (com o que o banco pagou). `viral` = os Viralizou valendo depois; `duracao` = o Hype. */
+export function textoDourado(d: DouradoPago, o: { viral: number; duracao: number; frase: string }): string {
+  if (d.tipo <= 3) return textoPegou(d.tipo as TipoDourado, { ganho: d.ganho, viral: o.viral, duracao: o.duracao * (d.dobro ? 2 : 1) });
+  if (d.tipo === 4) return `${d.moedas} ${d.moedas === 1 ? 'moedinha' : 'moedinhas'}! +${formatarValor(d.ganho)}`;
+  if (d.tipo === 5) return o.frase;
+  if (d.tipo === 6) return d.lado === 1 ? 'Devolveu! Deus te pague (em até 2 min)' : `+${formatarValor(d.ganho)} (ninguém viu)`;
+  return d.tigre?.pagou ? `Pagou! +${formatarValor(d.ganho)}` : `O tigre comeu ${formatarValor(d.tigre?.perdeu ?? 0)}. Só mais uma?`;
 }

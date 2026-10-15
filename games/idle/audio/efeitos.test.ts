@@ -14,7 +14,7 @@ describe('efeitos', () => {
     expect([...IDS_EFEITOS].sort()).toEqual(
       ['abrir', 'acaoCompra', 'acaoVende', 'cnpj', 'clique', 'compra', 'compraMuitas', 'conquista', 'contratado', 'dourado',
         'douradoPego', 'era', 'erro', 'fechar', 'no', 'oportunidade', 'pegar', 'plantar', 'po', 'venda',
-        'mae', 'shopee', 'call', 'telaAzul', 'gol'].sort(),
+        'mae', 'shopee', 'call', 'telaAzul', 'gol', 'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo'].sort(),
     );
     for (const id of IDS_EFEITOS) {
       const { c, dura } = tocar(id);
@@ -53,6 +53,6 @@ describe('efeitos', () => {
     expect(f[f.length - 1][1]).toBeLessThan(f[0][1]); // cai: "toc", não "pi"
   });
   it('momentos grandes', () => {
-    expect([...GRANDES].sort()).toEqual(['cnpj', 'conquista', 'douradoPego', 'era', 'venda']);
+    expect([...GRANDES].sort()).toEqual(['cnpj', 'combo', 'conquista', 'douradoPego', 'era', 'venda']);
   });
 });
