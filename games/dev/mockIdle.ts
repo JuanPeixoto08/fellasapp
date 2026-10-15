@@ -44,6 +44,7 @@ export const idleBuy = (kind: 'gerador' | 'melhoria', id: number, qty: 0 | 1 | 1
 export const idlePickStrategy = (era: number, opcao: number) => call<IdleState>('select public.idle_pick_strategy($1, $2) as v', [era, opcao]);
 export const idleClaim = (window: number) => call<IdleState>('select public.idle_claim_opportunity($1) as v', [window]);
 export const idleDouradoPegar = (seg: number, lado: number) => call<IdleState>('select public.idle_dourado_pegar($1, $2) as v', [seg, lado]);
+export const idleEventoPegar = (seg: number, gols: number) => call<IdleState>('select public.idle_evento_pegar($1, $2) as v', [seg, gols]);
 type ComHorta = IdleState & { horta: HortaEstado; descobriu?: number | null };
 export const idleHorta = () => call<HortaEstado>('select public.idle_horta() as v');
 export const idleHortaPlantar = (canteiro: number, especie: number) => call<ComHorta>('select public.idle_horta_plantar($1, $2) as v', [canteiro, especie]);
