@@ -158,8 +158,20 @@ antigas). Entram os tipos 6 e 7.
   compra.
 - **Eventos:** `lixo` (um "tum" por destroço desviado), `houston` (bipe de alarme ao aparecer), `conserto` (ao
   consertar).
-- **Músicas:** `eraMusica` vai até 7, com tema da órbita (lento, espacial) e da Lua (mais vazio e grave), no mesmo
-  sintetizador. O Juan julga na página de audição.
+- **Músicas:** `eraMusica` vai até 7, com tema da órbita e da Lua **no estilo Hans Zimmer** (pedido do Juan):
+  - Órbita (6): órgão + arpejo repetitivo que cresce aos poucos, clima leve.
+  - Lua (7): tique-taque seco marcando o tempo, grave longo, órgão mais escuro.
+  - O crescendo de órgão completo, o mais *Interestelar*, fica guardado pras eras 9 e 10.
+  - **Melodias originais "no estilo"**: nada copiado de tema dele (direito autoral).
+- **Qualidade, sem som robótico** (o Juan: "algo bem feito, sem essa robotização"):
+  - Instrumento novo de **órgão** aditivo (várias parciais somadas), com as camadas levemente desafinadas entre si,
+    ataque e soltura lentos e um vibrato bem leve.
+  - **Reverb de convolução** (resposta ao impulso gerada no código, sala grande) na música, pra tirar o som "seco".
+  - **Humanização**: cada nota com força e tempo variando um pouco (sorteio com semente, pra ficar igual a cada giro),
+    pads com filtro que abre devagar, ar de ruído filtrado bem baixo.
+  - O Juan julga na página de audição antes de publicar. Se o sintetizador não chegar no nível que ele quer, o passo
+    seguinte (decidido depois da audição, fora desta entrega) é usar amostras gravadas de licença livre (arquivo de
+    áudio).
 - Sem som em teste no Chrome do Juan (mutar música e efeitos antes).
 
 ## 7. Ritmo das 12 eras
