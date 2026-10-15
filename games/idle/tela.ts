@@ -549,11 +549,19 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       const url = ativos.geral(m.id);
       if (url) box.style.backgroundImage = `url(${url})`;
       box.classList.add('geral');
-    } else {
+    } else if (m.tipo === 'sinergia') {
       box.classList.add('sinergia');
       for (const id of [m.fonte, m.alvo]) {
         const mini = el('span', 'mini');
         mini.style.backgroundImage = `url(${ativos.gerador(id)})`;
+        box.append(mini);
+      }
+    } else {
+      // legado (eras 6+): o 1º gerador da era fonte e o da era alvo, como na sinergia (sem arte nova)
+      box.classList.add('sinergia', 'legado');
+      for (const e of [m.fonteEra, m.alvoEra]) {
+        const mini = el('span', 'mini');
+        mini.style.backgroundImage = `url(${ativos.gerador((e - 1) * 6 + 1)})`;
         box.append(mini);
       }
     }

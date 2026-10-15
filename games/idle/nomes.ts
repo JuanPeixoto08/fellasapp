@@ -1,7 +1,15 @@
 // Textos da Fellas Inc.: dá pra trocar nomes e frases à vontade (a lógica usa só os ids e os números).
 // Depois de mudar, crie uma migração nova do catálogo (ver o cabeçalho gerado em catalogo.ts).
 
-/** Os 30 geradores, na ordem. A cada 6 começa uma era (e uma cena). */
+/** Balanceamento das eras 6–7 que a simulação ajustou (simulacao.test.ts, "ritmo das eras 6 e 7"): os multiplicadores
+ *  das gerais, o p do legado e o ×N das estratégias de gerador. */
+const GERAL_6 = [1.3, 1.3, 1.35, 1.35] as const;
+const GERAL_7 = [1.35, 1.35, 1.4, 1.4] as const;
+const LEGADO_P = 0.0005;
+const EST_6_GEN = 2;
+const EST_7_GEN = 2;
+
+/** Os geradores, na ordem. A cada 6 começa uma era (e uma cena). */
 export const GERADORES: readonly string[] = [
   'Você, no notebook da faculdade', 'Post motivacional no LinkedIn', 'Planilha no Excel',
   'Vendendo pra tia no grupo da família', 'Freela no Fiverr', 'Live na Twitch',
@@ -11,6 +19,12 @@ export const GERADORES: readonly string[] = [
   'Fusão com a concorrência',
   'Rolê patrocinado', 'Comprar um time do Brasileirão', 'Ilha particular', 'Filial em Dubai', 'IPO na bolsa',
   'Foguete pra Marte',
+  // era 6 · Em órbita (entrega 1 das eras 6–12)
+  'Constelação de satélites', 'Voo de 11 minutos com famoso', 'Hotel em órbita', 'HAL 9000 gerenciando a estação',
+  'Ferro-velho orbital', 'Equipe de perfuração do Armageddon',
+  // era 7 · Lua
+  'Posto de gasolina lunar', 'Estúdio da teoria da conspiração', 'Fazenda de queijo lunar', 'Mina de hélio-3 com clone',
+  'Raio encolhedor do Gru', 'Base no lado escuro da Lua',
 ];
 
 /** As 8 melhorias de cada gerador (níveis 1, 10, 25, 50, 100, 150, 200 e 300 unidades); cada uma dobra o gerador. */
@@ -45,7 +59,35 @@ export const MELHORIAS_GERADOR: readonly (readonly [string, string, string, stri
   ['Escritório no arranha-céu', 'Carro de luxo da firma', 'Filial em Portugal', 'Parceiro xeique', 'Torre própria', 'Chocolate de Dubai', 'Lamborghini da polícia', 'Apartamento na Palm'],
   ['Tocar o sino', 'Ação em alta', 'Dividendos', 'Índice da bolsa', 'Bilionário na capa', 'Circuit breaker', 'Ação meme', 'Recompra de ações'],
   ['Motor reutilizável', 'Lançamento sem explodir', 'Estação em órbita', 'Base na Lua', 'Colônia em Marte', 'Foguete pego com hashi', 'Carro esportivo em órbita', 'Passagem só de ida'],
+  ['Primeiro lançamento', 'Trenzinho de luzes no céu', 'Antena de pizza', 'Plano família interplanetário', 'Astrônomo reclamando', 'Mil satélites por mês', 'Internet no avião', 'Céu com mais satélite que estrela'],
+  ['Macacão com logo', 'Cantora pop a bordo', 'Vídeo flutuando com a água', 'Champanhe sem gravidade', 'Lista de espera de bilionário', 'Capitão de série de TV a bordo', 'Podcast gravado em órbita', 'Ingresso mais caro que um apartamento'],
+  ['Valsa do Danúbio Azul na acoplagem', 'Airbnb na estação espacial', 'Café da manhã em tubinho', 'Vista pra Terra (taxa extra)', 'Videofone de 1,70 o minuto', 'Spa de microgravidade', 'Suíte com janela redonda', 'Hilton da Odisseia'],
+  ['Olho vermelho na parede', 'Osso jogado pro alto', 'Leitura labial', 'Xadrez imbatível', '"Desculpe, Dave"', 'Porta da cápsula trancada', 'Módulo de memória extra', 'Daisy, Daisy'],
+  ['Rede de pegar destroço', 'Parafuso perdido de 1965', 'Luva de astronauta achada', 'Satélite soviético de segunda mão', 'Braço robótico', 'Guindaste orbital', 'Ferro-velho com selo ISO', 'Reciclagem de estação inteira'],
+  ['Sonda de petróleo', 'Briefing de regata na agência espacial', 'Bomba nuclear de brinde', 'Rock farofa no rádio', 'Biscoito de bichinho', 'Broca nova (a velha travou)', 'Despedida no asteroide', 'Asteroide partido ao meio'],
+  ['Pegada na poeira', 'Bandeira que não balança', 'Conveniência 24 h (o dia lunar dura 14)', 'Gasolina de hélio', 'Pão de queijo liofilizado', 'Calibrador de pneu de jipe lunar', 'Frentista de traje', 'Posto com bandeira própria'],
+  ['Holofote que faz sombra errada', 'Cenário de areia cinza', 'Bandeira com ventilador', 'Fio de pendurar astronauta', 'Diretor perfeccionista contratado', 'Documentário no YouTube', 'Fórum de terraplanista', 'Pôster "Foi tudo gravado aqui"'],
+  ['Faca de queijo espacial', 'Bolacha de água e sal', 'Queijo da cratera', 'Cachorro no comando', 'Foguete de garagem', 'Curado no vácuo', 'Meia-cura de 4 bilhões de anos', 'Exportação pra Minas'],
+  ['Contrato de 3 anos', 'Robô com carinha na tela', 'Mensagem gravada da família', 'Clone de reserva', 'Clone que descobriu', 'Antena de interferência', 'Gaveta com 50 clones', 'Fusão nuclear limpa'],
+  ['Minion de capacete', 'Banana espacial', 'Foguete roubado', 'Lua no bolso', 'Vilão concorrente', 'Empréstimo do Banco do Mal', 'Três meninas adotadas', 'Lua de volta (com juros)'],
+  ['Prisma na entrada', 'Vinil da banda', 'Robô gigante escondido', 'Sinal sem resposta', 'Lado escuro (que nem é escuro)', 'Hangar de nave secreta', 'Laser apontado pra Terra', 'Eclipse particular'],
 ];
+
+/** A frase de cada gerador que tem uma (os das eras 6 em diante): aparece na caixinha e na Loja. Só da página. */
+export const FRASES_GERADOR: Readonly<Record<number, string>> = {
+  31: 'Internet no meio do nada, e nenhuma estrela visível no céu.',
+  32: 'Onze minutos de voo e três horas de vídeo sobre como mudou a sua vida.',
+  33: 'Diária em dólar, vista de graça, gravidade cobrada à parte.',
+  34: 'Desculpe, Dave. Receio que não posso cancelar sua assinatura.',
+  35: 'Tudo que a humanidade jogou pra cima, agora com nota fiscal.',
+  36: 'Treinar astronauta pra furar dava mais trabalho. Ninguém perguntou.',
+  37: 'Aceita cartão, Pix e pedra lunar. Calibragem grátis.',
+  38: 'Dizem que foi tudo gravado aqui. A gente só aluga o estúdio.',
+  39: 'Todo mundo sabia que a Lua era de queijo. Faltava alguém vender.',
+  40: 'Contrato de três anos. Você vai renovar. Você sempre renova.',
+  41: 'Roubar a Lua deu trabalho. Alugar ela de volta dá lucro.',
+  42: 'Escuro só no nome. O aluguel é bem iluminado.',
+};
 
 /** Melhorias gerais: 4 por era, +% em toda a produção. */
 export const GERAIS: readonly { nome: string; frase: string; mult: number; era: number }[] = [
@@ -69,6 +111,30 @@ export const GERAIS: readonly { nome: string; frase: string; mult: number; era: 
   { era: 5, mult: 1.25, nome: 'Reunião no iate', frase: 'Pauta: o pôr do sol.' },
   { era: 5, mult: 1.3, nome: 'Cultura de dono', frase: 'Todo mundo pensa como sócio.' },
   { era: 5, mult: 1.3, nome: 'Lenda do mercado', frase: 'Tem até documentário sobre você.' },
+  { era: 6, mult: GERAL_6[0], nome: 'Lançamento transmitido ao vivo', frase: 'Dez milhões assistindo a contagem.' },
+  { era: 6, mult: GERAL_6[1], nome: 'Foguete que pousa de ré', frase: 'Reutilizável, e ainda estaciona sozinho.' },
+  { era: 6, mult: GERAL_6[2], nome: 'Contagem regressiva com patrocínio', frase: 'Dez, nove, oferecimento…' },
+  { era: 6, mult: GERAL_6[3], nome: 'Selfie do espaço', frase: 'A Terra inteira no fundo e você no meio.' },
+  { era: 7, mult: GERAL_7[0], nome: 'Pequeno passo', frase: 'Um salto gigante pro faturamento.' },
+  { era: 7, mult: GERAL_7[1], nome: 'Telescópio apontado pra você', frase: 'Lá de baixo dá pra ver o seu logo.' },
+  { era: 7, mult: GERAL_7[2], nome: 'Trem-bala lunar', frase: 'Do Mar da Tranquilidade ao escritório em 4 min.' },
+  { era: 7, mult: GERAL_7[3], nome: 'Lua cheia de clientes', frase: 'Toda lua cheia é Black Friday.' },
+];
+
+/** Legado (eras 6+): cada unidade de gerador da era `fonteEra` que você tem dá +porUnidade nos geradores da era
+ *  `alvoEra`. Liberado ao chegar na era alvo. Ids 3001 em diante, na ordem. */
+export const LEGADO: readonly { nome: string; fonteEra: number; alvoEra: number; porUnidade: number }[] = [
+  { alvoEra: 6, fonteEra: 1, porUnidade: LEGADO_P, nome: 'O notebook da faculdade foi pro espaço' },
+  { alvoEra: 6, fonteEra: 2, porUnidade: LEGADO_P, nome: 'A garagem virou hangar' },
+  { alvoEra: 6, fonteEra: 3, porUnidade: LEGADO_P, nome: 'Escritório com gravidade zero' },
+  { alvoEra: 6, fonteEra: 4, porUnidade: LEGADO_P, nome: 'O andar inteiro em órbita' },
+  { alvoEra: 6, fonteEra: 5, porUnidade: LEGADO_P, nome: 'A sede virou base de lançamento' },
+  { alvoEra: 7, fonteEra: 1, porUnidade: LEGADO_P, nome: 'Wi-Fi da biblioteca chega na Lua' },
+  { alvoEra: 7, fonteEra: 2, porUnidade: LEGADO_P, nome: 'Food truck lunar' },
+  { alvoEra: 7, fonteEra: 3, porUnidade: LEGADO_P, nome: 'Podcast gravado na cratera' },
+  { alvoEra: 7, fonteEra: 4, porUnidade: LEGADO_P, nome: 'Trader que opera da Lua' },
+  { alvoEra: 7, fonteEra: 5, porUnidade: LEGADO_P, nome: 'IPO na Bolsa Lunar' },
+  { alvoEra: 7, fonteEra: 6, porUnidade: LEGADO_P, nome: 'Satélite de retransmissão' },
 ];
 
 /** Sinergias: cada unidade da fonte dá +porUnidade no alvo. */
@@ -113,7 +179,7 @@ export type EstrategiaTexto = {
   sociais?: Record<string, number>;
 };
 
-/** Estratégias: 3 por era (2 a 5). `ativa: false` = depende de algo que ainda não chegou. */
+/** Estratégias: 3 por era (2 a 5) e 2 nas eras 6 e 7. `ativa: false` = depende de algo que ainda não chegou. */
 export const ESTRATEGIAS: readonly EstrategiaTexto[] = [
   { era: 2, opcao: 0, nome: 'Bootstrapping', frase: 'Cresce com o que tem: os geradores do 1 ao 12 rendem 50% a mais.', genDe: 1, genAte: 12, genMult: 1.5 },
   { era: 2, opcao: 1, nome: 'Queimar caixa', frase: 'Tudo custa 25% a mais, mas a produção sobe 60%.', custoMult: 1.25, prodMult: 1.6 },
@@ -127,10 +193,14 @@ export const ESTRATEGIAS: readonly EstrategiaTexto[] = [
   { era: 5, opcao: 0, nome: 'Expansão global', frase: 'Os geradores do 25 ao 30 rendem o dobro.', genDe: 25, genAte: 30, genMult: 2 },
   { era: 5, opcao: 1, nome: 'Holding', frase: '+3% de produção por gerador diferente que você tem.', porGeradorDistinto: 0.03 },
   { era: 5, opcao: 2, nome: 'Rolê eterno', frase: 'Oportunidades ficam 30 segundos na tela e o limite do dia sobe 5.', oppSegundos: 30, oppExtra: 5 },
+  { era: 6, opcao: 0, nome: 'Turismo espacial', frase: 'Os geradores do 31 ao 36 rendem o dobro.', genDe: 31, genAte: 36, genMult: EST_6_GEN },
+  { era: 6, opcao: 1, nome: 'Satélites de internet', frase: 'Oportunidades em F$ rendem 50% a mais, as outras valem em dobro, e o limite do dia sobe 2.', oppBonusMult: 1.5, oppExtra: 2 },
+  { era: 7, opcao: 0, nome: 'Mineração lunar', frase: 'Os geradores do 37 ao 42 rendem o dobro.', genDe: 37, genAte: 42, genMult: EST_7_GEN },
+  { era: 7, opcao: 1, nome: 'Hotel na Lua', frase: 'Geradores e melhorias custam 25% menos.', custoMult: 0.75 },
 ];
 
 /** Nome de cada era (é a cena). */
-export const ERAS: readonly string[] = ['Quarto', 'Garagem', 'Escritório', 'Andar inteiro', 'Sede'];
+export const ERAS: readonly string[] = ['Quarto', 'Garagem', 'Escritório', 'Andar inteiro', 'Sede', 'Em órbita', 'Lua'];
 
 /** Cargos sorteados ao contratar (o banco guarda o texto no contrato). Minúsculo: entra no meio da frase
  *  ("te contratou como sócio de fachada"). */
@@ -175,9 +245,11 @@ export type TipoConquista =
   | 'evt_mae' | 'evt_shopee' | 'evt_call' | 'evt_tela' | 'evt_gols' | 'era_300' | 'era_melhorias'
   // dourados e Caixinha (0076), todas de evento (idle_ganhar com o contador de dourados_cont): maior Trend, Pix devolvidos,
   // derrotas e vitórias seguidas no Tigrinho, combos, cupons pegos, F$ de cashback; Insider na venda da Bolsa
-  | 'trend_max' | 'pix_dev' | 'tigre_perdeu' | 'combos' | 'cupons' | 'cashback' | 'tigre_seq' | 'insider';
+  | 'trend_max' | 'pix_dev' | 'tigre_perdeu' | 'combos' | 'cupons' | 'cashback' | 'tigre_seq' | 'insider'
+  // eras 6–7 (0078): Lixo espacial e Houston (de evento); o monolito, 1 de cada gerador da era 7 (de estado)
+  | 'evt_lixo' | 'evt_houston' | 'monolito';
 
-/** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
+/** Conquista "ter 100" de cada gerador, na ordem dos geradores: [nome, frase]. Ids 1–30 e, do gerador 31 em diante, 140 + (g − 31) (idConquistaGerador em catalogo.ts). */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
   ['Cem abas abertas', 'Cem abas, zero vagas aplicadas. Seu pai já desistiu de você em silêncio.'],
   ['Guru do LinkedIn', 'Escreveu "fui demitido e isso me ensinou" cem vezes. Ninguém te recontratou.'],
@@ -209,6 +281,19 @@ export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
   ['Dono de Dubai', 'Mudou pra Dubai pra não pagar imposto. O Brasil agradece a sua ausência.'],
   ['A bolsa é sua', 'Cem IPOs. Os aposentados que compraram na alta mandam beijo.'],
   ['Frota interplanetária', 'Cem foguetes pra fugir do planeta que você ajudou a estragar.'],
+  // geradores 31–42: ids 140–151 (os ids 31+ já eram das outras conquistas)
+  ['Céu poluído', 'Cem satélites. Os astrônomos te odeiam.'],
+  ['Turista de luxo', 'Cem voos de 11 minutos. Ninguém saiu direito da atmosfera.'],
+  ['Cinco estrelas (de verdade)', 'Cem hotéis em órbita. O check-out é às 11 h, mas de qual fuso?'],
+  ['Abra a porta, HAL', 'Cem HALs. Nenhum abre a porta.'],
+  ['Catador de estrelas', 'Cem ferros-velhos. O lixo espacial agora tem dono.'],
+  ['Missão cumprida, Harry', 'Cem equipes de perfuração. O asteroide nem viu.'],
+  ['Abastece aí', 'Cem postos na Lua. O jipe agradece.'],
+  ['Foi tudo gravado', 'Cem estúdios. Agora tem prova de que nada aconteceu.'],
+  ['Queijo suíço espacial', 'Cem fazendas. A Lua está cada vez mais esburacada.'],
+  ['Sou eu mesmo?', 'Cem minas, e cem de você trabalhando nelas.'],
+  ['Lua no bolso', 'Cem raios encolhedores. A maré nunca mais foi a mesma.'],
+  ['Do lado de lá', 'Cem bases no lado escuro, que de escuro não tem nada.'],
 ];
 
 export type ConquistaTexto = {
@@ -304,6 +389,13 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 135, tipo: 'combos', valor: 10, nome: 'C-C-C-Combo!', frase: 'Dez combos seguidos. O narrador ficou rouco.', condicao: 'Fazer 10 Combos' },
   { id: 136, tipo: 'cupons', valor: 25, nome: 'Primeira compra (de novo)', frase: 'Vinte e cinco primeiras compras, todas no mesmo CPF.', condicao: 'Pegar 25 Cupons de primeira compra' },
   { id: 137, tipo: 'cashback', valor: 1e12, nome: 'Volta pra conta', frase: 'Um trilhão de volta. O que você gastou pra isso, melhor nem somar.', condicao: 'Receber F$ 1 tri de cashback' },
+  // eras 6–7 (0077/0078); as "ter 100" dos geradores 31–42 (140–151) estão em CONQUISTAS_GERADOR
+  { id: 152, tipo: 'era_300', alvo: 6, nome: 'Órbita lotada', frase: 'Trezentos de cada. O céu virou estacionamento.', condicao: 'Ter 300 de cada gerador da era 6' },
+  { id: 153, tipo: 'era_300', alvo: 7, nome: 'Condomínio lunar', frase: 'A Lua tem síndico agora. É você.', condicao: 'Ter 300 de cada gerador da era 7' },
+  { id: 154, tipo: 'era_melhorias', alvo: 6, nome: 'Estação completa', frase: 'Tudo comprado. Até o banheiro funciona sem gravidade.', condicao: 'Comprar todas as melhorias da era 6' },
+  { id: 155, tipo: 'era_melhorias', alvo: 7, nome: 'Lua de luxo', frase: 'Cada cratera com hidromassagem.', condicao: 'Comprar todas as melhorias da era 7' },
+  { id: 156, tipo: 'evt_lixo', valor: 3, nome: 'Desviou de tudo', frase: 'Nenhum arranhão. Nem no satélite do vizinho.', condicao: 'Desviar os 3 destroços de um Lixo espacial' },
+  { id: 157, tipo: 'evt_houston', valor: 10, nome: 'Silver tape resolve', frase: 'Dez problemas, um rolo de fita.', condicao: 'Consertar 10 "Houston, temos um problema"' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -321,6 +413,8 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 131, escondida: true, tipo: 'melhoria', alvo: 138, nome: 'Embaixo do lago prateado', frase: 'Toda música tem uma mensagem escondida. Essa também.', condicao: 'Comprar "Mensagem subliminar no episódio"' },
   { id: 138, escondida: true, tipo: 'tigre_seq', valor: 3, nome: 'O tigre tá pagando', frase: 'Ele deixou você ganhar. É assim que começa.', condicao: 'Ganhar 3 seguidas no Tigrinho depois das 3 grátis' },
   { id: 139, escondida: true, tipo: 'insider', valor: 1, nome: 'Insider (shh)', frase: 'A CVM quer saber a sua localização.', condicao: 'Vender com 100% de lucro uma ação de empresa espiada nas últimas 2 h' },
+  { id: 158, escondida: true, tipo: 'monolito', nome: 'Meu Deus, está cheio de estrelas', frase: 'Alguém deixou isso aqui há 4 milhões de anos.', condicao: 'Ter pelo menos 1 de cada gerador da era 7' },
+  { id: 159, escondida: true, tipo: 'melhoria', alvo: 348, nome: 'Daisy, Daisy', frase: 'Ele cantou até a voz acabar.', condicao: 'Comprar "Daisy, Daisy"' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os ramos (o Tempo virou Dourados e a Horta entrou em 13/10). */

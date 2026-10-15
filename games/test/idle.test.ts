@@ -22,12 +22,12 @@ describe('catálogo no banco', () => {
   it('tem os mesmos números do catalogo.ts', async () => {
     const gens = await q<{ id: number; custo: number; renda: number }>('select id, custo, renda from public.idle_cat_gen order by id');
     expect(gens.map((g) => [g.id, g.custo, g.renda])).toEqual(catalogo.geradores.map((g) => [g.id, g.custo, g.renda]));
-    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(290);
-    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(12);
+    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_upg'))[0].n).toBe(405);
+    expect((await q<{ n: number }>('select count(*)::int as n from public.idle_cat_est where ativa'))[0].n).toBe(16);
   });
   it('membro lê; anônimo não', async () => {
     const lidos = await t.asRole<{ n: number }>('authenticated', 'select count(*)::int as n from public.idle_cat_gen');
-    expect(lidos[0].n).toBe(30);
+    expect(lidos[0].n).toBe(42);
     await expect(t.asRole('anon', 'select * from public.idle_cat_gen')).rejects.toThrow();
   });
 });
@@ -129,7 +129,7 @@ describe('idle_buy', () => {
   it('qtd inválida e gerador inexistente: idle_bad_choice', async () => {
     await dar(A, 1e6);
     await expect(buy('gerador', 1, 3)).rejects.toThrow(/idle_bad_choice/);
-    await expect(buy('gerador', 31)).rejects.toThrow(/idle_bad_choice/);
+    await expect(buy('gerador', 43)).rejects.toThrow(/idle_bad_choice/);
     await expect(t.rpc('idle_buy', { p_kind: 'xx', p_id: 1, p_qty: 1 })).rejects.toThrow(/idle_bad_choice/);
   });
   it('melhoria de nível 1 dobra o gerador; repetir é idle_owned; nível 2 sem 10 unidades é idle_locked', async () => {

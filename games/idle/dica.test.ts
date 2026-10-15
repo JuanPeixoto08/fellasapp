@@ -372,3 +372,23 @@ describe('a caixinha das oportunidades novas (0076)', () => {
       { texto: 'Mostra o humor de Pastelaria até ele mudar · 1 crédito' }, { texto: 'Você tem 2', tom: 'fraco' }] });
   });
 });
+
+describe('legado na caixinha (eras 6+)', () => {
+  const generators = gens({ 1: 400, 2: 300, 3: 200, 4: 150, 5: 100, 6: 90, 31: 2 });
+  it('a melhoria diz quanto dá agora, em números da pessoa', () => {
+    const s = comTaxa({ era: 6, generators, strategies: [0, 0, 0, 0, 0, -1] });
+    expect(textos(dicaMelhoria(s, melhoria((x) => x.id === 3001), 1.2e16))).toEqual(expect.arrayContaining([
+      'Cada gerador da era 1 dá +0,05% nos geradores da era 6',
+      'Seus 1.240 geradores da era 1 dão +62% na era 6',
+    ]));
+  });
+  it('o gerador da era alvo mostra o legado que já tem', () => {
+    const s = comTaxa({ era: 6, generators, strategies: [0, 0, 0, 0, 0, -1], upgrades: [3001] });
+    expect(textos(dicaGerador(s, 31, 1e15))).toContain('Legado: +62%');
+  });
+  it('estado com 30 geradores: a caixinha do gerador e a da produção não viram NaN', () => {
+    const s = comTaxa({ generators: gens({ 1: 3 }) });
+    expect(textos(dicaGerador(s, 1, 20)).join(' ')).not.toContain('NaN');
+    expect(textos(dicaProducao(s, Date.parse(s.server_now))).join(' ')).not.toContain('NaN');
+  });
+});

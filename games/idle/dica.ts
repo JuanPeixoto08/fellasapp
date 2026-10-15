@@ -4,7 +4,7 @@
 import type { IdleState, LugarEstado, PinoMapa } from '../shared/types';
 import type { Marco } from './mapa';
 import { catalogo, type Melhoria } from './catalogo';
-import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, partesContratos, rendasGeradores, VIRAL_MS } from './economia';
+import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, multLegado, partesContratos, rendasGeradores, unidadesDaEra, VIRAL_MS } from './economia';
 import {
   CHUVA_S, COMBO_MULT, escolhaLinkedin, LINKEDIN_MULT, MOEDINHA_S, PIX_FICAR_S, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, TREND_MAX,
   type TipoDourado,
@@ -48,18 +48,19 @@ export const multMapaDe = (s: IdleState) => s.mapa_mult ?? 1;
 /** "· 2 min da sua produção" (sem produção ainda, nada). */
 const emTempo = (s: IdleState, preco: number) => (s.rate > 0 ? ` · ${tempoDeProducao(preco / s.rate)} da sua produção` : '');
 
-/** Quanto as melhorias de gerador dobram e quanto as sinergias somam num gerador. */
+/** Quanto as melhorias de gerador dobram, quanto as sinergias somam e quanto o legado dá num gerador. */
 function partesGerador(s: IdleState, gid: number) {
   let dobras = 0;
   let sinergia = 0;
   for (const id of s.upgrades) {
     const m = catalogo.melhorias.find((x) => x.id === id);
     if (m?.tipo === 'gerador' && m.gerador === gid) dobras++;
-    if (m?.tipo === 'sinergia' && m.alvo === gid) sinergia += m.porUnidade * s.generators[m.fonte - 1];
+    if (m?.tipo === 'sinergia' && m.alvo === gid) sinergia += m.porUnidade * (s.generators[m.fonte - 1] ?? 0);
   }
   const est = estrategiasAtivas(catalogo, s).reduce(
     (a, e) => (e.genDe !== null && e.genAte !== null && gid >= e.genDe && gid <= e.genAte ? a * e.genMult : a), 1);
-  return { dobras, sinergia, est };
+  const legado = multLegado(catalogo, s, catalogo.geradores[gid - 1].era) - 1;
+  return { dobras, sinergia, est, legado };
 }
 
 /** Quanto rende uma unidade de cada gerador agora (com tudo, horta e Mapa do rolê inclusos). */
@@ -71,8 +72,8 @@ export function porUnidade(s: IdleState) {
 
 export function dicaGerador(s: IdleState, gid: number, precoProximo: number, cashback = 0): Dica {
   const cada = porUnidade(s);
-  const n = s.generators[gid - 1];
-  const soma = cada.reduce((a, x, i) => a + x * s.generators[i], 0);
+  const n = s.generators[gid - 1] ?? 0;
+  const soma = cada.reduce((a, x, i) => a + x * (s.generators[i] ?? 0), 0);
   const linhas: LinhaDica[] = [{ texto: `Cada um rende ${formatarTaxa(cada[gid - 1])}` }];
   if (n > 0) {
     const fatia = soma > 0 ? (n * cada[gid - 1]) / soma : 0;
@@ -81,6 +82,7 @@ export function dicaGerador(s: IdleState, gid: number, precoProximo: number, cas
   const p = partesGerador(s, gid);
   if (p.dobras) linhas.push({ texto: `Melhorias: rende ${2 ** p.dobras}× mais`, tom: 'fraco' });
   if (p.sinergia) linhas.push({ texto: `Sinergias: +${num(p.sinergia * 100, 0)}%`, tom: 'fraco' });
+  if (p.legado > 0) linhas.push({ texto: `Legado: +${num(p.legado * 100, 0)}%`, tom: 'fraco' });
   if (p.est !== 1) linhas.push({ texto: `Estratégia: ${vezes(p.est)}`, tom: 'fraco' });
   if (hortaProd(s)) linhas.push({ texto: `Horta: ${hortaProd(s) > 0 ? '+' : '−'}${pct(Math.abs(hortaProd(s)))}`, tom: 'fraco' });
   const conv = multGerador(s, gid, Date.parse(s.server_now) || Date.now());
@@ -104,12 +106,20 @@ export function dicaMelhoria(s: IdleState, m: Melhoria, preco: number | null, ca
   } else if (m.tipo === 'geral') {
     linhas.push({ texto: `Toda a produção ${vezes(m.mult)}` });
     ganho = s.rate * (m.mult - 1);
-  } else {
-    const nf = s.generators[m.fonte - 1];
+  } else if (m.tipo === 'sinergia') {
+    const nf = s.generators[m.fonte - 1] ?? 0;
     linhas.push({ texto: `Cada ${nome(m.fonte)} dá +${num(m.porUnidade * 100)}% em ${nome(m.alvo)}` });
     linhas.push({ texto: `Com os seus ${nf}: ${nome(m.alvo)} +${num(m.porUnidade * nf * 100, 0)}%`, tom: 'fraco' });
     const atual = 1 + partesGerador(s, m.alvo).sinergia;
     ganho = (cada[m.alvo - 1] * s.generators[m.alvo - 1] * m.porUnidade * nf) / atual;
+  } else {
+    // legado (eras 6+): quanto as unidades da era fonte que você tem dão na era alvo, agora
+    const n = unidadesDaEra(catalogo, s.generators, m.fonteEra);
+    linhas.push({ texto: `Cada gerador da era ${m.fonteEra} dá +${num(m.porUnidade * 100)}% nos geradores da era ${m.alvoEra}` });
+    linhas.push({ texto: `Seus ${inteiro(n)} geradores da era ${m.fonteEra} dão +${num(m.porUnidade * n * 100, 0)}% na era ${m.alvoEra}`, tom: 'fraco' });
+    const atual = multLegado(catalogo, s, m.alvoEra);
+    const daEra = catalogo.geradores.filter((g) => g.era === m.alvoEra).reduce((a, g) => a + cada[g.id - 1] * (s.generators[g.id - 1] ?? 0), 0);
+    ganho = (daEra * m.porUnidade * n) / atual;
   }
   if (preco !== null) {
     if (ganho > 0) linhas.push({ texto: `Agora: ${formatarTaxa(ganho)}`, tom: 'bom' });
@@ -122,7 +132,7 @@ export function dicaMelhoria(s: IdleState, m: Melhoria, preco: number | null, ca
 /** O F$/s do topo, multiplicador por multiplicador (a mesma conta de economia.ts/idle_rate_at). */
 export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   const f = fatores(catalogo, s);
-  const base = f.porGerador.reduce((a, x, i) => a + x * s.generators[i], 0);
+  const base = f.porGerador.reduce((a, x, i) => a + x * (s.generators[i] ?? 0), 0);
   const gerais = s.upgrades.reduce((a, id) => {
     const m = catalogo.melhorias.find((x) => x.id === id);
     return m?.tipo === 'geral' ? a * m.mult : a;

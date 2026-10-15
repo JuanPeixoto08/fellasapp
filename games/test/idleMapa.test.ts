@@ -405,7 +405,7 @@ describe('a produção na tela conta o Mapa do rolê', () => {
     expect(s.mapa_mult).toBeCloseTo(mult, 12);
     expect(s.mapa_abertos).toBe(3);
     expect(mult).toBeGreaterThan(1);
-    const soma = porUnidade(s).reduce((a, x, i) => a + x * s.generators[i], 0);
+    const soma = porUnidade(s).reduce((a, x, i) => a + x * (s.generators[i] ?? 0), 0);
     expect(Math.abs(soma - s.rate) / s.rate).toBeLessThan(1e-9);
     const linhas = dicaProducao(s, Date.parse(s.server_now)).linhas.map((l) => l.texto);
     expect(linhas).toContain(`Mapa do rolê: ×${(Math.round(mult * 100) / 100).toLocaleString('pt-BR')}`);

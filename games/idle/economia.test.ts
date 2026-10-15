@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogo as cat } from './catalogo';
 import {
   abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
-  pontosTotais, precoContrato, preco, produzido, rendasGeradores, taxa, taxaPorUnidade, type Estado, VIRAL_MS,
+  multLegado, pontosTotais, precoContrato, preco, produzido, rendasGeradores, taxa, taxaPorUnidade, type Estado, unidadesDaEra, VIRAL_MS,
 } from './economia';
 
 const vazio = (): Estado => ({ generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1] });
@@ -264,7 +264,7 @@ describe('rendasGeradores (o sorteio do LinkedIn)', () => {
   it('cada gerador: unidades × quanto cada uma rende; a soma é a taxa', () => {
     const s = { generators: [10, 5, ...Array(28).fill(0)], upgrades: [11], strategies: [-1, -1, -1, -1] };
     const r = rendasGeradores(cat, s);
-    expect(r).toHaveLength(30);
+    expect(r).toHaveLength(42);
     expect(r[0]).toBeCloseTo(10 * taxaPorUnidade(cat, s, 1), 9);
     expect(r[1]).toBeCloseTo(5 * taxaPorUnidade(cat, s, 2), 9);
     expect(r.slice(2).every((x) => x === 0)).toBe(true);
@@ -285,5 +285,38 @@ describe('LinkedIn e Combo no produzido (0076)', () => {
   it('fator que já acabou (ou lista vazia) é a conta de antes', () => {
     expect(produzido(2, 50_000, 60_000, null, [], VIRAL_MS, null, [{ ateMs: 40_000, mult: 7 }])).toBeCloseTo(20, 6);
     expect(acumular(5, 2, 0, 10_000, null, [], VIRAL_MS, null, [])).toBeCloseTo(25, 6);
+  });
+});
+
+describe('legado (eras 6+, igual a idle_gen_rendas na 0078)', () => {
+  const base = () => com([[1, 400], [2, 300], [3, 200], [4, 150], [5, 100], [6, 90], [30, 1], [31, 1]], { strategies: [0, 0, 0, 0, -1, -1] });
+  it('cada unidade da era fonte dá +p nos geradores da era alvo, e só neles', () => {
+    const s = base();
+    const comLegado = { ...s, upgrades: [3001] };
+    expect(unidadesDaEra(cat, s.generators, 1)).toBe(1240);
+    expect(multLegado(cat, comLegado, 6)).toBeCloseTo(1 + 0.0005 * 1240, 12);
+    expect(multLegado(cat, comLegado, 7)).toBe(1);
+    expect(taxaPorUnidade(cat, comLegado, 31) / taxaPorUnidade(cat, s, 31)).toBeCloseTo(1.62, 12);
+    expect(taxaPorUnidade(cat, comLegado, 30)).toBeCloseTo(taxaPorUnidade(cat, s, 30), 12);
+  });
+  it('dois legados da mesma era alvo somam (não multiplicam)', () => {
+    const s = { ...base(), upgrades: [3001, 3005] }; // era 1 (1240) e era 5 (1)
+    expect(multLegado(cat, s, 6)).toBeCloseTo(1 + 0.0005 * 1240 + 0.0005 * 1, 12);
+  });
+  it('liberado na era alvo, não antes', () => {
+    const m = cat.melhorias.find((x) => x.id === 3001)!;
+    expect(liberada(cat, m, com([[30, 1]]))).toBe(false);
+    expect(liberada(cat, m, com([[30, 1], [31, 1]]))).toBe(true);
+  });
+});
+
+describe('estado curto (resposta de antes da 0078, com 30 geradores)', () => {
+  it('os geradores que faltam contam 0: taxa e rendas sem NaN', () => {
+    const s = com([[1, 3], [2, 1]]);
+    expect(s.generators).toHaveLength(30);
+    expect(Number.isFinite(taxa(cat, s))).toBe(true);
+    expect(rendasGeradores(cat, s)).toHaveLength(42);
+    expect(rendasGeradores(cat, s).every(Number.isFinite)).toBe(true);
+    expect(liberada(cat, cat.melhorias.find((x) => x.id === 311)!, s)).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 // Catálogo da Fellas Inc. montado a partir dos textos (nomes.ts) e dos parâmetros de balanceamento.
 // É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
 import {
-  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista,
+  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, LEGADO, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista,
   type TipoNo,
 } from './nomes';
 
@@ -13,6 +13,12 @@ export type { TipoConquista, TipoNo } from './nomes';
  *  era 4 em 1 d, era 5 em 3,5 d, gerador 30 fora da semana, 484 compras na 1ª hora). */
 export const PARAMETROS = { custoInicial: 15, crescimentoCusto: 2.6, retornoInicial: 30, crescimentoRetorno: 1.58 };
 export type Parametros = typeof PARAMETROS;
+/** O 2º trecho da curva (eras 6+, 15/10): do gerador `aPartirDe` em diante, custo_g = custoInicial·crescimentoCusto^k e
+ *  renda_g = custo_g / (retornoInicial·crescimentoRetorno^k), com k = g − aPartirDe. Os geradores antes dele usam
+ *  PARAMETROS e não mudam nunca (preço em produção). Calibrado na simulação (simulacao.test.ts, "ritmo das eras 6 e 7"):
+ *  era 6 em 10,5 dias e era 7 em 16 dias. */
+export const PARAMETROS_ESPACO = { aPartirDe: 31, custoInicial: 6e14, crescimentoCusto: 1.6, retornoInicial: 2.5e6, crescimentoRetorno: 1.45 };
+export type ParametrosEspaco = typeof PARAMETROS_ESPACO;
 
 /** Quantas unidades liberam cada nível de melhoria de gerador, e o preço (× custo base do gerador). 150/200/300 desde
  *  14/10 (eras 1–5); os preços dos três novos saíram da simulação (simulacao.test.ts). */
@@ -20,6 +26,8 @@ export const NIVEIS = [1, 10, 25, 50, 100, 150, 200, 300] as const;
 export const PRECO_NIVEL = [10, 50, 500, 50_000, 5_000_000, 5e9, 5e12, 5e18] as const;
 /** Preço das gerais (× custo do primeiro gerador da era), na ordem em que aparecem na era. */
 export const PRECO_GERAL = [20, 40, 80, 160] as const;
+/** Preço do legado (× custo do primeiro gerador da era alvo), pela era fonte (1 a 6): o mesmo dobro das gerais. */
+export const PRECO_LEGADO = [20, 40, 80, 160, 320, 640] as const;
 /** Sinergia: preço (× custo do alvo) e quantas unidades de cada lado pedem. */
 export const PRECO_SINERGIA = 100;
 export const REQUER_SINERGIA = 15;
@@ -35,6 +43,10 @@ export type Melhoria =
   | {
       id: number; tipo: 'sinergia'; nome: string; frase: string; preco: number;
       fonte: number; alvo: number; porUnidade: number; requerFonte: number; requerAlvo: number;
+    }
+  | {
+      id: number; tipo: 'legado'; nome: string; frase: string; preco: number;
+      fonteEra: number; alvoEra: number; porUnidade: number; requerEra: number;
     };
 export type Estrategia = {
   era: number; opcao: number; nome: string; frase: string; ativa: boolean; requer: 'contratos' | 'lugares' | null;
@@ -55,10 +67,21 @@ export type Catalogo = {
   geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[]; conquistas: Conquista[]; arvore: No[];
 };
 
-export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
+/** O id da conquista "ter 100" do gerador g: 1–30 = o próprio g; do 31 em diante, 140 + (g − 31) (os ids 31+ já eram das
+ *  outras conquistas). */
+export const idConquistaGerador = (g: number) => (g <= 30 ? g : 109 + g);
+
+export function montarCatalogo(p: Parametros = PARAMETROS, q: ParametrosEspaco = PARAMETROS_ESPACO): Catalogo {
+  const corte = q.aPartirDe - 1; // índice do 1º gerador do 2º trecho
   const geradores: Gerador[] = GERADORES.map((nome, i) => {
-    const custo = p.custoInicial * p.crescimentoCusto ** i;
-    return { id: i + 1, era: Math.floor(i / 6) + 1, nome, custo, renda: custo / (p.retornoInicial * p.crescimentoRetorno ** i) };
+    if (i < corte) {
+      // os de sempre: a mesma conta de antes, byte a byte (catalogo.test.ts compara com a 0075)
+      const custo = p.custoInicial * p.crescimentoCusto ** i;
+      return { id: i + 1, era: Math.floor(i / 6) + 1, nome, custo, renda: custo / (p.retornoInicial * p.crescimentoRetorno ** i) };
+    }
+    const k = i - corte;
+    const custo = q.custoInicial * q.crescimentoCusto ** k;
+    return { id: i + 1, era: Math.floor(i / 6) + 1, nome, custo, renda: custo / (q.retornoInicial * q.crescimentoRetorno ** k) };
   });
   const melhorias: Melhoria[] = [];
   geradores.forEach((g) =>
@@ -86,6 +109,15 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
       requerFonte: especial ? 100 : REQUER_SINERGIA, requerAlvo: especial ? 1 : REQUER_SINERGIA,
     });
   });
+  LEGADO.forEach((x, i) => {
+    const primeiro = geradores[(x.alvoEra - 1) * 6];
+    melhorias.push({
+      id: 3001 + i, tipo: 'legado', nome: x.nome,
+      frase: `Cada gerador da era ${x.fonteEra} que você tem dá +${(x.porUnidade * 100).toLocaleString('pt-BR')}% nos geradores da era ${x.alvoEra}.`,
+      preco: primeiro.custo * PRECO_LEGADO[x.fonteEra - 1], fonteEra: x.fonteEra, alvoEra: x.alvoEra, porUnidade: x.porUnidade,
+      requerEra: x.alvoEra,
+    });
+  });
   const estrategias: Estrategia[] = ESTRATEGIAS.map((e) => ({
     era: e.era, opcao: e.opcao, nome: e.nome, frase: e.frase, ativa: e.ativa ?? true, requer: e.requer ?? null,
     genDe: e.genDe ?? null, genAte: e.genAte ?? null, genMult: e.genMult ?? 1, prodMult: e.prodMult ?? 1,
@@ -94,7 +126,7 @@ export function montarCatalogo(p: Parametros = PARAMETROS): Catalogo {
   }));
   const conquistas: Conquista[] = [
     ...CONQUISTAS_GERADOR.map(([nome, frase], i): Conquista => ({
-      id: i + 1, nome, frase, condicao: `Ter 100 "${geradores[i].nome}"`, tipo: 'gerador', alvo: i + 1, valor: 100,
+      id: idConquistaGerador(i + 1), nome, frase, condicao: `Ter 100 "${geradores[i].nome}"`, tipo: 'gerador', alvo: i + 1, valor: 100,
       escondida: false,
     })),
     ...CONQUISTAS.map((c): Conquista => ({
@@ -120,7 +152,7 @@ export function catalogoSql(cat: Catalogo = catalogo): string {
   const gen = cat.geradores.map((g) => `  (${g.id}, ${g.era}, ${txt(g.nome)}, ${num(g.custo)}, ${num(g.renda)})`);
   const upg = cat.melhorias.map((m) => {
     const c = (k: string) => num(((m as Record<string, unknown>)[k] as number | undefined) ?? null);
-    return `  (${m.id}, ${txt(m.tipo)}, ${txt(m.nome)}, ${txt(m.frase)}, ${num(m.preco)}, ${c('gerador')}, ${c('nivel')}, ${c('requer')}, ${c('mult')}, ${c('requerEra')}, ${c('fonte')}, ${c('alvo')}, ${c('porUnidade')}, ${c('requerFonte')}, ${c('requerAlvo')})`;
+    return `  (${m.id}, ${txt(m.tipo)}, ${txt(m.nome)}, ${txt(m.frase)}, ${num(m.preco)}, ${c('gerador')}, ${c('nivel')}, ${c('requer')}, ${c('mult')}, ${c('requerEra')}, ${c('fonte')}, ${c('alvo')}, ${c('porUnidade')}, ${c('requerFonte')}, ${c('requerAlvo')}, ${c('fonteEra')}, ${c('alvoEra')})`;
   });
   const est = cat.estrategias.map(
     (e) =>
@@ -143,9 +175,9 @@ create table if not exists public.idle_cat_gen (
   id int primary key, era int not null, nome text not null, custo double precision not null, renda double precision not null
 );
 create table if not exists public.idle_cat_upg (
-  id int primary key, tipo text not null check (tipo in ('gerador', 'geral', 'sinergia')), nome text not null, frase text not null,
+  id int primary key, tipo text not null check (tipo in ('gerador', 'geral', 'sinergia', 'legado')), nome text not null, frase text not null,
   preco double precision not null, gerador int, nivel int, requer int, mult double precision, requer_era int,
-  fonte int, alvo int, por_unidade double precision, requer_fonte int, requer_alvo int
+  fonte int, alvo int, por_unidade double precision, requer_fonte int, requer_alvo int, fonte_era int, alvo_era int
 );
 create table if not exists public.idle_cat_est (
   era int not null, opcao int not null, nome text not null, frase text not null, ativa boolean not null, requer text,
@@ -163,6 +195,10 @@ create table if not exists public.idle_cat_no (
   id int primary key, ramo int not null, posicao int not null, nome text not null, efeito text not null, custo int not null,
   tipo text not null, valor double precision not null, requer int
 );
+-- legado (0077): banco que já tinha a tabela ganha as colunas e o tipo novo (o create acima não roda de novo)
+alter table public.idle_cat_upg add column if not exists fonte_era int, add column if not exists alvo_era int;
+alter table public.idle_cat_upg drop constraint if exists idle_cat_upg_tipo_check;
+alter table public.idle_cat_upg add constraint idle_cat_upg_tipo_check check (tipo in ('gerador', 'geral', 'sinergia', 'legado'));
 
 alter table public.idle_cat_gen enable row level security;
 alter table public.idle_cat_upg enable row level security;
@@ -194,7 +230,7 @@ delete from public.idle_cat_no where true;
 
 insert into public.idle_cat_gen (id, era, nome, custo, renda) values
 ${lista(gen)}
-insert into public.idle_cat_upg (id, tipo, nome, frase, preco, gerador, nivel, requer, mult, requer_era, fonte, alvo, por_unidade, requer_fonte, requer_alvo) values
+insert into public.idle_cat_upg (id, tipo, nome, frase, preco, gerador, nivel, requer, mult, requer_era, fonte, alvo, por_unidade, requer_fonte, requer_alvo, fonte_era, alvo_era) values
 ${lista(upg)}
 insert into public.idle_cat_est (era, opcao, nome, frase, ativa, requer, gen_de, gen_ate, gen_mult, prod_mult, custo_mult, opp_bonus_mult, opp_extra, opp_segundos, por_gerador_distinto, sociais) values
 ${lista(est)}

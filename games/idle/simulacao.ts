@@ -32,7 +32,7 @@ export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BON
   const ef = efeitosArvore(cat, bonus.arvore);
   const ini = abertura(cat, ef, gerais);
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
-  const s: Estado = { generators: ini.generators, upgrades: ini.upgrades, strategies: [-1, -1, -1, -1], social: SOLO, bonus };
+  const s: Estado = { generators: [...ini.generators, ...Array(Math.max(0, cat.geradores.length - ini.generators.length)).fill(0)], upgrades: ini.upgrades, strategies: [-1, -1, -1, -1], social: SOLO, bonus };
   let v = ini.valuation;
   let relogio = 0;
   const marcos: Marcos = { segundaNotebook: null, era: { 2: null, 3: null, 4: null, 5: null }, compras1h: 0, gerador30: null, amostras: [] };
