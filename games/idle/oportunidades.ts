@@ -33,7 +33,7 @@ export type TipoOportunidade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 /** A janela de corte (0076): as de antes continuam com 3 tipos (% 3), pra nada que já está na caixinha de alguém trocar
  *  de tipo; a partir dela, a roda de 8 (% 100). É a janela da meia-noite de Brasília depois do db push (o passo de
  *  publicar acerta o número, aqui e em idle_opp_kind). */
-export const OPP_CORTE = 2_987_010;
+export const OPP_CORTE = 2_986_866;
 /** Limites (exclusivos) de r = h % 100 de cada tipo, de 0 a 7: 0–17, 18–33, 34–49, 50–59, 60–71, 72–80, 81–90, 91–99. */
 const RODA_OPP: readonly number[] = [18, 34, 50, 60, 72, 81, 91, 100];
 

@@ -84,12 +84,12 @@ end;
 $$;
 revoke all on function public.idle_conv_faixa(public.idle_state, bigint) from public, anon, authenticated;
 
--- o tipo da janela w (o da 0049): antes do corte (2987010 = 17/10/2026 0h de Brasília; igual a OPP_CORTE, acertado no
+-- o tipo da janela w (o da 0049): antes do corte (2986866 = 16/10/2026 0h de Brasília; igual a OPP_CORTE, acertado no
 -- dia do db push) os 3 de sempre (% 3); depois, a roda de 8 (% 100): 0–17 · 18–33 · 34–49 · 50–59 · 60–71 · 72–80 ·
 -- 81–90 · 91–99
 create or replace function public.idle_opp_kind(u uuid, w bigint)
 returns int language sql immutable set search_path = public as $$
-  select case when w < 2987010 then mod(x.h2, 3)::int
+  select case when w < 2986866 then mod(x.h2, 3)::int
               else (case when mod(x.h2, 100) < 18 then 0 when mod(x.h2, 100) < 34 then 1 when mod(x.h2, 100) < 50 then 2
                          when mod(x.h2, 100) < 60 then 3 when mod(x.h2, 100) < 72 then 4 when mod(x.h2, 100) < 81 then 5
                          when mod(x.h2, 100) < 91 then 6 else 7 end) end
