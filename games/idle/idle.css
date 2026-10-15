@@ -50,6 +50,7 @@
 .idle .palco { position: relative; display: grid; justify-content: center; }
 .idle .cena { width: 320px; height: 192px; image-rendering: pixelated; --c: #2B2938; }
 .idle .valor { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 10px; text-align: center; }
+.idle .hud { display: contents; } /* celular: os números soltos embaixo da cena; no PC vira a plaquinha do placar */
 .idle .numero { font: 400 36px var(--i-pixel); color: var(--paper); text-shadow: 2px 2px 0 #000; font-variant-numeric: tabular-nums; }
 .idle .taxa { font: 400 20px var(--i-pixel); color: var(--mint); }
 .idle .bonus { flex-basis: 100%; color: var(--gold); font-size: 13px; }
@@ -944,15 +945,45 @@ body:has(.idle) { background: #121212; }
   .idle .minigame-corpo .horta-grade { width: min(100%, 540px); }
 }
 
-/* a cena e os números num cartão com moldura (mockup): a cena encostada na borda, os números com respiro do lado */
+/* PC: o placar do jogo em cima da cena (no lugar da coluna de números do lado, que ficava meio vazia): o dinheiro, o
+   F$/s, os selos e o bônus numa plaquinha de pixel no canto de cima; o resumo (era, contratados, conquistas) numa faixa
+   no pé da cena. A cena fica só com a moldura dela (sem o brilho roxo); do lado, a Caixinha em pé (tela.ts muda ela de
+   lugar no PC), e as portas ficam sozinhas embaixo, da altura que sobrar. */
 @media (min-width: 1100px) {
-  .idle .cartao-empresa { gap: 16px; background: var(--i-painel); --c: var(--i-borda);
-    box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), 0 18px 40px -12px rgba(91, 63, 217, 0.35); }
-  .idle .cartao-empresa .cena { box-shadow: 2px 0 0 0 var(--i-borda); }
-  .idle .valor { gap: 6px; padding: 16px 16px 16px 0; }
-  .idle .numero { font-size: 34px; line-height: 1; white-space: normal; }
+  .idle .cartao-empresa { grid-template-columns: var(--cena-w) minmax(0, 1fr); gap: 14px; align-items: start; background: none; box-shadow: none; }
+  .idle .cartao-empresa .cena { box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle .cartao-empresa > .palco { grid-area: 1 / 1; }
+  .idle .valor { grid-area: 1 / 1; position: relative; align-self: stretch; display: block; padding: 0; pointer-events: none; }
+  /* a Caixinha em pé: o título, quantas dá pra pegar hoje e as guardadas uma embaixo da outra (boneco e texto em cima,
+     o Pegar largo embaixo); com 4 ou 5 guardadas (a árvore) a lista rola por dentro */
+  .idle .cartao-empresa > .bancada-caixa { grid-area: 1 / 2; display: flex; flex-direction: column; gap: 8px; height: var(--cena-h); min-height: 0;
+    padding: 10px; background: var(--i-painel); --c: var(--i-borda);
+    box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle .cartao-empresa .bancada-caixa-cab { flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; background: none; }
+  .idle .cartao-empresa .bancada-caixa-cab .sub { font-size: 12.5px; line-height: 1.25; }
+  .idle .cartao-empresa .bancada-caixa-itens { min-height: 0; overflow: auto; }
+  .idle .cartao-empresa .bancada-caixa .escolhas { display: flex; flex-direction: column; gap: 8px; height: auto; padding: 2px; }
+  .idle .cartao-empresa .bancada-caixa .escolha { display: grid; grid-template-columns: 32px minmax(0, 1fr); grid-template-areas: 'bon txt' 'btn btn';
+    align-items: start; gap: 4px 8px; padding: 6px 8px 8px; background: var(--i-painel2); }
+  .idle .cartao-empresa .bancada-caixa .escolha .boneco { grid-area: bon; width: 32px; height: 32px; }
+  .idle .cartao-empresa .bancada-caixa .escolha-texto { grid-area: txt; gap: 0; }
+  .idle .cartao-empresa .bancada-caixa .escolha-texto strong { font-size: 12.5px; line-height: 1.2; }
+  .idle .cartao-empresa .bancada-caixa .escolha-texto .prazo { font-size: 11.5px; }
+  .idle .cartao-empresa .bancada-caixa .escolha .btn { grid-area: btn; width: 100%; min-height: 30px; font-size: 17px; }
+  .idle .cartao-empresa > .bancada-caixa { container-type: inline-size; }
+  /* as portas sozinhas embaixo, da altura que sobra: o desenho cresce junto (porta com cara de porta) */
+  .idle .bancada { grid-template-rows: minmax(0, 1fr); }
+  .idle .portas { height: 100%; }
+  .idle .portas .porta-icone { width: 64px; height: 64px; }
+  .idle .hud { position: absolute; top: 12px; left: 12px; display: grid; justify-items: start; gap: 6px; max-width: calc(100% - 24px);
+    padding: 10px 14px 12px; pointer-events: auto; background: color-mix(in srgb, var(--i-fundo2) 92%, transparent); --c: var(--i-borda2);
+    box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle .numero { font-size: 34px; line-height: 1; white-space: nowrap; }
   .idle .taxa { font-size: 20px; }
-  .idle .info { gap: 6px; margin-top: 6px; font-size: 13.5px; line-height: 1.3; }
+  .idle .selos { justify-content: flex-start; }
+  .idle .info { position: absolute; left: 0; right: 0; bottom: 0; flex-direction: row; flex-wrap: wrap; gap: 2px 14px; margin: 0;
+    padding: 6px 12px 7px; font-size: 13.5px; line-height: 1.3; color: #D6D1C6; pointer-events: auto;
+    background: color-mix(in srgb, var(--i-fundo2) 88%, transparent); }
 }
 /* tela inicial no PC: só a cena (grande, escala.ts), com a moldura dela e sem o brilho roxo; a caixa de diálogo por cima
    do chão; o topo na largura da cena */
@@ -977,8 +1008,12 @@ body:has(.idle) { background: #121212; }
   .idle .minigame-corpo .colecao-item, .idle .minigame-corpo .colecao-item.escondida { padding: 4px 2px; }
 }
 
-/* proporção do mockup: a coluna da empresa é a cena + uma coluna de números estreita; a Loja fica com o resto da largura
-   (sem coluna vazia do lado da cena nas telas largas) */
+/* Caixinha em pé estreita (PC de 1280: a coluna fica com ~140 px): sem o bonequinho, o texto usa a largura toda */
+@container (max-width: 180px) {
+  .idle .cartao-empresa .bancada-caixa .escolha { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'txt' 'btn'; }
+  .idle .cartao-empresa .bancada-caixa .escolha .boneco { display: none; }
+}
+/* proporção do mockup: a coluna da empresa é a cena + a Caixinha em pé do lado; a Loja fica com o resto da largura */
 @media (min-width: 1100px) {
   .idle:not(.sem-painel) { grid-template-columns: minmax(0, calc(var(--cena-w, 640px) + 226px)) minmax(420px, 1fr); }
   .idle .lista-geradores { container-type: inline-size; }

@@ -868,6 +868,29 @@ describe('empresa, resumo e bancada', () => {
     tela.renderizar(modelo({ estado: estado({ era: 5, generators: g }) }));
     expect(root.querySelector('.valor .info span')!.textContent).toBe('Era 6 · Em órbita');
   });
+  it('o placar da cena: o dinheiro, o F$/s, os selos e o bônus juntos na plaquinha; o resumo numa faixa à parte', () => {
+    criarTela(root, acoes).renderizar(modelo());
+    const hud = root.querySelector('.cartao-empresa .valor .hud')!;
+    expect([...hud.children].map((x) => x.className)).toEqual(['numero', 'taxa', 'selos', 'bonus']);
+    expect(root.querySelector('.valor > .info')).not.toBeNull();
+  });
+  it('a Caixinha: no PC em pé do lado da cena; no celular embaixo das portas; antes do Abrir CNPJ não aparece', () => {
+    const original = window.matchMedia;
+    const pc = (sim: boolean) => { window.matchMedia = ((q: string) => ({ matches: sim && q.includes('1100'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia; };
+    try {
+      pc(true);
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo());
+      expect(root.querySelector('.cartao-empresa > .bancada-caixa')).not.toBeNull();
+      tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+      expect(root.querySelector('.bancada-caixa')!.hasAttribute('hidden')).toBe(true);
+      pc(false);
+      window.dispatchEvent(new Event('resize'));
+      expect(root.querySelector('.bancada > .bancada-caixa')).not.toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
   it('a Caixinha da bancada: o selo some sem nada guardado e o aviso aparece no lugar da lista', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ pendentes: [3] }));

@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-placar-na-cena',
+    titulo: 'Placar em cima da cena',
+    data: '2026-10-15',
+    itens: [
+      'No PC, o dinheiro e o F$/s viraram um placar de jogo no canto da cena, com o Viralizou e a Promoção valendo logo embaixo. A era e o resto ficam numa faixa no pé da cena.',
+      'A Caixinha mudou pro lado da cena, uma oportunidade embaixo da outra com o Pegar. As portas dos minigames ficaram sozinhas embaixo, maiores.',
+    ],
+  },
+  {
     id: '2026-10-15-menos-roxo',
     titulo: 'Roxo só no que é pra apertar',
     data: '2026-10-15',
