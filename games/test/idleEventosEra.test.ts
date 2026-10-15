@@ -82,6 +82,33 @@ describe('Marmita e Atualização no banco', () => {
     expect(await comprar()).toBeCloseTo(cheio * 0.75, 3);
   });
 
+  it('Atualização com o desconto da Horta (Coentro) e com a meia-preço (sem Promoção), como o idle_buy', async () => {
+    // 3 × 3 de horta (25 Food trucks: era 2, com as estratégias escolhidas) e um Coentro maduro
+    await q(`update public.idle_state set generators[11] = 25, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await q(`insert into public.idle_horta_plantas (user_id, canteiro, especie, inicio) values ($1, 0, 5, now() - interval '2 hours')`, [A]);
+    const cheio = async () => (await q<{ p: number }>(
+      `select u.preco * public.idle_cost_mult(s) as p from public.idle_cat_upg u, public.idle_state s where u.id = 11 and s.user_id = $1`, [A]))[0].p;
+    const comprar = async () => {
+      const antes = (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+      await q(`update public.idle_state set settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+      const s = await t.rpc<{ valuation: number }>('idle_buy', { p_kind: 'melhoria', p_id: 11, p_qty: 1 });
+      await q('update public.idle_state set upgrades = array_remove(upgrades, 11) where user_id = $1', [A]);
+      return antes - s.valuation;
+    };
+    const hb = (await t.rpc<{ horta_bonus: { melhorias: number } }>('idle_open')).horta_bonus.melhorias;
+    expect(hb).toBeGreaterThan(0);
+    const preco = await cheio();
+    await q(`update public.idle_state set upg_desc_ate = now() + interval '60 seconds' where user_id = $1`, [A]);
+    expect(await comprar()).toBeCloseTo(preco * 0.75 * (1 - hb), 3);
+    // meia-preço sem Promoção: a metade, por cima da Atualização e da Horta
+    await q('update public.idle_state set meias = 1 where user_id = $1', [A]);
+    expect(await comprar()).toBeCloseTo(preco * 0.75 * (1 - hb) * 0.5, 3);
+    // sem Horta e sem Atualização: a meia-preço sozinha é a metade
+    await q('delete from public.idle_horta_plantas where user_id = $1', [A]);
+    await q('update public.idle_state set meias = 1, upg_desc_ate = null where user_id = $1', [A]);
+    expect(await comprar()).toBeCloseTo(preco * 0.5, 3);
+  });
+
   it('o JSON traz os campos novos e esconde os que já passaram', async () => {
     await q(`update public.idle_state set marmita_ate = now() + interval '1 minute', upg_desc_ate = now() - interval '1 minute',
                eventos_era = '{"mae": 2}' where user_id = $1`, [A]);
