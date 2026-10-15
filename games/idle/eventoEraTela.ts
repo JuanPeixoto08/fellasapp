@@ -109,12 +109,15 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
    *  a tela azul é a faixa inteira). Devolve onde ela ficou (fração da tela). */
   function posicionarCaixa(el: HTMLElement, p: Ponto): Ponto {
     posicionar(el, p);
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    const r = el.getBoundingClientRect(); // com o balanço: um pouco maior que a caixa parada (a favor da folga)
-    if (!W || !H || !r.width || !r.height) return p;
+    // tudo em px da camada (no PC a .app tem zoom: o left em px é antes do zoom, igual ao offsetWidth/clientWidth);
+    // a folga de 8 px cobre o balanço de ±3°
+    const W = camada.clientWidth;
+    const H = camada.clientHeight;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (!W || !H || !w || !h) return p;
     const centro = { x: (Math.round(p.x * 100) / 100) * W, y: (Math.round(p.y * 100) / 100) * H };
-    const c = prenderNaTela(centro, { w: r.width, h: r.height }, { w: W, h: H });
+    const c = prenderNaTela(centro, { w, h }, { w: W, h: H });
     if (c.x === centro.x && c.y === centro.y) return p;
     el.style.left = `${Math.round(c.x)}px`;
     el.style.top = `${Math.round(c.y)}px`;

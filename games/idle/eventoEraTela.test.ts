@@ -161,12 +161,16 @@ describe('eventos de era na tela', () => {
   it('mostrar prende a caixa na tela e o texto sobe de onde ela ficou; a tela azul (faixa inteira) fica de fora', () => {
     const raiz = document.createElement('div');
     document.body.append(raiz);
-    const w0 = window.innerWidth;
-    const h0 = window.innerHeight;
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 387 });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
-    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
-      { width: 249, height: 120, x: 0, y: 0, left: 0, top: 0, right: 249, bottom: 120, toJSON: () => ({}) } as DOMRect);
+    // a camada (a tela) com 387 × 800 e cada caixa com 249 × 120 (happy-dom não faz layout)
+    const medida = (nome: 'clientWidth' | 'clientHeight' | 'offsetWidth' | 'offsetHeight', valor: (el: HTMLElement) => number) =>
+      vi.spyOn(HTMLElement.prototype, nome, 'get').mockImplementation(function (this: HTMLElement) { return valor(this); });
+    const ehCamada = (el: HTMLElement) => el.classList.contains('eventos-era');
+    const espioes = [
+      medida('clientWidth', (el) => (ehCamada(el) ? 387 : 0)),
+      medida('clientHeight', (el) => (ehCamada(el) ? 800 : 0)),
+      medida('offsetWidth', (el) => (el.classList.contains('evento-era') ? 249 : 0)),
+      medida('offsetHeight', (el) => (el.classList.contains('evento-era') ? 120 : 0)),
+    ];
     try {
       const o = { ...opcoes(), posicao: () => ({ x: 0.74, y: 0.5 }) };
       const t = criarEventoEraTela(raiz, o);
@@ -178,9 +182,7 @@ describe('eventos de era na tela', () => {
       t.mostrar({ seg: 200, tipo: 4, agoraMs: 200_000 });
       expect(raiz.querySelector<HTMLElement>('.evento-era-4')!.style.left).toBe('50%');
     } finally {
-      rect.mockRestore();
-      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w0 });
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: h0 });
+      for (const e of espioes) e.mockRestore();
       raiz.remove();
     }
   });
