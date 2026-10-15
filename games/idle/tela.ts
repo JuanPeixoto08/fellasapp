@@ -6,6 +6,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, Lad
 import { ativos } from './ativos';
 import { deEmpresa, empresaDoGerador } from './bolsa';
 import { criarBolsaTela } from './bolsaTela';
+import { contadorCliques } from './segredo';
 import { criarHortaTela } from './hortaTela';
 import { criarConvidadosTela } from './convidadosTela';
 import { portaBolsa, portaConvidados, portaHorta, portaMapa, type ResumoPorta } from './portas';
@@ -452,6 +453,21 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     * (descontoAtivo(s, agoraTela) ? DESCONTO_MELHORIA : 1); // Atualização instalada (o banco aplica igual)
   const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
 
+  const tresCliques = contadorCliques();
+  function segredo() {
+    const camada = el('div', 'segredo', 'Sillas Gabriel Coelho Sena');
+    camada.setAttribute('role', 'dialog');
+    camada.setAttribute('aria-label', 'Sillas Gabriel Coelho Sena');
+    camada.tabIndex = -1;
+    const fechar = () => { camada.remove(); document.removeEventListener('keydown', esc); clearTimeout(timer); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') fechar(); };
+    const timer = setTimeout(fechar, 4000);
+    camada.addEventListener('click', fechar);
+    document.addEventListener('keydown', esc);
+    app.append(camada);
+    camada.focus();
+  }
+
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
     const n = s.generators[gid - 1];
@@ -482,6 +498,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     );
     botoes.append(um, dez, max);
     linha.append(sprite, meio, botoes);
+    if (gid === 1) {
+      for (const alvo of [sprite, meio]) alvo.addEventListener('click', () => { if (tresCliques(Date.now())) segredo(); });
+    }
     dicas.ligar(linha, `g${gid}`, () => dicaGerador(s, gid, preco(g.custo, n, 1, cm) * meiaAgora(s)));
     return linha;
   }

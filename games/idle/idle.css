@@ -1861,3 +1861,6 @@ body:has(.idle) { background: #121212; }
   /* tela larga: o chat em 3 colunas */
   .idle .cup-msgs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* easter egg da Loja (três cliques no 1º gerador): o nome na tela inteira */
+.idle .segredo { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; text-align: center;
+  padding: 16px; background: #1E1B2E; color: #F2D27A; font-size: clamp(32px, 7vw, 96px); line-height: 1.05; cursor: pointer; }
