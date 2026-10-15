@@ -264,6 +264,14 @@ describe('o estado, a conta e a compra (0076, parte B)', () => {
     const s = await t.rpc<J>('idle_open');
     expect(s.horta_crescendo).toBe(1);
   });
+  it('horta_crescendo usa o tempo próprio da planta (Terry Crews, árvore): madura pelo dela não conta', async () => {
+    await q('update public.idle_state set generators[11] = 1 where user_id = $1', [A]);
+    const [e] = await q<{ id: number }>('select id from public.idle_cat_horta where amadurece_s > 300 order by amadurece_s desc limit 1');
+    await q(`insert into public.idle_horta_plantas (user_id, canteiro, especie, inicio, amadurece_s) values
+               ($1, 0, $2, now() - interval '120 seconds', 60), ($1, 1, $2, now() - interval '120 seconds', 3600)`, [A, e.id]);
+    const s = await t.rpc<J>('idle_open');
+    expect(s.horta_crescendo).toBe(1);
+  });
   it('vender a startup zera os bônus e os estoques novos; os contadores e o Tigrinho do dia ficam', async () => {
     await q(`update public.idle_state set linkedin_ate = now() + interval '1 minute', linkedin_gen = 2, linkedin_mult = 4.5,
                combo_ate = now() + interval '1 minute', combo_n = 2, combo_seg = 1, garantidos = '[{"seg": 1, "tipo": 0, "dobro": true}]',

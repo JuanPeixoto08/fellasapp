@@ -200,7 +200,7 @@ returns int language sql stable set search_path = public as $$
    where p.user_id = u and p.fim is null and p.inicio <= now()
      and p.canteiro / 6 < public.idle_horta_lado(coalesce(s.generators[11], 0))
      and p.canteiro % 6 < public.idle_horta_lado(coalesce(s.generators[11], 0))
-     and p.inicio + make_interval(secs => k.amadurece_s) > now()
+     and p.inicio + make_interval(secs => coalesce(p.amadurece_s, k.amadurece_s)) > now()
 $$;
 revoke all on function public.idle_horta_crescendo(uuid) from public, anon, authenticated;
 
