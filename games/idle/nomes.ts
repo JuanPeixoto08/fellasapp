@@ -172,7 +172,10 @@ export type TipoConquista =
   | 'tee_pct' | 'tee_quatro_dez' | 'tee_encalhe'
   | 'cup_nota' | 'cup_pt'
   // eras 1–5 (0074): eventos de era (evento) e "a era inteira" (estado)
-  | 'evt_mae' | 'evt_shopee' | 'evt_call' | 'evt_tela' | 'evt_gols' | 'era_300' | 'era_melhorias';
+  | 'evt_mae' | 'evt_shopee' | 'evt_call' | 'evt_tela' | 'evt_gols' | 'era_300' | 'era_melhorias'
+  // dourados e Caixinha (0076), todas de evento (idle_ganhar com o contador de dourados_cont): maior Trend, Pix devolvidos,
+  // derrotas e vitórias seguidas no Tigrinho, combos, cupons pegos, F$ de cashback; Insider na venda da Bolsa
+  | 'trend_max' | 'pix_dev' | 'tigre_perdeu' | 'combos' | 'cupons' | 'cashback' | 'tigre_seq' | 'insider';
 
 /** Conquista "ter 100" de cada gerador (ids 1 a 30, na ordem dos geradores): [nome, frase]. */
 export const CONQUISTAS_GERADOR: readonly (readonly [string, string])[] = [
@@ -294,6 +297,13 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 128, tipo: 'era_melhorias', alvo: 3, nome: 'Escritório premium', frase: 'Até a cadeira da reunião faz massagem. A reunião continua inútil.', condicao: 'Comprar todas as melhorias da era 3' },
   { id: 129, tipo: 'era_melhorias', alvo: 4, nome: 'Andar de luxo', frase: 'Banheiro novo pra estagiário chorar com conforto.', condicao: 'Comprar todas as melhorias da era 4' },
   { id: 130, tipo: 'era_melhorias', alvo: 5, nome: 'Sede cinco estrelas', frase: 'Heliponto, academia e um RH que não responde.', condicao: 'Comprar todas as melhorias da era 5' },
+  // dourados e Caixinha (0075): as de evento saem de idle_ganhar com o contador (0076)
+  { id: 132, tipo: 'trend_max', valor: 20, nome: 'Dancinha do TikTok', frase: 'Vinte moedas em oito segundos. Seu polegar tem mais seguidor que você.', condicao: 'Pegar as 20 moedinhas de um Trend' },
+  { id: 133, tipo: 'pix_dev', valor: 10, nome: 'Cidadão de bem', frase: 'Devolveu dez Pix. O banco nunca te devolveu nada.', condicao: 'Devolver 10 Pix errados' },
+  { id: 134, tipo: 'tigre_perdeu', valor: 10, nome: 'Só mais uma', frase: 'Dez derrotas. Amanhã você recupera, com certeza.', condicao: 'Perder 10 vezes no Tigrinho' },
+  { id: 135, tipo: 'combos', valor: 10, nome: 'C-C-C-Combo!', frase: 'Dez combos seguidos. O narrador ficou rouco.', condicao: 'Fazer 10 Combos' },
+  { id: 136, tipo: 'cupons', valor: 25, nome: 'Primeira compra (de novo)', frase: 'Vinte e cinco primeiras compras, todas no mesmo CPF.', condicao: 'Pegar 25 Cupons de primeira compra' },
+  { id: 137, tipo: 'cashback', valor: 1e12, nome: 'Volta pra conta', frase: 'Um trilhão de volta. O que você gastou pra isso, melhor nem somar.', condicao: 'Receber F$ 1 tri de cashback' },
   { id: 101, escondida: true, tipo: 'gerador_exato', valor: 67, nome: '6-7', frase: 'Seis sete. Ninguém sabe por quê.', condicao: 'Ter exatamente 67 de algum gerador' },
   { id: 102, escondida: true, tipo: 'aura', nome: 'Farmou aura', frase: '+1000 de aura.', condicao: 'Ficar em 1º no placar' },
   { id: 103, escondida: true, tipo: 'aura_negativa', nome: 'Aura negativa', frase: 'Vendeu por um real e um abraço.', condicao: 'Vender a startup e ganhar só 1 ponto' },
@@ -309,6 +319,8 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 114, escondida: true, tipo: 'tee_encalhe', nome: 'Coleção encalhada', frase: 'Vai virar pano de chão de luxo.', condicao: 'Coleção com menos de 20% de procura' },
   { id: 115, escondida: true, tipo: 'cup_pt', nome: 'Deu PT', frase: 'A galera foi embora carregada. Literalmente.', condicao: 'Ter PT numa noite' },
   { id: 131, escondida: true, tipo: 'melhoria', alvo: 138, nome: 'Embaixo do lago prateado', frase: 'Toda música tem uma mensagem escondida. Essa também.', condicao: 'Comprar "Mensagem subliminar no episódio"' },
+  { id: 138, escondida: true, tipo: 'tigre_seq', valor: 3, nome: 'O tigre tá pagando', frase: 'Ele deixou você ganhar. É assim que começa.', condicao: 'Ganhar 3 seguidas no Tigrinho depois das 3 grátis' },
+  { id: 139, escondida: true, tipo: 'insider', valor: 1, nome: 'Insider (shh)', frase: 'A CVM quer saber a sua localização.', condicao: 'Vender com 100% de lucro uma ação de empresa espiada nas últimas 2 h' },
 ];
 
 /** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os ramos (o Tempo virou Dourados e a Horta entrou em 13/10). */

@@ -54,10 +54,10 @@ describe('catálogo', () => {
     expect(catalogo.cargos).toContain('CEO de nada');
   });
 
-  it('conquistas: 104 visíveis e 15 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
+  it('conquistas: 110 visíveis e 17 escondidas (com as da horta e dos convidados), ids únicos, uma de 100 pra cada gerador, textos curtos', () => {
     const c = catalogo.conquistas;
-    expect(c.filter((x) => !x.escondida)).toHaveLength(104);
-    expect(c.filter((x) => x.escondida)).toHaveLength(15);
+    expect(c.filter((x) => !x.escondida)).toHaveLength(110);
+    expect(c.filter((x) => x.escondida)).toHaveLength(17);
     expect(new Set(c.map((x) => x.id)).size).toBe(c.length);
     for (let g = 1; g <= 30; g++) expect(c.find((x) => x.id === g)).toMatchObject({ tipo: 'gerador', alvo: g, valor: 100, escondida: false });
     expect(c.find((x) => x.id === 7)!.nome).toBe('Estágio não remunerado em escala');
@@ -77,10 +77,21 @@ describe('catálogo', () => {
     }
     expect(c.find((x) => x.id === 131)).toMatchObject({ tipo: 'melhoria', alvo: 138, escondida: true });
   });
+  it('as conquistas dos dourados e da Caixinha (132–139): visíveis antes das escondidas', () => {
+    const c = catalogo.conquistas;
+    expect(c.find((x) => x.id === 132)).toMatchObject({ tipo: 'trend_max', valor: 20, nome: 'Dancinha do TikTok', escondida: false });
+    expect(c.find((x) => x.id === 135)).toMatchObject({ tipo: 'combos', valor: 10, nome: 'C-C-C-Combo!', escondida: false });
+    expect(c.find((x) => x.id === 137)).toMatchObject({ tipo: 'cashback', valor: 1e12, nome: 'Volta pra conta', escondida: false });
+    expect(c.find((x) => x.id === 138)).toMatchObject({ tipo: 'tigre_seq', valor: 3, nome: 'O tigre tá pagando', escondida: true });
+    expect(c.find((x) => x.id === 139)).toMatchObject({ tipo: 'insider', valor: 1, nome: 'Insider (shh)', escondida: true });
+    const ids = c.map((x) => x.id);
+    expect(ids.indexOf(137)).toBeLessThan(ids.indexOf(101));
+    expect(ids.slice(-2)).toEqual([138, 139]);
+  });
   it('escondidas: as da spec; a Guiana Brasileira é a Filial em Portugal (a melhoria 283, que mudou de nome)', () => {
     expect(catalogo.conquistas.filter((x) => x.escondida).map((x) => x.nome)).toEqual([
       '6-7', 'Farmou aura', 'Aura negativa', 'Tá saindo da jaula', 'Guiana Brasileira', 'Fez o L', '3h06',
-      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?', 'Coleção encalhada', 'Deu PT', 'Embaixo do lago prateado',
+      'Modo sigma', 'Pai tá on', 'Brainrot', 'Ele tem pescoço sim', 'São a mesma pessoa?', 'Coleção encalhada', 'Deu PT', 'Embaixo do lago prateado', 'O tigre tá pagando', 'Insider (shh)',
     ]);
     expect(catalogo.melhorias.find((m) => m.id === 283)).toMatchObject({ nome: 'Filial em Portugal', gerador: 28, requer: 25 });
     expect(catalogo.conquistas.find((x) => x.nome === 'Guiana Brasileira')).toMatchObject({ tipo: 'melhoria', alvo: 283 });
