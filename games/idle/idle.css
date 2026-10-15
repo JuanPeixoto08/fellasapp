@@ -91,18 +91,20 @@
 @keyframes evento-balanca { from { transform: translate(-50%, -50%) translateY(-4px) rotate(-3deg); }
   to { transform: translate(-50%, -50%) translateY(4px) rotate(3deg); } }
 .idle .evento-era .icone-evento { width: 48px; height: 48px; image-rendering: pixelated; }
-.idle .evento-balao { background: #F4F1EA; color: #1E1B2E; padding: 2px 6px; font-size: 16px; white-space: nowrap;
+.idle .evento-balao { background: #F4F1EA; color: #1E1B2E; padding: 2px 6px; font: 400 18px var(--i-pixel); white-space: nowrap;
   box-shadow: 0 0 0 2px #1E1B2E; }
 .idle .evento-era-4 { left: 50% !important; width: 100%; background: #2A5BD7; color: #F4F1EA; padding: 10px 0;
   animation-name: none, dourado-pisca; }
 .idle .evento-era-4 .evento-balao { background: transparent; color: #F4F1EA; box-shadow: none; }
 .idle .evento-era-5 { inset: 0; transform: none; animation: none; pointer-events: none; }
-.idle .evento-placar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #1E1B2E;
-  color: #5FD38D; padding: 2px 8px; font-size: 20px; }
-.idle .evento-bola { position: absolute; width: 36px; height: 36px; transform: translate(-50%, -50%); pointer-events: auto;
-  border: 0; padding: 0; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #1E1B2E 0 22%, #F4F1EA 23% 100%);
-  box-shadow: 0 0 0 2px #1E1B2E; transition: left 0.25s, top 0.25s; cursor: pointer;
+.idle .evento-placar { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); background: #1E1B2E;
+  color: #5FD38D; padding: 2px 14px; font: 400 24px var(--i-pixel); white-space: nowrap; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px #5FD38D; }
+.idle .evento-bola { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); pointer-events: auto;
+  border: 0; padding: 0; border-radius: 50%; background: transparent; transition: left 0.25s, top 0.25s; cursor: pointer;
   animation: dourado-pisca 0.22s steps(2) 9s 14 both; animation-delay: calc(var(--janela, 30s) - 3s + var(--ja, 0s)); }
+.idle .evento-bola .icone-evento { display: block; width: 44px; height: 44px; image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px rgba(242, 210, 122, 0.9)); }
 .idle .evento-era button:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
 .idle .info { display: none; }
 .idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 12px 8px 4px; color: var(--paper); }

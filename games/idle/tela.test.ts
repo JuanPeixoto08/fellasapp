@@ -231,7 +231,7 @@ describe('tela da Fellas Inc.', () => {
     const T = Date.parse('2026-10-12T12:00:00.000Z');
     tela.eventosEra.mostrar({ seg: T / 1000, tipo: 3, agoraMs: T });
     root.querySelector<HTMLButtonElement>('.evento-era button')!.click();
-    expect(acoes.pegarEventoEra).toHaveBeenCalledWith(T / 1000, 0);
+    expect(acoes.pegarEventoEra).toHaveBeenCalledWith(T / 1000, 0, expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
     expect(root.querySelector('.evento-era')).toBeNull();
     const em = (s: number) => new Date(T + s * 1000).toISOString();
     tela.relogioBonus(estado({ marmita_ate: em(100) }), T);

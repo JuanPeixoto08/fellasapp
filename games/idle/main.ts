@@ -8,7 +8,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, Lug
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
-import { descontoAtivo, eventoEraEm, posicaoEvento, textoEventoPegou, type TipoEventoEra } from './eventosEra';
+import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from './eventosEra';
 import { ganhoInvestidor, JANELA_S, posicao, promoAtiva, textoPegou, type TipoDourado } from './dourados';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
@@ -290,9 +290,8 @@ const tela = criarTela(document.getElementById('app')!, {
     }
   })(),
   // evento de era: o banco confere o segundo e a era e paga; manda os gols no Jogo do Brasil
-  pegarEventoEra: (seg, gols) => void (async () => {
+  pegarEventoEra: (seg, gols, p) => void (async () => {
     if (!ancora) return;
-    const p = posicaoEvento(ancora.estado.user_id, seg, 0);
     try {
       const s = await api.idleEventoPegar(seg, gols);
       aplicar(s);
@@ -695,6 +694,7 @@ setInterval(() => {
   if (!ancora) return;
   if (document.hidden) {
     agendarDouradosNoFundo(); // o som dos eventos segue agendado no fundo (PC)
+    tela.eventosEra.tick(agoraSrv()); // a janela do Jogo do Brasil acabou com a aba escondida: os gols feitos vão
     return;
   }
   tela.atualizarValor(valuationAgora(ancora, Date.now()));

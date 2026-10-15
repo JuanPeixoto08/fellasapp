@@ -96,7 +96,7 @@ export type Acoes = {
   lugarRecarregar(): void; // a mecânica pede o lugar de novo (chegou a hora de algo: a coleção ficou pronta)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
   pegarDourado(seg: number, lado: number): void;
-  pegarEventoEra(seg: number, gols: number): void;
+  pegarEventoEra(seg: number, gols: number, pos: { x: number; y: number }): void; // pos: onde estava (o texto sobe dali)
 };
 export type Tela = {
   canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void;
@@ -1053,9 +1053,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   // eventos na tela, por cima de tudo
   const dourados = criarDouradoTela(app, (seg, lado) => a.pegarDourado(seg, lado));
   const eventosEraBase = criarEventoEraTela(app, {
-    aoPegar: (seg, gols) => {
+    aoPegar: (seg, gols, pos) => {
       dicas.conferir(); // o evento saiu da tela: a caixinha dele fecha
-      a.pegarEventoEra(seg, gols);
+      a.pegarEventoEra(seg, gols, pos);
     },
     dica: (alvo, chave, tipo) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaEventoEra(tipo, ultimo.estado.rate) : null)),
     posicao: (seg, i) => (ultimo?.estado ? posicaoEvento(ultimo.estado.user_id, seg, i) : { x: 0.5, y: 0.5 }),

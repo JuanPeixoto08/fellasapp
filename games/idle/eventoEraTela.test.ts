@@ -14,7 +14,7 @@ describe('eventos de era na tela', () => {
     expect(b.textContent).toBe('Já vou!');
     b.click(); b.click();
     expect(o.aoPegar).toHaveBeenCalledTimes(1);
-    expect(o.aoPegar).toHaveBeenCalledWith(100, 0);
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 0, { x: 0.5, y: 0.5 });
     t.mostrar({ seg: 200, tipo: 1, agoraMs: 200_000 });
     t.tick(208_001);
     expect(raiz.querySelector('.evento-era')).toBeNull();
@@ -36,12 +36,57 @@ describe('eventos de era na tela', () => {
     t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
     const bola = () => raiz.querySelector<HTMLButtonElement>('.evento-bola')!;
     for (let i = 0; i < 3; i++) bola().click();
-    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('3 de 7');
+    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Jogo do Brasil · 3 de 7');
+    expect(bola().querySelector('svg.icone-evento')).not.toBeNull(); // a bola de pixel
     t.tick(130_000);
-    expect(o.aoPegar).toHaveBeenCalledWith(100, 3);
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 3, { x: 0.5, y: 0.5 });
     t.mostrar({ seg: 200, tipo: 5, agoraMs: 200_000 });
     for (let i = 0; i < 7; i++) bola().click();
-    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 7);
+    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 7, { x: 0.5, y: 0.5 });
+  });
+  it('a bola fica no pulo (tempo / 1,5 s) + gols: anda a cada clique e a cada 1,5 s, sem travar depois de clicar rápido', () => {
+    const raiz = document.createElement('div');
+    const posicao = vi.fn((_seg: number, i: number) => ({ x: i / 10, y: 0.5 }));
+    const t = criarEventoEraTela(raiz, { ...opcoes(), posicao });
+    const bola = () => raiz.querySelector<HTMLButtonElement>('.evento-bola')!;
+    const pulos = () => posicao.mock.calls.map((c) => c[1]);
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
+    expect(pulos()).toEqual([0]);
+    bola().click(); bola().click(); bola().click(); // 3 gols rápidos
+    expect(pulos()).toEqual([0, 1, 2, 3]);
+    t.tick(101_000); // ainda no mesmo passo de 1,5 s: não pula
+    expect(pulos()).toEqual([0, 1, 2, 3]);
+    t.tick(101_500); // passou 1,5 s: pula na hora (passo 1 + 3 gols)
+    expect(pulos()).toEqual([0, 1, 2, 3, 4]);
+    expect(bola().style.left).toBe('40%');
+    bola().click();
+    expect(pulos()).toEqual([0, 1, 2, 3, 4, 5]);
+    t.tick(103_000);
+    expect(pulos()).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+  it('a bola que aparece com a janela andando já começa no pulo do tempo', () => {
+    const raiz = document.createElement('div');
+    const posicao = vi.fn((_seg: number, i: number) => ({ x: i / 10, y: 0.5 }));
+    const t = criarEventoEraTela(raiz, { ...opcoes(), posicao });
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 106_000 });
+    expect(posicao.mock.calls.map((c) => c[1])).toEqual([4]);
+  });
+  it('aoPegar recebe onde a coisa estava: o ponto dela, a faixa da tela azul no meio, o último pulo da bola', () => {
+    const raiz = document.createElement('div');
+    const o = { ...opcoes(), posicao: (_seg: number, i: number) => ({ x: 0.2 + i / 10, y: 0.3 }) };
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 3, agoraMs: 100_000 });
+    raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    expect(o.aoPegar).toHaveBeenLastCalledWith(100, 0, { x: 0.2, y: 0.3 });
+    t.mostrar({ seg: 200, tipo: 4, agoraMs: 200_000 });
+    raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 0, { x: 0.5, y: 0.3 });
+    t.mostrar({ seg: 300, tipo: 5, agoraMs: 300_000 });
+    raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
+    raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
+    t.tick(301_500); // pulo 1 + 2 gols = 3
+    t.tick(330_000);
+    expect(o.aoPegar).toHaveBeenLastCalledWith(300, 2, { x: 0.2 + 3 / 10, y: 0.3 });
   });
   it('Jogo do Brasil sem gol não chama o banco', () => {
     const raiz = document.createElement('div');
