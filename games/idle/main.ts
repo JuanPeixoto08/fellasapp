@@ -79,8 +79,8 @@ function agendarDouradosNoFundo() {
   const de = Math.floor(agora / 1000);
   for (const ev of eventosEntre(s, de, de + SOM_A_FRENTE_S)) {
     if (somNoFundo.has(ev.seg)) continue;
-    somNoFundo.add(ev.seg);
-    audio.tocarEm('dourado', (ev.seg * 1000 - agora) / 1000);
+    // não agendou (efeitos desligados, áudio ainda ligando ou recriado): o próximo tique tenta de novo
+    if (audio.tocarEm('dourado', (ev.seg * 1000 - agora) / 1000)) somNoFundo.add(ev.seg);
   }
 }
 function voltouDoFundo() {
@@ -725,6 +725,7 @@ async function guard(trabalho: () => Promise<void>) {
 
 // número subindo e a oportunidade ao vivo (só com a aba visível)
 setInterval(() => {
+  audio.conferir(); // o contexto de áudio fechou ou travou (PC dormiu, fone trocou): recria sem esperar um efeito
   if (!ancora) return;
   if (document.hidden) {
     agendarDouradosNoFundo(); // o som dos eventos segue agendado no fundo (PC)

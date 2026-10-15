@@ -5,6 +5,7 @@ export const VOL_MUSICA = 0.22; // medido na página de audição: a música fic
 export const VOL_EFEITOS = 0.8;
 const ABAIXADA = 0.4; // ~−8 dB
 const TRAVADO_MS = 2000; // rodando e o relógio do áudio parado esse tempo de relógio de parede: travou
+const RECRIAR_MIN_MS = 30_000; // no máximo uma recriação por travada nesse tempo (saída que trava sempre não vira loop)
 
 export type Saida = { musica: GainNode; efeitos: GainNode; geral: GainNode };
 
@@ -30,8 +31,9 @@ export function montarSaida(ctx: BaseAudioContext): Saida {
 }
 
 export type Motor = {
-  /** Cria (ou retoma) o contexto. Fora de um toque/tecla o navegador pode não deixar: fica suspenso até o próximo. */
-  ligar(): void;
+  /** Cria (ou retoma) o contexto. Fora de um toque/tecla o navegador pode não deixar: fica suspenso até o próximo.
+   * Se criar falhou (navegador sem Web Audio), só tenta de novo com `gesto`. */
+  ligar(gesto?: boolean): void;
   ligado(): boolean;
   ctx(): BaseAudioContext | null;
   saida(): Saida | null;
@@ -53,9 +55,20 @@ export function criarMotor(fabrica: () => AudioContext, opcoes: { segundoPlano?:
   let pediSuspender = false; // quem suspendeu foi o motor (celular com a aba escondida): o statechange não retoma
   let marcaT = 0; // último currentTime visto rodando…
   let marcaMs: number | null = null; // …e quando (relógio de parede); null = olhar de novo
+  let andou = false; // o relógio deste contexto já saiu do 0 (antes disso, parado é fone abrindo, não travada)
+  let recriadoMs: number | null = null;
+  let falhou = false; // a fábrica lançou: fora de gesto não insiste
+  // resume/suspend/close recusados (ou ausentes num navegador velho) não podem virar erro solto
+  const quieto = (f: () => Promise<void>) => {
+    try {
+      f().catch(() => {});
+    } catch {
+      /* navegador velho */
+    }
+  };
   const retomar = (c: AudioContext) => {
     pediSuspender = false;
-    c.resume().catch(() => {}); // recusado (sem gesto): fica suspenso até o próximo toque
+    quieto(() => c.resume()); // recusado (sem gesto): fica suspenso até o próximo toque
   };
   const alvo = () => (aVista ? VOL_MUSICA * volume : 0);
   const fade = (segundos: number) => {
@@ -66,20 +79,31 @@ export function criarMotor(fabrica: () => AudioContext, opcoes: { segundoPlano?:
     g.setTargetAtTime(alvo(), t, segundos / 3);
   };
   return {
-    ligar() {
+    ligar(gesto = false) {
       if (!ctx) {
-        const c = fabrica();
+        if (falhou && !gesto) return;
+        let c: AudioContext;
+        let saida: Saida;
+        try {
+          c = fabrica();
+          saida = montarSaida(c);
+          // o sistema suspendeu sozinho (PC dormiu, fone Bluetooth trocou, ligação no celular): à vista, tenta retomar
+          c.addEventListener('statechange', () => {
+            if (c !== ctx) return; // o velho, já largado
+            marcaMs = null;
+            const st = c.state as string;
+            if ((st === 'suspended' || st === 'interrupted') && aVista && !pediSuspender) quieto(() => c.resume());
+          });
+        } catch {
+          falhou = true; // sem Web Audio (iOS velho, webview, sem placa): o jogo segue mudo
+          return;
+        }
+        falhou = false;
         ctx = c;
-        s = montarSaida(c);
+        s = saida;
         s.musica.gain.value = 0;
         marcaMs = null;
-        // o sistema suspendeu sozinho (PC dormiu, fone Bluetooth trocou, ligação no celular): à vista, tenta retomar
-        c.addEventListener('statechange', () => {
-          if (c !== ctx) return; // o velho, já largado
-          marcaMs = null;
-          const st = c.state as string;
-          if ((st === 'suspended' || st === 'interrupted') && aVista && !pediSuspender) c.resume().catch(() => {});
-        });
+        andou = false;
       }
       if (ctx.state !== 'running') retomar(ctx);
       else pediSuspender = false;
@@ -105,7 +129,7 @@ export function criarMotor(fabrica: () => AudioContext, opcoes: { segundoPlano?:
         setTimeout(() => {
           if (aVista || c !== ctx) return;
           pediSuspender = true;
-          c.suspend().catch(() => {});
+          quieto(() => c.suspend());
         }, 350);
       }
     },
@@ -125,14 +149,17 @@ export function criarMotor(fabrica: () => AudioContext, opcoes: { segundoPlano?:
           marcaMs = null; // suspenso o relógio para mesmo
           return false;
         }
+        if (c.currentTime > 0) andou = true;
         if (marcaMs === null || c.currentTime !== marcaT) {
           marcaT = c.currentTime;
           marcaMs = agoraMs;
           return false;
         }
-        if (agoraMs - marcaMs <= TRAVADO_MS) return false;
-        c.close().catch(() => {});
+        if (!andou || agoraMs - marcaMs <= TRAVADO_MS) return false;
+        if (recriadoMs !== null && agoraMs - recriadoMs < RECRIAR_MIN_MS) return false;
+        quieto(() => c.close());
       }
+      recriadoMs = agoraMs;
       ctx = null;
       s = null;
       marcaMs = null;

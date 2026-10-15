@@ -6,11 +6,12 @@ import { criarAudio } from './index';
 
 afterEach(() => vi.useRealTimers());
 
-function montar(o: { recusar?: boolean; segundoPlano?: boolean; escondida?: boolean } = {}) {
+function montar(o: { recusar?: boolean; assincrono?: boolean; segundoPlano?: boolean; escondida?: boolean } = {}) {
   const cs: ContextoFalso[] = [];
   const fabrica = () => {
     const novo = new ContextoFalso();
     novo.recusar = o.recusar ?? false;
+    novo.resumeAssincrono = o.assincrono ?? false;
     cs.push(novo);
     return comoContexto(novo);
   };
@@ -225,5 +226,86 @@ describe('som da Fellas Inc.', () => {
     audio.tocar('conquista');
     const musica = c.ganhos().find((g) => (g.gain as ParamFalso).eventos.some((e) => e[0] === 'alvo' && e[1] < 0.32 && e[1] > 0))!;
     expect(musica).toBeDefined();
+  });
+});
+
+describe('som da Fellas Inc.: revisão', () => {
+  it('sem Web Audio (a fábrica lança): o jogo não cai; o toque tenta de novo', () => {
+    let tentativas = 0;
+    const doc = document.implementation.createHTMLDocument('x');
+    Object.defineProperty(doc, 'hidden', { value: false, configurable: true });
+    const janela = new EventTarget();
+    const fabrica = () => {
+      tentativas++;
+      throw new Error('AudioContext is not defined');
+    };
+    let audio!: ReturnType<typeof criarAudio>;
+    expect(() => { audio = criarAudio(fabrica, doc, { janela }); }).not.toThrow();
+    expect(() => {
+      audio.era(3);
+      audio.chaves({ musica: 1, efeitos: true });
+      audio.tocar('compra');
+      expect(audio.tocarEm('dourado', 5)).toBe(false);
+      audio.conferir();
+      janela.dispatchEvent(new Event('focus'));
+      doc.dispatchEvent(new Event('visibilitychange'));
+    }).not.toThrow();
+    expect(tentativas).toBe(1); // fora de gesto não insiste
+    expect(() => doc.dispatchEvent(new Event('pointerup'))).not.toThrow();
+    expect(tentativas).toBe(2); // o toque tenta de novo
+  });
+  it('tocarEm diz se agendou: contexto ainda ligando (o resume é assíncrono) não agenda, e o jogo tenta de novo depois', async () => {
+    const { cs, audio } = montar({ assincrono: true });
+    audio.chaves({ musica: 0, efeitos: true });
+    expect(audio.tocarEm('dourado', 30)).toBe(false); // ainda ligando
+    await Promise.resolve();
+    expect(audio.tocarEm('dourado', 30)).toBe(true);
+    audio.chaves({ musica: 0, efeitos: false });
+    expect(audio.tocarEm('dourado', 30)).toBe(false);
+    audio.chaves({ musica: 0, efeitos: true });
+    cs[0].mudar('closed');
+    expect(audio.tocarEm('dourado', 30)).toBe(false); // recriou, mas o novo ainda está ligando
+    expect(cs).toHaveLength(2);
+    await Promise.resolve();
+    expect(cs[1].state).toBe('running');
+    expect(audio.tocarEm('dourado', 30)).toBe(true);
+  });
+  it('conferir() do tique do jogo: pega o contexto fechado sem esperar um efeito', () => {
+    const { cs, audio } = montar();
+    cs[0].mudar('closed');
+    audio.conferir();
+    expect(cs).toHaveLength(2);
+    expect(cs[1].state).toBe('running');
+  });
+  it('PC com a aba escondida: recriar o contexto já volta a música no fundo (o giro à frente)', () => {
+    const { cs, audio, doc, vista } = montar({ segundoPlano: true });
+    audio.era(1);
+    vista.escondida = true;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    cs[0].mudar('closed');
+    audio.conferir();
+    expect(cs).toHaveLength(2);
+    expect(cs[1].osciladores().length).toBeGreaterThan(100); // agendou o giro no novo
+  });
+  it('PC, aba restaurada escondida (a música nunca começou): recriar não liga a música sozinha', () => {
+    const { cs, audio, vista } = montar({ segundoPlano: true, escondida: true });
+    vista.escondida = true;
+    audio.era(1);
+    expect(cs[0].osciladores()).toHaveLength(0);
+    cs[0].mudar('closed');
+    audio.conferir();
+    expect(cs).toHaveLength(2);
+    expect(cs[1].osciladores()).toHaveLength(0);
+  });
+  it('celular com a aba escondida: o contexto fechou, mas só recria quando a aba aparecer', () => {
+    const { cs, audio, doc, vista } = montar({ segundoPlano: false });
+    vista.escondida = true;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    cs[0].mudar('closed');
+    audio.conferir();
+    expect(cs).toHaveLength(1);
+    vista.escondida = false;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    expect(cs).toHaveLength(2);
   });
 });

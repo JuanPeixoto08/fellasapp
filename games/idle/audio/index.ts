@@ -13,10 +13,13 @@ export type Audio = {
   /** Era da música (0 = antes do Abrir CNPJ); troca no fim do giro. */
   era(era: number): void;
   chaves(c: ChavesSom): void;
-  /** Agenda o efeito pra daqui a `atrasoS` no relógio do áudio (aba escondida no PC: o navegador quase não acorda a página). */
-  tocarEm(id: IdEfeito, atrasoS: number, o?: OpcoesEfeito): void;
+  /** Agenda o efeito pra daqui a `atrasoS` no relógio do áudio (aba escondida no PC: o navegador quase não acorda a página).
+   * Devolve se agendou: false (efeitos desligados, contexto ainda ligando) = tente de novo depois. */
+  tocarEm(id: IdEfeito, atrasoS: number, o?: OpcoesEfeito): boolean;
   /** Cancela os agendados que ainda não tocaram (a aba voltou: a página toca na hora). */
   cancelarAgendados(): void;
+  /** Conferência barata (contexto fechado ou travado → recria); o jogo chama no tique curto. */
+  conferir(): void;
 };
 
 /** No PC a música segue com a aba escondida; no celular (toque como forma principal) pausa, como a maioria dos jogos. */
@@ -45,40 +48,48 @@ export function criarAudio(
   let chaves: ChavesSom = { musica: 1, efeitos: true };
   let eraAtual: number | null = null; // a música espera o jogo dizer a era (não começa na 0 pra quem já está na 7)
   let agendados: GainNode | null = null; // canal dos agendados: cancelar desliga ele
-  const ajustarMusica = () => {
+  /** `noFundo`: começa a música mesmo com a aba escondida (PC, contexto recriado com a música já tocando no fundo). */
+  const ajustarMusica = (noFundo = false) => {
     motor.musica(chaves.musica);
     if (chaves.musica <= 0) seq.parar();
-    else if (eraAtual !== null && motor.ligado() && !alvo.hidden) seq.tocar(eraAtual);
+    // escondida no PC, o sequenciador já agenda o giro à frente (o `adiante` olha a aba)
+    else if (eraAtual !== null && motor.ligado() && (!alvo.hidden || noFundo)) seq.tocar(eraAtual);
   };
-  const ligar = () => {
-    if (!segundoPlano && alvo.hidden) return; // celular com a aba escondida: fica quieto até ela aparecer
-    motor.ligar();
+  const podeLigar = () => segundoPlano || !alvo.hidden; // celular com a aba escondida: fica quieto até ela aparecer
+  const ligar = (gesto: boolean) => {
+    if (!podeLigar()) return;
+    motor.ligar(gesto);
     ajustarMusica();
   };
   // o contexto fechou ou travou: o motor largou ele, e a música e os agendados eram dele
   const conferir = () => {
     if (!motor.conferir(agora())) return;
+    const tocava = seq.tocando(); // escondida no PC, só volta a música que já estava tocando no fundo
     seq.parar();
     agendados = null;
-    ligar();
+    if (!podeLigar()) return;
+    motor.ligar();
+    ajustarMusica(tocava);
   };
   // fora de um toque o navegador pode não deixar: o contexto fica suspenso e o próximo toque retoma
-  const acordar = () => {
+  const acordar = (gesto: boolean) => {
     conferir();
-    if (motor.ctx()?.state !== 'running') ligar();
+    if (motor.ctx()?.state !== 'running') ligar(gesto);
   };
+  const noGesto = () => acordar(true);
+  const semGesto = () => acordar(false);
   // no toque de tela o navegador só conta como gesto o fim do toque (pointerup/touchend/click); o pointerdown vale no mouse
-  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) alvo.addEventListener(ev, acordar);
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) alvo.addEventListener(ev, noGesto);
   alvo.addEventListener('visibilitychange', () => {
     motor.visivel(!alvo.hidden);
     if (!alvo.hidden) {
-      acordar();
+      semGesto();
       ajustarMusica();
     } else if (segundoPlano) seq.passo(); // já agenda o giro à frente, antes do navegador frear a aba
   });
-  janela?.addEventListener('focus', acordar);
-  janela?.addEventListener('pageshow', acordar); // voltou do cache de ida e volta do navegador
-  acordar();
+  janela?.addEventListener('focus', semGesto);
+  janela?.addEventListener('pageshow', semGesto); // voltou do cache de ida e volta do navegador
+  semGesto();
   return {
     tocar(id, o = {}) {
       conferir();
@@ -99,12 +110,13 @@ export function criarAudio(
       conferir();
       const ctx = motor.ctx();
       const s = motor.saida();
-      if (!chaves.efeitos || !ctx || !s || ctx.state !== 'running') return;
+      if (!chaves.efeitos || !ctx || !s || ctx.state !== 'running') return false;
       if (!agendados) {
         agendados = ctx.createGain();
         agendados.connect(s.efeitos);
       }
       RECEITAS[id](ctx, agendados, ctx.currentTime + Math.max(0, atrasoS), o);
+      return true;
     },
     cancelarAgendados() {
       agendados?.disconnect();
@@ -114,5 +126,6 @@ export function criarAudio(
       chaves = c;
       ajustarMusica();
     },
+    conferir,
   };
 }

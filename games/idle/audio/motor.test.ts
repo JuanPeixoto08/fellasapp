@@ -158,6 +158,7 @@ describe('motor: o sistema mexeu no áudio', () => {
     const cs: ContextoFalso[] = [];
     const m = criarMotor(() => comoContexto(cs[cs.push(new ContextoFalso()) - 1]));
     m.ligar();
+    cs[0].currentTime = 1;
     m.conferir(0);
     m.conferir(3000); // travou: fecha o velho
     m.ligar();
@@ -165,5 +166,46 @@ describe('motor: o sistema mexeu no áudio', () => {
     cs[0].state = 'running';
     cs[0].mudar('suspended');
     expect(cs[0].resumidos).toBe(r);
+  });
+});
+
+describe('motor: sem áudio e sem pânico', () => {
+  it('a fábrica falha (navegador sem Web Audio): ligar não lança; só tenta de novo num gesto', () => {
+    let tentativas = 0;
+    const m = criarMotor(() => {
+      tentativas++;
+      throw new Error('sem AudioContext');
+    });
+    expect(() => m.ligar()).not.toThrow();
+    expect(m.ligado()).toBe(false);
+    m.ligar();
+    m.musica(0.5);
+    m.visivel(false);
+    m.abaixarMusica(1);
+    expect(m.conferir(0)).toBe(false);
+    expect(tentativas).toBe(1);
+    m.ligar(true);
+    expect(tentativas).toBe(2);
+  });
+  it('relógio que nunca saiu do 0 (fone abrindo devagar, saída sem som) não conta como travado', () => {
+    const c = new ContextoFalso();
+    const m = criarMotor(() => comoContexto(c));
+    m.ligar();
+    expect(m.conferir(0)).toBe(false);
+    expect(m.conferir(60_000)).toBe(false);
+  });
+  it('travou de novo logo depois de recriar: no máximo uma recriação a cada 30 s', () => {
+    const cs: ContextoFalso[] = [];
+    const m = criarMotor(() => comoContexto(cs[cs.push(new ContextoFalso()) - 1]));
+    m.ligar();
+    cs[0].currentTime = 1;
+    m.conferir(0);
+    expect(m.conferir(3000)).toBe(true);
+    m.ligar();
+    cs[1].currentTime = 1;
+    m.conferir(3100);
+    expect(m.conferir(6000)).toBe(false); // parado há 2,9 s, mas recriou faz 3 s
+    expect(m.conferir(32_000)).toBe(false); // ainda dentro dos 30 s
+    expect(m.conferir(33_100)).toBe(true);
   });
 });

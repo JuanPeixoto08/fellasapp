@@ -48,6 +48,8 @@ export class ContextoFalso {
   fechados = 0;
   /** O navegador não deixa (sem gesto, ligação no celular): o resume() é recusado e o estado fica. */
   recusar = false;
+  /** Como no navegador de verdade: o resume() só liga depois (numa microtarefa), não na hora. */
+  resumeAssincrono = false;
   private ouvintes: (() => void)[] = [];
   private novo<T extends NoFalso>(n: T): T { this.criados.push(n); return n; }
   createGain() { return this.novo(new GanhoFalso()); }
@@ -66,6 +68,7 @@ export class ContextoFalso {
   resume() {
     this.resumidos++;
     if (this.recusar || this.state === 'closed') return Promise.reject(new Error('o navegador não deixou'));
+    if (this.resumeAssincrono) return Promise.resolve().then(() => { if (this.state !== 'closed') this.mudar('running'); });
     this.mudar('running');
     return Promise.resolve();
   }
