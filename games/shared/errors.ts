@@ -33,7 +33,7 @@ export type GameErrorCode =
   | 'idle_strategy_set'
   | 'idle_bad_choice'
   | 'idle_opp_gone'
-  | 'idle_dourado_gone' | 'idle_dourado_pego'
+  | 'idle_dourado_gone' | 'idle_dourado_pego' | 'idle_chamar_vazio'
   | 'idle_evento_gone' | 'idle_evento_pego'
   | 'idle_horta_ocupado' | 'idle_horta_vazio' | 'idle_horta_trancado' | 'idle_horta_semente' | 'idle_horta_verde'
   | 'idle_lugar_aberto' | 'idle_lugar_fechado' | 'idle_lugar_nome' | 'idle_lugar_moeda' | 'idle_lugar_nivel_max'
@@ -81,6 +81,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_opp_gone: 'Essa oportunidade já passou',
   idle_dourado_gone: 'Esse já foi embora',
   idle_dourado_pego: 'Esse você já pegou',
+  idle_chamar_vazio: 'Você não tem dourado guardado pra chamar',
   idle_evento_gone: 'Esse já foi embora',
   idle_evento_pego: 'Esse você já pegou',
   idle_horta_ocupado: 'Esse canteiro tá ocupado',
@@ -162,7 +163,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_strategy_set',
   'idle_bad_choice',
   'idle_opp_gone',
-  'idle_dourado_gone', 'idle_dourado_pego',
+  'idle_dourado_gone', 'idle_dourado_pego', 'idle_chamar_vazio',
   'idle_evento_gone', 'idle_evento_pego',
   'idle_horta_ocupado', 'idle_horta_vazio', 'idle_horta_trancado', 'idle_horta_semente', 'idle_horta_verde',
   'idle_lugar_aberto', 'idle_lugar_fechado', 'idle_lugar_nome', 'idle_lugar_moeda', 'idle_lugar_nivel_max',

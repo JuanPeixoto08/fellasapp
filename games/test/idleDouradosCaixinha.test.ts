@@ -288,3 +288,254 @@ describe('o estado, a conta e a compra (0076, parte B)', () => {
       tigre_n: 3, tigre_hoje: true });
   });
 });
+
+describe('pegar os dourados novos (0076, parte C)', () => {
+  type JP = J & { dourado: NonNullable<IdleState['dourado']> };
+  const dourado = (seg: number, tipo: number) =>
+    q('insert into public.teste_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
+  const sorteio = (seg: number, sal: number, r: number) =>
+    q('insert into public.teste_sorteio values ($1, $2, $3) on conflict (s, sal) do update set r = excluded.r', [seg, sal, r]);
+  const pegar = (seg: number, lado = 0, moedas?: number) =>
+    t.rpc<JP>('idle_dourado_pegar', moedas === undefined ? { p_seg: seg, p_lado: lado } : { p_seg: seg, p_lado: lado, p_moedas: moedas });
+  const garantir = (seg: number, tipo: number, dobro = true) => q(
+    `update public.idle_state set garantidos = garantidos || jsonb_build_array(jsonb_build_object('seg', $2::bigint, 'tipo', $3::int, 'dobro', $4::boolean))
+      where user_id = $1`, [A, seg, tipo, dobro]);
+  const combo = (n: number, de: number) => q('update public.idle_state set combo_n = $2, combo_seg = $3 where user_id = $1', [A, n, de]);
+
+  beforeEach(async () => {
+    // a sorte vem de tabelas: teste_dourado (o tipo de cada segundo) e teste_sorteio (cada sorteio; sem linha = 0)
+    await t.db.exec(`
+      create table public.teste_dourado (s bigint primary key, tipo int);
+      create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
+        'select tipo from public.teste_dourado where teste_dourado.s = idle_dourado.s';
+      create table public.teste_sorteio (s bigint, sal int, r int, primary key (s, sal));
+      create or replace function public.idle_dourado_sorteio(u uuid, s bigint, sal int, n int) returns int language sql stable as
+        'select coalesce((select r from public.teste_sorteio x where x.s = idle_dourado_sorteio.s and x.sal = idle_dourado_sorteio.sal), 0)';`);
+    await abrir();
+  });
+
+  it('Trend: 1 min de produção por moedinha, no máximo 20 (25 vira 20, negativo vira 0); vale até a janela + 8 + 3 s', async () => {
+    const seg = await agoraSeg();
+    const r = await taxa();
+    await dourado(seg - 20, 4); // 12 + 8 + 3 = 23 s
+    const antes = await valor();
+    const s = await pegar(seg - 20, 0, 25);
+    expect(s.valuation - antes).toBeCloseTo(r * 60 * 20, 2);
+    expect(s.dourado).toMatchObject({ tipo: 4, moedas: 20 });
+    expect(s.dourados_cont.trend_max).toBe(20);
+    await dourado(seg - 1, 4);
+    const antes2 = await valor();
+    expect((await pegar(seg - 1, 0, -3)).valuation - antes2).toBeCloseTo(0, 6);
+    await dourado(seg - 19, 0); // o Investidor não tem os 8 s: 12 + 3 = 15
+    await expect(pegar(seg - 19)).rejects.toThrow(/idle_dourado_gone/);
+  });
+  it('Pix: ficar paga 30 min; devolver põe um garantido em dobro de 20 a 120 s depois; o mesmo Pix paga uma vez só', async () => {
+    const seg = await agoraSeg();
+    const r = await taxa();
+    await dourado(seg, 6);
+    const antes = await valor();
+    const s = await pegar(seg, 0);
+    expect(s.valuation - antes).toBeCloseTo(r * 1800, 2);
+    await expect(pegar(seg, 1)).rejects.toThrow(/idle_dourado_pego/); // ficou: não dá pra devolver o mesmo Pix
+    await dourado(seg - 1, 6);
+    await sorteio(seg - 1, 6161, 37);
+    const d = await pegar(seg - 1, 1);
+    expect(d.garantidos).toEqual([{ seg: seg + 56, tipo: tipoGarantido(A, seg + 56), dobro: true }]);
+    expect(d.dourados_cont.pix_dev).toBe(1);
+    expect(d.dourado).toMatchObject({ tipo: 6, lado: 1, garantido_seg: seg + 56 });
+    await expect(pegar(seg - 1, 0)).rejects.toThrow(/idle_dourado_pego/);
+  });
+  it('garantido em dobro: Investidor 2×, Viralizou em dois fins, Promoção 1 min, LinkedIn 2 min, Trend 2 min por moedinha; sai da lista', async () => {
+    const seg = await agoraSeg();
+    const r = await taxa();
+    await garantir(seg, 0);
+    const antes = await valor();
+    let s = await pegar(seg);
+    expect(s.valuation - antes).toBeCloseTo(r * 1200 * 2, 2);
+    expect(s.garantidos).toEqual([]);
+    await garantir(seg - 1, 2);
+    s = await pegar(seg - 1);
+    expect(s.viral).toHaveLength(2);
+    expect(Date.parse(s.viral[1]) - Date.parse(s.viral[0])).toBeCloseTo(60_000, -3);
+    await garantir(seg - 2, 1);
+    s = await pegar(seg - 2);
+    expect(Date.parse(s.promo_ate!) - Date.parse(s.server_now)).toBeCloseTo(60_000, -3);
+    await garantir(seg - 3, 5);
+    s = await pegar(seg - 3);
+    expect(Date.parse(s.linkedin_ate!) - Date.parse(s.server_now)).toBeCloseTo(120_000, -3);
+    await garantir(seg - 4, 4);
+    const antes2 = await valor();
+    s = await pegar(seg - 4, 0, 10);
+    expect(s.valuation - antes2).toBeCloseTo(r * 60 * 10 * 2, 2);
+    expect(s.dourado.dobro).toBe(true);
+  });
+  it('garantido que passou da janela não paga e sai da lista', async () => {
+    const seg = await agoraSeg();
+    await garantir(seg - 20, 0);
+    await expect(pegar(seg - 20)).rejects.toThrow(/idle_dourado_gone/);
+    await q(`update public.idle_state set garantidos = jsonb_build_array(jsonb_build_object('seg', $2::bigint, 'tipo', 0, 'dobro', true)) where user_id = $1`, [A, seg - 61]);
+    expect((await t.rpc<J>('idle_open')).garantidos).toEqual([]);
+  });
+  it('Tigrinho: as 3 primeiras do dia pagam 30 min (mesmo com a sorte ruim); depois a sorte: paga 30 min ou come 15', async () => {
+    const seg = await agoraSeg();
+    const r = await taxa();
+    for (let i = 0; i < 4; i++) {
+      await dourado(seg - i, 7);
+      await sorteio(seg - i, 4242, 50);
+    }
+    for (let i = 0; i < 3; i++) {
+      const antes = await valor();
+      const s = await pegar(seg - i);
+      expect(s.valuation - antes).toBeCloseTo(r * 1800, 2);
+      expect(s.dourado.tigre).toMatchObject({ pagou: true, gratis: true, n: i + 1 });
+    }
+    const antes = await valor();
+    const s = await pegar(seg - 3);
+    expect(antes - s.valuation).toBeCloseTo(r * 900, 2);
+    expect(s.dourado.tigre).toMatchObject({ pagou: false, gratis: false, n: 4 });
+    expect(s.dourados_cont.tigre_perdeu).toBe(1);
+    await dourado(seg - 4, 7);
+    await sorteio(seg - 4, 4242, 29);
+    const s2 = await pegar(seg - 4);
+    expect(s2.dourado.tigre).toMatchObject({ pagou: true, gratis: false });
+    expect(s2.dourados_cont.tigre_seq).toBe(1);
+  });
+  it('Tigrinho: perder com pouco F$ nunca deixa negativo; outro dia volta a ter 3 grátis; vender a startup não devolve as grátis', async () => {
+    const seg = await agoraSeg();
+    await q('update public.idle_state set tigre_dia = public.games_today(), tigre_n = 3, valuation = 1 where user_id = $1', [A]);
+    await dourado(seg, 7);
+    await sorteio(seg, 4242, 99);
+    const s = await pegar(seg);
+    expect(s.valuation).toBe(0);
+    expect(s.dourado.tigre!.perdeu).toBe(1);
+    await q('update public.idle_state set tigre_dia = public.games_today() - 1, valuation = 1e12 where user_id = $1', [A]);
+    await dourado(seg - 1, 7);
+    await sorteio(seg - 1, 4242, 99);
+    expect((await pegar(seg - 1)).dourado.tigre).toMatchObject({ pagou: true, gratis: true, n: 1 });
+    await q(`update public.idle_state set tigre_n = 3, prestige_earned = 0, valuation = 1e30, generators[30] = 150, strategies = '{0,0,0,0}' where user_id = $1`, [A]);
+    await t.rpc('idle_prestige');
+    expect((await q<{ n: number }>('select tigre_n as n from public.idle_state where user_id = $1', [A]))[0].n).toBe(3);
+  });
+  it('LinkedIn: o gerador sorteado entre os que mais rendem fica ×30 por 1 min (mult = 1 + 29·f); outro substitui', async () => {
+    const seg = await agoraSeg();
+    const [{ r }] = await q<{ r: number[] }>(
+      'select array(select x.renda from public.idle_gen_rendas(s, now()) x order by x.gen) as r from public.idle_state s where user_id = $1', [A]);
+    const soma = r.reduce((a, x) => a + x, 0);
+    const top = r.indexOf(Math.max(...r)) + 1;
+    await dourado(seg, 5);
+    const s = await pegar(seg); // sorteio 0 = o que mais rende
+    expect(s.linkedin_gen).toBe(top);
+    expect(s.linkedin_mult).toBeCloseTo(1 + 29 * (r[top - 1] / soma), 9);
+    expect(Date.parse(s.linkedin_ate!) - Date.parse(s.server_now)).toBeCloseTo(60_000, -3);
+    await dourado(seg - 1, 5);
+    await sorteio(seg - 1, 5151, 1);
+    const s2 = await pegar(seg - 1);
+    expect(s2.linkedin_gen).not.toBe(top);
+    expect(s2.dourado).toMatchObject({ tipo: 5, gen: s2.linkedin_gen });
+  });
+  it('Combo: 3 pegos seguidos = ×7 por 1 min; o 2º lado da dupla não soma', async () => {
+    const seg = await agoraSeg();
+    await dourado(seg - 10, 0);
+    await dourado(seg - 7, 3);
+    await dourado(seg - 5, 0);
+    await pegar(seg - 10);
+    await pegar(seg - 7, 0);
+    let s = await pegar(seg - 7, 1);
+    expect(s.combo_n).toBe(2);
+    s = await pegar(seg - 5);
+    expect(s.dourado.combo).toBe(true);
+    expect(s.combo_n).toBe(0);
+    expect(Date.parse(s.combo_ate!) - Date.parse(s.server_now)).toBeCloseTo(60_000, -3);
+    expect(s.dourados_cont.combos).toBe(1);
+  });
+  it('Combo quebra com um dourado perdido no meio; não quebra com Tigrinho ignorado nem com garantido perdido; zera depois de 30 min', async () => {
+    const seg = await agoraSeg();
+    await dourado(seg - 40, 0); // ninguém pegou e a janela já passou
+    await dourado(seg, 0);
+    await combo(2, seg - 50);
+    expect((await pegar(seg)).combo_n).toBe(1);
+    await dourado(seg - 30, 7); // Tigrinho ignorado
+    await dourado(seg - 1, 0);
+    await combo(2, seg - 35);
+    expect((await pegar(seg - 1)).dourado.combo).toBe(true);
+    await q(`update public.idle_state set garantidos = jsonb_build_array(jsonb_build_object('seg', $2::bigint, 'tipo', 0, 'dobro', false)) where user_id = $1`, [A, seg - 25]);
+    await dourado(seg - 2, 0);
+    await combo(2, seg - 28);
+    expect((await pegar(seg - 2)).dourado.combo).toBe(true);
+    await dourado(seg - 3, 0);
+    await combo(2, seg - 2000);
+    expect((await pegar(seg - 3)).combo_n).toBe(1);
+  });
+  it('Chamar: sem guardado, idle_chamar_vazio; com 2, gasta 1 e põe um garantido no segundo seguinte (sem dobro, sem Pix nem Tigrinho)', async () => {
+    await expect(t.rpc('idle_dourado_chamar')).rejects.toThrow(/idle_chamar_vazio/);
+    await q('update public.idle_state set chamados = 2 where user_id = $1', [A]);
+    const seg = await agoraSeg();
+    const s = await t.rpc<J>('idle_dourado_chamar');
+    expect(s.chamados).toBe(1);
+    const g = s.garantidos![0];
+    expect(g.seg - seg).toBeGreaterThanOrEqual(1);
+    expect(g.seg - seg).toBeLessThanOrEqual(2);
+    expect(g).toEqual({ seg: g.seg, tipo: tipoGarantido(A, g.seg), dobro: false });
+    const s2 = await t.rpc<J>('idle_dourado_chamar');
+    expect(s2.chamados).toBe(0);
+    expect(new Set(s2.garantidos!.map((x) => x.seg)).size).toBe(2);
+  });
+  it('Combo: a dupla conta uma vez mesmo com outro dourado pego entre os dois lados', async () => {
+    const seg = await agoraSeg();
+    await dourado(seg - 10, 3);
+    await dourado(seg - 8, 0);
+    let s = await pegar(seg - 10, 0);
+    expect(s.combo_n).toBe(1);
+    s = await pegar(seg - 8);
+    expect(s.combo_n).toBe(2);
+    s = await pegar(seg - 10, 1); // o 2º lado, depois de outro dourado: nem soma nem quebra nem dispara
+    expect(s.combo_n).toBe(2);
+    expect(s.dourado.combo).toBe(false);
+    expect(s.combo_ate).toBeNull();
+    expect(s.combo_seg).toBe(seg - 8);
+  });
+  it('quem não é membro não pega nem chama', async () => {
+    const seg = await agoraSeg();
+    await t.as(B);
+    await expect(pegar(seg)).rejects.toThrow(/not_member/);
+    await expect(t.rpc('idle_dourado_chamar')).rejects.toThrow(/not_member/);
+  });
+});
+
+describe('conquistas dos dourados (132–135, 138)', () => {
+  beforeEach(async () => {
+    t = await freshDb(); // com o catálogo das conquistas
+    await t.db.exec(`
+      create table public.teste_dourado (s bigint primary key, tipo int);
+      create or replace function public.idle_dourado(u uuid, s bigint, gema double precision default 0) returns int language sql stable as
+        'select tipo from public.teste_dourado where teste_dourado.s = idle_dourado.s';
+      create table public.teste_sorteio (s bigint, sal int, r int, primary key (s, sal));
+      create or replace function public.idle_dourado_sorteio(u uuid, s bigint, sal int, n int) returns int language sql stable as
+        'select coalesce((select r from public.teste_sorteio x where x.s = idle_dourado_sorteio.s and x.sal = idle_dourado_sorteio.sal), 0)';`);
+    await abrir();
+  });
+  const tem = async (id: number) =>
+    (await q('select 1 from public.idle_conquistas where user_id = $1 and conquista_id = $2', [A, id])).length > 0;
+
+  it('Combo 10, Trend com 20, Pix devolvido 10, 3 seguidas pagas depois das grátis e 10 derrotas no Tigrinho', async () => {
+    const seg = await agoraSeg();
+    await q(`update public.idle_state set dourados_cont = '{"pix_dev": 9, "tigre_perdeu": 9, "combos": 9, "tigre_seq": 2}',
+               tigre_dia = public.games_today(), tigre_n = 3, combo_n = 2, combo_seg = $2 where user_id = $1`, [A, seg - 11]);
+    const vez = async (x: number, tipo: number, lado = 0, moedas?: number, sorte?: number) => {
+      await q('insert into public.teste_dourado values ($1, $2)', [x, tipo]);
+      if (sorte !== undefined) await q('insert into public.teste_sorteio values ($1, 4242, $2)', [x, sorte]);
+      await t.rpc('idle_dourado_pegar', moedas === undefined ? { p_seg: x, p_lado: lado } : { p_seg: x, p_lado: lado, p_moedas: moedas });
+    };
+    await vez(seg - 10, 4, 0, 19); // o 3º seguido: Combo nº 10
+    expect(await tem(135)).toBe(true);
+    expect(await tem(132)).toBe(false);
+    await vez(seg - 9, 4, 0, 20);
+    expect(await tem(132)).toBe(true);
+    await vez(seg - 8, 6, 1);
+    expect(await tem(133)).toBe(true);
+    await vez(seg - 7, 7, 0, undefined, 0); // 4ª do dia, a sorte paga: 3 seguidas
+    expect(await tem(138)).toBe(true);
+    await vez(seg - 6, 7, 0, undefined, 99); // perde: a 10ª derrota
+    expect(await tem(134)).toBe(true);
+  });
+});

@@ -593,3 +593,207 @@ end;
 $$;
 
 revoke all on function public.idle_json(public.idle_state) from public, anon, authenticated;
+
+-- ===== parte C: pegar o dourado, o Combo e o Chamar =====
+-- o Combo quebrou entre o último pego (de) e o atual (ate)? Um segundo no meio com dourado da sorte (não Tigrinho), não
+-- pego e com a janela já passada (igual a combo.ts comboAgora). `peso` = Gemaplys + a frequência da árvore − 1; `tela` =
+-- quanto fica na tela (s). Os garantidos não estão na sorte: perder um não quebra.
+create or replace function public.idle_combo_quebrou(s public.idle_state, de bigint, ate bigint, peso double precision, tela double precision)
+returns boolean language sql stable set search_path = public as $$
+  select exists (
+    select 1
+      from generate_series(de + 1, ate - 1) x
+      cross join lateral (select coalesce(public.idle_dourado(s.user_id, x, peso), public.idle_conv_faixa(s, x)) as tipo) d
+     where d.tipo is not null and d.tipo <> 7
+       and now() > to_timestamp(x) + make_interval(secs => tela + case when d.tipo in (4, 6) then 8 else 0 end + 3)
+       and not exists (select 1 from public.idle_dourados_pegos p where p.user_id = s.user_id and p.seg = x))
+$$;
+revoke all on function public.idle_combo_quebrou(public.idle_state, bigint, bigint, double precision, double precision) from public, anon, authenticated;
+
+drop function if exists public.idle_dourado_pegar(bigint, int);
+-- pegar o dourado do segundo p_seg (o da 0061) com os quatro novos, os garantidos e o Combo. p_lado: o lado da dupla, ou a
+-- escolha do Pix (0 ficar, 1 devolver); p_moedas: as moedinhas do Trend (a página conta; o banco aceita 0 a 20).
+-- Devolve o estado + "dourado": {tipo, lado, ganho, dobro, moedas, gen, mult, garantido_seg, tigre, combo}.
+create or replace function public.idle_dourado_pegar(p_seg bigint, p_lado int, p_moedas int default 0)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s        public.idle_state;
+  v_me     uuid := auth.uid();
+  v_tipo   int;
+  v_ini    timestamptz;
+  v_freq   double precision := public.idle_arv(auth.uid(), 'dourado_freq', 'max', 1);    -- Pé de coelho / Dia de sorte
+  v_tela   double precision := public.idle_arv(auth.uid(), 'dourado_tela', 'max', 12);   -- Olho de lince: 24 s
+  v_dur    double precision := public.idle_arv(auth.uid(), 'dourado_duracao', 'max', 1); -- Hype: o dobro
+  v_gema   double precision;
+  v_g      jsonb;
+  v_dobro  boolean := false;
+  v_d      double precision;
+  v_rate   double precision;
+  v_ganho  double precision := 0;
+  v_moedas int := 0;
+  v_gen    int;
+  v_f      double precision;
+  v_gseg   bigint;
+  v_tigre  jsonb;
+  v_gratis boolean;
+  v_pagou  boolean;
+  v_perdeu double precision := 0;
+  v_combo  boolean := false;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 60 then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  v_gema := public.idle_conv_peso(s, 3);
+  -- garantido (Pix devolvido, Chamar) primeiro: o tipo e o dobro vêm da lista; senão a sorte e a faixa do MC V.V
+  select g into v_g from jsonb_array_elements(public.idle_garantidos_vivos(s.garantidos)) g where (g ->> 'seg')::bigint = p_seg limit 1;
+  if v_g is not null then
+    v_tipo := (v_g ->> 'tipo')::int;
+    v_dobro := coalesce((v_g ->> 'dobro')::boolean, false);
+  else
+    -- a frequência da árvore entra como peso a mais no extra do Gemaplys (igual a convidados.ts eventoDaSorte)
+    v_tipo := coalesce(public.idle_dourado(v_me, p_seg, v_gema + v_freq - 1), public.idle_conv_faixa(s, p_seg));
+  end if;
+  v_d := case when v_dobro then 2 else 1 end;
+  v_ini := to_timestamp(p_seg);
+  -- na tela: base × (1 − gema/2); o Trend (a chuva) e o Pix (a escolha) têm 8 s a mais; o banco aceita 3 s a mais (rede)
+  if v_tipo is null or now() < v_ini - interval '2 seconds'
+     or now() > v_ini + make_interval(secs => v_tela * (1 - v_gema / 2) + case when v_tipo in (4, 6) then 8 else 0 end + 3) then
+    raise exception 'idle_dourado_gone' using errcode = 'P0001';
+  end if;
+  if p_lado is null or p_lado not in (0, 1) or (p_lado = 1 and v_tipo not in (3, 6)) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  delete from public.idle_dourados_pegos where user_id = v_me and pegou_em < now() - interval '1 hour';
+  -- o Pix grava sempre o lado 0: ficar e devolver são o mesmo Pix (paga uma vez)
+  insert into public.idle_dourados_pegos (user_id, seg, lado)
+  values (v_me, p_seg, case when v_tipo = 6 then 0 else p_lado end) on conflict do nothing;
+  if not found then
+    raise exception 'idle_dourado_pego' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_rate := public.idle_rate(s);
+  case v_tipo
+    when 0 then -- Investidor apressado: 20 min (× Investidor anjo × horta; 2× no dobro)
+      v_ganho := v_rate * 1200 * v_d * public.idle_arv(v_me, 'dourado_investidor', 'mult', 1)
+                 * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), now()) b));
+    when 1 then -- Promoção relâmpago: 30 s × Hype (o dobro dura 2×)
+      s.promo_ate := greatest(coalesce(s.promo_ate, now()), now() + make_interval(secs => 30 * v_dur * v_d));
+    when 2, 3 then -- Viralizou (e cada lado da dupla); no dobro, um 2º fim logo depois do 1º (×10 por 2 min)
+      s.viral_ate := array(select v from unnest(s.viral_ate) v where v > now()) || (now() + make_interval(secs => 60 * v_dur))
+                     || case when v_dobro then array[now() + make_interval(secs => 120 * v_dur)] else '{}'::timestamptz[] end;
+    when 4 then -- Trend do TikTok: 1 min de produção por moedinha (2 no dobro), até 20
+      v_moedas := least(20, greatest(0, coalesce(p_moedas, 0)));
+      v_ganho := v_rate * 60 * v_moedas * v_d;
+      s.dourados_cont := coalesce(s.dourados_cont, '{}'::jsonb)
+                         || jsonb_build_object('trend_max', greatest(coalesce((s.dourados_cont ->> 'trend_max')::int, 0), v_moedas));
+      perform public.idle_ganhar(v_me, 'trend_max', v_moedas);
+    when 5 then -- Bombou no LinkedIn: um dos 5 que mais produzem ×30 por 1 min (× Hype × dobro), congelado agora; o novo substitui
+      select l.gen, l.f into v_gen, v_f from public.idle_linkedin(s, p_seg) l;
+      s.linkedin_gen := v_gen;
+      s.linkedin_mult := 1 + 29 * coalesce(v_f, 0);
+      s.linkedin_ate := now() + make_interval(secs => 60 * v_dur * v_d);
+    when 6 then -- Pix errado: ficar (30 min) ou devolver (um garantido em dobro de 20 a 120 s depois)
+      if p_lado = 0 then
+        v_ganho := v_rate * 1800;
+      else
+        v_gseg := public.idle_dourado_pix_seg(v_me, p_seg);
+        s.garantidos := coalesce(s.garantidos, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+          'seg', v_gseg, 'tipo', public.idle_dourado_tipo_garantido(v_me, v_gseg), 'dobro', true));
+        s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'pix_dev', 1);
+        perform public.idle_ganhar(v_me, 'pix_dev', (s.dourados_cont ->> 'pix_dev')::double precision);
+      end if;
+    else -- Tigrinho: as 3 primeiras do dia pagam; depois a casa paga 3 em cada 10 (30 min) e come 15 min (nunca abaixo de zero)
+      if s.tigre_dia is distinct from public.games_today() then
+        s.tigre_dia := public.games_today();
+        s.tigre_n := 0;
+      end if;
+      s.tigre_n := coalesce(s.tigre_n, 0) + 1;
+      v_gratis := s.tigre_n <= 3;
+      v_pagou := v_gratis or public.idle_dourado_tigre_paga(v_me, p_seg);
+      if v_pagou then
+        v_ganho := v_rate * 1800;
+        if not v_gratis then -- O tigre tá pagando: vitórias seguidas depois das grátis
+          s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'tigre_seq', 1);
+          perform public.idle_ganhar(v_me, 'tigre_seq', (s.dourados_cont ->> 'tigre_seq')::double precision);
+        end if;
+      else
+        v_perdeu := least(greatest(s.valuation, 0), v_rate * 900);
+        s.valuation := s.valuation - v_perdeu;
+        s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'tigre_perdeu', 1) || jsonb_build_object('tigre_seq', 0);
+        perform public.idle_ganhar(v_me, 'tigre_perdeu', (s.dourados_cont ->> 'tigre_perdeu')::double precision);
+      end if;
+      v_tigre := jsonb_build_object('pagou', v_pagou, 'gratis', v_gratis, 'perdeu', v_perdeu, 'n', s.tigre_n);
+  end case;
+  s.valuation := s.valuation + v_ganho;
+  -- o garantido sai da lista quando pego (a dupla, depois dos dois lados)
+  if v_g is not null
+     and (v_tipo <> 3 or (select count(*) from public.idle_dourados_pegos p where p.user_id = v_me and p.seg = p_seg) >= 2) then
+    s.garantidos := coalesce((select jsonb_agg(g) from jsonb_array_elements(s.garantidos) g where (g ->> 'seg')::bigint <> p_seg), '[]'::jsonb);
+  end if;
+  -- Combo: 3 pegos seguidos sem nenhum sumir no meio = ×7 por 1 min (× Hype). A dupla conta uma vez: se o outro lado do
+  -- mesmo segundo já foi pego (mesmo com outro dourado no meio), este não soma nem quebra; o último pego de mais de 30 min
+  -- atrás (ou nenhum) zera
+  if (select count(*) from public.idle_dourados_pegos p where p.user_id = v_me and p.seg = p_seg) < 2 then
+    if s.combo_seg is null or s.combo_seg < p_seg - 1800
+       or (p_seg > s.combo_seg and public.idle_combo_quebrou(s, s.combo_seg, p_seg, v_gema + v_freq - 1, v_tela * (1 - v_gema / 2))) then
+      s.combo_n := 0;
+    end if;
+    s.combo_n := coalesce(s.combo_n, 0) + 1;
+    s.combo_seg := greatest(coalesce(s.combo_seg, p_seg), p_seg);
+    if s.combo_n >= 3 then
+      s.combo_ate := greatest(coalesce(s.combo_ate, now()), now()) + make_interval(secs => 60 * v_dur);
+      s.combo_n := 0;
+      v_combo := true;
+      s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'combos', 1);
+      perform public.idle_ganhar(v_me, 'combos', (s.dourados_cont ->> 'combos')::double precision);
+    end if;
+  end if;
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('dourado', jsonb_build_object(
+    'tipo', v_tipo, 'lado', p_lado, 'ganho', v_ganho, 'dobro', v_dobro, 'moedas', v_moedas, 'gen', v_gen,
+    'mult', case when v_tipo = 5 then s.linkedin_mult end, 'garantido_seg', v_gseg, 'tigre', v_tigre, 'combo', v_combo));
+end;
+$$;
+revoke all on function public.idle_dourado_pegar(bigint, int, int) from public, anon;
+grant execute on function public.idle_dourado_pegar(bigint, int, int) to authenticated;
+
+-- Chamar um dourado (guardado pela Caixinha): gasta 1 e põe um garantido no segundo seguinte (a roda sem Pix nem
+-- Tigrinho, sem dobro); dois no mesmo segundo: o 2º vai pro seguinte
+create or replace function public.idle_dourado_chamar()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s     public.idle_state;
+  v_me  uuid := auth.uid();
+  v_seg bigint := floor(extract(epoch from now()))::bigint + 1;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.chamados, 0) < 1 then
+    raise exception 'idle_chamar_vazio' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  while exists (select 1 from jsonb_array_elements(coalesce(s.garantidos, '[]'::jsonb)) g where (g ->> 'seg')::bigint = v_seg) loop
+    v_seg := v_seg + 1;
+  end loop;
+  s.chamados := s.chamados - 1;
+  s.garantidos := coalesce(s.garantidos, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+    'seg', v_seg, 'tipo', public.idle_dourado_tipo_garantido(v_me, v_seg), 'dobro', false));
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+revoke all on function public.idle_dourado_chamar() from public, anon;
+grant execute on function public.idle_dourado_chamar() to authenticated;
