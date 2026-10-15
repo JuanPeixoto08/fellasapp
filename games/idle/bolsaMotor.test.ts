@@ -125,4 +125,30 @@ describe('simulação de 30 dias (calibra o catálogo)', () => {
       expect(estrategia(c, (v, rep) => v < 0.7 * rep, (v, rep) => v > 1.05 * rep), c).toBeGreaterThan(0);
     }
   });
+
+  // Insider (shh), entrega 5: 100% de lucro (contando a corretagem) vendendo em até 2 h depois de comprar. Medido ao
+  // planejar: 16% das janelas (37% nas malucas PRMO e MEME, 0,05% na IRMA). A raridade da conquista vem da cadeia
+  // (Informação privilegiada, espiar, comprar e vender em 2 h), não da Bolsa.
+  it('Insider (shh): 100% de lucro em 2 h é possível, mas não é a regra', () => {
+    let janelas = 0;
+    let deu = 0;
+    for (const r of runs) {
+      r.series.forEach((serie, i) => {
+        for (let t = 0; t + 120 < serie.length; t += 10) {
+          if (r.rj[i][t]) continue;
+          janelas++;
+          const custo = serie[t] * (1 + BOLSA.corretagem);
+          for (let k = t + 1; k <= t + 120; k++) {
+            if (r.rj[i][k]) break;
+            if (serie[k] >= 2 * custo) {
+              deu++;
+              break;
+            }
+          }
+        }
+      });
+    }
+    expect(deu / janelas).toBeGreaterThan(0.01);
+    expect(deu / janelas).toBeLessThan(0.25);
+  });
 });

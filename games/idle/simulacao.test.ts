@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalogo } from './catalogo';
-import { K_PRESTIGIO, pontosTotais } from './economia';
+import { K_PRESTIGIO, pontosTotais, SEM_BONUS } from './economia';
 import { gastar, primeiraVenda, simular, volta } from './simulacao';
+import { mediaOportunidade, RODA_OPP_HOJE, RODA_OPP_NOVA } from './valorMedio';
 
 const H = 3600;
 const DIA = 24 * H;
@@ -70,5 +71,25 @@ describe('ritmo do prestígio', () => {
     expect(r).toMatchObject({ era: 5, gastos: 7 }); // 9 com o nó do Tempo (2 pontos), que saiu em 13/10
     expect(r.segunda).toBeLessThan(r.primeira);
     expect(r.segunda / r.primeira).toBeLessThan(0.91); // 234000 / 259200 = 0,90
+  });
+});
+
+// Entrega 5 (0076): no modelo de valorMedio.ts a oportunidade média do jogador da simulação (sem Horta nem Bolsa na
+// 1ª semana) sobe 36% (o Adubo e a Informação viram 15 min). Os ritmos têm que continuar valendo com isso. Se algum
+// sair do alvo: cupons de 10 pra 5 (CUPONS_POR_OPP e a 0076), rode de novo e avise o Juan; NÃO mexa em PARAMETROS.
+describe('ritmo com as oportunidades novas (entrega 5)', () => {
+  const sem = { horta: false, bolsa: false };
+  const minutos = 15 * (mediaOportunidade(RODA_OPP_NOVA, sem) / mediaOportunidade(RODA_OPP_HOJE, sem));
+  const m = simular(catalogo, 14, SEM_BONUS, [], minutos);
+  it('uns 20 min por oportunidade (eram 15)', () => expect(minutos).toBeCloseTo(20.42, 1));
+  it('era 5 no dia 4 ou 5', () => {
+    expect(m.era[5]!).toBeGreaterThanOrEqual(3 * DIA);
+    expect(m.era[5]!).toBeLessThan(5 * DIA);
+  });
+  it('gerador 30 não sai na 1ª semana', () => expect(m.gerador30 === null || m.gerador30 >= 7 * DIA).toBe(true));
+  it('a 1ª semana rende uns 17 pontos (16 a 18)', () => {
+    const p = pontosTotais(m.amostras.find((a) => a.t >= 7 * DIA)!.taxa);
+    expect(p).toBeGreaterThanOrEqual(16);
+    expect(p).toBeLessThanOrEqual(18);
   });
 });

@@ -26,8 +26,9 @@ function sessoes(dias: number): [number, number][] {
   return s;
 }
 
-/** `bonus`: os nós da árvore e as conquistas de quem já vendeu; `gerais`: as melhorias gerais que a venda manteve. */
-export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BONUS, gerais: number[] = []): Marcos {
+/** `bonus`: os nós da árvore e as conquistas de quem já vendeu; `gerais`: as melhorias gerais que a venda manteve;
+ * `minutosOpp`: quanto vale cada oportunidade pega (15 min de produção até a entrega 5; ver valorMedio.ts). */
+export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BONUS, gerais: number[] = [], minutosOpp = 15): Marcos {
   const ef = efeitosArvore(cat, bonus.arvore);
   const ini = abertura(cat, ef, gerais);
   // jogador sozinho: ninguém contrata ninguém, então vale o piso de freela (+2%) o tempo todo
@@ -85,7 +86,7 @@ export function simular(cat: Catalogo = padrao, dias = 7, bonus: Bonus = SEM_BON
     if (d !== dia) { dia = d; oppHoje = 0; }
     if (ini > 0) {
       const pegar = Math.min(ef.caixinha, LIMITE_DIA + ef.oppExtra - oppHoje);
-      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 900 * ef.oppBonus;
+      for (let i = 0; i < pegar; i++) v += taxa(cat, s) * 60 * minutosOpp * ef.oppBonus;
       oppHoje += pegar;
     }
     for (let t = ini; t < fim; t += PASSO) {

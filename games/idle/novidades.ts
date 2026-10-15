@@ -4,6 +4,21 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-dourados-caixinha',
+    titulo: 'Dourados novos e uma Caixinha mais cheia',
+    data: '2026-10-15',
+    itens: [
+      'Trend do TikTok: chovem moedinhas por 8 segundos. Cada uma que você pega é 1 minuto de produção, até 20.',
+      'Bombou no LinkedIn: um dos seus 5 geradores que mais produzem rende ×30 por 1 minuto. O post de coach vem de brinde.',
+      'Pix errado: fica com 30 minutos de produção ou devolve e ganha um dourado em dobro em até 2 minutos. Ninguém viu.',
+      'Tigrinho: as 3 primeiras jogadas do dia sempre pagam. Depois, a casa paga 3 em cada 10. Só mais uma.',
+      'Combo: pegue 3 dourados seguidos sem deixar nenhum sumir e a produção fica ×7 por 1 minuto.',
+      'Cinco oportunidades novas na Caixinha: Chamar um dourado (guarda até 3 pra chamar quando quiser), Cupom de primeira compra (10 compras de gerador 25% mais baratas), Adubo de farmácia (a planta mais perto de amadurecer fica madura na hora), Cashback (toda compra devolve 30% por 2 minutos) e Informação privilegiada (espia o humor de uma empresa da Bolsa até ele mudar).',
+      'Sem Horta ou sem Bolsa, o Adubo e a Informação viram 15 minutos de produção.',
+      '6 conquistas novas: Dancinha do TikTok, Cidadão de bem, Só mais uma, C-C-C-Combo!, Primeira compra (de novo) e Volta pra conta.',
+    ],
+  },
+  {
     id: '2026-10-15-placar-na-cena',
     titulo: 'Placar em cima da cena',
     data: '2026-10-15',
