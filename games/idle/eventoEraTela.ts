@@ -68,14 +68,30 @@ export type OpcoesEventoEra = {
 /** Bola acima disto (fração da tela, do topo): o placar vai pra baixo dela, senão sairia da tela/cobriria o topo. */
 const PLACAR_EMBAIXO_Y = 0.25;
 const passoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / 1500));
+/** Folga da caixa até a borda da tela (px). */
+const MARGEM_TELA = 8;
+/** O centro (px) de uma caixa `tam` empurrado pra ela caber inteira na tela, com `margem` de folga; maior que a
+ *  tela num eixo, fica no meio dele. */
+export function prenderNaTela(centro: Ponto, tam: { w: number; h: number }, tela: { w: number; h: number }, margem = MARGEM_TELA): Ponto {
+  const eixo = (c: number, t: number, total: number) => {
+    const min = margem + t / 2;
+    const max = total - margem - t / 2;
+    return min > max ? total / 2 : Math.min(max, Math.max(min, c));
+  };
+  return { x: eixo(centro.x, tam.w, tela.w), y: eixo(centro.y, tam.h, tela.h) };
+}
 
 export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   const camada = document.createElement('div');
   camada.className = 'eventos-era';
   raiz.append(camada);
   // a bola fica no pulo `passo + gols`: anda a cada 1,5 s e a cada gol
-  let atual: { seg: number; tipo: TipoEventoEra; ateMs: number; caixa: HTMLElement; gols: number; passo: number; pos: Ponto } | null = null;
+  // `base` = o ponto sorteado (a caixa volta a ele e é presa de novo quando a tela muda de tamanho)
+  let atual: { seg: number; tipo: TipoEventoEra; ateMs: number; caixa: HTMLElement; gols: number; passo: number; pos: Ponto; base?: Ponto } | null = null;
   const encerrados = new Set<number>();
+  window.addEventListener('resize', () => {
+    if (atual?.base) atual.pos = posicionarCaixa(atual.caixa, atual.base);
+  });
 
   function encerrar(enviar: boolean) {
     if (!atual) return;
@@ -88,6 +104,21 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   function posicionar(el: HTMLElement, p: Ponto) {
     el.style.left = `${Math.round(p.x * 100)}%`;
     el.style.top = `${Math.round(p.y * 100)}%`;
+  }
+  /** A caixa no ponto sorteado, empurrada pra dentro da tela se a borda passar (a bola e o placar têm o clamp do CSS;
+   *  a tela azul é a faixa inteira). Devolve onde ela ficou (fração da tela). */
+  function posicionarCaixa(el: HTMLElement, p: Ponto): Ponto {
+    posicionar(el, p);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const r = el.getBoundingClientRect(); // com o balanço: um pouco maior que a caixa parada (a favor da folga)
+    if (!W || !H || !r.width || !r.height) return p;
+    const centro = { x: (Math.round(p.x * 100) / 100) * W, y: (Math.round(p.y * 100) / 100) * H };
+    const c = prenderNaTela(centro, { w: r.width, h: r.height }, { w: W, h: H });
+    if (c.x === centro.x && c.y === centro.y) return p;
+    el.style.left = `${Math.round(c.x)}px`;
+    el.style.top = `${Math.round(c.y)}px`;
+    return { x: Math.round(c.x) / W, y: Math.round(c.y) / H };
   }
   /** A bola e o placar dela (em cima da bola; embaixo quando a bola está perto do topo; o CSS segura nas laterais). */
   function moverBola(caixa: HTMLElement, p: Ponto) {
@@ -156,10 +187,14 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
           encerrar(true);
         });
         caixa.append(icone(t), balao, b);
-        posicionar(caixa, pos);
+        posicionar(caixa, atual.pos);
         o.dica(caixa, `evento-${e.seg}`, t);
       }
       camada.append(caixa);
+      if (e.tipo !== 4 && e.tipo !== 5) {
+        atual.base = pos;
+        atual.pos = posicionarCaixa(caixa, pos); // já na tela: dá pra medir
+      }
     },
     /** A cada passo da página: a bola pula a cada 1,5 s; passou da janela, encerra (o Jogo do Brasil manda os gols). */
     tick(agoraMs: number) {

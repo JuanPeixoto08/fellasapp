@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { criarEventoEraTela } from './eventoEraTela';
+import { criarEventoEraTela, prenderNaTela } from './eventoEraTela';
 
 const opcoes = (aoPegar = vi.fn()) => ({ aoPegar, dica: vi.fn(), posicao: () => ({ x: 0.5, y: 0.5 }) });
 
@@ -147,5 +147,41 @@ describe('eventos de era na tela', () => {
     raiz.querySelector<HTMLButtonElement>('.evento-era button')?.click(); // já saiu: não toca de novo
     expect(aoBotao).toHaveBeenLastCalledWith(3);
     expect(aoBotao).toHaveBeenCalledTimes(2);
+  });
+  it('a caixa fica inteira dentro da tela (8 px de margem): o centro é empurrado pra dentro', () => {
+    const tela = { w: 387, h: 800 };
+    // a call (249 px) sorteada em left 161 px: a borda direita ia a 410 px; vai pra 387 - 8 - 124,5
+    expect(prenderNaTela({ x: 161 + 124.5, y: 400 }, { w: 249, h: 120 }, tela)).toEqual({ x: 387 - 8 - 124.5, y: 400 });
+    expect(prenderNaTela({ x: 50, y: 400 }, { w: 249, h: 120 }, tela)).toEqual({ x: 8 + 124.5, y: 400 });
+    expect(prenderNaTela({ x: 200, y: 20 }, { w: 100, h: 120 }, tela)).toEqual({ x: 200, y: 8 + 60 });
+    expect(prenderNaTela({ x: 200, y: 790 }, { w: 100, h: 120 }, tela)).toEqual({ x: 200, y: 800 - 8 - 60 });
+    expect(prenderNaTela({ x: 200, y: 400 }, { w: 100, h: 120 }, tela)).toEqual({ x: 200, y: 400 }); // já cabe
+    expect(prenderNaTela({ x: 10, y: 400 }, { w: 500, h: 120 }, tela)).toEqual({ x: 193.5, y: 400 }); // maior que a tela: no meio
+  });
+  it('mostrar prende a caixa na tela e o texto sobe de onde ela ficou; a tela azul (faixa inteira) fica de fora', () => {
+    const raiz = document.createElement('div');
+    document.body.append(raiz);
+    const w0 = window.innerWidth;
+    const h0 = window.innerHeight;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 387 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      { width: 249, height: 120, x: 0, y: 0, left: 0, top: 0, right: 249, bottom: 120, toJSON: () => ({}) } as DOMRect);
+    try {
+      const o = { ...opcoes(), posicao: () => ({ x: 0.74, y: 0.5 }) };
+      const t = criarEventoEraTela(raiz, o);
+      t.mostrar({ seg: 100, tipo: 3, agoraMs: 100_000 });
+      const caixa = raiz.querySelector<HTMLElement>('.evento-era')!;
+      expect(caixa.style.left).toBe(`${Math.round(387 - 8 - 124.5)}px`);
+      caixa.querySelector<HTMLButtonElement>('button')!.click();
+      expect(o.aoPegar.mock.calls[0][2].x).toBeCloseTo(Math.round(387 - 8 - 124.5) / 387, 5);
+      t.mostrar({ seg: 200, tipo: 4, agoraMs: 200_000 });
+      expect(raiz.querySelector<HTMLElement>('.evento-era-4')!.style.left).toBe('50%');
+    } finally {
+      rect.mockRestore();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w0 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: h0 });
+      raiz.remove();
+    }
   });
 });
