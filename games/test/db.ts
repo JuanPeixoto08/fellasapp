@@ -1,5 +1,6 @@
 // Postgres de verdade (PGlite) com o mínimo do Supabase que as migrações dos jogos usam.
 import { PGlite } from '@electric-sql/pglite';
+import { afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -68,14 +69,44 @@ export function quartaATarde(agora = Date.now()): Date {
  *  de cada tipo antigo param o relógio aqui (0076). 144 janelas de 10 min por dia. */
 export const quartaAntesDoCorte = () => quartaATarde((OPP_CORTE - 14 * 144) * 600_000);
 
+let atual: PGlite | null = null;
+let molde: Promise<PGlite> | null = null;
+
+async function fecharAtual() {
+  const db = atual;
+  atual = null;
+  if (db && !db.closed) await db.close();
+}
+
+/** Roda o esqueleto e as migrações uma vez por worker; cada teste ganha uma cópia (clone) desse banco pronto. */
+function modelo(): Promise<PGlite> {
+  molde ??= (async () => {
+    const db = new PGlite();
+    await db.exec(SKELETON);
+    for (const name of MIGRATIONS) {
+      await db.exec(readFileSync(resolve(__dirname, '../../supabase/migrations', name), 'utf8'));
+    }
+    return db;
+  })();
+  return molde;
+}
+
+// Fecha o último banco e o molde ao fim de cada arquivo de teste.
+afterAll(async () => {
+  await fecharAtual();
+  const m = molde;
+  molde = null;
+  if (m) await (await m).close();
+});
+
 /** `conquistas: false` esvazia o catálogo das conquistas: os testes das entregas 1 e 2 conferem a conta exata, sem o
  *  +1% de cada conquista que as ações vão ganhando. */
 export async function freshDb(opcoes: { conquistas?: boolean } = {}) {
-  const db = new PGlite();
-  await db.exec(SKELETON);
-  for (const name of MIGRATIONS) {
-    await db.exec(readFileSync(resolve(__dirname, '../../supabase/migrations', name), 'utf8'));
-  }
+  // O banco do teste anterior deste worker já não é usado (cada teste cria o seu no beforeEach): fecha pra liberar a
+  // memória do WASM, que antes só crescia até o fim da suíte.
+  await fecharAtual();
+  const db = (await (await modelo()).clone()) as PGlite;
+  atual = db;
   if (opcoes.conquistas === false) await db.exec('delete from public.idle_cat_conquista where true');
   const t = {
     db,
