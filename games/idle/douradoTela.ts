@@ -108,6 +108,8 @@ export type OpcoesDourado = {
   som?(id: 'trend' | 'tigreGira'): void;
   /** relógio local (ms) da chuva e do rolo; os testes trocam */
   agora?(): number;
+  /** o ícone saiu da tela (clicado ou passou do tempo): a caixinha dele fecha na hora (o Trend e o Pix só pegam depois) */
+  saiu?(): void;
 };
 
 export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado: number, moedas?: number) => void, o: OpcoesDourado = {}) {
@@ -123,9 +125,11 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
   const rolos = new Map<number, { el: HTMLElement; desde: number }>();
 
   function tirar(chave: string) {
-    ativos.get(chave)?.botao.remove();
+    const a = ativos.get(chave);
+    a?.botao.remove();
     ativos.delete(chave);
     encerrados.add(chave);
+    if (a) o.saiu?.();
   }
   /** Um elemento no ponto do evento (o CSS prende dentro da tela, como o .dourado). */
   function noPonto(el: HTMLElement, e: EventoNaTela) {

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { criarDouradoTela } from './douradoTela';
@@ -160,5 +162,36 @@ describe('os dourados novos na tela (0076)', () => {
     raiz.querySelector<HTMLButtonElement>('.dourado-7')!.click();
     d.pararTigre(T / 1000, null);
     expect(raiz.querySelector('.tigre-rolo')).toBeNull();
+  });
+});
+
+describe('correções da revisão (0076)', () => {
+  it('o ícone saiu (clique no Trend/Pix, que só pega depois, ou o tempo acabou): avisa na hora, pra caixinha fechar', () => {
+    const saiu = vi.fn();
+    d = criarDouradoTela(raiz, pegar, { saiu });
+    d.mostrar(ev({ tipo: 4 }));
+    raiz.querySelector<HTMLButtonElement>('.dourado-4')!.click();
+    expect(saiu).toHaveBeenCalledTimes(1);
+    expect(pegar).not.toHaveBeenCalled(); // o Trend só pega quando a chuva acaba
+    d.mostrar(ev({ seg: T / 1000 + 1, tipo: 6 }));
+    raiz.querySelector<HTMLButtonElement>('.dourado-6')!.click();
+    expect(saiu).toHaveBeenCalledTimes(2);
+    d.mostrar(ev({ seg: T / 1000 + 2, tipo: 5 }));
+    d.tick(T + 20_000);
+    expect(saiu).toHaveBeenCalledTimes(3);
+  });
+  it('a chuva fecha no relógio dela, mesmo com a aba escondida (main.ts anda o tick no fundo)', () => {
+    const main = readFileSync(resolve(__dirname, 'main.ts'), 'utf8');
+    const fundo = main.slice(main.indexOf('if (document.hidden) {'), main.indexOf('return;', main.indexOf('if (document.hidden) {')));
+    expect(fundo).toContain('tela.dourados.tick(');
+  });
+  it('resposta sem o Tigrinho (banco de antes da 0076 ou outro tipo): o rolo sai em vez de girar pra sempre', () => {
+    const main = readFileSync(resolve(__dirname, 'main.ts'), 'utf8');
+    expect(main).toMatch(/resultadoTigre\(d\)/);
+    expect(main).toMatch(/else \{\s*tela\.dourados\.pararTigre\(seg, null\);/);
+  });
+  it('o hover do Chamar usa token, não cor solta', () => {
+    const css = readFileSync(resolve(__dirname, 'dourados.css'), 'utf8');
+    expect(css).not.toMatch(/--c:\s*#fff/i);
   });
 });

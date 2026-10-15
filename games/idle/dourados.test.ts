@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  COMBO_MULT, COMBO_PRECISA, CHUVA_S, douradoEm, FRASES_LINKEDIN, fraseLinkedin, douradosEntre, escolhaLinkedin, ganhoInvestidor, JANELA_S, janelaS, LINKEDIN_MULT, MOEDINHA_S,
+  COMBO_MULT, COMBO_PRECISA, CHUVA_S, douradoEm, FRASES_LINKEDIN, fraseLinkedin, resultadoTigre, douradosEntre, escolhaLinkedin, ganhoInvestidor, JANELA_S, janelaS, LINKEDIN_MULT, MOEDINHA_S,
   PIX_FICAR_S, posicao, promoAtiva, segundoPix, selosBonus, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, tigrePaga, TIPOS_DOURADO,
   textoDourado, tipoDourado, tipoGarantido, TREND_MAX, textoPegou,
 } from './dourados';
@@ -209,5 +209,15 @@ describe('o texto que sobe com os dourados novos', () => {
     const vistas = new Set<string>();
     for (let s = 1_760_000_000; s < 1_760_000_200; s++) vistas.add(fraseLinkedin(U, s));
     expect([...vistas].sort()).toEqual([...FRASES_LINKEDIN].sort());
+  });
+});
+
+describe('o que o rolo do Tigrinho faz com a resposta do banco', () => {
+  const base = { lado: 0, ganho: 0, dobro: false, moedas: 0, gen: null, mult: null, garantido_seg: null, combo: false };
+  it('Tigrinho: para em PAGOU ou COMEU; qualquer outra resposta (sem dourado, outro tipo): null, o rolo só sai', () => {
+    expect(resultadoTigre({ ...base, tipo: 7, tigre: { pagou: true, gratis: true, perdeu: 0, n: 1 } })).toBe(true);
+    expect(resultadoTigre({ ...base, tipo: 7, tigre: { pagou: false, gratis: false, perdeu: 9, n: 4 } })).toBe(false);
+    expect(resultadoTigre({ ...base, tipo: 0, tigre: null })).toBeNull();
+    expect(resultadoTigre(undefined)).toBeNull();
   });
 });

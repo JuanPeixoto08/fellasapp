@@ -10,7 +10,7 @@ import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
 import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from './eventosEra';
-import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
+import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, resultadoTigre, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
 import { VIRAL_MS } from './economia';
 import { eventoEm, eventosEntre, naCena } from './convidados';
 import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './bolsa';
@@ -278,13 +278,15 @@ const tela = criarTela(document.getElementById('app')!, {
       const texto = d ? textoDourado(d, { viral: viraisAtivos(s, Date.parse(s.server_now), VIRAL_MS * ef.douradoDuracao).length,
         duracao: ef.douradoDuracao, frase: fraseLinkedin(s0.user_id, seg) }) : null;
       const subir = () => { if (chaves.avisos && texto) tela.dourados.subirTexto(texto, p.x, p.y); };
-      if (d?.tipo === 7) {
+      const tigre = resultadoTigre(d);
+      if (tigre !== null) {
         // o rolo para no resultado: só aí toca e sobe o texto
-        tela.dourados.pararTigre(seg, !!d.tigre?.pagou, () => {
-          audio.tocar(d.tigre?.pagou ? 'tigrePaga' : 'tigreCome');
+        tela.dourados.pararTigre(seg, tigre, () => {
+          audio.tocar(tigre ? 'tigrePaga' : 'tigreCome');
           subir();
         });
       } else {
+        tela.dourados.pararTigre(seg, null); // resposta sem o Tigrinho (banco velho): o rolo, se tiver, sai
         audio.tocar(d?.tipo === 5 ? 'linkedin' : d?.tipo === 6 ? 'pix' : 'douradoPego');
         subir();
       }
@@ -715,6 +717,7 @@ setInterval(() => {
   if (document.hidden) {
     agendarDouradosNoFundo(); // o som dos eventos segue agendado no fundo (PC)
     tela.eventosEra.tick(agoraSrv()); // a janela do Jogo do Brasil acabou com a aba escondida: os gols feitos vão
+    tela.dourados.tick(agoraSrv()); // a chuva do Trend acabou com a aba escondida: as moedinhas vão dentro da janela do banco
     return;
   }
   tela.atualizarValor(valuationAgora(ancora, Date.now()));

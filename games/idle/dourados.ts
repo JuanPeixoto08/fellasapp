@@ -218,6 +218,10 @@ export const FRASES_LINKEDIN = [
 ] as const;
 export const fraseLinkedin = (uid: string, seg: number): string => FRASES_LINKEDIN[sorteioDourado(uid, seg, SAL.frase, FRASES_LINKEDIN.length)];
 
+/** O que o rolo do Tigrinho faz com a resposta do banco: para em PAGOU (true) ou COMEU (false); qualquer outra resposta
+ *  (outro tipo, ou sem `dourado`, de um banco de antes da 0076) é null: o rolo só sai. */
+export const resultadoTigre = (d?: DouradoPago | null): boolean | null => (d?.tipo === 7 ? !!d.tigre?.pagou : null);
+
 /** O texto que sobe quando pega (com o que o banco pagou). `viral` = os Viralizou valendo depois; `duracao` = o Hype. */
 export function textoDourado(d: DouradoPago, o: { viral: number; duracao: number; frase: string }): string {
   if (d.tipo <= 3) return textoPegou(d.tipo as TipoDourado, { ganho: d.ganho, viral: o.viral, duracao: o.duracao * (d.dobro ? 2 : 1) });

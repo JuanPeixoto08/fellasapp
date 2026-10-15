@@ -1104,6 +1104,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   }, {
     dica: (alvo, chave, tipo, seg, dobro) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaDourado(tipo, ultimo.estado, { seg, dobro }) : null)),
     som: (id) => a.efeito(id),
+    saiu: () => dicas.conferir(), // o ícone saiu: a caixinha dele fecha (o Trend e o Pix só pegam depois)
   });
   const eventosEraBase = criarEventoEraTela(app, {
     aoPegar: (seg, gols, pos) => {

@@ -61,7 +61,7 @@
 .idle button.selo-bonus.selo-acao { min-height: 24px; padding: 0 8px; border: 0; border-radius: 0; cursor: pointer;
   color: var(--i-sobre-roxo); background: var(--i-roxo); --c: var(--i-roxo-borda);
   box-shadow: 0 -1px 0 0 var(--c), 0 1px 0 0 var(--c), -1px 0 0 0 var(--c), 1px 0 0 0 var(--c), inset 0 -2px 0 var(--i-roxo-e); }
-.idle button.selo-bonus.selo-acao:hover { --c: #fff; }
+.idle button.selo-bonus.selo-acao:hover { --c: var(--paper); }
 .idle button.selo-bonus.selo-acao:active { transform: translateY(1px); }
 .idle button.selo-bonus.selo-acao:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
 @media (pointer: coarse) { .idle button.selo-bonus.selo-acao { min-height: 36px; } }
