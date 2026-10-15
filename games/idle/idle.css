@@ -97,9 +97,13 @@
   animation-name: none, dourado-pisca; }
 .idle .evento-era-4 .evento-balao { background: transparent; color: #F4F1EA; box-shadow: none; }
 .idle .evento-era-5 { inset: 0; transform: none; animation: none; pointer-events: none; }
-.idle .evento-placar { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); background: #1E1B2E;
-  color: #5FD38D; padding: 2px 14px; font: 400 24px var(--i-pixel); white-space: nowrap; font-variant-numeric: tabular-nums;
-  box-shadow: 0 0 0 2px #5FD38D; }
+/* o placar anda com a bola: em cima dela (30 px = meia bola + folga), embaixo quando ela está perto do topo; o clamp
+   segura o placar (até ~230 px de largura) dentro da tela nas laterais, como o .dourado */
+.idle .evento-placar { position: absolute; left: clamp(124px, var(--x, 50%), calc(100% - 124px)); top: var(--y, 50%);
+  transform: translate(-50%, calc(-100% - 30px)); background: #1E1B2E; color: #5FD38D; padding: 1px 10px;
+  font: 400 18px var(--i-pixel); white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px #5FD38D;
+  transition: left 0.25s, top 0.25s; pointer-events: none; }
+.idle .evento-placar.embaixo { transform: translate(-50%, 30px); }
 .idle .evento-bola { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); pointer-events: auto;
   border: 0; padding: 0; border-radius: 50%; background: transparent; transition: left 0.25s, top 0.25s; cursor: pointer;
   animation: dourado-pisca 0.22s steps(2) 9s 14 both; animation-delay: calc(var(--janela, 30s) - 3s + var(--ja, 0s)); }
@@ -631,7 +635,7 @@ body:has(.idle) { background: #121212; }
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
   .idle .dourado { animation: none; }
   .idle .evento-era, .idle .evento-bola { animation: none; }
-  .idle .evento-bola { transition: none; }
+  .idle .evento-bola, .idle .evento-placar { transition: none; }
   .idle .gaveta.chegou .gaveta-caixa, .idle .gaveta.chegou .selo { animation: none; }
   .idle .dourado-texto { animation-duration: 0.01s; animation-delay: 1.2s; }
   .idle .no-arvore.pode { animation: none; filter: drop-shadow(0 0 8px rgba(184, 162, 255, 0.65)); }

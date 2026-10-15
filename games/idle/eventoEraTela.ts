@@ -61,6 +61,8 @@ export type OpcoesEventoEra = {
   posicao(seg: number, i: number): Ponto;
 };
 /** Quantos pulos de 1,5 s a bola já deu, `agoraMs` depois do segundo `seg`. */
+/** Bola acima disto (fração da tela, do topo): o placar vai pra baixo dela, senão sairia da tela/cobriria o topo. */
+const PLACAR_EMBAIXO_Y = 0.25;
 const passoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / 1500));
 
 export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
@@ -83,12 +85,22 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
     el.style.left = `${Math.round(p.x * 100)}%`;
     el.style.top = `${Math.round(p.y * 100)}%`;
   }
+  /** A bola e o placar dela (em cima da bola; embaixo quando a bola está perto do topo; o CSS segura nas laterais). */
+  function moverBola(caixa: HTMLElement, p: Ponto) {
+    const bola = caixa.querySelector<HTMLElement>('.evento-bola');
+    const placar = caixa.querySelector<HTMLElement>('.evento-placar');
+    if (bola) posicionar(bola, p);
+    if (placar) {
+      placar.style.setProperty('--x', `${Math.round(p.x * 100)}%`);
+      placar.style.setProperty('--y', `${Math.round(p.y * 100)}%`);
+      placar.classList.toggle('embaixo', p.y < PLACAR_EMBAIXO_Y);
+    }
+  }
   /** A bola vai pro pulo `passo + gols`. */
   function pularBola() {
     if (!atual || atual.tipo !== 5) return;
-    const bola = atual.caixa.querySelector<HTMLElement>('.evento-bola');
     atual.pos = o.posicao(atual.seg, atual.passo + atual.gols);
-    if (bola) posicionar(bola, atual.pos);
+    moverBola(atual.caixa, atual.pos);
   }
 
   return {
@@ -113,15 +125,15 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         bola.className = 'evento-bola';
         bola.setAttribute('aria-label', 'Chutar pro gol');
         bola.append(icone(5));
-        posicionar(bola, pos);
         bola.addEventListener('click', () => {
           if (!atual || atual.seg !== e.seg) return;
           atual.gols++;
           contar(atual.gols);
-          pularBola();
-          if (atual.gols >= MAX_GOLS) encerrar(true);
+          if (atual.gols >= MAX_GOLS) encerrar(true); // o 7º: o texto sobe onde a bola levou o chute
+          else pularBola();
         });
         caixa.append(placar, bola);
+        moverBola(caixa, pos);
         o.dica(bola, `evento-${e.seg}`, e.tipo);
       } else {
         const t = e.tipo;

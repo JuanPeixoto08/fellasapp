@@ -88,6 +88,38 @@ describe('eventos de era na tela', () => {
     t.tick(330_000);
     expect(o.aoPegar).toHaveBeenLastCalledWith(300, 2, { x: 0.2 + 3 / 10, y: 0.3 });
   });
+  it('o placar anda com a bola: em cima dela; embaixo quando ela está perto do topo', () => {
+    const raiz = document.createElement('div');
+    const ys = [0.6, 0.2, 0.7];
+    const t = criarEventoEraTela(raiz, { ...opcoes(), posicao: (_seg: number, i: number) => ({ x: 0.1 + i / 10, y: ys[i] ?? 0.5 }) });
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
+    const bola = raiz.querySelector<HTMLButtonElement>('.evento-bola')!;
+    const placar = raiz.querySelector<HTMLElement>('.evento-placar')!;
+    const junto = () => {
+      expect(placar.style.getPropertyValue('--x')).toBe(bola.style.left);
+      expect(placar.style.getPropertyValue('--y')).toBe(bola.style.top);
+    };
+    junto();
+    expect(bola.style.left).toBe('10%');
+    expect(placar.classList.contains('embaixo')).toBe(false);
+    bola.click(); // pulo 1: perto do topo
+    junto();
+    expect(bola.style.left).toBe('20%');
+    expect(placar.classList.contains('embaixo')).toBe(true);
+    expect(placar.textContent).toBe('Jogo do Brasil · 1 de 7');
+    t.tick(101_500); // pulo 2 (passo 1 + 1 gol)
+    junto();
+    expect(bola.style.top).toBe('70%');
+    expect(placar.classList.contains('embaixo')).toBe(false);
+  });
+  it('no 7º gol o texto sobe onde a bola levou o chute (antes de pular)', () => {
+    const raiz = document.createElement('div');
+    const o = { ...opcoes(), posicao: (_seg: number, i: number) => ({ x: i / 10, y: 0.5 }) };
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
+    for (let i = 0; i < 7; i++) raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 7, { x: 0.6, y: 0.5 }); // o 7º chute foi na bola do pulo 6
+  });
   it('Jogo do Brasil sem gol não chama o banco', () => {
     const raiz = document.createElement('div');
     const o = opcoes();
