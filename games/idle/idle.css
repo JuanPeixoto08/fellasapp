@@ -97,6 +97,8 @@
   animation-name: none, dourado-pisca; }
 .idle .evento-era-4 .evento-balao { background: transparent; color: #F4F1EA; box-shadow: none; }
 .idle .evento-era-5 { inset: 0; transform: none; animation: none; pointer-events: none; }
+/* depois do 1º gol a tela atrás trava até o jogo acabar (clique que erra a bola cai aqui, não num gerador) */
+.idle .evento-era-5.travado { pointer-events: auto; }
 /* o placar anda com a bola: em cima dela (30 px = meia bola + folga), embaixo quando ela está perto do topo; o clamp
    segura o placar (até ~230 px de largura) dentro da tela nas laterais, como o .dourado */
 .idle .evento-placar { position: absolute; left: clamp(124px, var(--x, 50%), calc(100% - 124px)); top: var(--y, 50%);

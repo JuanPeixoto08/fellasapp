@@ -4,6 +4,14 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-jogo-do-brasil-trava',
+    titulo: 'Jogo do Brasil sem clique perdido',
+    data: '2026-10-15',
+    itens: [
+      'Depois do primeiro gol, o resto da tela trava até o jogo acabar. Errou a bola? Não compra gerador nem abre nada sem querer.',
+    ],
+  },
+  {
     id: '2026-10-14-eras-1-5',
     titulo: 'As eras 1 a 5 ganharam vida',
     data: '2026-10-14',

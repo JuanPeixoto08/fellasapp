@@ -166,6 +166,8 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         bola.addEventListener('click', () => {
           if (!atual || atual.seg !== e.seg) return;
           atual.gols++;
+          // do 1º gol até acabar, a caixa (a tela inteira) segura os cliques: errar a bola não compra gerador sem querer
+          caixa.classList.add('travado');
           contar(atual.gols);
           o.aoGol?.(atual.gols);
           if (atual.gols >= MAX_GOLS) encerrar(true); // o 7º: o texto sobe onde a bola levou o chute
