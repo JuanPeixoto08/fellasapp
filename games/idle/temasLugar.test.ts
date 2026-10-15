@@ -38,7 +38,7 @@ describe('tema de cada lugar', () => {
     // toda regra com fundo no destaque e cor de texto própria escreve com o token, nunca com uma cor solta
     const regras = css.match(/[^{}]+\{[^{}]*background: var\(--i-roxo\)[^{}]*\}/g) ?? [];
     const comCor = regras.filter((r) => /[{;]\s*color:/.test(r));
-    expect(comCor.length).toBeGreaterThanOrEqual(3); // .btn.main, .aba.ativa, .chave.ligada
+    expect(comCor.length).toBeGreaterThanOrEqual(2); // .btn.main e .selo-bonus (aba ativa e chave ligada não enchem mais de roxo)
     for (const r of comCor) expect(r, r).toMatch(/[{;]\s*color: var\(--i-sobre-roxo\)/);
     expect(css).toMatch(/\.idle \{[^}]*--i-sobre-roxo: #fff;/);
     const tema = css.match(/\.idle \.minigame-tela\[data-tema\], \.idle \.lugar-tela\[data-tema\] \{[^}]*\}/)![0];

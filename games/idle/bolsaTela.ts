@@ -218,7 +218,7 @@ export function criarBolsaTela(a: {
       const comprar = el('div', 'bts comprar');
       comprar.append(el('div', 'rot2', `Comprar (+${(b.corretagem * 100).toLocaleString('pt-BR')}% de corretagem)${alavanca > 1 ? ` · entram alavancadas ×${alavanca.toLocaleString('pt-BR')} (Vorcaro)` : ''}`));
       for (const [q, n] of [[1, 1], [10, 10], [0, 1]] as const) {
-        const bt = button(q === 0 ? 'Máx' : String(q), 'btn main', () => a.negociar(m.id, 'comprar', q, b.tick));
+        const bt = button(q === 0 ? 'Máx' : String(q), 'btn compra', () => a.negociar(m.id, 'comprar', q, b.tick));
         bt.disabled = ocupado || cabe < n || maxCompra(valuation, m.valor, b.r, m.limite, tem, b.corretagem) < n;
         if (!ocupado && cabe >= n) precos.push({ botao: bt, preco: n * unidade }); // no limite fica apagado
         comprar.append(bt);

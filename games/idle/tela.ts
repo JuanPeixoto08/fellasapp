@@ -148,9 +148,11 @@ export function restam(ms: number) {
 
 export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () => undefined): Tela {
   const app = el('div', 'app idle');
-  // PC: a base de 1280 × 720 cresce com a janela (zoom); a cena só por inteiro (escala.ts)
+  // PC: a base de 1280 × 720 cresce com a janela (zoom); a cena só por inteiro (escala.ts). Na tela inicial sem o
+  // Legado do lado, a cena cresce até ocupar a tela.
+  let cenaGrande = false;
   const escalar = () => {
-    const e = escalaPc(window.innerWidth, window.innerHeight);
+    const e = escalaPc(window.innerWidth, window.innerHeight, cenaGrande);
     const pc = e.cena > 0;
     app.style.zoom = pc ? String(e.zoom) : '';
     app.style.height = pc ? `${window.innerHeight / e.zoom}px` : '';
@@ -240,9 +242,13 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const bonus = el('div', 'bonus', '');
   // Viralizou / Promoção valendo: selos com o tempo que falta (relogioBonus, a cada passo da página)
   const selos = el('div', 'selos');
-  // resumo (o PC mostra do lado da cena; o celular esconde .info pelo CSS)
+  // resumo (o PC mostra numa faixa no pé da cena; o celular esconde .info pelo CSS)
   const info = el('div', 'info');
-  placa.append(numero, taxaTxt, selos, bonus, info);
+  // no PC a placa vira o placar do jogo em cima da cena: o dinheiro e o que mexe nele numa plaquinha no canto de cima
+  // (no celular a .hud some no layout e fica tudo como antes, embaixo da cena)
+  const hud = el('div', 'hud');
+  hud.append(numero, taxaTxt, selos, bonus);
+  placa.append(hud, info);
   // caixinhas de informação (dica.ts): o F$/s do topo, os geradores, as melhorias, os contratos e os convidados
   const dicas = criarDicas(app);
   const convidadosTela = criarConvidadosTela({ sentar: (c, id) => a.sentar(c, id), tirar: (c) => a.tirar(c) }, dicas.ligar);
@@ -255,15 +261,20 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     }),
   };
 
+  // antes do Abrir CNPJ: uma caixa de diálogo de jogo dentro da cena (no PC por cima do chão; no celular colada embaixo
+  // dela), a fala em cima e as duas escolhas lado a lado, com o cursor de pixel na escolhida
   const abrir = el('div', 'abrir');
-  abrir.append(
-    el('p', undefined, '3h06. Bora fundar uma empresa?'),
-    button('Abrir CNPJ', 'btn main', a.abrirCnpj),
-    button('Mudar visual', 'btn', () => a.editor('abrir')),
-  );
-  // a empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e a bancada embaixo
+  const fala = el('p', 'fala', '3h06. Bora fundar uma empresa?');
+  fala.id = 'idle-fala-inicio';
+  abrir.setAttribute('role', 'group');
+  abrir.setAttribute('aria-labelledby', fala.id);
+  const escolhas = el('div', 'escolhas');
+  escolhas.append(button('Abrir CNPJ', 'btn main', a.abrirCnpj), button('Mudar visual', 'btn', () => a.editor('abrir')));
+  abrir.append(fala, escolhas);
+  palco.append(abrir);
+  // a empresa: cena (com a caixa do Abrir CNPJ) + resumo num cartão, e a bancada embaixo
   const cartaoEmpresa = el('div', 'cartao-empresa');
-  cartaoEmpresa.append(palco, placa, abrir);
+  cartaoEmpresa.append(palco, placa);
   // bancada: as portas dos minigames (cada um abre em tela cheia) e a Caixinha das oportunidades guardadas
   const portas = el('div', 'portas');
   type Porta = { botao: HTMLButtonElement; st: HTMLElement; badge: HTMLElement };
@@ -335,6 +346,14 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   bancada.append(portas, caixinha);
   const empresa = el('div', 'empresa');
   empresa.append(cartaoEmpresa, bancada);
+  // PC: a Caixinha fica em pé do lado da cena (o placar está em cima dela, a coluna não sobra vazia); celular: embaixo das portas
+  const lugarCaixinha = () => {
+    const pc = typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1100px)').matches;
+    const alvo = pc ? cartaoEmpresa : bancada;
+    if (caixinha.parentElement !== alvo) alvo.append(caixinha);
+  };
+  lugarCaixinha();
+  window.addEventListener('resize', lugarCaixinha);
 
 
   const abas = el('nav', 'abas');
@@ -656,6 +675,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     gavetaCaixa.setAttribute('aria-label', `Caixinha: ${m.pendentes.length} ${m.pendentes.length === 1 ? 'oportunidade guardada' : 'oportunidades guardadas'}`);
     caixaSub.textContent = s ? (s.opp_left > 0 ? `Hoje ainda dá pra pegar ${s.opp_left}` : 'Já pegou todas de hoje') : '';
     mostrar(bancada, jogando);
+    mostrar(caixinha, jogando); // no PC ela mora no cartão da cena, que aparece também antes do Abrir CNPJ
     const trader = (s?.generators[18] ?? 0) >= 1; // gerador 19 (Grupo de trader) = índice 18 aqui
     const foodTruck = (s?.generators[10] ?? 0) >= 1; // gerador 11 (Food truck)
     if (s) {
@@ -739,6 +759,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     engrenagem.setAttribute('aria-label', m.novidadeNova ? 'Configurações (tem novidade)' : 'Configurações');
     mostrar(pontoNovo, m.novidadeNova);
     app.classList.toggle('sem-painel', !jogando && !verLegado);
+    app.classList.toggle('inicio', m.fase === 'antes');
+    if (cenaGrande !== (m.fase === 'antes' && !verLegado)) {
+      cenaGrande = !cenaGrande;
+      escalar();
+    }
     mostrar(listaL, verLegado);
 
     listaG.replaceChildren();

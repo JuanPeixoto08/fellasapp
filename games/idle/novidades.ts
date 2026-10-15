@@ -4,6 +4,39 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-placar-na-cena',
+    titulo: 'Placar em cima da cena',
+    data: '2026-10-15',
+    itens: [
+      'No PC, o dinheiro e o F$/s viraram um placar de jogo no canto da cena, com o Viralizou e a Promoção valendo logo embaixo. A era e o resto ficam numa faixa no pé da cena.',
+      'A Caixinha mudou pro lado da cena, uma oportunidade embaixo da outra com o Pegar. As portas dos minigames ficaram sozinhas embaixo, maiores.',
+    ],
+  },
+  {
+    id: '2026-10-15-menos-roxo',
+    titulo: 'Roxo só no que é pra apertar',
+    data: '2026-10-15',
+    itens: [
+      'A aba aberta, a chave ligada e os botões de comprar da Bolsa largaram o roxo cheio. Agora o roxo só aparece no botão principal de cada tela, e dá pra achar de primeira.',
+    ],
+  },
+  {
+    id: '2026-10-15-quarto-inicio',
+    titulo: 'O quarto das 3h06 ficou maior',
+    data: '2026-10-15',
+    itens: [
+      'Antes de abrir o CNPJ, o quarto ocupa a tela e a pergunta vem numa caixa de diálogo de jogo, com a setinha piscando na escolha.',
+    ],
+  },
+  {
+    id: '2026-10-15-jogo-do-brasil-trava',
+    titulo: 'Jogo do Brasil sem clique perdido',
+    data: '2026-10-15',
+    itens: [
+      'Depois do primeiro gol, o resto da tela trava até o jogo acabar. Errou a bola? Não compra gerador nem abre nada sem querer.',
+    ],
+  },
+  {
     id: '2026-10-14-eras-1-5',
     titulo: 'As eras 1 a 5 ganharam vida',
     data: '2026-10-14',

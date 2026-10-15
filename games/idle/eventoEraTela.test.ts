@@ -44,6 +44,20 @@ describe('eventos de era na tela', () => {
     for (let i = 0; i < 7; i++) bola().click();
     expect(o.aoPegar).toHaveBeenLastCalledWith(200, 7, { x: 0.5, y: 0.5 });
   });
+  it('Jogo do Brasil: do 1º gol até acabar, a tela trava atrás (clique fora da bola não é gol nem cai no jogo)', () => {
+    const raiz = document.createElement('div');
+    const o = opcoes();
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
+    const caixa = () => raiz.querySelector<HTMLElement>('.evento-era-5')!;
+    expect(caixa().classList.contains('travado')).toBe(false); // antes de começar, o jogo atrás segue clicável
+    raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
+    expect(caixa().classList.contains('travado')).toBe(true);
+    caixa().click();
+    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Jogo do Brasil · 1 de 7');
+    t.tick(130_000);
+    expect(raiz.querySelector('.evento-era-5')).toBeNull(); // acabou: a trava sai junto
+  });
   it('a bola fica no pulo (tempo / 1,5 s) + gols: anda a cada clique e a cada 1,5 s, sem travar depois de clicar rápido', () => {
     const raiz = document.createElement('div');
     const posicao = vi.fn((_seg: number, i: number) => ({ x: i / 10, y: 0.5 }));
