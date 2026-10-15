@@ -143,6 +143,14 @@ describe('caixinha da produção (o F$/s do topo)', () => {
     expect(t).toContain('Agora: ×10 das oportunidades');
     expect(t).toContain('Agora: ×100 do Viralizou');
   });
+  it('a Marmita da mãe valendo aparece como "agora" (×3); vencida, não', () => {
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const t = textos(dicaProducao(comTaxa({ generators: gens({ 1: 1 }), marmita_ate: '2026-10-12T12:01:00.000Z' }), agora));
+    expect(t).toContain('Agora: ×3 da Marmita da mãe');
+    expect(t.indexOf('Agora: ×3 da Marmita da mãe')).toBe(t.length - 2); // antes do total
+    const vencida = textos(dicaProducao(comTaxa({ generators: gens({ 1: 1 }), marmita_ate: '2026-10-12T11:59:00.000Z' }), agora));
+    expect(vencida.some((x) => x.includes('Marmita'))).toBe(false);
+  });
 });
 
 describe('caixinha dos contratos', () => {

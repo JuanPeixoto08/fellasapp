@@ -7,7 +7,7 @@ import { catalogo, type Melhoria } from './catalogo';
 import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
-import { ganhoEventoAgora, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
+import { ganhoEventoAgora, marmitaAtiva, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
 } from './camisetaria';
@@ -140,6 +140,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   if (cincos) linhas.push({ texto: `Agora: ×${num(5 * cincos, 0)} ${cincos === 1 ? 'da oportunidade' : 'das oportunidades'}`, tom: 'bom' });
   const virais = s.viral.filter((t) => Date.parse(t) > agoraMs).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
+  if (marmitaAtiva(s, agoraMs)) linhas.push({ texto: 'Agora: ×3 da Marmita da mãe', tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
   return { titulo: 'De onde vem sua produção', linhas };
 }
