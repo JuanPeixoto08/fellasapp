@@ -91,6 +91,19 @@ describe('tela da Fellas Inc.', () => {
     expect(acoes.abrirCnpj).toHaveBeenCalled();
     expect(root.querySelector('.lista-geradores')!.hasAttribute('hidden')).toBe(true);
   });
+  it('antes: a fala e as escolhas numa caixa de diálogo dentro da cena; jogando, a caixa some e a tela volta ao normal', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ fase: 'antes', estado: estado({ started: false }) }));
+    const caixa = root.querySelector<HTMLElement>('.palco .abrir')!;
+    expect(caixa.getAttribute('role')).toBe('group');
+    expect(caixa.getAttribute('aria-labelledby')).toBe(caixa.querySelector('.fala')!.id);
+    expect(caixa.querySelector('.fala')!.textContent).toBe('3h06. Bora fundar uma empresa?');
+    expect([...caixa.querySelectorAll('.escolhas button')].map((b) => b.textContent)).toEqual(['Abrir CNPJ', 'Mudar visual']);
+    expect(root.querySelector('.idle')!.classList.contains('inicio')).toBe(true);
+    tela.renderizar(modelo({ estado: estado() }));
+    expect(caixa.hasAttribute('hidden')).toBe(true);
+    expect(root.querySelector('.idle')!.classList.contains('inicio')).toBe(false);
+  });
   it('Loja: o "cada" do gerador conta o Mapa do rolê (mapa_mult)', () => {
     const tela = criarTela(root, acoes);
     const cada = () => root.querySelector('.lista-geradores .gerador .sub')!.textContent!;

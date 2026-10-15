@@ -4,6 +4,14 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-quarto-inicio',
+    titulo: 'O quarto das 3h06 ficou maior',
+    data: '2026-10-15',
+    itens: [
+      'Antes de abrir o CNPJ, o quarto ocupa a tela e a pergunta vem numa caixa de diálogo de jogo, com a setinha piscando na escolha.',
+    ],
+  },
+  {
     id: '2026-10-15-jogo-do-brasil-trava',
     titulo: 'Jogo do Brasil sem clique perdido',
     data: '2026-10-15',

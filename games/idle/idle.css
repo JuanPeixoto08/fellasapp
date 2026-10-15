@@ -47,7 +47,7 @@
 /* empresa: cena + resumo (ou o Abrir CNPJ) num cartão, e as gavetas embaixo */
 .idle .empresa { display: grid; gap: 10px; width: 100%; max-width: 560px; justify-self: center; padding: 6px 14px 0; }
 .idle .cartao-empresa { display: grid; justify-items: center; gap: 8px; padding: 12px 12px 10px; background: var(--i-painel); }
-.idle .palco { position: relative; display: flex; justify-content: center; }
+.idle .palco { position: relative; display: grid; justify-content: center; }
 .idle .cena { width: 320px; height: 192px; image-rendering: pixelated; --c: #2B2938; }
 .idle .valor { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 10px; text-align: center; }
 .idle .numero { font: 400 36px var(--i-pixel); color: var(--paper); text-shadow: 2px 2px 0 #000; font-variant-numeric: tabular-nums; }
@@ -113,9 +113,30 @@
   filter: drop-shadow(0 0 6px rgba(242, 210, 122, 0.9)); }
 .idle .evento-era button:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
 .idle .info { display: none; }
-.idle .abrir { display: grid; justify-items: center; gap: 12px; padding: 12px 8px 4px; color: var(--paper); }
-.idle .abrir p { margin: 0; font: 400 22px var(--i-pixel); }
-.idle .abrir .btn { flex: none; min-width: 180px; }
+/* tela inicial: a caixa de diálogo do Abrir CNPJ, dentro da cena (celular: colada embaixo dela; PC: por cima do chão).
+   Moldura dupla de pixel (fio de fora, vão, fio de dentro); a fala em cima e as escolhas lado a lado, com o cursor de
+   pixel (desenhado, não glifo) piscando na escolhida: o Abrir CNPJ, ou a que estiver no mouse/foco. */
+.idle .abrir { display: grid; gap: 10px; margin-top: 4px; padding: 14px 16px 16px; background: var(--i-fundo2); color: var(--paper);
+  --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 0 0 3px var(--i-fundo2), inset 0 0 0 5px var(--i-borda);
+  animation: dialogo-sobe 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes dialogo-sobe { from { transform: translateY(8px); opacity: 0; } }
+.idle .abrir .fala { margin: 0; font: 400 22px/1.1 var(--i-pixel); text-wrap: balance; }
+.idle .abrir .escolhas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-left: 20px; }
+.idle .abrir .btn { position: relative; flex: none; }
+/* celular: a cena e a caixa já têm moldura; o cartão em volta delas some (sem cartão dentro de cartão) */
+.idle.inicio .cartao-empresa { padding: 0; background: none; box-shadow: none; }
+.idle .abrir .btn:not(.main) { padding: 0 6px; background: transparent; color: var(--i-mudo); box-shadow: none; }
+.idle .abrir .btn:not(.main):hover { color: var(--paper); }
+.idle .abrir .btn::before { content: ''; position: absolute; left: -20px; top: 50%; width: 8px; height: 14px; margin-top: -7px;
+  background: var(--paper); visibility: hidden; animation: cursor-pisca 1s steps(2, jump-none) infinite;
+  clip-path: polygon(0 0, 2px 0, 2px 2px, 4px 2px, 4px 4px, 6px 4px, 6px 6px, 8px 6px, 8px 8px, 6px 8px, 6px 10px, 4px 10px,
+    4px 12px, 2px 12px, 2px 14px, 0 14px); }
+.idle .abrir .btn:not(.main)::before { left: -14px; }
+.idle .abrir .btn.main::before,
+.idle .abrir .btn:not(.main):is(:hover, :focus-visible)::before { visibility: visible; }
+.idle .abrir .escolhas:has(.btn:not(.main):is(:hover, :focus-visible)) .btn.main::before { visibility: hidden; }
+@keyframes cursor-pisca { 50% { opacity: 0; } }
 
 /* bancada: no celular só a fileira de gavetas (a Caixinha abre a folha) */
 .idle .gavetas { display: flex; gap: 8px; }
@@ -549,8 +570,6 @@
   .idle .bonus { flex-basis: auto; }
   .idle .selos { flex-basis: auto; justify-content: flex-start; } /* na coluna, 100% seria a altura toda */
   .idle .info { display: flex; flex-direction: column; gap: 4px; margin-top: auto; font-size: 14px; color: var(--i-mudo); }
-  .idle .abrir { justify-items: start; align-content: center; padding: 0; }
-  .idle .abrir p { font-size: 29px; }
   .idle .bancada { display: flex; flex-direction: column; min-height: 0; background: var(--i-painel); --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
   .idle .gavetas { padding: 12px 12px 0; }
   .idle .gaveta { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 6px; font: 400 20px var(--i-pixel); }
@@ -637,6 +656,7 @@ body:has(.idle) { background: #121212; }
   .idle .sprite, .idle .vivo, .idle .boneco, .idle .conquista-aviso { animation: none; }
   .idle .dourado { animation: none; }
   .idle .evento-era, .idle .evento-bola { animation: none; }
+  .idle .abrir, .idle .abrir .btn::before { animation: none; }
   .idle .evento-bola, .idle .evento-placar { transition: none; }
   .idle .gaveta.chegou .gaveta-caixa, .idle .gaveta.chegou .selo { animation: none; }
   .idle .dourado-texto { animation-duration: 0.01s; animation-delay: 1.2s; }
@@ -926,6 +946,19 @@ body:has(.idle) { background: #121212; }
   .idle .numero { font-size: 34px; line-height: 1; white-space: normal; }
   .idle .taxa { font-size: 20px; }
   .idle .info { gap: 6px; margin-top: 6px; font-size: 13.5px; line-height: 1.3; }
+}
+/* tela inicial no PC: só a cena (grande, escala.ts), com a moldura dela e sem o brilho roxo; a caixa de diálogo por cima
+   do chão; o topo na largura da cena */
+@media (min-width: 1100px) {
+  .idle.inicio .cartao-empresa { grid-template-columns: var(--cena-w); justify-content: center; gap: 0; background: none; box-shadow: none; }
+  .idle.inicio .cartao-empresa .cena { box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+  .idle.inicio .abrir { position: absolute; left: 24px; right: 24px; bottom: 24px; margin: 0; gap: 14px; padding: 18px 24px 20px; }
+  .idle.inicio .abrir .fala { font-size: 32px; }
+  .idle.inicio .abrir .escolhas { column-gap: 28px; }
+  .idle.inicio .abrir .btn.main { min-width: 170px; }
+  .idle.inicio:not(.sem-painel) .abrir { left: 16px; right: 16px; bottom: 16px; gap: 10px; padding: 14px 18px 16px; }
+  .idle.inicio:not(.sem-painel) .abrir .fala { font-size: 26px; }
+  .idle.inicio.sem-painel .top { width: var(--cena-w); justify-self: center; }
 }
 /* a horta cabe na altura do PC sem rolar: blocos mais baixos e a coleção mais compacta */
 .idle .minigame-corpo .semente .bom { font: 400 13px 'Golos Text', system-ui, sans-serif; }

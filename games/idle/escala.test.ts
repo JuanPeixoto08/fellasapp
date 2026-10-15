@@ -23,4 +23,12 @@ describe('escala do PC (a tela cresce com a janela)', () => {
     expect(s.zoom).toBe(2);
     expect(s.largura).toBe(1440); // 720 × 2 de base; os outros 1000 px viram margem
   });
+  it('tela inicial (antes do Abrir CNPJ): a cena cresce até ocupar a tela, ainda por inteiro', () => {
+    expect(escalaPc(1280, 720, true).cena).toBe(6); // 960 × 576 na base
+    expect(escalaPc(2000, 961, true).cena).toBe(8); // o monitor do Juan
+    expect(escalaPc(1920, 960, true).cena).toBe(8);
+    expect(escalaPc(2560, 1440, true).cena).toBe(12);
+    expect(escalaPc(390, 760, true).cena).toBe(0); // celular: o CSS decide
+    expect(escalaPc(1280, 720, true).zoom).toBe(escalaPc(1280, 720).zoom); // o resto da tela não muda
+  });
 });
