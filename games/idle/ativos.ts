@@ -1,5 +1,5 @@
 // URLs das imagens da Fellas Inc. (Vite troca pelos arquivos com hash no build) e o JSON das vagas de cada cena.
-import type { Pose, Vagas } from './montagem';
+import type { Peca, Pose, Vagas } from './montagem';
 import type { NomeCena } from './palco';
 
 const nomeDe = (arq: string) => arq.split('/').pop()!.replace(/\.(png|json)$/, '');
@@ -21,14 +21,21 @@ const vagas = Object.fromEntries(
 );
 
 /** Uma cena em camadas; sem a arte nova, `fundo` é a tira antiga (com o fundador desenhado) e não há vagas. */
-export type Camadas = { fundo: string; frente: string | null; vagas: Vagas | null };
+export type Camadas = { fundo: string; frente: string | null; vagas: Vagas | null; pecas: (Peca & { url: string })[] };
 
 export const ativos = {
   camadas(nome: NomeCena): Camadas {
     const fundo = cenas[`${nome}-fundo`];
     const v = vagas[nome];
-    if (fundo && v) return { fundo, frente: cenas[`${nome}-frente`] ?? null, vagas: v };
-    return { fundo: cenas[nome], frente: null, vagas: null };
+    if (fundo && v) {
+      // peças (eras 6+): as da lista do JSON que têm a tira (`<cena>-peca-<id>.png`, também em assets/cenas)
+      const pecas = (v.pecas ?? []).flatMap((p) => {
+        const url = cenas[`${nome}-peca-${p.id}`];
+        return url ? [{ ...p, url }] : [];
+      });
+      return { fundo, frente: cenas[`${nome}-frente`] ?? null, vagas: v, pecas };
+    }
+    return { fundo: cenas[nome], frente: null, vagas: null, pecas: [] };
   },
   pose: (p: Pose): string | null => pessoas[`pose-${p}`] ?? null,
   estagiario: (p: Pose): string | null => pessoas[`estagiario-pose-${p}`] ?? null,

@@ -7,6 +7,7 @@ describe('palco', () => {
   it('todas as cenas têm quadros e ritmo', () => {
     expect(CENAS['cena-0-abrindo']).toEqual({ quadros: 12, atrasoMs: 180 });
     expect(CENAS['cena-5'].quadros).toBe(12);
+    expect(CENAS['cena-7']).toEqual({ quadros: 8, atrasoMs: 150 });
   });
   it('loop: quadro = tempo / atraso, dando a volta', () => {
     expect(quadroEm('cena-1', 0, false)).toBe(0);
@@ -20,6 +21,9 @@ describe('palco', () => {
     expect(chaveGente({ dono: { ...PADRAO, pele: 0 }, equipe: [] })).not.toBe(a);
     const x = { ...PADRAO, roupa: 1 };
     expect(chaveGente({ dono: PADRAO, equipe: [x, PADRAO] })).not.toBe(chaveGente({ dono: PADRAO, equipe: [PADRAO, x] }));
+    expect(chaveGente({ dono: PADRAO, equipe: [], pecas: ['g31'] })).not.toBe(a);
+    expect(chaveGente({ dono: PADRAO, equipe: [], pecas: ['g32', 'g31'] })).toBe(chaveGente({ dono: PADRAO, equipe: [], pecas: ['g31', 'g32'] }));
+    expect(chaveGente({ dono: PADRAO, equipe: [], pecas: [] })).toBe(a);
   });
   it('uma vez: para no fim (null)', () => {
     expect(quadroEm('cena-0-abrindo', 180 * 11, true)).toBe(11);

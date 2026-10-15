@@ -49,7 +49,8 @@ export function faseDoEstado(estado: IdleState, atual: Fase): Fase {
 
 export function cenaDoEstado(estado: IdleState, fase: Fase): NomeCena {
   if (fase === 'antes' || !estado.started) return 'cena-0-antes';
-  if (estado.generators[29] > 0) return 'cena-6';
+  if (estado.era >= 7) return 'cena-7';
+  if (estado.era === 6 || (estado.generators[29] ?? 0) > 0) return 'cena-6';
   return `cena-${Math.min(Math.max(estado.era, 1), 5)}` as NomeCena;
 }
 
@@ -75,10 +76,22 @@ export function segundosOportunidade(estado: IdleState, arvore: readonly number[
 export const vencido = (estado: IdleState, agoraServidorMs: number): boolean =>
   estado.muda_em !== null && agoraServidorMs >= Date.parse(estado.muda_em);
 
-/** O nome da era: "Era 5 · Sede". Com o gerador 30 a cena vira a 6 ("em órbita") e o nome acompanha: "Era 6 · Em órbita"
- *  (no jogo continua a era 5: estratégias e conquistas não mudam). `curto` = só o nome ("Sede", "Em órbita"). */
+/** O nome da era: "Era 5 · Sede". Só com o gerador 30 (ainda na era 5) a cena já é a da órbita e o nome acompanha: "Era 6 ·
+ *  Em órbita" (estratégias e conquistas ainda são da 5). Da era 6 em diante, o nome da era de verdade. `curto` = só o nome. */
 export function rotuloEra(era: number, orbita: boolean, curto = false): string {
-  const [n, nome] = orbita ? [6, 'Em órbita'] : [era, ERAS[era - 1]];
+  const [n, nome] = orbita && era < 6 ? [6, ERAS[5]] : [era, ERAS[era - 1]];
   return curto ? nome : `Era ${n} · ${nome}`;
+}
+
+/** O monolito (conquista escondida 158) aparece na cena da Lua. */
+export const CONQUISTA_MONOLITO = 158;
+/** As peças de cena que aparecem (ids do JSON das vagas): "g31"… de cada gerador das eras 6+ que você tem e o monolito. */
+export function pecasVisiveis(estado: IdleState): string[] {
+  const out: string[] = [];
+  estado.generators.forEach((n, i) => {
+    if (i >= 30 && n > 0) out.push(`g${i + 1}`);
+  });
+  if (estado.conquistas.some((c) => c.id === CONQUISTA_MONOLITO)) out.push('monolito');
+  return out;
 }
 

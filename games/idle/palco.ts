@@ -7,7 +7,7 @@ import { montarTira, ocuparVagas, type Kit } from './montagem';
 import { carregarImagem, pintar } from './navegador';
 import { chave, PADRAO, type Visual } from './personagem';
 
-export type NomeCena = 'cena-0-antes' | 'cena-0-abrindo' | 'cena-1' | 'cena-2' | 'cena-3' | 'cena-4' | 'cena-5' | 'cena-6';
+export type NomeCena = 'cena-0-antes' | 'cena-0-abrindo' | 'cena-1' | 'cena-2' | 'cena-3' | 'cena-4' | 'cena-5' | 'cena-6' | 'cena-7';
 
 export const CENAS: Record<NomeCena, { quadros: number; atrasoMs: number }> = {
   'cena-0-antes': { quadros: 8, atrasoMs: 150 },
@@ -18,6 +18,7 @@ export const CENAS: Record<NomeCena, { quadros: number; atrasoMs: number }> = {
   'cena-4': { quadros: 8, atrasoMs: 150 },
   'cena-5': { quadros: 12, atrasoMs: 150 },
   'cena-6': { quadros: 8, atrasoMs: 150 },
+  'cena-7': { quadros: 8, atrasoMs: 150 },
 };
 export const LARGURA = 160;
 export const ALTURA = 96;
@@ -30,8 +31,12 @@ export function quadroEm(nome: NomeCena, decorridoMs: number, umaVez: boolean): 
 }
 
 /** Quem aparece nas cenas: você e sua equipe (contrato mais recente primeiro). */
-export type Gente = { dono: Visual; equipe: Visual[]; /** vaga → visual (o convidado do PPP Podcast) */ fixos?: Record<string, Visual> };
-export const chaveGente = (g: Gente) => [chave(g.dono), ...g.equipe.map(chave), ...Object.entries(g.fixos ?? {}).map(([k, v]) => `${k}:${chave(v)}`)].join('|');
+export type Gente = {
+  dono: Visual; equipe: Visual[]; /** vaga → visual (o convidado do PPP Podcast) */ fixos?: Record<string, Visual>;
+  /** as peças de cena que aparecem (ids do JSON das vagas: "g31"… e "monolito") */ pecas?: readonly string[];
+};
+export const chaveGente = (g: Gente) => [chave(g.dono), ...g.equipe.map(chave), ...Object.entries(g.fixos ?? {}).map(([k, v]) => `${k}:${chave(v)}`),
+  ...[...(g.pecas ?? [])].sort().map((p) => `peca:${p}`)].join('|');
 
 export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) => Camadas, kit: Promise<Kit | null> | (() => Promise<Kit | null>)) {
   canvas.width = LARGURA;
@@ -51,12 +56,16 @@ export function criarPalco(canvas: HTMLCanvasElement, camadas: (nome: NomeCena) 
     pedidas.add(k);
     const c = camadas(nome);
     const quem = gente;
+    const visiveis = c.pecas.filter((p) => quem.pecas?.includes(p.id));
     void (async () => {
       // o kit só é preciso quando a cena tem vagas (tira antiga, sem gente, não depende dele)
       let kitFalhou: unknown = null;
       const pedirKit = c.vagas ? (typeof kit === 'function' ? kit() : kit).catch((e) => { kitFalhou = e ?? new Error('kit'); return null; }) : null;
-      const [fundo, frente, k2] = await Promise.all([carregarImagem(c.fundo), c.frente ? carregarImagem(c.frente) : null, pedirKit]);
-      const tira = c.vagas ? montarTira({ fundo, frente, vagas: c.vagas }, ocuparVagas(c.vagas, quem.dono, quem.equipe, quem.fixos), k2) : fundo;
+      const [fundo, frente, k2, pecas] = await Promise.all([
+        carregarImagem(c.fundo), c.frente ? carregarImagem(c.frente) : null, pedirKit,
+        Promise.all(visiveis.map(async (p) => ({ img: await carregarImagem(p.url), x: p.x, y: p.y }))),
+      ]);
+      const tira = c.vagas ? montarTira({ fundo, frente, vagas: c.vagas }, ocuparVagas(c.vagas, quem.dono, quem.equipe, quem.fixos), k2, pecas) : fundo;
       const cv = document.createElement('canvas');
       pintar(cv, tira);
       if (kitFalhou) {

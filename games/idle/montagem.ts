@@ -28,13 +28,16 @@ export type Posicao = { x: number; y: number; pose: Pose; espelhada: boolean };
 export type Vaga = Posicao & {
   id: string; papel: 'dono' | 'contratado'; freela?: Visual | 'estagiario'; trilha?: (Partial<Posicao> | null)[];
 };
-export type Vagas = { quadros: number; vagas: Vaga[] };
+/** Uma peça da cena (eras 6+): aparece quando a pessoa tem o que ela mostra (o gerador comprado, o monolito da conquista).
+ *  A imagem é `<cena>-peca-<id>.png`, os quadros da cena lado a lado; (x, y) é o canto de cima na cena. */
+export type Peca = { id: string; x: number; y: number };
+export type Vagas = { quadros: number; vagas: Vaga[]; pecas?: Peca[] };
 export type Ocupante = { visual: Visual } | { estagiario: true };
 export type Ocupada = { vaga: Vaga; quem: Ocupante };
 
-/** Quantas vagas de contratado cada cena tem (spec 7.3); null = a cena 6 decide no desenho (até 5). */
+/** Quantas vagas de contratado cada cena tem (spec 7.3); null = a cena decide no desenho (cenas 6 e 7). */
 export const VAGAS_CONTRATADO: Record<NomeCena, number | null> = {
-  'cena-0-antes': 0, 'cena-0-abrindo': 0, 'cena-1': 0, 'cena-2': 1, 'cena-3': 3, 'cena-4': 5, 'cena-5': 4, 'cena-6': null,
+  'cena-0-antes': 0, 'cena-0-abrindo': 0, 'cena-1': 0, 'cena-2': 1, 'cena-3': 3, 'cena-4': 5, 'cena-5': 4, 'cena-6': null, 'cena-7': null,
 };
 
 /** O boneco de um visual numa pose e quadro: corpo → roupa → cabelo → acessório, depois as cores. */
@@ -87,12 +90,20 @@ function sprite(kit: Kit, quem: Ocupante, pose: Pose, quadro: number): Imagem | 
   return recortar(folha, (quadro % QUADROS_POSE) * w, 0, w, h);
 }
 
-/** A tira pronta (quadros × 160 por 96). Sem kit (arte não carregou), só fundo e frente. */
-export function montarTira(c: { fundo: Imagem; frente: Imagem | null; vagas: Vagas }, gente: Ocupada[], kit: Kit | null): Imagem {
+/** A tira pronta (quadros × 160 por 96). Sem kit (arte não carregou), só fundo, peças e frente. `pecas`: as peças que
+ *  aparecem (tira com os quadros da cena), por cima do fundo e por baixo das pessoas e da frente. */
+export function montarTira(
+  c: { fundo: Imagem; frente: Imagem | null; vagas: Vagas }, gente: Ocupada[], kit: Kit | null,
+  pecas: readonly { img: Imagem; x: number; y: number }[] = [],
+): Imagem {
   const n = c.vagas.quadros;
   const tira = vazia(n * LARGURA_CENA, ALTURA_CENA);
   for (let f = 0; f < n; f++) {
     const quadro = recortar(c.fundo, f * LARGURA_CENA, 0, LARGURA_CENA, ALTURA_CENA);
+    for (const p of pecas) {
+      const w = p.img.w / n;
+      colar(quadro, recortar(p.img, f * w, 0, w, p.img.h), p.x, p.y);
+    }
     if (kit) {
       const aqui = gente
         .map((o, ordem) => ({ o, ordem, p: posicaoNoQuadro(o.vaga, f) }))
@@ -139,6 +150,14 @@ export function validarVagas(x: unknown, quadros: number, contratados: number | 
         erros.push(`${g.id}: fora da cena no quadro ${f}`);
       if (typeof p.espelhada !== 'boolean') erros.push(`${g.id}: espelhada não é true/false`);
     }
+  }
+  // peças (eras 6+): id único e o canto dentro da cena (o tamanho de cada uma, ativos.test.ts confere pela imagem)
+  const pecas = new Set<string>();
+  for (const p of v.pecas ?? []) {
+    if (typeof p.id !== 'string' || !p.id || pecas.has(p.id)) erros.push(`peça repetida ou sem id: ${p.id}`);
+    pecas.add(p.id);
+    if (!Number.isInteger(p.x) || !Number.isInteger(p.y) || p.x < 0 || p.y < 0 || p.x >= LARGURA_CENA || p.y >= ALTURA_CENA)
+      erros.push(`peça ${p.id}: fora da cena`);
   }
   return erros;
 }

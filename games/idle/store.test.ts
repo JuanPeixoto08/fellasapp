@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IdleState } from '../shared/types';
-import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, fatoresTempo, inicioSemana, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
+import { agoraServidor, ancorar, caixa, cenaDoEstado, deveAbrirEditor, estrategiaPendente, faseDoEstado, fatoresTempo, inicioSemana, pecasVisiveis, rotuloEra, segundosOportunidade, valuationAgora, vencido } from './store';
 
 const base = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 100, rate: 2, generators: [1, ...Array(29).fill(0)],
@@ -119,5 +119,28 @@ describe('fatoresTempo (0076)', () => {
     ]);
     expect(fatoresTempo({} as IdleState)).toEqual([]);
     expect(fatoresTempo({ linkedin_ate: null, linkedin_mult: null, combo_ate: null } as IdleState)).toEqual([]);
+  });
+});
+
+describe('eras 6 e 7 na cena', () => {
+  it('a cena da órbita (Foguete ou era 6) e a da Lua (era 7); o rótulo segue a era', () => {
+    const g = Array(42).fill(0);
+    g[29] = 1;
+    expect(cenaDoEstado(base({ era: 5, generators: g }), 'jogando')).toBe('cena-6');
+    expect(cenaDoEstado(base({ era: 6, generators: g }), 'jogando')).toBe('cena-6');
+    expect(cenaDoEstado(base({ era: 7, generators: g }), 'jogando')).toBe('cena-7');
+    expect(rotuloEra(5, true)).toBe('Era 6 · Em órbita');
+    expect(rotuloEra(6, true)).toBe('Era 6 · Em órbita');
+    expect(rotuloEra(7, true)).toBe('Era 7 · Lua');
+    expect(rotuloEra(7, true, true)).toBe('Lua');
+  });
+  it('peças visíveis: cada gerador das eras 6+ que você tem e o monolito com a conquista 158', () => {
+    const g = Array(42).fill(0);
+    g[29] = 5;
+    g[30] = 2;
+    g[36] = 1;
+    expect(pecasVisiveis(base({ generators: g }))).toEqual(['g31', 'g37']);
+    expect(pecasVisiveis(base({ generators: g, conquistas: [{ id: 158, em: '2026-10-15T12:00:00Z' }] }))).toEqual(['g31', 'g37', 'monolito']);
+    expect(pecasVisiveis(base())).toEqual([]);
   });
 });

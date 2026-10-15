@@ -24,7 +24,7 @@ import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
 import { gravarChave, gravarVolumeMusica, lerChave, lerVista, lerVolumeMusica, marcarVista, type ChaveSom } from './preferencias';
 import {
-  agoraServidor, ancorar, caixa, cenaDoEstado, efeitos, faseDoEstado, inicioSemana, deveAbrirEditor, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
+  agoraServidor, ancorar, caixa, cenaDoEstado, efeitos, faseDoEstado, inicioSemana, deveAbrirEditor, pecasVisiveis, segundosOportunidade, valuationAgora, vencido, type Ancora, type Fase,
 } from './store';
 import { criarTela, type Aba, type TelaConfig } from './tela';
 import { vigiarVersao } from '../shared/atualizar';
@@ -636,7 +636,7 @@ function aplicar(estado: IdleState) {
   const antes = ancora?.estado ?? null;
   ancora = ancorar(estado, Date.now());
   fase = faseDoEstado(estado, fase);
-  palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO), fixos: naCena(estado) });
+  palco.gente({ dono: estado.avatar ?? PADRAO, equipe: estado.equipe.map((c) => c.avatar ?? PADRAO), fixos: naCena(estado), pecas: pecasVisiveis(estado) });
   if (fase === 'antes') palco.preparar(['cena-0-abrindo', 'cena-1']);
   // nunca salvou o visual: o editor aparece sozinho (antes do Abrir CNPJ ou já jogando), até o primeiro "Bora"
   if (deveAbrirEditor(estado, fase, editorFechado, rascunho !== null)) rascunho = { ...PADRAO };

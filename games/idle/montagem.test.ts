@@ -134,6 +134,31 @@ describe('montarTira', () => {
   };
   const so = (vagas: Vaga[]): Vagas => ({ quadros: 2, vagas });
 
+  it('peças da cena (eras 6+): por cima do fundo, por baixo das pessoas e da frente, quadro a quadro', () => {
+    const vg = so([vaga('voce', 'dono', undefined, 10, 10)]);
+    const peca = vazia(2 * 4, 3); // 2 quadros de 4×3
+    pinta(peca, 0, 0, '#00FF00');
+    pinta(peca, 1, 0, '#00FF00');
+    pinta(peca, 4, 0, '#0000FF');
+    const embaixo = vazia(2 * 2, 2); // debaixo da pessoa (10, 10)
+    pinta(embaixo, 0, 0, '#FF0000');
+    pinta(embaixo, 2, 0, '#FF0000');
+    const frente = vazia(320, 96);
+    pinta(frente, 160 + 51, 40, '#FFFFFF');
+    const t = montarTira({ fundo: fundo(), frente, vagas: vg }, ocuparVagas(vg, V, []), kitFalso(),
+      [{ img: peca, x: 50, y: 40 }, { img: embaixo, x: 10, y: 10 }]);
+    expect(cor(t, 50, 40)).toBe('#00FF00'); // quadro 0: a 1ª coluna da tira da peça
+    expect(cor(t, 160 + 50, 40)).toBe('#0000FF'); // quadro 1: a 2ª
+    expect(cor(t, 160 + 51, 40)).toBe('#FFFFFF'); // a frente cobre a peça
+    expect(cor(t, 52, 40)).toBe('#121212'); // pixel transparente da peça mostra o fundo
+    expect(cor(t, 10, 10)).toBe(PELES[0][1]); // a pessoa fica por cima da peça
+  });
+  it('sem peça nenhuma, a tira é a de antes', () => {
+    const vg = so([vaga('voce', 'dono', undefined, 10, 10)]);
+    const a = montarTira({ fundo: fundo(), frente: null, vagas: vg }, ocuparVagas(vg, V, []), kitFalso());
+    const b = montarTira({ fundo: fundo(), frente: null, vagas: vg }, ocuparVagas(vg, V, []), kitFalso(), []);
+    expect(b.d).toEqual(a.d);
+  });
   it('fundo, pessoa com as cores dela e frente por cima, quadro a quadro', () => {
     const vg = so([vaga('voce', 'dono', undefined, 10, 10)]);
     const frente = vazia(320, 96);
@@ -194,5 +219,15 @@ describe('validarVagas', () => {
     expect(validarVagas({ ...ok, vagas: [{ ...ok.vagas[0], trilha: [null] }, ok.vagas[1]] }, 8, 1)).toContain('voce: trilha com 1 quadros');
     expect(validarVagas({ ...ok, vagas: [ok.vagas[0], { ...ok.vagas[1], freela: { ...PADRAO, pele: 9 } }] }, 8, 1)).toContain('estagiario: freela com visual inválido');
     expect(validarVagas(null, 8, 1)).toEqual(['sem lista de vagas']);
+  });
+});
+
+describe('peças no JSON das vagas', () => {
+  const base = (): Vagas => ({ quadros: 2, vagas: [vaga('voce', 'dono', undefined, 10, 10)] });
+  it('id único e dentro da cena', () => {
+    expect(validarVagas({ ...base(), pecas: [{ id: 'g31', x: 0, y: 0 }, { id: 'monolito', x: 159, y: 95 }] }, 2, 0)).toEqual([]);
+    expect(validarVagas({ ...base(), pecas: [{ id: 'g31', x: 0, y: 0 }, { id: 'g31', x: 5, y: 5 }] }, 2, 0)).toContain('peça repetida ou sem id: g31');
+    expect(validarVagas({ ...base(), pecas: [{ id: 'g32', x: 170, y: 0 }] }, 2, 0)).toContain('peça g32: fora da cena');
+    expect(validarVagas({ ...base(), pecas: [{ id: 'g33', x: 1.5, y: 0 }] }, 2, 0)).toContain('peça g33: fora da cena');
   });
 });
