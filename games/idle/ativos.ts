@@ -34,7 +34,7 @@ export const ativos = {
   estagiario: (p: Pose): string | null => pessoas[`estagiario-pose-${p}`] ?? null,
   cadeira: (): string | null => pessoas.cadeira ?? null,
   gerador: (id: number) => geradores[`gerador-${String(id).padStart(2, '0')}`],
-  oportunidade: (k: 0 | 1 | 2) => oportunidades[`oportunidade-${k}`],
+  oportunidade: (k: number) => oportunidades[`oportunidade-${k}`],
   geral: (id: number): string | null => gerais[`geral-${id}`] ?? null,
   /** Peças do estúdio do PPP Podcast (fundo, frente, aovivo, cadeira, cadeado). */
   estudio: (nome: 'fundo' | 'frente' | 'aovivo' | 'cadeira' | 'cadeado'): string | null => convidados[`estudio-${nome}`] ?? null,

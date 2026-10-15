@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubadaAte, destrancada, efeitosTexto, eventoEm, GABE, GEMAPLYS, kojimaMult,
-  LUVA, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
+  CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubada, derrubadaAte, destrancada, efeitosTexto, eventoEm, faixaEm, GABE, GEMAPLYS, kojimaMult,
+  LUVA, MCVV, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
 } from './convidados';
+import { tipoDourado } from './dourados';
 
 const H = 3_600_000;
 const cad = (cadeira: (number | null)[], x: Partial<Cadeiras> = {}): Cadeiras => ({
@@ -128,5 +129,15 @@ describe('eventos com o ramo Dourados da árvore', () => {
   });
   it('o texto do Gemaplys não fala mais "eram 12" (com o Olho de lince seriam 24)', () => {
     expect(efeitosTexto(GEMAPLYS, 1)[1]).toBe('Ficam 50% menos tempo na tela');
+  });
+});
+
+describe('a faixa do MC V.V com a roda nova (0076)', () => {
+  it('nunca dá Tigrinho: o 7 vira Investidor (0)', () => {
+    const uid = '4a681416-b4ee-4976-8cdd-540cc816f28c';
+    let seg = 1_760_000_000;
+    while (tipoDourado(uid, seg) !== 7 || derrubada(uid, seg - 7200, 1)) seg++;
+    const c = { cadeira: [MCVV, null, null], desde: [new Date((seg - 7200) * 1000).toISOString(), null, null], trocas: 3, trocas_t: null };
+    expect(faixaEm(uid, c, 1, seg)).toBe(0);
   });
 });

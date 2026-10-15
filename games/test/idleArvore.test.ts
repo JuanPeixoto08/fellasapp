@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogo } from '../idle/catalogo';
 import { abertura, efeitosArvore } from '../idle/economia';
 import { CAIXA_PADRAO, pendentes, tipo } from '../idle/oportunidades';
-import { freshDb, quartaATarde, type TestDb } from './db';
+import { freshDb, quartaAntesDoCorte, type TestDb } from './db';
 
 afterEach(() => vi.useRealTimers());
 
@@ -136,7 +136,7 @@ describe('o que cada ramo faz', () => {
   });
   it('Oportunidades: caixinha de 4 (e 5), +3 por dia e bônus em dobro', async () => {
     vi.useFakeTimers({ toFake: ['Date'] }); // numa quarta à tarde (ver quartaATarde), não na virada do dia
-    vi.setSystemTime(quartaATarde());
+    vi.setSystemTime(quartaAntesDoCorte());
     await abrir(A);
     await q('update public.idle_state set week_start = public.games_week_start() - 7 where user_id = $1', [A]);
     const sem = await t.rpc<Estado>('idle_open');

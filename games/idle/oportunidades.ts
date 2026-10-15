@@ -27,17 +27,43 @@ export const instante = (uid: string, w: number) => {
   return s === null ? NaN : (w * JANELA_S + Number(s % 590n)) * 1000;
 };
 
-/** O tipo da janela w (0, 1 ou 2), sorteado. */
-export const tipo = (uid: string, w: number) => {
+/** 0 15 min de produção · 1 ×5 por 1 min · 2 próxima compra pela metade · 3 Chamar um dourado · 4 Cupom de primeira compra ·
+ *  5 Adubo de farmácia · 6 Cashback · 7 Informação privilegiada (de 3 a 7 desde a 0076). */
+export type TipoOportunidade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** A janela de corte (0076): as de antes continuam com 3 tipos (% 3), pra nada que já está na caixinha de alguém trocar
+ *  de tipo; a partir dela, a roda de 8 (% 100). É a janela da meia-noite de Brasília depois do db push (o passo de
+ *  publicar acerta o número, aqui e em idle_opp_kind). */
+export const OPP_CORTE = 2_987_010;
+/** Limites (exclusivos) de r = h % 100 de cada tipo, de 0 a 7: 0–17, 18–33, 34–49, 50–59, 60–71, 72–80, 81–90, 91–99. */
+const RODA_OPP: readonly number[] = [18, 34, 50, 60, 72, 81, 91, 100];
+
+/** O tipo da janela w, sorteado (igual a idle_opp_kind). */
+export const tipo = (uid: string, w: number): TipoOportunidade => {
   const s = sorte(uid, w);
-  return (s === null ? 0 : Number(mistura(s) % 3n)) as 0 | 1 | 2;
+  if (s === null) return 0;
+  const h = mistura(s);
+  if (w < OPP_CORTE) return Number(h % 3n) as TipoOportunidade;
+  const r = Number(h % 100n);
+  return RODA_OPP.findIndex((lim) => r < lim) as TipoOportunidade;
 };
 
-export const TEXTO_TIPO: Record<0 | 1 | 2, string> = {
+export const TEXTO_TIPO: Record<TipoOportunidade, string> = {
   0: '15 minutos de produção na hora',
   1: 'Produção ×5 por 1 minuto',
   2: 'Próxima compra pela metade',
+  3: 'Chamar um dourado',
+  4: 'Cupom de primeira compra',
+  5: 'Adubo de farmácia',
+  6: 'Cashback',
+  7: 'Informação privilegiada',
 };
+
+// os números das oportunidades novas (0076); com "rendem o dobro" (Xepa / Viralizar) cada um vale 2×
+export const CUPONS_POR_OPP = 10;
+export const CUPOM_FATOR = 0.75; // compra de gerador 25% mais barata
+export const CASHBACK = 0.3; // devolve 30% do preço
+export const CASHBACK_S = 120; // por 2 min (soma no fim do que já tem)
+export const CHAMADOS_MAX = 3;
 
 /** Quantas a caixinha guarda e quanto tempo (s) uma guardada dura: 3 e 4h sem a árvore (ramo Oportunidades). */
 export type Caixa = { tamanho: number; validadeS: number };

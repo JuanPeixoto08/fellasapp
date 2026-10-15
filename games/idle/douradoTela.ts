@@ -82,7 +82,7 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
       const chave = `${e.seg}:${e.lado}`;
       const ateMs = e.seg * 1000 + (e.janelaS ?? JANELA_S) * 1000;
       if (ativos.has(chave) || encerrados.has(chave) || e.agoraMs >= ateMs) return;
-      const tipo = (e.tipo === 3 ? 2 : e.tipo) as 0 | 1 | 2;
+      const tipo = (e.tipo === 3 ? 2 : e.tipo > 3 ? 0 : e.tipo) as 0 | 1 | 2; // os novos ganham ícone na Task 6
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `dourado dourado-${tipo}`;

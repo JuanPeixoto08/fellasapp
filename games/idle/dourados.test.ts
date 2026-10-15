@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { douradoEm, douradosEntre, ganhoInvestidor, JANELA_S, janelaS, posicao, promoAtiva, selosBonus, TIPOS_DOURADO, textoPegou } from './dourados';
+import {
+  COMBO_MULT, COMBO_PRECISA, CHUVA_S, douradoEm, douradosEntre, escolhaLinkedin, ganhoInvestidor, JANELA_S, janelaS, LINKEDIN_MULT, MOEDINHA_S,
+  PIX_FICAR_S, posicao, promoAtiva, segundoPix, selosBonus, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, tigrePaga, TIPOS_DOURADO,
+  tipoDourado, tipoGarantido, TREND_MAX, textoPegou,
+} from './dourados';
 
 const U = '4a681416-b4ee-4976-8cdd-540cc816f28c';
 
@@ -18,27 +22,16 @@ describe('a sorte dos eventos na tela', () => {
     const intervalos = new Set(vistos.slice(1).map((s, i) => s - vistos[i]));
     expect(intervalos.size).toBeGreaterThan(200); // sorte de verdade: não volta sempre no mesmo passo
   });
-  it('as chances: Investidor ~45%, Promoção ~35%, Viralizou ~18%, dupla ~2%', () => {
-    const conta = [0, 0, 0, 0];
+  it('as chances da roda nova: 25 · 18 · 13 · 2 · 12 · 12 · 10 · 8 (%)', () => {
+    const conta = Array(8).fill(0);
     let n = 0;
     for (const u of [U, '098d04dc-bba1-433a-9ef8-0e9dd863e4ed', 'bf30208e-c18c-4efc-ae6d-d1331de03916']) {
-      for (let s = 1_760_000_000; s < 1_760_000_000 + 2_000_000; s++) {
-        const d = douradoEm(u, s);
-        if (d !== null) {
-          conta[d]++;
-          n++;
-        }
+      for (let s = 1_760_000_000; s < 1_760_000_000 + 200_000; s++) {
+        conta[tipoDourado(u, s)]++;
+        n++;
       }
     }
-    const pct = conta.map((c) => c / n);
-    expect(pct[0]).toBeGreaterThan(0.4);
-    expect(pct[0]).toBeLessThan(0.5);
-    expect(pct[1]).toBeGreaterThan(0.3);
-    expect(pct[1]).toBeLessThan(0.4);
-    expect(pct[2]).toBeGreaterThan(0.14);
-    expect(pct[2]).toBeLessThan(0.22);
-    expect(pct[3]).toBeGreaterThan(0.005);
-    expect(pct[3]).toBeLessThan(0.04);
+    [0.25, 0.18, 0.13, 0.02, 0.12, 0.12, 0.1, 0.08].forEach((p, t) => expect(Math.abs(conta[t] / n - p), `tipo ${t}`).toBeLessThan(0.01));
   });
   it('posição na tela dentro da margem; a dupla fica lado a lado', () => {
     for (let s = 0; s < 500; s++) {
@@ -51,7 +44,7 @@ describe('a sorte dos eventos na tela', () => {
       }
     }
     expect(JANELA_S).toBe(12);
-    expect(TIPOS_DOURADO).toEqual(['investidor', 'promocao', 'viralizou', 'dupla']);
+    expect(TIPOS_DOURADO).toEqual(['investidor', 'promocao', 'viralizou', 'dupla', 'trend', 'linkedin', 'pix', 'tigrinho']);
   });
 });
 
@@ -116,5 +109,49 @@ describe('selos dos eventos de era', () => {
     expect(l.map((x) => x.texto)).toEqual(['Marmita ×3 · 2:41', 'Melhorias −25% · 1:40']);
     expect(l[0].dica?.titulo).toBe('Marmita da mãe');
     expect(l[1].dica?.titulo).toBe('Atualização instalada');
+  });
+});
+
+describe('os sorteios dos dourados novos (iguais ao banco: idle_dourado_sorteio)', () => {
+  it('garantido: a roda sem Pix nem Tigrinho (os dois viram Investidor)', () => {
+    for (let s = 1_760_000_000; s < 1_760_000_000 + 20_000; s++) {
+      const t = tipoDourado(U, s);
+      expect(tipoGarantido(U, s)).toBe(t >= 6 ? 0 : t);
+    }
+  });
+  it('Pix devolvido: o garantido cai de 20 a 120 s depois', () => {
+    const vistos = new Set<number>();
+    for (let s = 1_760_000_000; s < 1_760_000_000 + 5_000; s++) {
+      const d = segundoPix(U, s) - s;
+      expect(d).toBeGreaterThanOrEqual(20);
+      expect(d).toBeLessThanOrEqual(120);
+      vistos.add(d);
+    }
+    expect(vistos.size).toBeGreaterThan(90);
+  });
+  it('Tigrinho: a casa paga 3 em cada 10', () => {
+    let n = 0;
+    for (let s = 1_760_000_000; s < 1_760_000_000 + 20_000; s++) if (tigrePaga(U, s)) n++;
+    expect(n / 20_000).toBeCloseTo(0.3, 1);
+  });
+  it('LinkedIn: um dos 5 que mais rendem; f = a parte dele na soma; sem renda nenhuma, null', () => {
+    const rendas = [0, 10, 40, 5, 0, 20, 1, 2, 30, ...Array(21).fill(0)]; // rendem os geradores 2, 3, 4, 6, 7, 8 e 9
+    const top = new Set([3, 9, 6, 2, 4]); // 40, 30, 20, 10, 5
+    const vistos = new Set<number>();
+    for (let s = 1_760_000_000; s < 1_760_000_000 + 500; s++) {
+      const e = escolhaLinkedin(U, s, rendas)!;
+      expect(top.has(e.gen)).toBe(true);
+      expect(e.f).toBeCloseTo(rendas[e.gen - 1] / 108, 12);
+      vistos.add(e.gen);
+    }
+    expect(vistos.size).toBe(5);
+    expect(escolhaLinkedin(U, 1, Array(30).fill(0))).toBeNull();
+    expect(escolhaLinkedin(U, 1, [7, ...Array(29).fill(0)])).toEqual({ gen: 1, f: 1 });
+  });
+  it('as constantes da spec (e as do plano: o Tigrinho paga 30 min e come 15)', () => {
+    expect({ TREND_MAX, CHUVA_S, MOEDINHA_S, PIX_FICAR_S, TIGRE_GRATIS, TIGRE_CHANCE, TIGRE_PAGA_S, TIGRE_COME_S, LINKEDIN_MULT, COMBO_MULT, COMBO_PRECISA }).toEqual({
+      TREND_MAX: 20, CHUVA_S: 8, MOEDINHA_S: 60, PIX_FICAR_S: 1800, TIGRE_GRATIS: 3, TIGRE_CHANCE: 30, TIGRE_PAGA_S: 1800, TIGRE_COME_S: 900,
+      LINKEDIN_MULT: 30, COMBO_MULT: 7, COMBO_PRECISA: 3,
+    });
   });
 });

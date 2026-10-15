@@ -7,6 +7,7 @@ import { catalogo, type Melhoria } from './catalogo';
 import { copiasOportunidade, estrategiasAtivas, fatores, multBonus, partesContratos } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
+import type { TipoOportunidade } from './oportunidades';
 import { ganhoEventoAgora, marmitaAtiva, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
@@ -147,8 +148,8 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
 
 /** A caixinha de uma oportunidade da Caixinha (0062: tudo empilha), com o que a pessoa tem agora. Os 15 minutos de
  *  produção não têm (a linha já diz tudo). */
-export function dicaOportunidade(s: IdleState, tipo: 0 | 1 | 2, agoraMs: number): Dica | null {
-  if (tipo === 0) return null;
+export function dicaOportunidade(s: IdleState, tipo: TipoOportunidade, agoraMs: number): Dica | null {
+  if (tipo === 0 || tipo > 2) return null; // a Task 7 preenche 3–7
   const c = copiasOportunidade(catalogo, s); // "rendem o dobro" (Viralizar / Xepa da feira): conta como 2 pegas
   const rende = (k: number) => (k === 2 ? 'Rendem o dobro' : `Rendem ${k}×`);
   if (tipo === 1) {

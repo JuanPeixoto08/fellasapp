@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogo as cat } from './catalogo';
 import {
   abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
-  pontosTotais, precoContrato, preco, produzido, taxa, taxaPorUnidade, type Estado, VIRAL_MS,
+  pontosTotais, precoContrato, preco, produzido, rendasGeradores, taxa, taxaPorUnidade, type Estado, VIRAL_MS,
 } from './economia';
 
 const vazio = (): Estado => ({ generators: Array(30).fill(0), upgrades: [], strategies: [-1, -1, -1, -1] });
@@ -257,5 +257,17 @@ describe('Marmita da mãe (×3) no produzido', () => {
   it('sem marmita (null ou já passou) é a conta de antes', () => {
     expect(produzido(2, 0, 10_000, null, [], VIRAL_MS, null)).toBeCloseTo(20, 6);
     expect(produzido(2, 50_000, 60_000, null, [], VIRAL_MS, 40_000)).toBeCloseTo(20, 6);
+  });
+});
+
+describe('rendasGeradores (o sorteio do LinkedIn)', () => {
+  it('cada gerador: unidades × quanto cada uma rende; a soma é a taxa', () => {
+    const s = { generators: [10, 5, ...Array(28).fill(0)], upgrades: [11], strategies: [-1, -1, -1, -1] };
+    const r = rendasGeradores(cat, s);
+    expect(r).toHaveLength(30);
+    expect(r[0]).toBeCloseTo(10 * taxaPorUnidade(cat, s, 1), 9);
+    expect(r[1]).toBeCloseTo(5 * taxaPorUnidade(cat, s, 2), 9);
+    expect(r.slice(2).every((x) => x === 0)).toBe(true);
+    expect(r[0] + r[1]).toBeCloseTo(taxa(cat, s), 9);
   });
 });

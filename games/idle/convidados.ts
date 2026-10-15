@@ -123,7 +123,8 @@ export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): Tip
   const passo = faixaS(p);
   const k = (seg - dS) / passo;
   if (k < 1 || !Number.isInteger(k) || derrubada(uid, dS, k)) return null;
-  return tipoDourado(uid, seg);
+  const t = tipoDourado(uid, seg);
+  return t === 7 ? 0 : t; // a faixa nunca é Tigrinho (0076)
 }
 
 type ComCadeiras = { user_id: string; generators: number[]; convidados?: Cadeiras; bonus?: { arvore: number[] } };

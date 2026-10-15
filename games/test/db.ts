@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { OPP_CORTE } from '../idle/oportunidades';
 import { SKELETON } from './skeleton';
 
 export const MIGRATIONS: string[] = [
@@ -48,6 +49,7 @@ export const MIGRATIONS: string[] = [
   '0073_fellas_inc_catalogo_eras_1_5.sql',
   '0074_fellas_inc_eventos_era.sql',
   '0075_fellas_inc_catalogo_dourados.sql',
+  '0076_fellas_inc_dourados_caixinha.sql',
 ];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;
@@ -61,6 +63,10 @@ export function quartaATarde(agora = Date.now()): Date {
   while (d.getUTCDay() !== 3) d.setUTCDate(d.getUTCDate() + 1);
   return d;
 }
+
+/** Uma quarta à tarde duas semanas antes do OPP_CORTE (a Caixinha ainda com os 3 tipos de antes): os testes que pegam um
+ *  de cada tipo antigo param o relógio aqui (0076). 144 janelas de 10 min por dia. */
+export const quartaAntesDoCorte = () => quartaATarde((OPP_CORTE - 14 * 144) * 600_000);
 
 /** `conquistas: false` esvazia o catálogo das conquistas: os testes das entregas 1 e 2 conferem a conta exata, sem o
  *  +1% de cada conquista que as ações vão ganhando. */

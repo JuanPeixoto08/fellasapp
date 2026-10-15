@@ -5,11 +5,27 @@ import type { Dica } from './dica';
 import { formatarValor } from './formatar';
 import { semente } from './oportunidades';
 
-export const TIPOS_DOURADO = ['investidor', 'promocao', 'viralizou', 'dupla'] as const;
-/** 0 Investidor apressado · 1 Promoção relâmpago · 2 Viralizou · 3 dupla de Viralizou. */
-export type TipoDourado = 0 | 1 | 2 | 3;
+export const TIPOS_DOURADO = ['investidor', 'promocao', 'viralizou', 'dupla', 'trend', 'linkedin', 'pix', 'tigrinho'] as const;
+/** 0 Investidor apressado · 1 Promoção relâmpago · 2 Viralizou · 3 dupla de Viralizou · 4 Trend do TikTok · 5 Bombou no
+ *  LinkedIn · 6 Pix errado · 7 Tigrinho (os quatro últimos desde 15/10, 0076). */
+export type TipoDourado = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 /** Quanto tempo o evento fica na tela (s); o banco aceita até 15 s (folga da rede). */
 export const JANELA_S = 12;
+
+// os números dos dourados novos (0076; o Tigrinho com os do plano: paga 30 min e come 15, ver valorMedio.ts)
+export const TREND_MAX = 20; // moedinhas que contam num Trend
+export const CHUVA_S = 8; // a chuva do Trend (e quanto a escolha do Pix fica aberta depois da janela)
+export const MOEDINHA_S = 60; // cada moedinha: 1 min de produção
+export const PIX_FICAR_S = 1800; // ficar com o Pix: 30 min de produção
+export const TIGRE_GRATIS = 3; // jogadas do dia que sempre pagam
+export const TIGRE_CHANCE = 30; // depois, paga 30 em cada 100
+export const TIGRE_PAGA_S = 1800;
+export const TIGRE_COME_S = 900;
+export const LINKEDIN_MULT = 30; // o gerador sorteado rende ×30
+export const LINKEDIN_TOP = 5; // sorteado entre os 5 que mais rendem
+export const COMBO_MULT = 7;
+export const COMBO_PRECISA = 3; // pegos seguidos
+export const COMBO_JANELA_S = 1800; // o último pego tem mais de 30 min: o combo zera
 
 const P = 2147483647n;
 const K = 1013904223n;
@@ -19,11 +35,41 @@ function h1(uid: string, s: number): bigint {
   const b = BigInt(s);
   return (b * b * 48271n + b * 16807n + BigInt(semente(uid)) * 69621n + 12345n) % P;
 }
+/** A 3ª mistura do segundo (igual a idle_dourado_h3): o tipo sai dela (r = h3 % 100), e os sorteios dos novos também. */
+const h3 = (uid: string, s: number) => mistura(mistura(h1(uid, s)));
+
+/** Faixas de r (0–99), na ordem da spec: dupla 0–1, Viralizou 2–14, Promoção 15–32, Investidor 33–57, Trend 58–69,
+ *  LinkedIn 70–81, Pix 82–91, Tigrinho 92–99. */
+const RODA: readonly (readonly [number, TipoDourado])[] = [[2, 3], [15, 2], [33, 1], [58, 0], [70, 4], [82, 5], [92, 6], [100, 7]];
 
 /** O tipo sorteado pro segundo `s` (vale pros eventos da sorte e pras faixas do MC V.V). */
 export function tipoDourado(uid: string, s: number): TipoDourado {
-  const r = Number(mistura(mistura(h1(uid, s))) % 100n);
-  return r < 2 ? 3 : r < 20 ? 2 : r < 55 ? 1 : 0;
+  const r = Number(h3(uid, s) % 100n);
+  return RODA.find(([lim]) => r < lim)![1];
+}
+
+/** O "sal" de cada sorteio dos dourados novos (o mesmo no banco). */
+export const SAL = { tigre: 4242, linkedin: 5151, pix: 6161, frase: 7373 } as const;
+/** Um sorteio de 0 a n − 1 do segundo `s` (igual a idle_dourado_sorteio). */
+export const sorteioDourado = (uid: string, s: number, sal: number, n: number) => Number(mistura(h3(uid, s) + BigInt(sal)) % BigInt(n));
+/** O tipo de um dourado garantido (Pix devolvido, Chamar) no segundo `s`: a roda sem Pix e sem Tigrinho (viram Investidor). */
+export function tipoGarantido(uid: string, s: number): TipoDourado {
+  const t = tipoDourado(uid, s);
+  return t >= 6 ? 0 : t;
+}
+/** Pix devolvido no segundo `s`: o segundo do garantido em dobro, de 20 a 120 s depois. */
+export const segundoPix = (uid: string, s: number) => s + 20 + sorteioDourado(uid, s, SAL.pix, 101);
+/** Tigrinho depois das 3 grátis do dia: paga? (3 em cada 10) */
+export const tigrePaga = (uid: string, s: number) => sorteioDourado(uid, s, SAL.tigre, 100) < TIGRE_CHANCE;
+/** Bombou no LinkedIn: o gerador sorteado entre os 5 que mais rendem (empate: o de id menor primeiro) e a parte dele na
+ *  soma (`rendas[i]` = o gerador i + 1). Sem renda nenhuma: null. Igual a idle_linkedin. */
+export function escolhaLinkedin(uid: string, s: number, rendas: readonly number[]): { gen: number; f: number } | null {
+  const soma = rendas.reduce((a, x) => a + (x > 0 ? x : 0), 0);
+  const top = rendas.map((renda, i) => ({ gen: i + 1, renda })).filter((x) => x.renda > 0)
+    .sort((a, b) => b.renda - a.renda || a.gen - b.gen).slice(0, LINKEDIN_TOP);
+  if (!top.length) return null;
+  const e = top[sorteioDourado(uid, s, SAL.linkedin, top.length)];
+  return { gen: e.gen, f: e.renda / soma };
 }
 
 /** O evento que aparece pro jogador no segundo `s` (epoch), ou null. `gema` = o peso do Gemaplys (0 a 1): mais

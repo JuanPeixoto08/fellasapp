@@ -189,6 +189,13 @@ export function taxaPorUnidade(cat: Catalogo, s: Estado, gid: number): number {
   return f.porGerador[gid - 1] * f.global;
 }
 
+/** Quanto cada gerador rende no total agora (unidades × cada uma, com o multiplicador global; `[i]` = o gerador i + 1).
+ *  O sorteio do LinkedIn usa (igual a idle_gen_rendas: os bônus que o banco põe por cima multiplicam todos igual). */
+export function rendasGeradores(cat: Catalogo, s: Estado): number[] {
+  const f = fatores(cat, s);
+  return f.porGerador.map((x, i) => x * s.generators[i] * f.global);
+}
+
 export function custoMult(cat: Catalogo, s: Estado): number {
   return estrategiasAtivas(cat, s).reduce((a, e) => a * e.custoMult, 1);
 }

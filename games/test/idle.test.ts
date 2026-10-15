@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
 import { instante, pendentes, tipo } from '../idle/oportunidades';
-import { freshDb, quartaATarde, type TestDb } from './db';
+import { freshDb, quartaAntesDoCorte, type TestDb } from './db';
 
 export const A = '00000000-0000-0000-0000-00000000000a';
 export const B = '00000000-0000-0000-0000-00000000000b';
@@ -178,7 +178,7 @@ const claim = (w: number) => t.rpc<Estado>('idle_claim_opportunity', { p_window:
 /** Numa quarta à tarde (ver quartaATarde), o primeiro instante em que as 3 guardadas são dos 3 tipos: o tipo é sorteado
  *  por janela (0049), então os testes que pegam um de cada param o relógio aí. */
 function quartaComOsTresTipos(): Date {
-  const ini = quartaATarde().getTime();
+  const ini = quartaAntesDoCorte().getTime();
   for (let m = 0; m < 6 * 60; m += 5) {
     const agora = ini + m * 60_000;
     const l = pendentes(A, agora, []);

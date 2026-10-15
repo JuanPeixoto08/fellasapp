@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { aoVivo, instante, pendentes, sai, semente, tipo, VALIDADE_S } from './oportunidades';
+import { aoVivo, instante, OPP_CORTE, pendentes, sai, semente, TEXTO_TIPO, tipo, VALIDADE_S } from './oportunidades';
 
 const U = '00000000-0000-0000-0000-00000000000a';
 const V = '1234abcd-0000-0000-0000-000000000000';
@@ -74,5 +74,23 @@ describe('oportunidades', () => {
     expect(Math.floor((t + 25_000) / 600_000)).toBe(w + 1);
     expect(aoVivo(V, t + 25_000, 30)).toBe(w);
     expect(aoVivo(V, t + 25_000, 10)).toBeNull();
+  });
+});
+
+describe('a roda da Caixinha com o corte (0076)', () => {
+  it('antes de OPP_CORTE, só 0, 1 e 2 (o que já está guardado não troca de tipo)', () => {
+    for (let w = OPP_CORTE - 3000; w < OPP_CORTE; w++) expect(tipo(V, w)).toBeLessThanOrEqual(2);
+  });
+  it('a partir do corte: 18 · 16 · 16 · 10 · 12 · 9 · 10 · 9 (%)', () => {
+    const conta = Array(8).fill(0);
+    const N = 60_000;
+    for (let w = OPP_CORTE; w < OPP_CORTE + N; w++) conta[tipo(V, w)]++;
+    [0.18, 0.16, 0.16, 0.1, 0.12, 0.09, 0.1, 0.09].forEach((p, k) => expect(Math.abs(conta[k] / N - p), `tipo ${k}`).toBeLessThan(0.01));
+  });
+  it('os textos dos 8 tipos', () => {
+    expect(TEXTO_TIPO).toEqual({
+      0: '15 minutos de produção na hora', 1: 'Produção ×5 por 1 minuto', 2: 'Próxima compra pela metade', 3: 'Chamar um dourado',
+      4: 'Cupom de primeira compra', 5: 'Adubo de farmácia', 6: 'Cashback', 7: 'Informação privilegiada',
+    });
   });
 });
