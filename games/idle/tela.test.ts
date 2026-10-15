@@ -892,3 +892,46 @@ describe('empresa, resumo e bancada', () => {
     expect(root.querySelector('.app')!.classList.contains('sem-painel')).toBe(false);
   });
 });
+
+describe('três cliques no primeiro gerador', () => {
+  const montar = () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ estado: estado({ generators: [3, 1, ...Array(28).fill(0)], valuation: 1e9 }) }));
+    const [g1, g2] = root.querySelectorAll<HTMLElement>('.lista-geradores .gerador');
+    return { g1, g2 };
+  };
+  const clicar = (alvo: Element, vezes: number, passoMs = 150) => {
+    for (let i = 0; i < vezes; i++) {
+      (alvo as HTMLElement).click();
+      vi.advanceTimersByTime(passoMs);
+    }
+  };
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-10-12T12:00:00.000Z'));
+    return () => vi.useRealTimers();
+  });
+  it('três cliques rápidos no desenho ou no nome abrem a camada; dois não', () => {
+    const { g1 } = montar();
+    clicar(g1.querySelector('.sprite')!, 2);
+    expect(root.querySelector('.segredo')).toBeNull();
+    vi.advanceTimersByTime(1000); // o par de antes passou
+    clicar(g1.querySelector('.sprite')!, 1);
+    clicar(g1.querySelector('.meio strong')!, 2); // o nome conta junto com o desenho
+    expect(root.querySelector('.segredo')).not.toBeNull();
+  });
+  it('os botões de compra não contam, nem o segundo gerador', () => {
+    const { g1, g2 } = montar();
+    clicar(g1.querySelector('button[data-qtd="1"]')!, 3);
+    clicar(g1.querySelector('button[data-qtd="10"]')!, 3);
+    clicar(g2.querySelector('.sprite')!, 3);
+    expect(root.querySelector('.segredo')).toBeNull();
+  });
+  it('Esc fecha a camada', () => {
+    const { g1 } = montar();
+    clicar(g1.querySelector('.sprite')!, 3);
+    expect(root.querySelector('.segredo')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(root.querySelector('.segredo')).toBeNull();
+  });
+});
