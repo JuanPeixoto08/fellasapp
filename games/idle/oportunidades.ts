@@ -37,8 +37,12 @@ export const OPP_CORTE = 2_987_010;
 /** Limites (exclusivos) de r = h % 100 de cada tipo, de 0 a 7: 0–17, 18–33, 34–49, 50–59, 60–71, 72–80, 81–90, 91–99. */
 const RODA_OPP: readonly number[] = [18, 34, 50, 60, 72, 81, 91, 100];
 
+/** Só o ?mock mexe: força o tipo de toda janela (dev/mockIdle.ts __oportunidade). */
+export const mockOportunidade: { tipo: TipoOportunidade | null } = { tipo: null };
+
 /** O tipo da janela w, sorteado (igual a idle_opp_kind). */
 export const tipo = (uid: string, w: number): TipoOportunidade => {
+  if (mockOportunidade.tipo !== null) return mockOportunidade.tipo;
   const s = sorte(uid, w);
   if (s === null) return 0;
   const h = mistura(s);
@@ -57,6 +61,18 @@ export const TEXTO_TIPO: Record<TipoOportunidade, string> = {
   6: 'Cashback',
   7: 'Informação privilegiada',
 };
+
+type ComGeradores = { generators: number[]; horta_crescendo?: number };
+/** Tem Horta (Food truck) com planta crescendo: o Adubo tem o que amadurecer. */
+export const temPlantaCrescendo = (s: ComGeradores) => (s.generators[10] ?? 0) >= 1 && (s.horta_crescendo ?? 0) > 0;
+/** Tem Bolsa (Grupo de trader): a Informação vira crédito de Espiar. */
+export const temBolsa = (s: ComGeradores) => (s.generators[18] ?? 0) >= 1;
+/** A linha da Caixinha: o nome do tipo, ou o que ele paga no lugar pra quem ainda não tem Horta/Bolsa (igual ao banco). */
+export function textoOportunidade(k: TipoOportunidade, s: ComGeradores): string {
+  if (k === 5 && !temPlantaCrescendo(s)) return 'Adubo de farmácia → sem planta crescendo: 15 min de produção';
+  if (k === 7 && !temBolsa(s)) return 'Informação privilegiada → sem Bolsa: 15 min de produção';
+  return TEXTO_TIPO[k];
+}
 
 // os números das oportunidades novas (0076); com "rendem o dobro" (Xepa / Viralizar) cada um vale 2×
 export const CUPONS_POR_OPP = 10;

@@ -197,3 +197,46 @@ describe('Convidados na Bolsa', () => {
     expect(linha(1).textContent).toContain('Subindo forte');
   });
 });
+
+describe('o Espiar (0076)', () => {
+  const espiada = { id: 1, valor: 33, limite: 120, risco: false, rj_ate: null, historico: [33], humor: 3, espiada: true, muda_em: 7 };
+  it('com crédito, a empresa escolhida ganha "Espiar (n)" com caixinha; espiada, mostra o humor e em quantos min muda', () => {
+    const espiar = vi.fn();
+    const dica = vi.fn();
+    document.body.innerHTML = '';
+    tela = criarBolsaTela({ negociar, melhorar, espiar }, dica);
+    document.body.append(tela.elemento);
+    tela.renderizar(B({ info_creditos: 2 }), 1e9, false);
+    const bt = [...document.querySelectorAll<HTMLButtonElement>('.bolsa-detalhe button')].find((b) => b.textContent === 'Espiar (2)')!;
+    bt.click();
+    expect(espiar).toHaveBeenCalledWith(1);
+    expect(dica).toHaveBeenCalledWith(bt, 'espiar-1', expect.any(Function));
+    expect(dica.mock.calls[0][2]()).toMatchObject({ titulo: 'Espiar' });
+    tela.renderizar(B({ info_creditos: 1, empresas: [espiada] }), 1e9, false);
+    expect(document.querySelector('.humor-vsauce')!.textContent).toBe('Espiado: subindo forte agora · muda em 7 min');
+    expect([...document.querySelectorAll('.bolsa-detalhe button')].some((b) => b.textContent?.startsWith('Espiar'))).toBe(false);
+    tela.renderizar(B({ info_creditos: 0, empresas: [espiada] }), 1e9, false, 1, true);
+    expect(document.querySelector('.humor-vsauce')!.textContent).toBe('VSauce: subindo forte agora. Ou não? · muda em 7 min');
+  });
+  it('sem crédito ou sem a ação ligada, sem botão', () => {
+    tela.renderizar(B({ info_creditos: 0 }), 1e9, false);
+    expect([...document.querySelectorAll('.bolsa-detalhe button')].some((b) => b.textContent?.startsWith('Espiar'))).toBe(false);
+    tela.renderizar(B({ info_creditos: 3 }), 1e9, false); // a tela do beforeEach não tem `espiar`
+    expect([...document.querySelectorAll('.bolsa-detalhe button')].some((b) => b.textContent?.startsWith('Espiar'))).toBe(false);
+  });
+  it('no minuto em que a empresa sai da recuperação o humor vira na hora: o Espiar fica apagado (não gasta crédito à toa)', () => {
+    const espiar = vi.fn();
+    document.body.innerHTML = '';
+    tela = criarBolsaTela({ negociar, melhorar, espiar }, vi.fn());
+    document.body.append(tela.elemento);
+    const esp = () => [...document.querySelectorAll<HTMLButtonElement>('.bolsa-detalhe button')].find((b) => b.textContent?.startsWith('Espiar'));
+    tela.renderizar(B({ info_creditos: 2 }), 1e9, false);
+    linha(6).click();
+    expect(esp()).toBeUndefined(); // quebrada: sem Espiar
+    const saiu = (tick: number) => B({ tick, info_creditos: 2, empresas: [{ id: 6, valor: 5, limite: 100, risco: false, rj_ate: null, historico: [5] }] });
+    tela.renderizar(saiu(1007), 1e9, false);
+    expect(esp()!.disabled).toBe(true);
+    tela.renderizar(saiu(1008), 1e9, false);
+    expect(esp()!.disabled).toBe(false);
+  });
+});

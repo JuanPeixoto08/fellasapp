@@ -5,6 +5,7 @@ import { button, el } from '../shared/hud/hud';
 import type { BolsaEmpresa, BolsaEstado, BolsaPosicao, LadoBolsa, MelhoriaBolsa } from '../shared/types';
 import { acoes, avisosPo, contaLimite, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 import { ativos } from './ativos';
+import { type Dica, dicaEspiar } from './dica';
 import { formatarValor } from './formatar';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -61,10 +62,14 @@ function iconeEmpresa(m: BolsaEmpresa, cls: string): HTMLElement {
 export function criarBolsaTela(a: {
   negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote?: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
-}) {
+  espiar?(empresa: number): void;
+}, dica?: (alvo: HTMLElement, chave: string, conteudo: () => Dica | null) => void) {
   const raiz = el('div', 'bolsa');
   let escolhida: number | null = null;
-  let ultimo: [BolsaEstado | null, number, boolean, number] | null = null;
+  let ultimo: [BolsaEstado | null, number, boolean, number, boolean] | null = null;
+  // o fim da recuperação de cada empresa quebrada que a tela viu: no minuto em que ela volta o banco vira o humor na hora
+  // (o humor dela "acaba" agora), e espiar ali gastaria o crédito sem mostrar nada. No minuto seguinte já dá.
+  const fimRj = new Map<number, number>();
 
   let relogioEl: HTMLElement | null = null;
   // botões de compra que só dependem do F$ (o atualizarValor da página acende e apaga a cada 100 ms)
@@ -75,15 +80,16 @@ export function criarBolsaTela(a: {
     const s = Math.max(0, Math.ceil(ms / 1000));
     relogioEl.textContent = `Preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
-  /** `alavanca`: o lote das compras agora (1 + o peso do Vorcaro; 1 sem ele). */
-  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean, alavanca = 1): void {
+  /** `alavanca`: o lote das compras agora (1 + o peso do Vorcaro; 1 sem ele). `vsauce`: o VSauce está sentado (é ele
+   *  quem mostra o humor, mesmo de empresa espiada). */
+  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean, alavanca = 1, vsauce = false): void {
     // redesenhar troca a lista e o detalhe por novos: guarda a rolagem e o foco pra devolver no fim
     const rolouLista = raiz.querySelector<HTMLElement>('.bolsa-lista')?.scrollTop ?? 0;
     const detalheAntes = raiz.querySelector<HTMLElement>('.bolsa-detalhe');
     const rolouDetalhe = detalheAntes && detalheAntes.dataset.empresa === String(escolhida) ? detalheAntes.scrollTop : 0;
     const ativo = document.activeElement;
     const focoEmpresa = ativo instanceof HTMLElement && raiz.contains(ativo) ? ativo.closest<HTMLElement>('.acao')?.dataset.empresa : undefined;
-    ultimo = [b, valuation, ocupado, alavanca];
+    ultimo = [b, valuation, ocupado, alavanca, vsauce];
     raiz.replaceChildren();
     relogioEl = null;
     atuais = [];
@@ -95,6 +101,7 @@ export function criarBolsaTela(a: {
       raiz.append(el('p', 'vazio', 'Compra 1 Grupo de trader pra abrir a Bolsa.'));
       return;
     }
+    for (const m of b.empresas) if (m.rj_ate !== null) fimRj.set(m.id, m.rj_ate);
     // sempre tem uma empresa escolhida (a 1ª, se nenhuma)
     if (!b.empresas.some((m) => m.id === escolhida)) escolhida = b.empresas[0]?.id ?? null;
     // as ações normais (lote 1) e os lotes alavancados do Vorcaro de cada empresa; o limite conta todos
@@ -177,7 +184,23 @@ export function criarBolsaTela(a: {
       const v = variacao(m.historico);
       const linhaPreco = el('div', 'preco-grande');
       linhaPreco.append(el('b', undefined, formatarValor(m.valor * b.r)), el('span', classeVar(v.minuto), `${pct(v.minuto)} no minuto · ${pct(v.hora)} na hora`));
-      if (m.humor !== undefined && m.humor !== null) linhaPreco.append(el('span', 'humor-vsauce', `VSauce: ${(HUMOR[m.humor] ?? '').toLowerCase()} agora. Ou não?`));
+      // o humor: o VSauce sentado mostra ("Ou não?"); espiado (Informação privilegiada, 0076) diz também quando muda
+      if (m.humor !== undefined && m.humor !== null) {
+        const humor = (HUMOR[m.humor] ?? '').toLowerCase();
+        const muda = m.espiada && m.muda_em ? ` · muda em ${m.muda_em} min` : '';
+        linhaPreco.append(el('span', 'humor-vsauce', m.espiada && !vsauce ? `Espiado: ${humor} agora${muda}` : `VSauce: ${humor} agora. Ou não?${muda}`));
+      }
+      const creditos = b.info_creditos ?? 0;
+      if (a.espiar && creditos > 0 && !m.espiada) {
+        const virando = fimRj.get(m.id) === b.tick; // saiu da recuperação neste minuto (ver fimRj)
+        const esp = button(`Espiar (${creditos})`, 'btn compacto espiar', () => a.espiar!(m.id));
+        esp.disabled = ocupado || virando;
+        dica?.(esp, `espiar-${m.id}`, () => {
+          const d = dicaEspiar(e.nome, creditos);
+          return virando ? { ...d, linhas: [...d.linhas, { texto: 'Acabou de voltar da recuperação: o humor vira neste minuto. Espia no próximo', tom: 'ruim' }] } : d;
+        });
+        linhaPreco.append(esp);
+      }
       d.append(linhaPreco);
       const graf = el('div', 'bolsa-graf');
       const pagou = p ? p.custo / p.qtd : undefined;

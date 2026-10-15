@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { aoVivo, cashbackAtivo, cupomVale, instante, OPP_CORTE, pendentes, sai, semente, TEXTO_TIPO, tipo, VALIDADE_S } from './oportunidades';
+import {
+  aoVivo, cashbackAtivo, cupomVale, instante, mockOportunidade, OPP_CORTE, pendentes, sai, semente, TEXTO_TIPO, textoOportunidade, tipo, VALIDADE_S,
+} from './oportunidades';
 
 const U = '00000000-0000-0000-0000-00000000000a';
 const V = '1234abcd-0000-0000-0000-000000000000';
@@ -107,5 +109,24 @@ describe('cupom e cashback valendo (0076)', () => {
     expect(cashbackAtivo({ cashback_ate: '2026-10-15T12:01:00Z' }, agora)).toBe(true);
     expect(cashbackAtivo({ cashback_ate: '2026-10-15T11:59:00Z' }, agora)).toBe(false);
     expect(cashbackAtivo({}, agora)).toBe(false);
+  });
+});
+
+describe('a linha da Caixinha (0076)', () => {
+  const g = (x: Record<number, number>) => Array.from({ length: 30 }, (_, i) => x[i + 1] ?? 0);
+  it('o nome do tipo; o Adubo sem Horta (ou sem planta crescendo) e a Informação sem Bolsa dizem o que pagam no lugar', () => {
+    expect(textoOportunidade(4, { generators: g({}) })).toBe('Cupom de primeira compra');
+    expect(textoOportunidade(5, { generators: g({}) })).toBe('Adubo de farmácia → sem planta crescendo: 15 min de produção');
+    expect(textoOportunidade(5, { generators: g({ 11: 3 }), horta_crescendo: 0 })).toBe('Adubo de farmácia → sem planta crescendo: 15 min de produção');
+    expect(textoOportunidade(5, { generators: g({ 11: 3 }), horta_crescendo: 2 })).toBe('Adubo de farmácia');
+    expect(textoOportunidade(7, { generators: g({}) })).toBe('Informação privilegiada → sem Bolsa: 15 min de produção');
+    expect(textoOportunidade(7, { generators: g({ 19: 1 }) })).toBe('Informação privilegiada');
+  });
+  it('?mock: o tipo forçado vale pra toda janela (e null volta à sorte)', () => {
+    const antes = tipo(V, 2_980_000);
+    mockOportunidade.tipo = 6;
+    expect(tipo(V, 2_980_000)).toBe(6);
+    mockOportunidade.tipo = null;
+    expect(tipo(V, 2_980_000)).toBe(antes);
   });
 });

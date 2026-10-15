@@ -4,6 +4,7 @@
 import {
   linhaPlacar, type BolsaEstado, type Fella, type HortaEstado, type IdleBoardRow, type IdleState, type IdleVisual, type LadoBolsa, type LinhaPlacar, type LugarEstado, type MapaEstado, type MelhoriaBolsa,
 } from '../shared/types';
+import { mockOportunidade, type TipoOportunidade } from '../idle/oportunidades';
 import { call, dono, FRIENDS, ME } from './mockDb';
 
 // visuais dos bots (ninguém real): Oliveira, Bia, Teteu
@@ -96,6 +97,7 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 // __vendavel() deixa sua empresa valendo uns 7 pontos de prestígio (150 foguetes, estratégias escolhidas); __pontos(10) põe 10 pontos de prestígio livres; __trader(3) abre a Bolsa (3 traders e F$ de sobra)
 const w = window as unknown as {
   __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __eventoEra: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
+  __oportunidade: (k: number | null) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -208,6 +210,23 @@ wc.__faixaAgora = async () => {
   avisar();
 };
 
+// __oportunidade(5) faz toda janela da Caixinha ser do tipo k (no banco e na página); null volta à sorte
+w.__oportunidade = async (k) => {
+  const { ready } = await import('./mockDb');
+  const db = await ready;
+  const ja = await db.query<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'idle_opp_kind_sorte'");
+  if (!ja.rows[0].n) {
+    await db.exec(`alter function public.idle_opp_kind(uuid, bigint) rename to idle_opp_kind_sorte;
+      create table public.mock_opp (k int);
+      create function public.idle_opp_kind(u uuid, w bigint) returns int language sql stable as
+        'select coalesce((select k from public.mock_opp limit 1), public.idle_opp_kind_sorte(u, w))';`);
+  }
+  await db.query('delete from public.mock_opp where true');
+  if (k !== null) await db.query('insert into public.mock_opp values ($1)', [k]);
+  mockOportunidade.tipo = k as TipoOportunidade | null;
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+
 // painel do ?mock pra testar os eventos sem abrir o console (só no dev)
 {
   const painel = document.createElement('div');
@@ -231,6 +250,19 @@ wc.__faixaAgora = async () => {
     const b = document.createElement('button');
     b.textContent = nome;
     b.style.cssText = 'padding:6px 8px;background:#5B3FD9;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void f());
+    painel.append(b);
+  }
+  // a Caixinha: força o tipo de toda janela (0 a 7) ou volta à sorte; créditos de Espiar
+  const caixinha: [string, () => Promise<void>][] = [
+    ...['15 min', '×5', 'Metade', 'Chamar', 'Cupom', 'Adubo', 'Cashback', 'Informação'].map((nome, k): [string, () => Promise<void>] => [`Caixinha: ${nome}`, () => w.__oportunidade(k)]),
+    ['Caixinha: sorte', () => w.__oportunidade(null)],
+    ['Bolsa +2 créditos', () => dono('update public.idle_state set info_creditos = info_creditos + 2 where user_id = $1', [ME]).then(() => { avisar(); })],
+  ];
+  for (const [nome, f] of caixinha) {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#B8501A;color:#fff;border:0;cursor:pointer';
     b.addEventListener('click', () => void f());
     painel.append(b);
   }

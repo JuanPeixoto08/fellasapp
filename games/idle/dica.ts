@@ -11,7 +11,7 @@ import {
 } from './dourados';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
-import type { TipoOportunidade } from './oportunidades';
+import { CASHBACK_S, cashbackAtivo, CHAMADOS_MAX, CUPONS_POR_OPP, temBolsa, temPlantaCrescendo, type TipoOportunidade } from './oportunidades';
 import { ganhoEventoAgora, marmitaAtiva, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
@@ -159,9 +159,42 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
 /** A caixinha de uma oportunidade da Caixinha (0062: tudo empilha), com o que a pessoa tem agora. Os 15 minutos de
  *  produção não têm (a linha já diz tudo). */
 export function dicaOportunidade(s: IdleState, tipo: TipoOportunidade, agoraMs: number): Dica | null {
-  if (tipo === 0 || tipo > 2) return null; // a Task 7 preenche 3–7
+  if (tipo === 0) return null;
   const c = copiasOportunidade(catalogo, s); // "rendem o dobro" (Viralizar / Xepa da feira): conta como 2 pegas
   const rende = (k: number) => (k === 2 ? 'Rendem o dobro' : `Rendem ${k}×`);
+  // 0076: os cinco novos, com a Xepa (c = 2) e o "no lugar" de quem não tem Horta/Bolsa
+  const quinze = formatarValor(s.rate * 900 * c * (1 + (s.horta_bonus?.oportunidades ?? 0)));
+  if (tipo === 3) {
+    const tem = s.chamados ?? 0;
+    const linhas: LinhaDica[] = [{ texto: c > 1 ? `${rende(c)}: guarda ${c} dourados pra chamar quando quiser (no máximo ${CHAMADOS_MAX})`
+      : `Guarda 1 dourado pra chamar quando quiser (no máximo ${CHAMADOS_MAX})` }];
+    if (tem >= CHAMADOS_MAX) linhas.push({ texto: `Você já tem ${CHAMADOS_MAX}: este se perde`, tom: 'ruim' });
+    else if (tem + c > CHAMADOS_MAX) linhas.push({ texto: `Você já tem ${tem}: só ${CHAMADOS_MAX - tem} ${CHAMADOS_MAX - tem === 1 ? 'cabe' : 'cabem'}`, tom: 'ruim' });
+    else if (tem) linhas.push({ texto: `Você tem ${tem}`, tom: 'fraco' });
+    return { titulo: 'Chamar um dourado', linhas };
+  }
+  if (tipo === 4) {
+    const linhas: LinhaDica[] = [{ texto: `+${CUPONS_POR_OPP * c} cupons: cada compra de gerador sai 25% mais barata` }];
+    if (s.cupons) linhas.push({ texto: `Você tem ${s.cupons}`, tom: 'fraco' });
+    return { titulo: 'Cupom de primeira compra', linhas };
+  }
+  if (tipo === 5) {
+    if (!temPlantaCrescendo(s)) return { titulo: 'Adubo de farmácia', linhas: [{ texto: `Sem planta crescendo: ${quinze} (15 min de produção) no lugar`, tom: 'fraco' }] };
+    return { titulo: 'Adubo de farmácia', linhas: [
+      { texto: c > 1 ? `As ${c} plantas mais perto de amadurecer ficam maduras na hora` : 'A planta mais perto de amadurecer fica madura na hora' },
+      { texto: `Crescendo agora: ${s.horta_crescendo}`, tom: 'fraco' }] };
+  }
+  if (tipo === 6) {
+    const linhas: LinhaDica[] = [{ texto: `Toda compra devolve 30% do preço por ${(CASHBACK_S / 60) * c} min` }];
+    if (cashbackAtivo(s, agoraMs)) linhas.push({ texto: 'Soma no fim do que já está valendo', tom: 'fraco' });
+    return { titulo: 'Cashback', linhas };
+  }
+  if (tipo === 7) {
+    if (!temBolsa(s)) return { titulo: 'Informação privilegiada', linhas: [{ texto: `Sem Bolsa: ${quinze} (15 min de produção) no lugar`, tom: 'fraco' }] };
+    const linhas: LinhaDica[] = [{ texto: `+${c} ${c === 1 ? 'crédito' : 'créditos'} de Espiar: o humor de uma empresa da Bolsa até ele mudar` }];
+    if (s.info_creditos) linhas.push({ texto: `Você tem ${s.info_creditos}`, tom: 'fraco' });
+    return { titulo: 'Informação privilegiada', linhas };
+  }
   if (tipo === 1) {
     const n = (s.boosts ?? (s.boost_until ? [s.boost_until] : [])).filter((t) => Date.parse(t) > agoraMs).length;
     const texto = n
@@ -462,4 +495,9 @@ export function dicaDourado(tipo: TipoDourado, s: IdleState, o: { seg: number; d
       : [{ texto: `A casa paga ${TIGRE_CHANCE / 10} em cada 10` }, { texto: `Ganha ${ganha} · perde ${formatarValor(s.rate * TIGRE_COME_S)}`, tom: 'ruim' }] };
   }
   return null;
+}
+
+/** A caixinha do "Espiar" da Bolsa (0076). */
+export function dicaEspiar(nome: string, creditos: number): Dica {
+  return { titulo: 'Espiar', linhas: [{ texto: `Mostra o humor de ${nome} até ele mudar · 1 crédito` }, { texto: `Você tem ${creditos}`, tom: 'fraco' }] };
 }

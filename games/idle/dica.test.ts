@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
-  dicaContratos, dicaDesafio, dicaDourado, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
+  dicaContratos, dicaDesafio, dicaDourado, dicaEspiar, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
   dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
 } from './dica';
 import { caderno } from './camisetaria';
@@ -336,4 +336,30 @@ describe('a caixinha dos dourados novos na tela (0076)', () => {
       'A casa paga 3 em cada 10', `Ganha ${formatarValor(1_800_000)} · perde ${formatarValor(900_000)}`]);
   });
   it('os de antes não têm caixinha', () => expect(dicaDourado(0, estado({ user_id: U }), { seg: 1 })).toBeNull());
+});
+
+describe('a caixinha das oportunidades novas (0076)', () => {
+  const comBolsa = (x: Partial<IdleState> = {}) => estado({ rate: 1000, generators: gens({ 19: 1, 11: 1 }), horta_crescendo: 1, ...x });
+  it('Chamar: guarda 1 (no máximo 3); avisa quando já tem 3', () => {
+    expect(textos(dicaOportunidade(comBolsa(), 3, 0)!)).toEqual(['Guarda 1 dourado pra chamar quando quiser (no máximo 3)']);
+    expect(textos(dicaOportunidade(comBolsa({ chamados: 3 }), 3, 0)!)).toContain('Você já tem 3: este se perde');
+  });
+  it('Cupom: +10 cupons e o que já tem', () => {
+    expect(textos(dicaOportunidade(comBolsa({ cupons: 4 }), 4, 0)!)).toEqual(['+10 cupons: cada compra de gerador sai 25% mais barata', 'Você tem 4']);
+  });
+  it('Adubo: a planta mais perto; sem planta crescendo, os 15 min em F$', () => {
+    expect(textos(dicaOportunidade(comBolsa(), 5, 0)!)[0]).toBe('A planta mais perto de amadurecer fica madura na hora');
+    expect(textos(dicaOportunidade(comBolsa({ horta_crescendo: 0 }), 5, 0)!)).toEqual([`Sem planta crescendo: ${formatarValor(900_000)} (15 min de produção) no lugar`]);
+  });
+  it('Cashback: 30% por 2 min', () => {
+    expect(textos(dicaOportunidade(comBolsa(), 6, 0)!)[0]).toBe('Toda compra devolve 30% do preço por 2 min');
+  });
+  it('Informação: +1 crédito de Espiar; sem Bolsa, os 15 min em F$', () => {
+    expect(textos(dicaOportunidade(comBolsa(), 7, 0)!)[0]).toBe('+1 crédito de Espiar: o humor de uma empresa da Bolsa até ele mudar');
+    expect(textos(dicaOportunidade(estado({ rate: 1000 }), 7, 0)!)).toEqual([`Sem Bolsa: ${formatarValor(900_000)} (15 min de produção) no lugar`]);
+  });
+  it('Espiar', () => {
+    expect(dicaEspiar('Pastelaria', 2)).toEqual({ titulo: 'Espiar', linhas: [
+      { texto: 'Mostra o humor de Pastelaria até ele mudar · 1 crédito' }, { texto: 'Você tem 2', tom: 'fraco' }] });
+  });
 });

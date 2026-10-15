@@ -2,6 +2,7 @@
 import '../shared/hud/hud.css';
 import './idle.css';
 import './dourados.css';
+import './caixinha.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';
@@ -17,7 +18,7 @@ import { buscarBolsaAgora, faltaVirar, proximaBusca, RECARREGA_BOLSA } from './b
 import { MARCOS } from './mapa';
 import { avisos, criarFilaAvisos, detectarNovas, type AvisoConquista } from './legado';
 import { temNovidade } from './novidades';
-import { aoVivo, instante, pendentes } from './oportunidades';
+import { aoVivo, cashbackAtivo, instante, pendentes } from './oportunidades';
 import { carregarImagem, carregarKit, criarDesenhista, type Desenhar } from './navegador';
 import { criarPalco } from './palco';
 import { PADRAO, sortear } from './personagem';
@@ -33,7 +34,7 @@ if (!import.meta.env.DEV) vigiarVersao();
 
 type Api = Pick<
   typeof realApi,
-  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleDouradoChamar' | 'idleEventoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'idleMapa' | 'idleLugar' | 'idleLugarAbrir' | 'idleLugarNivel' | 'idleLugarAcao' | 'fellas' | 'hasSession'
+  'idleOpen' | 'idleStart' | 'idleBuy' | 'idlePickStrategy' | 'idleClaim' | 'idleDouradoPegar' | 'idleDouradoChamar' | 'idleEventoPegar' | 'idleHorta' | 'idleHortaPlantar' | 'idleHortaColher' | 'idleHortaArrancar' | 'idleBoard' | 'idleHire' | 'idleSetAvatar' | 'idlePrestige' | 'idleBuyNode' | 'idleBolsa' | 'idleBolsaNegociar' | 'idleBolsaEspiar' | 'idleBolsaMelhorar' | 'idleConvSentar' | 'idleConvTirar' | 'idleMapa' | 'idleLugar' | 'idleLugarAbrir' | 'idleLugarNivel' | 'idleLugarAcao' | 'fellas' | 'hasSession'
 >;
 // só no dev: ?mock joga contra as migrações rodando no navegador (dev/mockIdle.ts)
 const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has('mock') ? await import('../dev/mockIdle') : realApi;
@@ -91,6 +92,7 @@ function voltouDoFundo() {
 }
 let promoValia = false;
 let descValia = false;
+let cashValia = false; // Cashback valendo no último passo (liga e desliga: as caixinhas de compra mudam)
 let novidadeNova = temNovidade(lerVista());
 let vivoAtual: number | null = null;
 // editor de personagem: rascunho aberto (null = fechado). Fechar sem salvar mostra o fundador padrão; o editor só
@@ -474,6 +476,12 @@ const tela = criarTela(document.getElementById('app')!, {
     aplicar(r);
     audio.tocar(lado === 'comprar' ? 'acaoCompra' : 'acaoVende', { lucro });
   }),
+  espiar: (empresa) => void guard(async () => {
+    const r = await api.idleBolsaEspiar(empresa);
+    receberBolsa(r.bolsa);
+    aplicar(r);
+    audio.tocar('pegar');
+  }),
   mapa: (acao) => {
     if (acao === 'fechar') {
       fecharMapa();
@@ -760,6 +768,11 @@ setInterval(() => {
   const desc = descontoAtivo(ancora.estado, agoraMs);
   if (desc !== descValia) {
     descValia = desc;
+    render();
+  }
+  const cash = cashbackAtivo(ancora.estado, agoraMs);
+  if (cash !== cashValia) {
+    cashValia = cash;
     render();
   }
   if (bolsaAberta && bolsa) tela.relogioBolsa(faltaVirar(bolsa.vira_em_ms, bolsaBuscadaEm, Date.now()));

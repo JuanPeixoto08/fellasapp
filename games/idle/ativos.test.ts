@@ -29,8 +29,11 @@ describe('ativos da Fellas Inc.', () => {
   it('resolve os 30 geradores', () => {
     for (let id = 1; id <= 30; id++) expect(naoVazia(ativos.gerador(id)), `gerador ${id}`).toBe(true);
   });
-  it('resolve as 3 oportunidades', () => {
-    for (const k of [0, 1, 2] as const) expect(naoVazia(ativos.oportunidade(k)), `oportunidade ${k}`).toBe(true);
+  it('resolve as 8 oportunidades, cada uma com 4 quadros de 24 px', () => {
+    for (let k = 0; k <= 7; k++) {
+      expect(naoVazia(ativos.oportunidade(k)), `oportunidade ${k}`).toBe(true);
+      expect(dim(`oportunidades/oportunidade-${k}.png`)).toEqual([96, 24]);
+    }
   });
   it('resolve os ícones das 20 melhorias gerais', () => {
     for (let id = 1001; id <= 1020; id++) expect(naoVazia(ativos.geral(id)), `geral ${id}`).toBe(true);

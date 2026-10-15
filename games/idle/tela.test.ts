@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { IdleBoardRow, IdleState } from '../shared/types';
 import type { Desenhar } from './navegador';
-import { instante, sai, tipo, VALIDADE_S } from './oportunidades';
+import { instante, OPP_CORTE, sai, tipo, VALIDADE_S } from './oportunidades';
+import { preco } from './economia';
+import { formatarValor } from './formatar';
 import { ativos } from './ativos';
 import { catalogo } from './catalogo';
 import { PADRAO } from './personagem';
@@ -36,7 +38,7 @@ beforeEach(() => {
     trocarAba: vi.fn<Acoes['trocarAba']>(), caixa: vi.fn<Acoes['caixa']>(), tentarDeNovo: vi.fn<Acoes['tentarDeNovo']>(),
     contratar: vi.fn<Acoes['contratar']>(), editor: vi.fn<Acoes['editor']>(), mudarVisual: vi.fn<Acoes['mudarVisual']>(),
     vender: vi.fn<Acoes['vender']>(), comprarNo: vi.fn<Acoes['comprarNo']>(),
-    bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
+    bolsa: vi.fn<Acoes['bolsa']>(), negociar: vi.fn<Acoes['negociar']>(), espiar: vi.fn<Acoes['espiar']>(), melhorar: vi.fn<Acoes['melhorar']>(),
     config: vi.fn<Acoes['config']>(), chave: vi.fn<Acoes['chave']>(), efeito: vi.fn<Acoes['efeito']>(), volumeMusica: vi.fn<Acoes['volumeMusica']>(), pegarDourado: vi.fn<Acoes['pegarDourado']>(), chamarDourado: vi.fn<Acoes['chamarDourado']>(),
     pegarEventoEra: vi.fn<Acoes['pegarEventoEra']>(),
     horta: vi.fn<Acoes['horta']>(), plantar: vi.fn<Acoes['plantar']>(), colher: vi.fn<Acoes['colher']>(), arrancar: vi.fn<Acoes['arrancar']>(),
@@ -374,6 +376,27 @@ describe('tela da Fellas Inc.', () => {
     expect(root.querySelector('.modal-caixa')!.textContent).toContain('Já pegou todas de hoje. Amanhã tem mais.');
     expect(root.querySelector<HTMLButtonElement>('.modal-caixa .escolha button')!.disabled).toBe(true);
     vi.useRealTimers();
+  });
+  it('caixinha: os tipos novos com o texto e o "no lugar" de quem não tem Horta', () => {
+    const uid = '00000000-0000-0000-0000-00000000000a';
+    let w = OPP_CORTE;
+    while (tipo(uid, w) !== 5) w++;
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ caixaAberta: true, pendentes: [w], estado: estado({ user_id: uid }) }));
+    expect(root.querySelector('.modal-caixa .escolha strong')!.textContent).toBe('Adubo de farmácia → sem planta crescendo: 15 min de produção');
+  });
+  it('Cupom: os geradores saem 25% mais baratos (1, 10 e Máx); com meia-preço o "1" usa a meia e o cupom fica', () => {
+    const tela = criarTela(root, acoes);
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const s = estado({ generators: [5, ...Array(29).fill(0)], valuation: 1e6, cupons: 3 });
+    const um = () => root.querySelector<HTMLButtonElement>('.gerador button[data-qtd="1"]')!.textContent;
+    const cheio = preco(catalogo.geradores[0].custo, 5, 1, 1);
+    tela.renderizar(modelo({ estado: s, agora }));
+    expect(um()).toBe(formatarValor(cheio * 0.75));
+    tela.renderizar(modelo({ estado: { ...s, meias: 1, half_price: true }, agora }));
+    expect(um()).toBe(formatarValor(cheio * 0.5));
+    tela.renderizar(modelo({ estado: { ...s, cupons: 0 }, agora }));
+    expect(um()).toBe(formatarValor(cheio));
   });
   it('prazo: horas com minutos, minutos, menos de 1 min', () => {
     expect(prazo(VALIDADE_S * 1000)).toBe('Some em 4h00');

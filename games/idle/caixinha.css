@@ -1,0 +1,11 @@
+/* Caixinha nova e Espiar (entrega 5, 0076). Fora do idle.css; usa os tokens dele (--i-*, --gold, --paper) e os cantos de
+   pixel (contorno por 4 sombras sem desfoque). As oportunidades novas usam a linha da Caixinha que já existe. */
+
+/* Espiar: ação secundária da Bolsa, ao lado do preço. Botão comum do jogo (sem roxo cheio: o roxo cheio fica pros
+   botões principais); vai pra direita da linha quando o humor não aparece, e cola no humor quando ele aparece. */
+.idle .bolsa .espiar { align-self: center; margin-left: auto; }
+.idle .bolsa .humor-vsauce + .espiar { margin-left: 0; }
+
+/* Caixinha: o que a oportunidade paga no lugar (Adubo sem planta crescendo, Informação sem Bolsa) numa linha menor
+   embaixo do nome (a coluna em pé é estreita). Mais clara que o prazo de baixo: é o que você ganha, o prazo é só a hora. */
+.idle .escolha-texto .no-lugar { display: block; font-size: 0.85em; font-weight: 400; line-height: 1.25; color: color-mix(in srgb, var(--paper) 80%, transparent); }

@@ -14,7 +14,7 @@ import { criarMapaTela, nomeLugar } from './mapaTela';
 import { criarLugarTela } from './lugarTela';
 import type { Dicas } from './mecanicas';
 import { aplicarTema } from './temasLugar';
-import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO } from './convidados';
+import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO, VSAUCE } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
@@ -36,7 +36,7 @@ import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, VISUAL_NOMES } from './nomes';
-import { sai, TEXTO_TIPO, tipo as tipoOportunidade } from './oportunidades';
+import { CASHBACK, cashbackAtivo, CUPOM_FATOR, cupomVale, sai, textoOportunidade, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { caixa, estrategiaPendente, rotuloEra, segundosOportunidade, type Fase } from './store';
 
@@ -89,6 +89,7 @@ export type Acoes = {
   vender(acao: 'abrir' | 'fechar' | 'confirmar'): void; comprarNo(id: number): void;
   horta(acao: 'abrir' | 'fechar'): void; plantar(canteiro: number, especie: number): void; colher(canteiro: number): void; arrancar(canteiro: number): void;
   bolsa(acao: 'abrir' | 'fechar'): void; negociar(empresa: number, lado: LadoBolsa, qtd: 0 | 1 | 10, tick: number, lote?: number): void;
+  espiar(empresa: number): void; // Informação privilegiada: gasta 1 crédito e mostra o humor da empresa (0076)
   convidados(acao: 'abrir' | 'fechar'): void; sentar(cadeira: number, convidado: number): void; tirar(cadeira: number): void;
   melhorar(tipo: MelhoriaBolsa, nivel: number): void;
   mapa(acao: 'abrir' | 'fechar'): void; // abre/fecha a tela cheia do mapa (fecha Bolsa/Horta/Convidados)
@@ -316,7 +317,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   caixinha.setAttribute('aria-label', 'Caixinha');
   caixinha.append(gavetaCaixa, corpoCaixa);
   const hortaTela = criarHortaTela({ plantar: (c, e) => a.plantar(c, e), colher: (c) => a.colher(c), arrancar: (c) => a.arrancar(c) });
-  const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t, lote) => a.negociar(e, l, q, t, lote), melhorar: (tp, n) => a.melhorar(tp, n) });
+  const bolsaTela = criarBolsaTela({ negociar: (e, l, q, t, lote) => a.negociar(e, l, q, t, lote), melhorar: (tp, n) => a.melhorar(tp, n), espiar: (e) => a.espiar(e) }, dicas.ligar);
   const mapaTela = criarMapaTela({ entrar: (id) => a.lugar(id), abrir: (id) => a.abrirLugar(id) }, dicasMapa, (v) => boneco(v, null));
   const lugarTela = criarLugarTela({ voltar: () => a.lugar(null), nivel: (id) => a.subirNivel(id), acao: (fn, args) => a.lugarAcao(fn, args), recarregar: () => a.lugarRecarregar(), usuario: () => ultimo?.estado?.user_id ?? null }, dicasMapa, (v) => boneco(v, null));
   // o minigame aberto, em tela cheia (como a árvore): Voltar, o ícone, o nome e o F$
@@ -473,6 +474,10 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const custoMelhoria = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.melhorias ?? 0)) * custosConv(s).melhorias
     * (descontoAtivo(s, agoraTela) ? DESCONTO_MELHORIA : 1); // Atualização instalada (o banco aplica igual)
   const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
+  // Cupom de primeira compra (0076): geradores 25% mais baratos (1, 10 e Máx), sem Promoção; a meia-preço guarda o cupom
+  const cupomAgora = (s: IdleState) => (cupomVale(s, agoraTela) ? CUPOM_FATOR : 1);
+  // Cashback (0076): a caixinha do botão de comprar diz quanto volta
+  const cashAgora = (s: IdleState) => (cashbackAtivo(s, agoraTela) ? CASHBACK : 0);
 
   const tresCliques = contadorCliques();
   function segredo() {
@@ -505,24 +510,27 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       meio.append(etq);
     }
     const cm = custoGerador(s);
+    const cmc = cm * cupomAgora(s);
+    // a compra de 1 com meia-preço usa a meia, sem o cupom (o desconto de compra não passa de 50%; o banco faz igual)
+    const precoUm = meiaAgora(s) < 1 ? preco(g.custo, n, 1, cm) * 0.5 : preco(g.custo, n, 1, cmc);
     const botoes = el('div', 'compra');
-    const um = button(formatarValor(preco(g.custo, n, 1, cm) * meiaAgora(s)), 'btn', () => a.comprar('gerador', gid, 1));
+    const um = button(formatarValor(precoUm), 'btn', () => a.comprar('gerador', gid, 1));
     um.dataset.qtd = '1';
     const dez = button('10', 'btn', () => a.comprar('gerador', gid, 10));
     dez.dataset.qtd = '10';
     const max = button('Máx', 'btn', () => a.comprar('gerador', gid, 0));
     max.dataset.qtd = '0';
     precos.push(
-      { botao: um, preco: preco(g.custo, n, 1, cm) * meiaAgora(s) },
-      { botao: dez, preco: preco(g.custo, n, 10, cm) },
-      { botao: max, preco: preco(g.custo, n, 1, cm), maximo: { custo: g.custo, n, cm } },
+      { botao: um, preco: precoUm },
+      { botao: dez, preco: preco(g.custo, n, 10, cmc) },
+      { botao: max, preco: preco(g.custo, n, 1, cmc), maximo: { custo: g.custo, n, cm: cmc } },
     );
     botoes.append(um, dez, max);
     linha.append(sprite, meio, botoes);
     if (gid === 1) {
       for (const alvo of [sprite, meio]) alvo.addEventListener('click', () => { if (tresCliques(Date.now())) segredo(); });
     }
-    dicas.ligar(linha, `g${gid}`, () => dicaGerador(s, gid, preco(g.custo, n, 1, cm) * meiaAgora(s)));
+    dicas.ligar(linha, `g${gid}`, () => dicaGerador(s, gid, precoUm, cashAgora(s)));
     return linha;
   }
 
@@ -635,7 +643,11 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       bonequinho.style.backgroundImage = `url(${ativos.oportunidade(k)})`;
       const texto = el('div', 'escolha-texto');
       const quando = el('span', 'sub prazo', '');
-      texto.append(el('strong', undefined, TEXTO_TIPO[k]), quando);
+      // o que paga no lugar (sem Horta/Bolsa) vai numa linha menor embaixo do nome (cabe na Caixinha em pé)
+      const [nomeOpp, noLugar] = textoOportunidade(k, s).split(' → ');
+      const forte = el('strong', undefined, nomeOpp);
+      if (noLugar) forte.append(el('small', 'no-lugar', ` → ${noLugar}`));
+      texto.append(forte, quando);
       dicas.ligar(li, `opp-${w}`, () => dicaOportunidade(s, k, agoraTela));
       prazos.push({ texto: quando, fim: sai(s.user_id, w, caixa(s).tamanho) });
       // desde a 0062 tudo empilha: outra meia-preço guardada vale mais uma compra pela metade
@@ -749,7 +761,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips, efeitosDe(catalogo, s).hortaMult);
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
-      bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(s.convidados ?? SEM_CADEIRAS, s.generators[12] ?? 0, VORCARO));
+      const cad = s.convidados ?? SEM_CADEIRAS;
+      bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(cad, s.generators[12] ?? 0, VORCARO),
+        peso(cad, s.generators[12] ?? 0, VSAUCE) > 0);
       noCorpo(bolsaTela.elemento);
     } else corpoBancada.replaceChildren();
     if (abriuAgora) {
@@ -830,7 +844,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const comprar = button(formatarValor(p), 'btn', () => a.comprar('melhoria', x.id, 1));
         precos.push({ botao: comprar, preco: p });
         item.append(iconeMelhoria(x), meio, comprar);
-        dicas.ligar(item, `m${x.id}`, () => dicaMelhoria(s, x, p));
+        dicas.ligar(item, `m${x.id}`, () => dicaMelhoria(s, x, p, cashAgora(s)));
         listaM.append(item);
       }
     }
