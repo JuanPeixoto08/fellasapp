@@ -466,9 +466,27 @@ describe('Mapa do rolê com a árvore grande (0082 parte E)', () => {
     const tee = j.lugares.find((l) => l.id === 3)!;
     expect(rel(tee.preco, 2 * 3600 * r * 0.5)).toBeLessThan(1e-12);
     expect(tee.horas).toBeCloseTo(1, 12);
+    // o desconto é o que deixa abrir: com 0,75 do preço cheio, sem os nós recusa; com eles abre e sobra ~0,25 do preço cheio
+    const cheio = 2 * 3600 * r;
+    const tudo = [1, 901, 902, 903, 904, 905, 906, 907, 908, 909, 910];
+    await q('delete from public.idle_arvore where user_id = $1', [A]);
+    await q('update public.idle_state set valuation = $2 where user_id = $1', [A, 0.75 * cheio]);
+    await expect(t.rpc('idle_place_abrir', { p_lugar: 3 })).rejects.toThrow(/idle_cant_afford/);
+    await ter(tudo);
     const s = await t.rpc<J & { mapa: unknown }>('idle_place_abrir', { p_lugar: 3 });
     expect(s.mapa).toBeTruthy();
+    expect(rel(s.valuation, 0.25 * cheio)).toBeLessThan(1e-3);
     expect(await q('select 1 from public.idle_place_state where user_id = $1 and lugar = 3', [A])).toHaveLength(1);
+    // subir nível: com 0,8 do custo cheio na moeda, sem os nós recusa; com eles sobe e sobra ~0,2 do custo cheio
+    const custo = 450 * 1.55;
+    await q('update public.idle_place_state set nivel = 2, moeda = $2 where user_id = $1 and lugar = 3', [A, 0.8 * custo]);
+    await q('delete from public.idle_arvore where user_id = $1', [A]);
+    await expect(t.rpc('idle_place_nivel', { p_lugar: 3 })).rejects.toThrow(/idle_lugar_moeda/);
+    await ter(tudo);
+    await t.rpc('idle_place_nivel', { p_lugar: 3 });
+    const [{ moeda, nivel }] = await q<{ moeda: number; nivel: number }>('select moeda, nivel from public.idle_place_state where user_id = $1 and lugar = 3', [A]);
+    expect(nivel).toBe(3);
+    expect(rel(moeda, 0.2 * custo)).toBeLessThan(1e-9);
     await q('update public.idle_place_state set nivel = 2 where user_id = $1 and lugar = 3', [A]);
     const [{ l }] = await q<{ l: { preco_nivel: number; venda_min: number; copao_mult: number } }>(
       'select public.idle_lugar_json(s, 3) as l from public.idle_state s where user_id = $1', [A]);

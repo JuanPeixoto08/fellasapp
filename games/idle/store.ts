@@ -38,8 +38,9 @@ export function valuationAgora(a: Ancora, clienteMs: number): number {
   const boost = a.estado.boosts ? a.estado.boosts.map(Date.parse) : a.estado.boost_until ? Date.parse(a.estado.boost_until) : null;
   const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
   const marmita = a.estado.marmita_ate ? Date.parse(a.estado.marmita_ate) : null; // Marmita da mãe: ×3 (0074)
+  const ef = efeitos(a.estado);
   return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais,
-    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita, fatoresTempo(a.estado, efeitos(a.estado).silverMult));
+    VIRAL_MS * ef.douradoDuracao, marmita, fatoresTempo(a.estado, ef.silverMult));
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {

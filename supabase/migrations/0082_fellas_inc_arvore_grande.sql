@@ -1453,10 +1453,10 @@ begin
     when 5 then -- Jogo do Brasil: 5 min de produção por gol, até 7
       v_gols := least(greatest(coalesce(p_gols, 0), 0), 7);
       v_ganho := v_rate * 300 * v_gols;
-    when 6 then -- Lixo espacial: 10 min de produção por destroço desviado, até 3
+    when 6 then -- Lixo espacial: lixo_min (10 sem a árvore) de produção por destroço desviado, até 3
       v_gols := least(greatest(coalesce(p_gols, 0), 0), 3);
       v_ganho := v_rate * 60 * public.idle_arv(v_me, 'lixo_min', 'max', 10) * v_gols;
-    else -- Houston, temos um problema: Silver tape, produção ×4 por 2 min (outro com um valendo soma 2 min no fim)
+    else -- Houston, temos um problema: Silver tape, produção × silver_mult por silver_min (×4 por 2 min sem a árvore; outro com um valendo soma no fim)
       s.silver_ate := greatest(coalesce(s.silver_ate, now()), now()) + make_interval(secs => 60 * public.idle_arv(v_me, 'silver_min', 'max', 2));
   end case;
   s.valuation := s.valuation + v_ganho;

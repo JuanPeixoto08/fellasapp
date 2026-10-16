@@ -71,7 +71,7 @@ const vale = (iso: string | null | undefined, agoraMs: number) => !!iso && Date.
 export const marmitaAtiva = (s: { marmita_ate?: string | null }, agoraMs: number) => vale(s.marmita_ate, agoraMs);
 /** Atualização instalada valendo (melhorias −25%). */
 export const descontoAtivo = (s: { upg_desc_ate?: string | null }, agoraMs: number) => vale(s.upg_desc_ate, agoraMs);
-/** Silver tape do Houston valendo (produção ×4). */
+/** Silver tape do Houston valendo (o × vem da árvore: ×4, ×5 com a Fita prateada). */
 export const silverAtivo = (s: { silver_ate?: string | null }, agoraMs: number) => vale(s.silver_ate, agoraMs);
 
 // ---------- textos ----------
