@@ -26,9 +26,9 @@ O que o plano decidiu onde a spec deixa a escolha, contradiz o código ou não f
    | Infinitos | 1.000 · 1,6^(n−1) | igual |
 
    O modelo: a simulação de sempre (3 aberturas de 10 min por dia, compra o melhor F$/s por F$) com a árvore nova, oportunidades de ~16,6 min (com Horta e Bolsa) e um fator fixo de ×17,2 = F$/s real ÷ F$/s do modelo no retrato (contratos, convidados, Mapa e Horta que a simulação não modela). Política de venda: vende no fim da abertura em que a venda dá +30% de pontos ou paga o próximo nó fixo liberado (o que vier antes); gasta no nó fixo mais barato liberado (todos os tipos, os 31 de hoje primeiro na conta).
-3. **A árvore cheia (sem infinitos) deixa o veterano ×26,9, acima do alvo de 10–20× (avisar o Juan).** ×5,65 da soma × ×2,75 do Espaço já dão ~×15,5 (a conta da §6); o resto é o Legado ×2 do Espaço (o legado das eras 6–7 do veterano passa de +250% pra +500%). A spec não marca nenhum efeito como "calibrável", então o plano mantém os valores; se o Juan quiser 10–20×, o caminho é o Espaço 3/7 em ×1,25/×1,5 (dá ~×20). Fica no relatório final.
+3. **A árvore cheia (sem infinitos) deixa o veterano ×26,9, acima do alvo de 10–20× (avisar o Juan).** ×5,65 da soma × ×2,75 do Espaço já dão ~×15,5 (a conta da §6); o resto é o Legado ×2 do Espaço (o legado das eras 6–7 do veterano passa de +250% pra +500%). **Decidido pelo Juan em 16/10: o Espaço 3/7 fica em ×1,25/×1,5 (dá ~×20).** A Task 6 mede de novo e anota o número.
 4. **Infinito do Dourados ("Investidor +2% por nível") é o tipo `dourado_investidor` com valor 1,02 por nível (composto: 1,02^n)**, igual aos nós 4.3, 4.7 e 4.10 (×2, ×1,5, ×1,5: 20 → 40 → 60 → 90 min). Assim o banco não muda nada nos dourados (`idle_arv` já multiplica, agora com o nível). Os outros "+X% por nível" somam (`valor × nível`).
-5. **"Efeito dos convidados" (PPP 5, 9 e ∞) = os bônus de produção dos convidados**: o +15% do Cristiano, a subida do Kojima (os +50%/24 h, não o −10% do começo) e o +2%/h do Toby, todos × (1 + soma). Os descontos, oportunidades, Bolsa e Horta dos convidados não mudam (eles estão espalhados em 8 funções do banco; mexer em todas era risco grande pra pouco). **O Juan confirma.**
+5. **"Efeito dos convidados" (PPP 5, 9 e ∞) = os bônus de produção dos convidados**: o +15% do Cristiano, a subida do Kojima (os +50%/24 h, não o −10% do começo) e o +2%/h do Toby, todos × (1 + soma). Os descontos, oportunidades, Bolsa e Horta dos convidados não mudam (eles estão espalhados em 8 funções do banco; mexer em todas era risco grande pra pouco). **Confirmado pelo Juan em 16/10.**
 6. **"O convidado cai 15%/5% das vezes" é a derrubada da faixa do MC V.V** (o único sorteio de 25% dos convidados; ninguém "cai" da cadeira no código). O texto do nó diz isso.
 7. **Espiada grátis por dia (Bolsa 3 e 7):** o dia é o de Brasília (`games_today()`, o mesmo corte da Caixinha e do Tigrinho). Espiar usa primeiro a grátis do dia; sem grátis, um crédito. Colunas novas `info_gratis_dia date`, `info_gratis_n int`; a venda não zera (como o Tigrinho do dia: vender não devolve as espiadas).
 8. **Formato dos nós novos:** pontes no ramo 11 (posição 1–9); infinitos na posição 11 do próprio ramo; coluna `cresce` (1,6) só nos infinitos. Preço do próximo nível = `round(custo · cresce^nível)` dos dois lados (com 1,6 nunca dá ,5, então o arredondamento é o mesmo em JS e em Postgres; a conta é em `double precision` e só vira inteiro depois de conferir os pontos livres, então nível 100 não estoura `bigint`).
@@ -356,11 +356,11 @@ Troque o comentário de `ARVORE` (l. 437–438) por `/** A árvore de habilidade
   { ramo: 9, posicao: 11, tipo: 'marcos_soma', valor: 0.03, nome: 'Rolê infinito', efeito: 'Os marcos dos lugares valem +3% por nível.' },
   { ramo: 10, posicao: 1, tipo: 'lixo_min', valor: 15, nome: 'Treino na NASA', efeito: 'Cada destroço desviado do Lixo espacial vale 15 min de produção (no lugar de 10).' },
   { ramo: 10, posicao: 2, tipo: 'silver_min', valor: 3, nome: 'Rolo extra de silver tape', efeito: 'O Silver tape do Houston dura 3 min.' },
-  { ramo: 10, posicao: 3, tipo: 'legado_mult', valor: 1.5, nome: 'Antena voltada pra Terra', efeito: 'As melhorias de legado valem ×1,5.' },
+  { ramo: 10, posicao: 3, tipo: 'legado_mult', valor: 1.25, nome: 'Antena voltada pra Terra', efeito: 'As melhorias de legado valem ×1,25.' },
   { ramo: 10, posicao: 4, tipo: 'espaco_soma', valor: 0.25, nome: 'Combustível de foguete', efeito: 'Geradores das eras 6 em diante +25% (somando com os outros do Espaço).' },
   { ramo: 10, posicao: 5, tipo: 'era_freq', valor: 1.5, nome: 'TARS, honestidade 90%', efeito: 'Eventos de era aparecem 1,5× mais.' },
   { ramo: 10, posicao: 6, tipo: 'silver_mult', valor: 5, nome: 'Fita prateada industrial', efeito: 'O Silver tape vira ×5.' },
-  { ramo: 10, posicao: 7, tipo: 'legado_mult', valor: 2, nome: 'Mensagem de casa', efeito: 'As melhorias de legado valem ×2.' },
+  { ramo: 10, posicao: 7, tipo: 'legado_mult', valor: 1.5, nome: 'Mensagem de casa', efeito: 'As melhorias de legado valem ×1,5.' },
   { ramo: 10, posicao: 8, tipo: 'espaco_soma', valor: 0.5, nome: 'Motor de dobra', efeito: 'Geradores das eras 6 em diante +50% (somando com os outros do Espaço).' },
   { ramo: 10, posicao: 9, tipo: 'era_janela', valor: 2, nome: 'Ancoragem manual', efeito: 'Eventos de era ficam o dobro do tempo na tela.' },
   { ramo: 10, posicao: 10, tipo: 'espaco_soma', valor: 1, nome: 'Endurance', efeito: 'Geradores das eras 6 em diante +100% (somando com os outros do Espaço).' },
@@ -1547,11 +1547,11 @@ describe('a árvore grande na produção (igual a idle_gen_rendas e idle_bonus_m
     expect(taxaPorUnidade(cat, com_, 37) / taxaPorUnidade(cat, sem, 37)).toBeCloseTo(1.75, 12);
     expect(taxaPorUnidade(cat, com_, 30)).toBeCloseTo(taxaPorUnidade(cat, sem, 30), 12);
   });
-  it('o legado ×2 dobra o p de todos os legados (o maior comprado vale)', () => {
+  it('o legado ×1,5 multiplica o p de todos os legados (o maior comprado vale)', () => {
     const s = { ...base(), upgrades: [3001, 3006] };
     const leg = (arvore: number[]) => multLegado(cat, { ...s, bonus: { arvore, conquistas: 0 } }, 6) - 1;
-    expect(leg([1003, 1007])).toBeCloseTo(2 * leg([]), 12);
-    expect(leg([1003])).toBeCloseTo(1.5 * leg([]), 12);
+    expect(leg([1003, 1007])).toBeCloseTo(1.5 * leg([]), 12);
+    expect(leg([1003])).toBeCloseTo(1.25 * leg([]), 12);
   });
 });
 ```
@@ -1962,7 +1962,7 @@ No fim do arquivo, acrescente:
 ```ts
 // Árvore grande (16/10): o veterano do retrato (games/test/fixtures, o maior F$/s de 15/10) vende, gasta na parte fixa
 // e recomeça até fechar. Medido ao planejar: fecha no dia 12,2 (passo 30 s; 12,8 com 5 s), em ~11 vendas; a árvore
-// cheia deixa a produção dele ×26,9; o modelo × 17,2 dá o F$/s real (contratos, convidados, Mapa, Horta). A parte fixa
+// cheia deixa a produção dele ~×20 (×26,9 com o legado ×1,5/×2 da spec; o Juan escolheu ×1,25/×1,5); o modelo × 17,2 dá o F$/s real (contratos, convidados, Mapa, Horta). A parte fixa
 // não pode passar de ~67 mil pontos: acima disso a era 7 trava e ele não fecha até as eras 8–9 (Decisão 2 do plano).
 // Se sair da faixa: ajuste SÓ os custos novos de catalogo.ts (CUSTO_NOVOS_HOJE, CUSTO_RECURSO, CUSTO_ESPACO,
 // CUSTO_PONTE), regere a 0081 (ainda não publicada) e avise o Juan.
@@ -1982,9 +1982,9 @@ describe('o veterano (árvore grande)', () => {
     expect(v.dia!).toBeGreaterThanOrEqual(10);
     expect(v.dia!).toBeLessThan(16);
   });
-  it('a árvore fixa cheia deixa a produção dele entre ×20 e ×30 (medido: ×26,9; a spec queria 10–20, ver a Decisão 3)', () => {
-    expect(v.multCheio).toBeGreaterThan(20);
-    expect(v.multCheio).toBeLessThan(30);
+  it('a árvore fixa cheia deixa a produção dele entre ×15 e ×23 (alvo ~×20, Decisão 3)', () => {
+    expect(v.multCheio).toBeGreaterThan(15);
+    expect(v.multCheio).toBeLessThan(23);
   });
 });
 ```
@@ -4329,4 +4329,4 @@ Vite em segundo plano (`cd games && npx vite --port 5199`), `http://localhost:51
 
 - [ ] **Step 5: Relatório pro controlador (sem publicar)**
 
-Liste: commits do branch; os preços finais (Decisão 2) e o dia em que o veterano fecha a parte fixa na simulação; o **×26,9 da árvore cheia** (Decisão 3) e o **efeito dos convidados** (Decisão 5) pro Juan decidir; a arte pra aprovação (Task 9, Step 5); as consultas do Taste Engine (Task 10). A publicação é do controlador com o Juan: conferir `supabase migration list` e os números 0081/0082 livres, o Juan roda o `db push` só dessas duas, conferir as colunas novas pela REST (`idle_state.era_max`, `idle_state.info_gratis_n`, `idle_arvore.nivel`, `idle_cat_no.requer2`/`req_vendas`/`req_era`/`cresce`) e as contagens (`idle_cat_no` = 120; `idle_state` com `era_max` ≥ a era de agora em todas as linhas), merge na main e push, conferir o `gh run list`.
+Liste: commits do branch; os preços finais (Decisão 2) e o dia em que o veterano fecha a parte fixa na simulação; o multiplicador medido da árvore cheia (Decisão 3, alvo ~×20); a arte pra aprovação (Task 9, Step 5); as consultas do Taste Engine (Task 10). A publicação é do controlador com o Juan: conferir `supabase migration list` e os números 0081/0082 livres, o Juan roda o `db push` só dessas duas, conferir as colunas novas pela REST (`idle_state.era_max`, `idle_state.info_gratis_n`, `idle_arvore.nivel`, `idle_cat_no.requer2`/`req_vendas`/`req_era`/`cresce`) e as contagens (`idle_cat_no` = 120; `idle_state` com `era_max` ≥ a era de agora em todas as linhas), merge na main e push, conferir o `gh run list`.

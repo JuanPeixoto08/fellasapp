@@ -213,11 +213,11 @@ igual na página e no banco).
 |---|---|---|
 | 1 | Treino na NASA | Cada destroço do Lixo espacial vale 15 min (era 10) |
 | 2 | Rolo extra de silver tape | Silver tape dura 3 min |
-| 3 | Antena voltada pra Terra | Legado ×1,5 |
+| 3 | Antena voltada pra Terra | Legado ×1,25 |
 | 4 | Combustível de foguete | Geradores das eras 6+ +25% |
 | 5 | TARS, honestidade 90% | Eventos de era aparecem 1,5× mais |
 | 6 | Fita prateada industrial | Silver tape vira ×5 |
-| 7 | Mensagem de casa | Legado ×2 |
+| 7 | Mensagem de casa | Legado ×1,5 |
 | 8 | Motor de dobra | Geradores das eras 6+ +50% |
 | 9 | Ancoragem manual | Eventos de era ficam 2× mais tempo na tela |
 | 10 | Endurance | Geradores das eras 6+ +100% |
