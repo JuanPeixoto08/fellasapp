@@ -4,6 +4,21 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-15-eras-6-7',
+    titulo: 'Eras 6 e 7: órbita e Lua',
+    data: '2026-10-15',
+    itens: [
+      'Duas eras novas: Em órbita (era 6) e Lua (era 7), com 12 geradores. Do satélite que apaga as estrelas ao posto de gasolina lunar, passando por um HAL 9000 que não deixa você cancelar a assinatura.',
+      'Cada gerador novo tem 8 melhorias, e cada era ganha 4 melhorias gerais.',
+      'Melhorias de legado: os geradores das eras antigas ajudam a era nova. Quanto mais notebook da faculdade você tem, mais a órbita rende.',
+      'Estratégias novas: Turismo espacial ou Satélites de internet na era 6; Mineração lunar ou Hotel na Lua na era 7.',
+      'Eventos novos: Lixo espacial (desvie dos 3 destroços; cada um vale 10 minutos de produção) e "Houston, temos um problema" (conserte com silver tape e a produção fica ×4 por 2 minutos).',
+      'Música nova nas duas eras, de órgão, e uma fanfarra conhecida na hora de sair da atmosfera.',
+      'Os números agora vão até o centilhão, passando pelo googol.',
+      '18 conquistas novas: uma pra cada gerador novo (ter 100), Órbita lotada, Condomínio lunar, Estação completa, Lua de luxo, Desviou de tudo e Silver tape resolve.',
+    ],
+  },
+  {
     id: '2026-10-15-som-volta',
     titulo: 'O som não some mais',
     data: '2026-10-15',
