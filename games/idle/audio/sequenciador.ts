@@ -31,8 +31,18 @@ export function criarSequenciador(
   let timer: ReturnType<typeof setInterval> | null = null;
   // canal próprio de cada rodada: parar desliga ele e corta o que já estava agendado
   let canal: GainNode | null = null;
+  let destinoRodada: AudioNode | null = null;
   let sala: Sala | null = null; // o envio de reverb da rodada (o molhado segue a era)
   const spb = () => 60 / bpm(era);
+  // a sala (convolução de 3,2 s) só existe quando a era da música pede molhado (6+): nas eras 0–5 nem é criada
+  function ligarSala(ctx: BaseAudioContext, quando: number) {
+    const molhado = molhadoDaEra(era);
+    if (!sala && molhado > 0 && canal && destinoRodada) {
+      sala = criarSala(ctx, destinoRodada);
+      canal.connect(sala.entrada); // o envio pra sala
+    }
+    sala?.molhado(molhado, quando);
+  }
 
   function passo() {
     const ctx = f.ctx();
@@ -52,7 +62,7 @@ export function criarSequenciador(
       inicio = fim;
       giro = 1 - giro;
       era = eraNova;
-      sala?.molhado(molhadoDaEra(era), inicio);
+      ligarSala(ctx, inicio);
       lista = notas(era, giro);
       i = 0;
     }
@@ -69,10 +79,9 @@ export function criarSequenciador(
       if (!ctx || !destino) return;
       canal = ctx.createGain();
       canal.connect(destino); // o seco
-      sala = criarSala(ctx, destino);
-      canal.connect(sala.entrada); // e o envio pra sala
+      destinoRodada = destino;
       era = eraNova = eraMusica(e);
-      sala.molhado(molhadoDaEra(era), ctx.currentTime);
+      ligarSala(ctx, ctx.currentTime);
       ativo = true;
       giro = 0;
       lista = notas(era, giro);
@@ -90,6 +99,7 @@ export function criarSequenciador(
       canal = null;
       sala?.desligar();
       sala = null;
+      destinoRodada = null;
       if (timer) clearInterval(timer);
       timer = null;
     },

@@ -76,6 +76,8 @@ export type OpcoesEventoEra = {
   aoDesvio?(desvios: number): void;
   /** clicou no botão da caixa (Abrir pacote, Sair da call, Consertar…): o som da ação */
   aoBotao?(tipo: 1 | 2 | 3 | 4 | 7): void;
+  /** o destroço saiu da tela (desviado ou trocado pelo próximo): a caixinha dele fecha */
+  aoSair?(): void;
   /** o que pisca em vermelho enquanto o Houston está na tela (a cena) */
   alarmeEm?: HTMLElement;
 };
@@ -168,7 +170,11 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   /** O destroço `i` (0 a 2): entra pela esquerda numa altura sorteada e atravessa em um terço da janela (o CSS anda; o
    *  atraso negativo acerta quem voltou pra aba no meio). Cada um conta uma vez: clicou, ele sai. */
   function lancarDestroco(caixa: HTMLElement, seg: number, i: number, agoraMs: number) {
-    caixa.querySelector('.evento-destroco')?.remove();
+    const velho = caixa.querySelector('.evento-destroco');
+    if (velho) {
+      velho.remove();
+      o.aoSair?.();
+    }
     if (i >= MAX_DESVIOS) return;
     const p = o.posicao(seg, i);
     const b = document.createElement('button');
@@ -187,6 +193,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
       contarDesvios(caixa, atual.gols);
       o.aoDesvio?.(atual.gols);
       b.remove();
+      o.aoSair?.();
       if (atual.gols >= MAX_DESVIOS) encerrar(true);
     });
     caixa.append(b);

@@ -28,8 +28,11 @@
 
 /* Houston: a cena pisca em vermelho enquanto o alarme toca (o vermelho é o da sirene do ícone) */
 .idle .palco.alarme::after { content: ''; position: absolute; inset: 0; background: #E0454B; opacity: 0; pointer-events: none;
-  animation: alarme-pisca 0.5s steps(2) infinite; }
-@keyframes alarme-pisca { 50% { opacity: 0.32; } }
+  animation: alarme-pisca 0.5s infinite; }
+/* pisca de verdade (liga e desliga, 2 por segundo, abaixo do limite de 3): sem rampa entre os dois */
+@keyframes alarme-pisca { 0%, 49.99% { opacity: 0; } 50%, 100% { opacity: 0.32; } }
+/* o aviso do Houston é comprido: quebra em duas linhas em vez de sair do quadro da cena */
+.idle .evento-era-7 .evento-balao { white-space: normal; max-width: 220px; text-align: center; }
 
 /* Silver tape (×4): selo prata, nem dourado nem roxo */
 .idle .selo-bonus.silver { color: var(--paper); background: var(--i-painel2); box-shadow: 0 0 0 2px var(--i-mudo); }

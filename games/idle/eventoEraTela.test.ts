@@ -222,6 +222,24 @@ describe('eventos das eras 6 e 7 na tela', () => {
     expect(o.aoDesvio).toHaveBeenCalledTimes(3);
     expect(raiz.querySelector('.evento-era-6')).toBeNull();
   });
+  it('Lixo espacial: aoSair roda depois de cada saída do destroço (clique e troca pelo próximo), já desligado da página', () => {
+    const raiz = document.createElement('div');
+    document.body.append(raiz);
+    const conectado: boolean[] = [];
+    let el: HTMLElement | null = null;
+    const o = { ...opcoes(), aoSair: vi.fn(() => conectado.push(el!.isConnected)) };
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 100_000 });
+    el = destroco(raiz);
+    el!.click(); // saída por clique
+    expect(o.aoSair).toHaveBeenCalledTimes(1);
+    t.tick(103_400); // o 2º entra
+    el = destroco(raiz);
+    t.tick(106_700); // o 3º entra no lugar do 2º, que ninguém clicou
+    expect(o.aoSair).toHaveBeenCalledTimes(2);
+    expect(conectado).toEqual([false, false]);
+    raiz.remove();
+  });
   it('Lixo espacial: sem desviar nenhum, não manda nada; com 1, manda 1 no fim da janela', () => {
     const raiz = document.createElement('div');
     const o = opcoes();

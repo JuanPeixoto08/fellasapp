@@ -6,7 +6,8 @@ import type { IdEfeito } from './efeitos';
 export function sonsDaMudanca(antes: IdleState | null, depois: IdleState): IdEfeito[] {
   if (!antes || antes.user_id !== depois.user_id) return [];
   const sons: IdEfeito[] = [];
-  if (depois.era > antes.era) sons.push(antes.era < 6 && depois.era >= 6 ? 'zaratustra' : 'era'); // a fanfarra ao sair da atmosfera (gerador 31) // vender a startup volta a era: isso tem o som da venda
+  if (depois.era > antes.era) sons.push(antes.era < 6 && depois.era >= 6 ? 'zaratustra' : 'era'); // a fanfarra ao sair da atmosfera (gerador 31)
+  // vender a startup volta a era: isso tem o som da venda
   const chefes = new Set(antes.chefes.map((c) => c.user_id));
   if (depois.chefes.some((c) => !chefes.has(c.user_id))) sons.push('contratado');
   return sons;

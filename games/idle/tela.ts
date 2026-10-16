@@ -1141,6 +1141,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     posicao: (seg, i) => (ultimo?.estado ? posicaoEvento(ultimo.estado.user_id, seg, i) : { x: 0.5, y: 0.5 }),
     aoGol: () => a.efeito('gol'), // cada gol apita
     aoDesvio: () => a.efeito('lixo'), // cada destroço desviado faz "tum"
+    aoSair: () => dicas.conferir(), // o destroço saiu: a caixinha dele fecha
     alarmeEm: palco, // o Houston pisca a cena
     aoBotao: (tipo) => { // a Shopee soa ao abrir a caixa, a call ao sair dela (a mãe e a tela azul soam ao aparecer)
       if (tipo === 2) a.efeito('shopee');

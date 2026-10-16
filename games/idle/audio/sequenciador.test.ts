@@ -116,8 +116,30 @@ describe('a sala das eras 6 e 7', () => {
     expect(canal.ligados).toHaveLength(2);
     expect(molhados(c)).toHaveLength(1);
   });
-  it('no swing (era 3) o molhado fica em 0: o som de sempre', () => {
-    expect(molhados(montarSala(3))).toHaveLength(0);
+  it('no swing (era 3) nem cria a sala: sem convolução rodando à toa', () => {
+    const c = montarSala(3);
+    expect(c.criados.some((n) => n instanceof ConvolverFalso)).toBe(false);
+    expect(molhados(c)).toHaveLength(0);
+    expect(c.ganhos()[0].ligados).toHaveLength(1);
+  });
+  it('na virada do giro da era 5 pra 6 a sala nasce (uma só) com o molhado do espaço; parar desliga', () => {
+    const c = new ContextoFalso();
+    c.state = 'running';
+    const s = criarSequenciador({ ctx: () => comoContexto(c), destino: () => destinoFalso(c) }, { relogio: false, notas: () => [] });
+    const convs = () => c.criados.filter((n) => n instanceof ConvolverFalso);
+    s.tocar(5);
+    expect(convs()).toHaveLength(0);
+    s.mudarEra(6);
+    c.currentTime = 200; // passa do fim do giro da era 5
+    s.passo();
+    expect(convs()).toHaveLength(1);
+    expect(molhados(c)).toHaveLength(1);
+    c.currentTime = 400;
+    s.passo();
+    expect(convs()).toHaveLength(1);
+    const canal = c.ganhos()[0];
+    s.parar();
+    expect(canal.ligados).toHaveLength(0);
   });
   it('o giro da Lua acaba em 64 batidas a 60 bpm (troca de giro em 64 s)', () => {
     const c = new ContextoFalso();

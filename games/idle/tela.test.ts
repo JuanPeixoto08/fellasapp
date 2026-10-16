@@ -503,6 +503,15 @@ describe('tela da Fellas Inc.', () => {
       vi.useRealTimers();
     }
   });
+  it('Houston: o palco ganha a classe alarme enquanto o aviso está na tela; destroço que sai fecha a caixinha (aoSair)', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ estado: estado({ user_id: '4a681416-b4ee-4976-8cdd-540cc816f28c', era: 7, generators: Array(42).fill(1), strategies: [0, 0, 0, 0, 0, 0] }) }));
+    const T = Date.parse('2026-10-12T12:00:00.000Z');
+    tela.eventosEra.mostrar({ seg: T / 1000, tipo: 7, agoraMs: T });
+    expect(root.querySelector('.palco')!.classList.contains('alarme')).toBe(true);
+    root.querySelector<HTMLButtonElement>('.evento-era button')!.click();
+    expect(root.querySelector('.palco')!.classList.contains('alarme')).toBe(false);
+  });
   it('a faixa da cena diz a era: "Era 7 · Lua"', () => {
     const tela = criarTela(root, acoes);
     tela.renderizar(modelo({ estado: estado({ era: 7, generators: Array(42).fill(1), strategies: [0, 0, 0, 0, 0, 0] }) }));
