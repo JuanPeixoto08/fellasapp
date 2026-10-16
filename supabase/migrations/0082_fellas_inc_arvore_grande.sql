@@ -14,14 +14,17 @@ alter table public.idle_arvore add column if not exists nivel int not null defau
 alter table public.idle_arvore drop constraint if exists idle_arvore_nivel_check;
 alter table public.idle_arvore add constraint idle_arvore_nivel_check check (nivel >= 1);
 
--- backfill: a era de agora, ou a das conquistas de era de quem já vendeu (39–42 = eras 2–5; 43, o 1º Foguete = 5);
--- nunca baixa (sem conquista de era = so a era de agora; nada de chute)
+-- backfill: a era de agora, ou a das conquistas de era de quem já vendeu (39–42 = eras 2–5; 43, o 1º Foguete = 5;
+-- 140–145, ter 100 dos geradores 31–36 = era 6; 146–151, dos 37–42 = era 7);
+-- nunca baixa (sem conquista de era = só a era de agora; nada de chute)
 with alvo as (
   select s.user_id,
          greatest(public.idle_era(s.generators),
-                  coalesce(max(case c.conquista_id when 39 then 2 when 40 then 3 when 41 then 4 when 42 then 5 when 43 then 5 end), 1)) as e
+                  coalesce(max(case c.conquista_id when 39 then 2 when 40 then 3 when 41 then 4 when 42 then 5 when 43 then 5
+                                                   when 140 then 6 when 141 then 6 when 142 then 6 when 143 then 6 when 144 then 6 when 145 then 6
+                                                   when 146 then 7 when 147 then 7 when 148 then 7 when 149 then 7 when 150 then 7 when 151 then 7 end), 1)) as e
     from public.idle_state s
-    left join public.idle_conquistas c on c.user_id = s.user_id and c.conquista_id in (39, 40, 41, 42, 43)
+    left join public.idle_conquistas c on c.user_id = s.user_id and c.conquista_id in (39, 40, 41, 42, 43, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151)
    group by s.user_id, s.generators
 )
 update public.idle_state s set era_max = a.e from alvo a where a.user_id = s.user_id and s.era_max < a.e;

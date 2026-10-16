@@ -142,10 +142,10 @@ describe('a maior era (0082 parte A)', () => {
     await t.db.exec(M0082);
     expect((await q<{ e: number }>('select era_max as e from public.idle_state where user_id = $1', [A]))[0].e).toBe(6);
   });
-  it('o backfill nao inventa era: sem conquista de era, a maior era e a de agora (nao 5)', async () => {
+  it('o backfill não inventa era: sem conquista de era, a maior era e a de agora (não 5)', async () => {
     await q('update public.idle_state set era_max = 1, generators = array_fill(0, array[42]) where user_id = $1', [A]);
     await q('delete from public.idle_conquistas where user_id = $1', [A]);
-    await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 1)', [A]); // conquista que nao e de era
+    await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 1)', [A]); // conquista que não é de era
     await t.db.exec(M0082);
     expect((await q<{ e: number }>('select era_max as e from public.idle_state where user_id = $1', [A]))[0].e).toBe(1);
     await q('update public.idle_state set generators[13] = 1 where user_id = $1', [A]); // era 3 de agora, sem conquista
