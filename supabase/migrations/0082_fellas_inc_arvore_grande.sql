@@ -337,3 +337,151 @@ returns table (gen int, renda double precision) language sql stable set search_p
     from public.idle_cat_gen c cross join glob
 $$;
 revoke all on function public.idle_gen_rendas(public.idle_state, timestamptz) from public, anon, authenticated;
+
+-- ===== parte C: Recomeço, Oportunidades, Gente e Horta =====
+
+-- "Abrir CNPJ" (o da 0041) com a árvore grande (0082): F$ inicial × o Abrir outra startup (10^nível) e 1 de cada gerador
+-- das eras 1 a N (Material escolar = 1; Kit primeiro emprego / Mochilão / Nepo baby = 2, 3, 4). Igual a economia.ts abertura.
+create or replace function public.idle_start()
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  g int;
+  v_eras int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if s.started then
+    raise exception 'idle_started' using errcode = 'P0001';
+  end if;
+  s.started := true;
+  s.valuation := greatest(10, public.idle_arv(s.user_id, 'inicio_valuation', 'max', 10)) * public.idle_arv(s.user_id, 'inicio_mult', 'mult', 1);
+  s.generators[1] := greatest(1, public.idle_arv(s.user_id, 'inicio_notebooks', 'max', 1))::int;
+  v_eras := greatest(case when public.idle_arv(s.user_id, 'inicio_era1', 'max', 0) > 0 then 1 else 0 end,
+                     public.idle_arv(s.user_id, 'inicio_eras', 'max', 0)::int);
+  for g in select c.id from public.idle_cat_gen c where c.era <= v_eras loop
+    s.generators[g] := greatest(coalesce(s.generators[g], 0), 1);
+  end loop;
+  s.settled_at := now();
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+
+revoke all on function public.idle_buy_node(int) from public, anon;
+grant execute on function public.idle_buy_node(int) to authenticated;
+revoke all on function public.idle_start() from public, anon;
+grant execute on function public.idle_start() to authenticated;
+
+
+-- preço do próximo contrato (o da 0041) com o Happy hour da firma (0082): o desconto da Gente × (1 − 2% por nível), nunca abaixo de 10% (igual a economia.ts precoContrato)
+create or replace function public.idle_hire_price(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_rate(s) * 1800
+       * power(1.5::double precision, (select count(*) from public.idle_contracts c
+                                        where c.employer_id = s.user_id and c.created_at <= now() and c.ends_at > now()))
+       * coalesce((select exp(sum(ln((e.sociais ->> 'contratoCustoMult')::double precision)))
+                     from public.idle_cat_est e
+                    where e.opcao = s.strategies[e.era - 1] and (e.sociais ->> 'contratoCustoMult') is not null), 1)
+       * greatest(0.1, public.idle_arv(s.user_id, 'contrato_preco', 'min', 1)
+                       * (1 - public.idle_arv(s.user_id, 'contrato_desconto', 'soma', 0)))
+$$;
+revoke all on function public.idle_hire_price(public.idle_state) from public, anon, authenticated;
+
+-- pegar oportunidade (a da 0076) com os 5 tipos novos (0076); o Cliente fiel (0082) faz a de F$ render +2% por nível
+create or replace function public.idle_claim_opportunity(p_window bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_mult double precision;
+  v_rate double precision;
+  v_n    int;
+  v_tipo int;
+  v_lado int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(auth.uid());
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if p_window is null or not (p_window = any (public.idle_opp_list(s))) then
+    raise exception 'idle_opp_gone' using errcode = 'P0001';
+  end if;
+  if s.opp_day is distinct from public.games_today() then
+    s.opp_day := public.games_today();
+    s.opp_count := 0;
+  end if;
+  if s.opp_count >= public.idle_opp_cap(s) then
+    raise exception 'idle_opp_cap' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_mult := coalesce((select exp(sum(ln(e.opp_bonus_mult))) from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]), 1)
+            * public.idle_arv(s.user_id, 'opp_bonus', 'mult', 1);
+  v_rate := public.idle_rate(s);
+  v_n := greatest(1, round(v_mult))::int; -- "rendem o dobro": o ×5 e a metade contam como v_n pegas
+  v_tipo := public.idle_opp_kind(s.user_id, p_window);
+  v_lado := public.idle_horta_lado(coalesce(s.generators[11], 0));
+  -- quem ainda não tem: o Adubo sem Horta (ou sem planta crescendo) e a Informação sem Bolsa pagam os 15 min (o tipo 0) no
+  -- lugar; quem decide é a hora do clique
+  if (v_tipo = 5 and public.idle_horta_crescendo(s.user_id) = 0)
+     or (v_tipo = 7 and coalesce(s.generators[19], 0) < 1) then
+    v_tipo := 0;
+  end if;
+  case v_tipo
+    when 0 then s.valuation := s.valuation + v_rate * 900 * v_mult * (1 + (select b.oportunidades from public.idle_horta_bonus(s.user_id, v_lado, now()) b))
+                               * (1 + public.idle_arv(s.user_id, 'opp_fs', 'soma', 0));
+    -- cada ×5 conta sozinho e dura 1 minuto; com "rendem o dobro" entram v_n de uma vez (2: ×25)
+    when 1 then s.boost_ate := array(select b from unnest(s.boost_ate) b where b > now())
+                               || array_fill(now() + interval '1 minute', array[v_n]);
+    when 2 then s.meias := s.meias + v_n; -- cada uma guardada vale uma compra; com o dobro, guarda duas
+    when 3 then s.chamados := least(3, coalesce(s.chamados, 0) + v_n); -- Chamar um dourado: no máximo 3 (o que passa se perde)
+    when 4 then -- Cupom de primeira compra: 10 compras de gerador 25% mais baratas (20 no dobro)
+      s.cupons := coalesce(s.cupons, 0) + 10 * v_n;
+      s.dourados_cont := public.idle_cont_mais(s.dourados_cont, 'cupons', 1);
+      perform public.idle_ganhar(s.user_id, 'cupons', (s.dourados_cont ->> 'cupons')::double precision);
+    when 5 then -- Adubo de farmácia: as v_n plantas crescendo mais perto de ficar maduras amadurecem agora (a conta já fechou)
+      update public.idle_horta_plantas p set amadurece_s = extract(epoch from now() - p.inicio)
+       where p.id in (select p2.id from public.idle_horta_plantas p2 join public.idle_cat_horta k on k.id = p2.especie
+                       where p2.user_id = s.user_id and p2.fim is null and p2.inicio <= now()
+                         and p2.canteiro / 6 < v_lado and p2.canteiro % 6 < v_lado
+                         and p2.inicio + make_interval(secs => coalesce(p2.amadurece_s, k.amadurece_s)) > now()
+                       order by p2.inicio + make_interval(secs => coalesce(p2.amadurece_s, k.amadurece_s)), p2.id
+                       limit v_n);
+    when 6 then -- Cashback: 30% de volta em toda compra por 2 min (4 no dobro), somando no fim do que já tem
+      s.cashback_ate := greatest(coalesce(s.cashback_ate, now()), now()) + make_interval(secs => 120 * v_n);
+    else -- Informação privilegiada: créditos de Espiar na Bolsa
+      s.info_creditos := coalesce(s.info_creditos, 0) + v_n;
+  end case;
+  s.opp_claimed := array_append(s.opp_claimed, p_window);
+  s.opp_count := s.opp_count + 1;
+  perform public.idle_ganhar(s.user_id, 'opp_dia', s.opp_count); -- "Receba!": 15 num dia
+  s.opp_total := s.opp_total + 1;
+  s.opp_recent := array_append(s.opp_recent, now());
+  s.opp_recent := s.opp_recent[greatest(1, cardinality(s.opp_recent) - 2):];
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
+grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
+
+-- chamam mudar; os descontos seguem até 50% depois de multiplicar. Sem planta: uma linha de zeros (o left join).
+-- × (1 + 5% por nível do Adubo orgânico premium, 0082)
+create or replace function public.idle_horta_bonus(u uuid, lado int, t timestamptz)
+returns table (producao double precision, geradores double precision, melhorias double precision, oportunidades double precision)
+language sql stable set search_path = public as $$
+  with m as (select public.idle_arv(u, 'horta_mult', 'max', 1) * (1 + public.idle_arv(u, 'horta_soma', 'soma', 0)) as m)
+  select coalesce(sum(k.producao), 0) * m.m, least(0.5, coalesce(sum(k.geradores), 0) * m.m),
+         least(0.5, coalesce(sum(k.melhorias), 0) * m.m), coalesce(sum(k.oportunidades), 0) * m.m
+    from m
+    left join (public.idle_horta_plantas p join public.idle_cat_horta k on k.id = p.especie)
+      on p.user_id = u and p.canteiro / 6 < lado and p.canteiro % 6 < lado
+     and p.inicio + make_interval(secs => coalesce(p.amadurece_s, k.amadurece_s)) <= t
+     and t < least(coalesce(p.fim, 'infinity'), p.inicio + make_interval(secs => coalesce(p.amadurece_s, k.amadurece_s) + coalesce(p.vida_s, k.vida_s)))
+   group by m.m
+$$;
+revoke all on function public.idle_horta_bonus(uuid, int, timestamptz) from public, anon, authenticated;

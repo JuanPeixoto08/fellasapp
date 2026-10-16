@@ -771,7 +771,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
         const [bom, ruim] = efeitosTexto(id, p);
         return [{ retrato: ativos.convidado(id), titulo: `${id === TERRY ? 'Terry' : 'Vini'} ${['na frente', 'no meio', 'no canto'][cad.cadeira.indexOf(id)]}`, bonus: bom, defeito: ruim }];
       });
-      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips, efeitosDe(catalogo, s).hortaMult);
+      hortaTela.renderizar(foodTruck ? m.horta : semHorta, taxaSemente, s.valuation, m.ocupado, agoraTela, chips, efeitosDe(catalogo, s).hortaMult * efeitosDe(catalogo, s).hortaSoma); // o Adubo orgânico premium (0082) por cima
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
       const cad = s.convidados ?? SEM_CADEIRAS;

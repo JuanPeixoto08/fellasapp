@@ -3,11 +3,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
-import { efeitosArvore, taxa, type Estado } from '../idle/economia';
-import { freshDb, type TestDb } from './db';
+import { abertura, efeitosArvore, precoContrato, taxa, type Estado } from '../idle/economia';
+import { CAIXA_PADRAO, pendentes } from '../idle/oportunidades';
+import { freshDb, quartaAntesDoCorte, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
 let t: TestDb;
@@ -230,5 +231,57 @@ describe('paridade da produção com a árvore grande (0082 parte B)', () => {
       const [{ v }] = await q<{ v: number }>('select public.idle_rate(s) as v from public.idle_state s where user_id = $1', [A]);
       expect(rel(v, taxa(catalogo, s)), `${nos} ${JSON.stringify(niveis)}`).toBeLessThan(1e-9);
     }
+  });
+});
+
+describe('Recomeço, Oportunidades e Gente com a árvore grande (0082 parte C)', () => {
+  afterEach(() => vi.useRealTimers());
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+    await t.as(A);
+  });
+  const RECOMECO = [1, 21, 22, 23, 24, 25];
+  it.each([
+    ['F$ 1 bi', [...RECOMECO, 206], {}],
+    ['eras 1 e 2', [...RECOMECO, 206, 207], {}],
+    ['F$ 1 tri, eras 1 a 4', [...RECOMECO, 206, 207, 208, 209, 210], {}],
+    ['×10 por nível (3)', [...RECOMECO, 206, 207, 208, 209, 210, 3002], { 3002: 3 }],
+  ] as [string, number[], Record<number, number>][])('abertura: %s (idle_start = economia.ts abertura)', async (_n, nos, niveis) => {
+    await ter(nos, niveis);
+    const esperado = abertura(catalogo, efeitosArvore(catalogo, nos, niveis));
+    const s = await t.rpc<J>('idle_start');
+    expect(rel(s.valuation, esperado.valuation)).toBeLessThan(1e-12);
+    expect(s.generators).toEqual(esperado.generators);
+  });
+  it('contratar: Estágio "pela experiência" (×0,3) e o Happy hour (−2% por nível, piso 10%), igual a precoContrato', async () => {
+    await t.rpc('idle_start');
+    for (const [nos, niveis] of [[[509], {}], [[509, 3005], { 3005: 10 }], [[509, 3005], { 3005: 40 }]] as [number[], Record<number, number>][]) {
+      await q('delete from public.idle_arvore where user_id = $1', [A]);
+      await ter(nos, niveis);
+      const [{ p, g, u, st }] = await q<{ p: number; g: number[]; u: number[]; st: number[] }>(
+        'select public.idle_hire_price(s) as p, s.generators as g, s.upgrades as u, s.strategies as st from public.idle_state s where user_id = $1', [A]);
+      const est = { generators: g, upgrades: u, strategies: st, bonus: { arvore: nos, conquistas: 0, niveis }, social: { contratei: 0, empregos: [] } };
+      expect(rel(p, precoContrato(catalogo, est, 0)), `${nos} ${JSON.stringify(niveis)}`).toBeLessThan(1e-9);
+    }
+  });
+  it('Cliente fiel: a oportunidade de F$ rende +2% por nível (com a Xepa e o Cupom empilhado: ×3 × 1,1)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // numa quarta à tarde, não na virada do dia
+    vi.setSystemTime(quartaAntesDoCorte());
+    await t.rpc('idle_start');
+    await q('update public.idle_state set week_start = public.games_week_start() - 7 where user_id = $1', [A]);
+    const nos = [1, 31, 32, 33, 34, 35, 306, 307, 308, 309, 310, 3003];
+    await ter(nos, { 3003: 5 });
+    const com = await t.rpc<J & { server_now: string; week_start: string }>('idle_open');
+    const agora = Date.parse(com.server_now);
+    const semana = Date.parse(com.week_start + 'T00:00:00-03:00');
+    const lista = pendentes(A, agora, [], semana, { tamanho: efeitosArvore(catalogo, nos).caixinha, validadeS: CAIXA_PADRAO.validadeS });
+    await q(`update public.idle_state set settled_at = now() + interval '1 hour' where user_id = $1`, [A]);
+    // a de F$ em qualquer janela: troca o sorteio do tipo por um que dá sempre 0 (a conta do valor é a que importa aqui)
+    await t.db.exec('create or replace function public.idle_opp_kind(u uuid, w bigint) returns int language sql immutable as $$ select 0 $$;');
+    const w = lista[0];
+    expect(w).toBeDefined();
+    const depois = await t.rpc<J>('idle_claim_opportunity', { p_window: w });
+    expect((depois.valuation - com.valuation) / (com.rate * 900)).toBeCloseTo(3 * 1.1, 6);
   });
 });

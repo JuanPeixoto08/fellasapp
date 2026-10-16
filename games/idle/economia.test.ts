@@ -409,3 +409,24 @@ describe('a árvore grande na produção (igual a idle_gen_rendas e idle_bonus_m
     expect(leg([1003])).toBeCloseTo(1.25 * leg([]), 12);
   });
 });
+
+describe('Recomeço e Gente da árvore grande (igual a idle_start e idle_hire_price na 0082)', () => {
+  it('abertura: F$ 1 bi / 1 tri, 1 de cada gerador das eras 1 a N, e o ×10 por nível do Abrir outra startup', () => {
+    const ab = (nos: number[], niveis: Record<number, number> = {}) => abertura(cat, efeitosArvore(cat, nos, niveis));
+    expect(ab([206]).valuation).toBe(1e9);
+    expect(ab([206, 208]).valuation).toBe(1e12);
+    const g = ab([207]).generators;
+    expect(g.slice(0, 13)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]);
+    const g4 = ab([22, 25, 210]).generators;
+    expect(g4.slice(0, 25)).toEqual([10, ...Array(23).fill(1), 0]);
+    expect(ab([208, 3002], { 3002: 3 }).valuation).toBeCloseTo(1e15, 0);
+  });
+  it('contratar: o desconto da Gente × (1 − 2% por nível), nunca abaixo de 10%', () => {
+    const s = com([[1, 100]], { strategies: [-1, -1, -1, -1, -1, -1] });
+    const preco = (arvore: number[], niveis: Record<number, number> = {}) => precoContrato(cat, { ...s, bonus: { arvore, conquistas: 0, niveis } }, 0);
+    const cheio = precoContrato(cat, s, 0);
+    expect(preco([509]) / cheio).toBeCloseTo(0.3, 12);
+    expect(preco([509, 3005], { 3005: 10 }) / cheio).toBeCloseTo(0.3 * 0.8, 12);
+    expect(preco([509, 3005], { 3005: 40 }) / cheio).toBeCloseTo(0.1, 12);
+  });
+});

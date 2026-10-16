@@ -257,6 +257,16 @@ describe('o ramo Horta da árvore (0061)', () => {
     for (let c = 0; c < 36; c++) await por(c, 7, 7 * 3600);
     expect((await t.rpc<Estado>('idle_open')).horta_bonus.geradores).toBe(0.5);
   });
+  it('Transgênico gourmet (×2) e o Adubo orgânico premium (+5% por nível, 0082): bônus ×2 × 1,25 no nível 5; descontos seguem até 50%', async () => {
+    await por(0, 1, 2 * 3600);
+    await ter([1, 61, 62, 63, 64, 65, 606, 607, 608, 609, 610, 3006]);
+    await q('update public.idle_arvore set nivel = 5 where user_id = $1 and no_id = 3006', [A]);
+    expect((await t.rpc<Estado>('idle_open')).horta_bonus.producao).toBeCloseTo(0.01 * 2 * 1.25, 9);
+    await q('update public.idle_state set generators[11] = 200 where user_id = $1', [A]);
+    await q('delete from public.idle_horta_plantas where user_id = $1', [A]);
+    for (let c = 0; c < 36; c++) await por(c, 7, 7 * 3600);
+    expect((await t.rpc<Estado>('idle_open')).horta_bonus.geradores).toBe(0.5);
+  });
   it('sem planta nenhuma, o bônus com o nó continua zero (uma linha de zeros)', async () => {
     await ter([1, 61, 62, 63, 64]);
     expect((await t.rpc<Estado>('idle_open')).horta_bonus).toEqual({ producao: 0, geradores: 0, melhorias: 0, oportunidades: 0 });

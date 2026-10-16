@@ -169,20 +169,22 @@ export function pontosTotais(r: number): number {
   return n;
 }
 
-/** A empresa do "Abrir CNPJ" com os nós do Recomeço (igual a idle_start na 0041). `gerais`: as melhorias gerais que a
- *  venda manteve (só com "Leva o crachá"). */
+/** A empresa do "Abrir CNPJ" com os nós do Recomeço (igual a idle_start na 0082): F$ inicial × o Abrir outra startup, os notebooks e 1 de cada gerador das eras 1 a N. `gerais`: as melhorias gerais que a venda manteve (só com "Leva o crachá"). */
 export function abertura(cat: Catalogo, ef: EfeitosArvore, gerais: readonly number[] = []): { valuation: number; generators: number[]; upgrades: number[] } {
   const generators = Array(cat.geradores.length).fill(0);
   generators[0] = ef.inicioNotebooks;
-  if (ef.inicioEra1) for (const g of cat.geradores) if (g.era === 1) generators[g.id - 1] = Math.max(generators[g.id - 1], 1);
-  return { valuation: ef.inicioValuation, generators, upgrades: ef.manterGerais ? [...gerais] : [] };
+  // 1 de cada gerador das eras 1 a N: o Material escolar (era 1) e o Kit primeiro emprego / Mochilão / Nepo baby (2, 3, 4)
+  const eras = Math.max(ef.inicioEra1 ? 1 : 0, ef.inicioEras);
+  for (const g of cat.geradores) if (g.era <= eras) generators[g.id - 1] = Math.max(generators[g.id - 1], 1);
+  return { valuation: ef.inicioValuation * ef.inicioMult, generators, upgrades: ef.manterGerais ? [...gerais] : [] };
 }
 
-/** Preço do próximo contrato (igual a idle_hire_price): 30 min da produção × 1,5^(contratos ativos que você fez) × 2 com
- *  Abrir capital × o desconto da árvore. */
+/** Preço do próximo contrato (igual a idle_hire_price na 0082): 30 min da produção × 1,5^(contratos ativos que você fez) ×
+ *  2 com Abrir capital × o desconto da árvore (o menor da Gente × (1 − 2% por nível do Happy hour), nunca abaixo de 10%). */
 export function precoContrato(cat: Catalogo, s: Estado, ativos: number): number {
   const custo = estrategiasAtivas(cat, s).reduce((a, e) => a * (e.sociais.contratoCustoMult ?? 1), 1);
-  return taxa(cat, s) * 1800 * 1.5 ** ativos * custo * efeitosDe(cat, s).contratoPreco;
+  const ef = efeitosDe(cat, s);
+  return taxa(cat, s) * 1800 * 1.5 ** ativos * custo * Math.max(0.1, ef.contratoPreco * (1 - ef.contratoDesconto));
 }
 
 export function estrategiasAtivas(cat: Catalogo, s: Estado): Estrategia[] {

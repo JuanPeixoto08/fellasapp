@@ -176,7 +176,7 @@ export function dicaOportunidade(s: IdleState, tipo: TipoOportunidade, agoraMs: 
   const c = copiasOportunidade(catalogo, s); // "rendem o dobro" (Viralizar / Xepa da feira): conta como 2 pegas
   const rende = (k: number) => (k === 2 ? 'Rendem o dobro' : `Rendem ${k}×`);
   // 0076: os cinco novos, com a Xepa (c = 2) e o "no lugar" de quem não tem Horta/Bolsa
-  const quinze = formatarValor(s.rate * 900 * c * (1 + (s.horta_bonus?.oportunidades ?? 0)));
+  const quinze = formatarValor(s.rate * 900 * c * (1 + (s.horta_bonus?.oportunidades ?? 0)) * efeitosDe(catalogo, s).oppFs); // o Cliente fiel (0082) vale nas de F$
   if (tipo === 3) {
     const tem = s.chamados ?? 0;
     const linhas: LinhaDica[] = [{ texto: c > 1 ? `${rende(c)}: guarda ${c} dourados pra chamar quando quiser (no máximo ${CHAMADOS_MAX})`
