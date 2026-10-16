@@ -195,6 +195,17 @@ describe('nível e marcos', () => {
     await q(`update public.idle_state set strategies = '{0,2,1,0}' where user_id = $1`, [A]);
     expect(await mult()).toBeCloseTo(multMapa(bonus, 3, { marcosMult: 2, porLugar: 0.05 }));
   });
+  it('paridade do mult com a árvore grande: marcos × 1,5 (Rolê que virou lenda) × (1 + 3% por nível do Rolê infinito)', async () => {
+    await lancarJantar();
+    await empresa(4);
+    for (const l of [3, 4, 7]) await abrir(l);
+    await q(`update public.idle_place_state set marcos = '{31,32,41}' where user_id = $1 and lugar in (3, 4)`, [A]);
+    await q(`update public.idle_state set strategies = '{0,2,1,0}' where user_id = $1`, [A]);
+    await q('insert into public.idle_arvore (user_id, no_id, nivel) select $1, unnest($2::int[]), 1', [A, [1, 901, 902, 903, 904, 905, 906, 907, 908]]);
+    await q('insert into public.idle_arvore (user_id, no_id, nivel) values ($1, 3009, 5)', [A]);
+    const [{ m }] = await q<{ m: number }>('select public.idle_place_mult(s) as m from public.idle_state s where user_id = $1', [A]);
+    expect(m).toBeCloseTo(multMapa(0.12, 3, { marcosMult: 2, porLugar: 0.05 }, 1.5 * 1.15));
+  });
 });
 
 const registrar = (u: string, l: number, nome: string, numero: number, quando = 'now()') =>

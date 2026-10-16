@@ -134,7 +134,7 @@ const dois = (x: number) => (Math.round(x * 100) / 100).toLocaleString('pt-BR');
 /** Selos ao lado do F$: "×10 · 0:42", "×100 · 0:15" (dourado a partir de dois, até o primeiro acabar), "Metade · 0:21",
  *  e os de 0076. `viralMs` = quanto dura um Viralizou (o Hype dobra), `combo` = o combo em andamento (combo.ts),
  *  `duracao` = o Hype (o Combo dura isso em min). */
-export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; combo?: number; duracao?: number } = {}): Selo[] {
+export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; combo?: number; duracao?: number; silverMult?: number } = {}): Selo[] {
   const out: Selo[] = [];
   const v = viraisAtivos(s, agoraMs, o.viralMs);
   if (v.length) out.push({ texto: `×${vezes(v.length)} · ${mmss(v[0] - agoraMs)}`, ouro: v.length >= 2 });
@@ -156,8 +156,9 @@ export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; 
   // eras 6–7 (0078): o Silver tape do Houston (×4), prata: nem dourado nem roxo
   if (s.silver_ate && Date.parse(s.silver_ate) > agoraMs) {
     const falta = mmss(Date.parse(s.silver_ate) - agoraMs);
-    out.push({ texto: `Silver tape ×${SILVER_MULT} · ${falta}`, ouro: false, classe: 'silver', dica: { titulo: 'Houston, temos um problema', linhas: [
-      { texto: `Produção ×${SILVER_MULT}, por cima de todo o resto` }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+    const sm = o.silverMult ?? SILVER_MULT; // ×5 com a Fita prateada (0082)
+    out.push({ texto: `Silver tape ×${sm} · ${falta}`, ouro: false, classe: 'silver', dica: { titulo: 'Houston, temos um problema', linhas: [
+      { texto: `Produção ×${sm}, por cima de todo o resto` }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
   }
   // dourados novos e Caixinha (0076): LinkedIn, Combo (e as bolinhas do que está em andamento), Cupom, Cashback e o Chamar.
   // LinkedIn sem gerador rendendo: o banco grava gen null e mult 1 (e o fim); aí não tem o que mostrar

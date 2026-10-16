@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogo } from '../idle/catalogo';
 import { derrubada, kojimaMult, multProducao, trocasAgora } from '../idle/convidados';
 import { abertura, efeitosArvore, precoContrato, taxa, type Estado } from '../idle/economia';
+import { eventoEraEm } from '../idle/eventosEra';
 import { CAIXA_PADRAO, pendentes } from '../idle/oportunidades';
 import type { BolsaEstado } from '../shared/types';
 import { freshDb, quartaAntesDoCorte, type TestDb } from './db';
@@ -367,5 +368,112 @@ describe('Bolsa e PPP com a árvore grande (0082 parte D)', () => {
     const s = await t.rpc<{ convidados: { trocas: number; trocas_t: string | null } }>('idle_conv_sentar', { p_cadeira: 1, p_convidado: 1 });
     expect(s.convidados.trocas).toBe(4);
     expect(s.convidados.trocas_t).not.toBeNull();
+  });
+});
+
+describe('os eventos do Espaço com a árvore grande (0082 parte E)', () => {
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+  });
+  it('TARS (1,5×): os mesmos segundos e tipos que eventoEraEm(…, 1,5) em 60 mil segundos', async () => {
+    await ter([1, 1001, 1002, 1003, 1004, 1005]);
+    const ini = 1_760_000_000;
+    // 60 mil segundos (cada segundo sem sorte consulta a árvore: 200 mil deixaria o teste lento)
+    const sql = await q<{ s: string; e: number }>(
+      `select s::text, e from (select s, public.idle_evento_era($1::uuid, s, 7) as e from generate_series($2::bigint, $3::bigint) s) x
+        where e is not null order by s`, [A, ini, ini + 60_000 - 1]);
+    const ts: { s: string; e: number }[] = [];
+    for (let s = ini; s < ini + 60_000; s++) {
+      const e = eventoEraEm(A, s, 7, 1.5);
+      if (e !== null) ts.push({ s: String(s), e });
+    }
+    expect(ts.length).toBeGreaterThan(40);
+    expect(sql).toEqual(ts);
+  });
+});
+
+describe('pegar os eventos do Espaço com a árvore grande (0082 parte E)', () => {
+  type JE = J & { silver_ate: string | null; evento: { tipo: number; ganho: number; gols: number } };
+  const agoraSeg = async () => Number((await q<{ s: string }>('select floor(extract(epoch from now()))::bigint::text as s'))[0].s);
+  const evento = (seg: number, tipo: number) => q('insert into public.teste_evento_arv values ($1, $2)', [seg, tipo]);
+  const pegar = (seg: number, gols = 0) => t.rpc<JE>('idle_evento_pegar', { p_seg: seg, p_gols: gols, p_tipo: null });
+  const valor = async () => (await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v;
+  const taxaA = async () => (await q<{ r: number }>('select public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]))[0].r;
+  const ESPACO = [1, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009];
+
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.db.exec(`
+      create table public.teste_evento_arv (s bigint, tipo int);
+      create or replace function public.idle_evento_era(u uuid, s bigint, era int) returns int language sql stable as
+        'select x.tipo from public.teste_evento_arv x where x.s = idle_evento_era.s limit 1';`);
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    await q(`update public.idle_state set valuation = 1e12, generators[1:42] = array_fill(1, array[42]), strategies = '{0,0,0,0,0,0}',
+               settled_at = now() + interval '1 day' where user_id = $1`, [A]);
+    await ter(ESPACO);
+  });
+  it('Lixo: 15 min de produção por destroço com o Treino na NASA', async () => {
+    const seg = await agoraSeg();
+    await evento(seg, 6);
+    const r = await taxaA();
+    const antes = await valor();
+    expect((await pegar(seg, 2)).valuation - antes).toBeCloseTo(r * 900 * 2, 0);
+  });
+  it('Houston: o Silver tape dura 3 min e outro soma 3 min no fim', async () => {
+    const seg = await agoraSeg();
+    await evento(seg, 7);
+    const s = await pegar(seg);
+    const agora = Date.parse((await q<{ n: string }>('select now()::text as n'))[0].n);
+    expect(Date.parse(s.silver_ate!) - agora).toBeCloseTo(180_000, -3);
+    await evento(seg - 1, 7);
+    expect(Date.parse((await pegar(seg - 1)).silver_ate!) - agora).toBeCloseTo(360_000, -3);
+  });
+  it('Fita prateada industrial: fechar a conta com o Silver tape vale ×5', async () => {
+    await q(`update public.idle_state set settled_at = now(), silver_ate = now() + interval '40 seconds' where user_id = $1`, [A]);
+    const r = await taxaA();
+    const [{ v0, v1 }] = await q<{ v0: number; v1: number }>(
+      `select s.valuation as v0, (public.idle_settle(s, s.settled_at + interval '100 seconds')).valuation as v1
+         from public.idle_state s where user_id = $1`, [A]);
+    expect(v1 - v0).toBeCloseTo(r * (40 * 5 + 60), 0);
+  });
+  it('Ancoragem manual: a janela dobra (Lixo 20 + 3 s; Jogo do Brasil 60 + 3 s, aceito até 120 s de agora)', async () => {
+    const seg = await agoraSeg();
+    await evento(seg - 21, 6); // 21 s < 23 s
+    await expect(pegar(seg - 21, 1)).resolves.toBeTruthy();
+    await evento(seg - 25, 6);
+    await expect(pegar(seg - 25, 1)).rejects.toThrow(/idle_evento_gone/);
+    await evento(seg - 61, 5); // o Jogo do Brasil: 61 s < 63 s
+    await expect(pegar(seg - 61, 1)).resolves.toBeTruthy();
+  });
+});
+
+describe('Mapa do rolê com a árvore grande (0082 parte E)', () => {
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    await q(`update public.idle_state set valuation = 1e30, generators[1:13] = array_fill(1, array[13]), strategies = '{0,0,-1,-1,-1,-1}'
+              where user_id = $1`, [A]);
+  });
+  it('abrir lugar 50% mais barato (e as horas da caixinha); subir nível 40% mais barato; venda em 15 min; Copão ×1,5', async () => {
+    await ter([1, 901, 902, 903, 904, 905, 906, 907, 908, 909, 910]);
+    const [{ j, r }] = await q<{ j: { lugares: { id: number; preco: number; horas: number }[] }; r: number }>(
+      'select public.idle_mapa_json(s) as j, public.idle_rate(s) as r from public.idle_state s where user_id = $1', [A]);
+    const tee = j.lugares.find((l) => l.id === 3)!;
+    expect(rel(tee.preco, 2 * 3600 * r * 0.5)).toBeLessThan(1e-12);
+    expect(tee.horas).toBeCloseTo(1, 12);
+    const s = await t.rpc<J & { mapa: unknown }>('idle_place_abrir', { p_lugar: 3 });
+    expect(s.mapa).toBeTruthy();
+    expect(await q('select 1 from public.idle_place_state where user_id = $1 and lugar = 3', [A])).toHaveLength(1);
+    await q('update public.idle_place_state set nivel = 2 where user_id = $1 and lugar = 3', [A]);
+    const [{ l }] = await q<{ l: { preco_nivel: number; venda_min: number; copao_mult: number } }>(
+      'select public.idle_lugar_json(s, 3) as l from public.idle_state s where user_id = $1', [A]);
+    expect(rel(l.preco_nivel, 450 * 1.55 * 0.6)).toBeLessThan(1e-12);
+    expect(l.venda_min).toBeCloseTo(15, 12);
+    expect(l.copao_mult).toBe(1.5);
   });
 });

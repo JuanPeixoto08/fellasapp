@@ -257,6 +257,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
 
   const cadAtual = (): Caderno => caderno(ultimo?.l.caderninho ?? []);
   const nivelAtual = () => ultimo?.l.nivel ?? 1;
+  const vendaMs = () => (ultimo?.l.venda_min ? ultimo.l.venda_min * 60_000 : VENDA_MS); // o Drop esgotado (0082) corta pela metade
 
   function escolher(tipo: Tipo, id: number) {
     if (!liberado(tipo, id, nivelAtual())) return;
@@ -424,7 +425,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
         b.lotes[sel.lote].focus();
         atualizarBancada();
       });
-      dicas.ligar(bt, `tee-lote-${k}`, `Lote ${NOMES_LOTE[k].toLowerCase()}`, () => dicaTeeLote(sel.peca, nivelAtual(), k));
+      dicas.ligar(bt, `tee-lote-${k}`, `Lote ${NOMES_LOTE[k].toLowerCase()}`, () => dicaTeeLote(sel.peca, nivelAtual(), k, vendaMs()));
       b.lotes.push(bt);
       lotes.append(bt);
     });
@@ -523,7 +524,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     const rep = repeticao(sel.tema, sel.estilo, m.historico);
     if (rep === 2) avisos.push('Mesmo tema e estilo de uma das 3 últimas: a nota cai.');
     else if (rep === 1) avisos.push('Mesmo tema ou estilo da última coleção: a nota cai um pouco.');
-    avisos.push(`Fica pronta em ${duracao(producaoMs(sel.lote))} e vende por ${duracao(VENDA_MS)}.`);
+    avisos.push(`Fica pronta em ${duracao(producaoMs(sel.lote))} e vende por ${duracao(vendaMs())}.`);
     avisosLancar = avisos;
     // cabe sem rolar: o espaço embaixo do Lançar tem altura fixa e mostra só a primeira; a caixinha do Lançar mostra todas
     aviso.textContent = avisos[0];

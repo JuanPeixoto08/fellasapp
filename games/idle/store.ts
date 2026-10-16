@@ -25,11 +25,11 @@ export const caixa = (estado: IdleState): Caixa => ({ tamanho: efeitos(estado).c
 
 /** Os bônus com tempo do estado que multiplicam a produção toda: LinkedIn (o mult que o banco congelou) e Combo (0076) e o
  *  Silver tape do Houston (0078). */
-export function fatoresTempo(s: Pick<IdleState, 'linkedin_ate' | 'linkedin_mult' | 'combo_ate' | 'silver_ate'>): FatorTempo[] {
+export function fatoresTempo(s: Pick<IdleState, 'linkedin_ate' | 'linkedin_mult' | 'combo_ate' | 'silver_ate'>, silverMult = SILVER_MULT): FatorTempo[] {
   const out: FatorTempo[] = [];
   if (s.linkedin_ate && s.linkedin_mult) out.push({ ateMs: Date.parse(s.linkedin_ate), mult: s.linkedin_mult });
   if (s.combo_ate) out.push({ ateMs: Date.parse(s.combo_ate), mult: COMBO_MULT });
-  if (s.silver_ate) out.push({ ateMs: Date.parse(s.silver_ate), mult: SILVER_MULT });
+  if (s.silver_ate) out.push({ ateMs: Date.parse(s.silver_ate), mult: silverMult }); // ×5 com a Fita prateada (0082)
   return out;
 }
 
@@ -39,7 +39,7 @@ export function valuationAgora(a: Ancora, clienteMs: number): number {
   const virais = (a.estado.viral ?? []).map(Date.parse); // Viralizou: ×10 cada (sem teto), igual ao banco
   const marmita = a.estado.marmita_ate ? Date.parse(a.estado.marmita_ate) : null; // Marmita da mãe: ×3 (0074)
   return acumular(a.estado.valuation, a.estado.rate, a.servidorMs, agoraServidor(a, clienteMs), boost, virais,
-    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita, fatoresTempo(a.estado));
+    VIRAL_MS * efeitos(a.estado).douradoDuracao, marmita, fatoresTempo(a.estado, efeitos(a.estado).silverMult));
 }
 
 export function faseDoEstado(estado: IdleState, atual: Fase): Fase {

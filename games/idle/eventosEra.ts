@@ -22,6 +22,10 @@ export const DESVIO_S = 600;
 /** Houston (era 7): o Silver tape multiplica a produção por 4 por 2 min (outro com um valendo soma 2 min no fim). */
 export const SILVER_MULT = 4;
 export const SILVER_S = 120;
+/** O que a árvore grande muda nos eventos (o Espaço): minutos por destroço, minutos e × do Silver tape. Os campos têm os
+ *  nomes de EfeitosArvore: dá pra passar os efeitos direto. */
+export type EventoArvore = { lixoMin: number; silverMin: number; silverMult: number };
+export const EVENTO_PADRAO: EventoArvore = { lixoMin: DESVIO_S / 60, silverMin: SILVER_S / 60, silverMult: SILVER_MULT };
 
 const P = 2147483647n;
 const K = 1013904223n;
@@ -32,10 +36,11 @@ function h2(uid: string, s: number): bigint {
   return mistura((b * b * 16807n + b * 69621n + BigInt(semente(uid)) * 48271n + 4242n) % P);
 }
 
-/** O evento de era do segundo `s` pra quem está na era `era`, ou null. */
-export function eventoEraEm(uid: string, s: number, era: number): TipoEventoEra | null {
+/** O evento de era do segundo `s` pra quem está na era `era`, ou null. `freq` (o TARS da árvore, 1,5): uma 2ª chance de
+ *  1 em 3600 a cada 0,5 a mais no mesmo número (igual a idle_evento_era na 0082). */
+export function eventoEraEm(uid: string, s: number, era: number, freq = 1): TipoEventoEra | null {
   const h = h2(uid, s);
-  if (h % BigInt(CHANCE_EVENTO) !== 0n) return null;
+  if (h % BigInt(CHANCE_EVENTO) !== 0n && !(freq > 1 && Number(mistura(h + 777n) % 3600n) < Math.round(2 * (freq - 1)))) return null;
   const ate = Math.max(1, Math.min(era, ULTIMA_ERA_COM_EVENTO));
   const total = ate - 1 + 3; // os antigos pesam 1, o da sua era 3
   let r = Number(mistura(h) % BigInt(total));
@@ -71,18 +76,19 @@ export const silverAtivo = (s: { silver_ate?: string | null }, agoraMs: number) 
 
 // ---------- textos ----------
 /** Quanto entra em F$ na hora, com a produção `rate` de agora: Shopee (se sair F$), a call, 1 gol, 1 destroço desviado; no
- *  Houston, o que o ×4 dá a mais nos 2 min. */
-export function ganhoEventoAgora(tipo: TipoEventoEra, rate: number): number {
+ *  Houston, o que o Silver tape dá a mais enquanto dura. `ev`: o que a árvore muda (o Espaço). */
+export function ganhoEventoAgora(tipo: TipoEventoEra, rate: number, ev: EventoArvore = EVENTO_PADRAO): number {
   if (tipo === 2) return rate * 3600 * 0.8;
   if (tipo === 3) return rate * 1800;
   if (tipo === 5) return rate * 300;
-  if (tipo === 6) return rate * DESVIO_S;
-  if (tipo === 7) return rate * SILVER_S * (SILVER_MULT - 1);
+  if (tipo === 6) return rate * 60 * ev.lixoMin;
+  if (tipo === 7) return rate * 60 * ev.silverMin * (ev.silverMult - 1);
   return 0;
 }
 
-/** O texto que sobe quando pega (com o que o banco mandou em `evento`). */
-export function textoEventoPegou(e: EventoPago): string {
+const num = (x: number) => x.toLocaleString('pt-BR');
+/** O texto que sobe quando pega (com o que o banco mandou em `evento`; `ev` = o que a árvore muda no Espaço). */
+export function textoEventoPegou(e: EventoPago, ev: EventoArvore = EVENTO_PADRAO): string {
   if (e.tipo === 1) return 'Marmita da mãe! ×3 por 3 min';
   if (e.tipo === 2) {
     if (e.premio === 1) return 'Promoção! Tudo pela metade por 1 min';
@@ -92,6 +98,6 @@ export function textoEventoPegou(e: EventoPago): string {
   if (e.tipo === 3) return `Fugiu da call! +${formatarValor(e.ganho)}`;
   if (e.tipo === 4) return 'Atualização instalada! Melhorias −25%';
   if (e.tipo === 6) return `${e.gols} ${e.gols === 1 ? 'destroço desviado' : 'destroços desviados'}! +${formatarValor(e.ganho)}`;
-  if (e.tipo === 7) return `Consertado com silver tape! ×${SILVER_MULT} por 2 min`;
+  if (e.tipo === 7) return `Consertado com silver tape! ×${num(ev.silverMult)} por ${num(ev.silverMin)} min`;
   return `${e.gols} ${e.gols === 1 ? 'gol' : 'gols'}! +${formatarValor(e.ganho)}`;
 }

@@ -1139,7 +1139,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       dicas.conferir(); // o evento saiu da tela: a caixinha dele fecha
       a.pegarEventoEra(seg, gols, pos, tipo);
     },
-    dica: (alvo, chave, tipo) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaEventoEra(tipo, ultimo.estado.rate) : null)),
+    dica: (alvo, chave, tipo) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaEventoEra(tipo, ultimo.estado.rate, efeitosDe(catalogo, ultimo.estado)) : null)),
     posicao: (seg, i) => (ultimo?.estado ? posicaoEvento(ultimo.estado.user_id, seg, i) : { x: 0.5, y: 0.5 }),
     aoGol: () => a.efeito('gol'), // cada gol apita
     aoDesvio: () => a.efeito('lixo'), // cada destroço desviado faz "tum"
@@ -1165,7 +1165,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   function relogioBonus(s: IdleState | null, agoraMs: number) {
     // o Hype dobra o Viralizou (o selo ×10 vale o tempo todo) e o Combo; as bolinhas do combo em andamento (combo.ts)
     const dur = s ? efeitosDe(catalogo, s).douradoDuracao : 1;
-    const lista = s ? selosBonus(s, agoraMs, { viralMs: VIRAL_MS * dur, combo: comboAgora(s, agoraMs), duracao: dur }) : [];
+    const lista = s ? selosBonus(s, agoraMs, { viralMs: VIRAL_MS * dur, combo: comboAgora(s, agoraMs), duracao: dur, silverMult: efeitosDe(catalogo, s).silverMult }) : [];
     const antes = selosAgora;
     selosAgora = lista;
     const mesmos = lista.length === antes.length && lista.every((x, i) => x.ouro === antes[i].ouro && x.dica?.titulo === antes[i].dica?.titulo

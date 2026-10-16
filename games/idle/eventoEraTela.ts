@@ -85,9 +85,9 @@ export type OpcoesEventoEra = {
 /** Bola acima disto (fração da tela, do topo): o placar vai pra baixo dela, senão sairia da tela/cobriria o topo. */
 const PLACAR_EMBAIXO_Y = 0.25;
 const passoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / 1500));
-/** Lixo espacial: cada destroço atravessa em um terço da janela, um depois do outro. */
+/** Lixo espacial: cada destroço atravessa em um terço da janela, um depois do outro (a janela pode vir dobrada da árvore). */
 export const PASSO_DESTROCO_MS = (JANELA_EVENTO_S[6] * 1000) / MAX_DESVIOS;
-const destrocoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / PASSO_DESTROCO_MS));
+const destrocoDe = (seg: number, agoraMs: number, passoMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / passoMs));
 /** Folga da caixa até a borda da tela (px). */
 const MARGEM_TELA = 8;
 /** O centro (px) de uma caixa `tam` empurrado pra ela caber inteira na tela, com `margem` de folga; maior que a
@@ -107,7 +107,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   raiz.append(camada);
   // a bola fica no pulo `passo + gols`: anda a cada 1,5 s e a cada gol
   // `base` = o ponto sorteado (a caixa volta a ele e é presa de novo quando a tela muda de tamanho)
-  let atual: { seg: number; tipo: TipoEventoEra; ateMs: number; caixa: HTMLElement; gols: number; passo: number; pos: Ponto; base?: Ponto } | null = null;
+  let atual: { seg: number; tipo: TipoEventoEra; ateMs: number; caixa: HTMLElement; gols: number; passo: number; passoMs: number; pos: Ponto; base?: Ponto } | null = null;
   const encerrados = new Set<number>();
   window.addEventListener('resize', () => {
     if (atual?.base) atual.pos = posicionarCaixa(atual.caixa, atual.base);
@@ -169,7 +169,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   }
   /** O destroço `i` (0 a 2): entra pela esquerda numa altura sorteada e atravessa em um terço da janela (o CSS anda; o
    *  atraso negativo acerta quem voltou pra aba no meio). Cada um conta uma vez: clicou, ele sai. */
-  function lancarDestroco(caixa: HTMLElement, seg: number, i: number, agoraMs: number) {
+  function lancarDestroco(caixa: HTMLElement, seg: number, i: number, agoraMs: number, passoMs: number) {
     const velho = caixa.querySelector('.evento-destroco');
     if (velho) {
       velho.remove();
@@ -182,8 +182,8 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
     b.className = 'evento-destroco';
     b.setAttribute('aria-label', 'Desviar do destroço');
     b.style.top = `${Math.round(p.y * 100)}%`;
-    b.style.setProperty('--passo', `${Math.round(PASSO_DESTROCO_MS)}ms`);
-    b.style.setProperty('--ja', `-${Math.max(0, Math.round(agoraMs - seg * 1000 - i * PASSO_DESTROCO_MS))}ms`);
+    b.style.setProperty('--passo', `${Math.round(passoMs)}ms`);
+    b.style.setProperty('--ja', `-${Math.max(0, Math.round(agoraMs - seg * 1000 - i * passoMs))}ms`);
     b.append(icone(6));
     b.addEventListener('click', () => {
       if (!atual || atual.seg !== seg || atual.passo !== i) return;
@@ -201,17 +201,19 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
   }
 
   return {
-    mostrar(e: { seg: number; tipo: TipoEventoEra; agoraMs: number }) {
-      const ateMs = (e.seg + JANELA_EVENTO_S[e.tipo]) * 1000;
+    mostrar(e: { seg: number; tipo: TipoEventoEra; agoraMs: number; janelaS?: number }) {
+      const janela = e.janelaS ?? JANELA_EVENTO_S[e.tipo]; // a Ancoragem manual (0082) dobra
+      const ateMs = (e.seg + janela) * 1000;
       if (atual || encerrados.has(e.seg) || e.agoraMs >= ateMs) return;
       const caixa = document.createElement('div');
       caixa.className = `evento-era evento-era-${e.tipo}`;
-      caixa.style.setProperty('--janela', `${JANELA_EVENTO_S[e.tipo]}s`);
+      caixa.style.setProperty('--janela', `${janela}s`);
       caixa.style.setProperty('--ja', `-${Math.max(0, Math.round((e.agoraMs - e.seg * 1000) / 1000))}s`);
-      const passo = e.tipo === 5 ? passoDe(e.seg, e.agoraMs) : e.tipo === 6 ? destrocoDe(e.seg, e.agoraMs) : 0;
+      const passoMs = (janela * 1000) / MAX_DESVIOS;
+      const passo = e.tipo === 5 ? passoDe(e.seg, e.agoraMs) : e.tipo === 6 ? destrocoDe(e.seg, e.agoraMs, passoMs) : 0;
       const pos = o.posicao(e.seg, passo);
       // a tela azul é a faixa inteira no meio da tela (o CSS força o left em 50%)
-      atual = { seg: e.seg, tipo: e.tipo, ateMs, caixa, gols: 0, passo, pos: e.tipo === 4 ? { x: 0.5, y: pos.y } : pos };
+      atual = { seg: e.seg, tipo: e.tipo, ateMs, caixa, gols: 0, passo, passoMs, pos: e.tipo === 4 ? { x: 0.5, y: pos.y } : pos };
       if (e.tipo === 5) {
         const placar = document.createElement('div');
         placar.className = 'evento-placar';
@@ -241,7 +243,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         placar.className = 'evento-placar lixo-placar';
         caixa.append(placar);
         contarDesvios(caixa, 0);
-        lancarDestroco(caixa, e.seg, passo, e.agoraMs);
+        lancarDestroco(caixa, e.seg, passo, e.agoraMs, passoMs);
       } else {
         const t = e.tipo;
         const balao = document.createElement('div');
@@ -283,10 +285,10 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         }
       }
       if (atual.tipo === 6) {
-        const i = destrocoDe(atual.seg, agoraMs);
+        const i = destrocoDe(atual.seg, agoraMs, atual.passoMs);
         if (i > atual.passo) {
           atual.passo = i;
-          lancarDestroco(atual.caixa, atual.seg, i, agoraMs);
+          lancarDestroco(atual.caixa, atual.seg, i, agoraMs, atual.passoMs);
         }
       }
     },

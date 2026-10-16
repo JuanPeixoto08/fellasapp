@@ -4,8 +4,9 @@ import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
   dicaContratos, dicaDesafio, dicaDourado, dicaEspiar, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
-  dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, tempoDeProducao,
+  dicaCupPreco, dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, num, tempoDeProducao,
 } from './dica';
+import { lucroVenda as lucroVendaCup } from './copao';
 import { caderno } from './camisetaria';
 import { MARCOS } from './mapa';
 import type { LugarEstado } from '../shared/types';
@@ -411,6 +412,16 @@ describe('eventos das eras 6 e 7 na caixinha', () => {
     expect(textos(dicaEventoEra(6, 2000))).toEqual(['Cada destroço desviado: F$ 1,2 mi (até 3)', '10 min da sua produção por destroço']);
     expect(textos(dicaEventoEra(7, 2000))).toEqual(['Produção ×4 por 2 min: +F$ 720 mil a mais', 'Pegar outro com um valendo soma 2 min']);
     expect(dicaEventoEra(7, 2000).titulo).toBe('Houston, temos um problema');
+  });
+  it('com a árvore grande: as caixinhas do Lixo, do Houston, da Camisetaria e do Copão dizem os números de agora', () => {
+    const ev = { lixoMin: 15, silverMin: 3, silverMult: 5 };
+    expect(textos(dicaEventoEra(6, 2000, ev))).toEqual(['Cada destroço desviado: F$ 1,8 mi (até 3)', '15 min da sua produção por destroço']);
+    expect(textos(dicaEventoEra(7, 2000, ev))).toEqual(['Produção ×5 por 3 min: +F$ 1,44 mi a mais', 'Pegar outro com um valendo soma 3 min']);
+    expect(dicaTeeLote(1, 1, 0, 15 * 60_000)).toBe('12 peças por 36 cupons. Fica pronto em 2 min e vende em 15 min a 19,5 cupons a peça: esgotando, rende 234.');
+    const c = { base: 1, tamanho: 1, forca: 1, preco: 10 };
+    const lucro = lucroVendaCup(c) * 1.5;
+    expect(dicaCupPreco(c, 1.5)).toContain(lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`);
+    expect(dicaCupPreco(c, 1.5)).not.toBe(dicaCupPreco(c));
   });
   it('a produção mostra o Silver tape valendo', () => {
     const s = comTaxa({ silver_ate: '2026-10-12T12:01:00.000Z' });

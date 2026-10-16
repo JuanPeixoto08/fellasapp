@@ -11,7 +11,7 @@ import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, Lug
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
 import { quantasCompradas, somDaCompra, sonsDaMudanca } from './audio/eventos';
-import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from './eventosEra';
+import { descontoAtivo, eventoEraEm, JANELA_EVENTO_S, textoEventoPegou, type TipoEventoEra } from './eventosEra';
 import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, resultadoTigre, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
 import { VIRAL_MS } from './economia';
 import { eventoEm, eventosEntre, naCena } from './convidados';
@@ -325,7 +325,7 @@ const tela = criarTela(document.getElementById('app')!, {
       const s = await api.idleEventoPegar(seg, gols, tipo);
       aplicar(s);
       audio.tocar('douradoPego');
-      if (chaves.avisos && s.evento) tela.dourados.subirTexto(textoEventoPegou(s.evento), p.x, p.y);
+      if (chaves.avisos && s.evento) tela.dourados.subirTexto(textoEventoPegou(s.evento, efeitos(s)), p.x, p.y);
     } catch (e) {
       const err = toGameError(e);
       if (err.code === 'no_session') fase = 'sem_sessao';
@@ -617,7 +617,7 @@ if (import.meta.env.DEV) {
     mostrarDourado(seg, tipo, agoraSrv(), ancora ? efeitos(ancora.estado).douradoTela : JANELA_S);
   // __eventoEra(tipo) (dev/mockIdle.ts) força um evento de era agora
   (window as unknown as { __mostrarEventoEra: (seg: number, tipo: TipoEventoEra) => void }).__mostrarEventoEra = (seg, tipo) =>
-    tela.eventosEra.mostrar({ seg, tipo, agoraMs: agoraSrv() });
+    tela.eventosEra.mostrar({ seg, tipo, agoraMs: agoraSrv(), janelaS: JANELA_EVENTO_S[tipo] * (ancora ? efeitos(ancora.estado).eraJanela : 1) });
 }
 
 function render() {
@@ -754,11 +754,13 @@ setInterval(() => {
       const e = eventoEm(ancora.estado, g.seg);
       if (e && agoraMs < (g.seg + e.janelaS) * 1000) mostrarDourado(g.seg, e.tipo, agoraMs, e.janelaS, e.dobro);
     }
-    // eventos de era: olha 30 s pra trás (a janela mais longa); um por vez, e não no segundo de um dourado
-    for (let x = Math.max(segVistoEra + 1, seg - 29); x <= seg; x++) {
-      const t = eventoEraEm(ancora.estado.user_id, x, ancora.estado.era);
+    // eventos de era: olha pra trás a janela mais longa (30 s; 60 com a Ancoragem manual); um por vez, e não no segundo de
+    // um dourado; o TARS (0082) põe mais segundos na roda
+    const efe = efeitos(ancora.estado);
+    for (let x = Math.max(segVistoEra + 1, seg - (30 * efe.eraJanela - 1)); x <= seg; x++) {
+      const t = eventoEraEm(ancora.estado.user_id, x, ancora.estado.era, efe.eraFreq);
       if (t !== null && !eventoEm(ancora.estado, x) && !tela.eventosEra.ativo()) {
-        tela.eventosEra.mostrar({ seg: x, tipo: t, agoraMs });
+        tela.eventosEra.mostrar({ seg: x, tipo: t, agoraMs, janelaS: JANELA_EVENTO_S[t] * efe.eraJanela });
         // a mãe, a tela azul e o alarme do Houston soam ao aparecer; a Shopee, a call, os gols e os destroços soam na ação
         if (tela.eventosEra.ativo() && (t === 1 || t === 4 || t === 7)) audio.tocar(t === 1 ? 'mae' : t === 4 ? 'telaAzul' : 'houston');
       }

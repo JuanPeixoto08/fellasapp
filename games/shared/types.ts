@@ -249,7 +249,7 @@ export type LugarEstado = {
   id: number; moeda_nome: string | null; numero: 'pct' | 'nota' | 'estrelas' | null; lancado: boolean;
   nome: string | null; frase: string | null; icone: string | null;
   aberto: boolean; nivel: number | null; moeda: number | null; fas: number | null; volume: number | null; lendario: boolean | null;
-  marcos: number[]; preco_nivel: number | null;
+  marcos: number[]; preco_nivel: number | null; /** árvore grande (0082): quanto a Camisetaria leva pra vender (min) e o × das fichas do Copão */ venda_min?: number; copao_mult?: number;
   desafio: { id: number; texto: string; premio: 'horas' | 'legado' | 'investidor'; premio_valor: number; feito: boolean } | null;
   podio: ProducaoLugar[]; semana: { user_id: string; numero: number; avatar: IdleVisual | null }[];
   dono: { user_id: string; numero: number; avatar: IdleVisual | null } | null;

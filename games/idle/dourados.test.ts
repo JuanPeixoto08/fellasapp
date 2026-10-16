@@ -237,4 +237,9 @@ describe('selo do Silver tape (0078)', () => {
     expect(s.dica!.linhas.map((l) => l.texto)).toEqual(['Produção ×4, por cima de todo o resto', 'Acaba em 1:52']);
     expect(selosBonus({ promo_ate: null, viral: [], silver_ate: em(-1) }, T)).toEqual([]);
   });
+  it('com a Fita prateada (0082) o selo e a caixinha dizem ×5', () => {
+    const [s] = selosBonus({ promo_ate: null, viral: [], silver_ate: em(112) }, T, { silverMult: 5 });
+    expect(s.texto).toBe('Silver tape ×5 · 1:52');
+    expect(s.dica!.linhas[0].texto).toBe('Produção ×5, por cima de todo o resto');
+  });
 });

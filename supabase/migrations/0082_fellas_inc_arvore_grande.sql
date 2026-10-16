@@ -1021,3 +1021,528 @@ end;
 $$;
 revoke all on function public.idle_conv_sentar(int, int) from public, anon;
 grant execute on function public.idle_conv_sentar(int, int) to authenticated;
+
+
+-- ===== parte E: Mapa do rolê, Camisetaria, Copão e os eventos do Espaço =====
+
+-- quantos lugares abertos e o JSON do mapa (pinos). Sem linha em idle_state: tudo fechado. (0082: a árvore grande)
+create or replace function public.idle_mapa_json(s public.idle_state)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'mapa', (select m.png from public.idle_map m where m.id = 1),
+    'lugares', (select jsonb_agg(jsonb_build_object(
+        'id', c.id, 'faixa', c.faixa, 'lote', c.lote, 'lancado', c.lancado, 'horas', c.horas * public.idle_arv(s.user_id, 'mapa_abrir', 'min', 1), 'era', c.era,
+        'moeda', c.moeda, 'numero', c.numero,
+        'preco', case when s.started then c.horas * 3600 * public.idle_rate(s) * public.idle_arv(s.user_id, 'mapa_abrir', 'min', 1) else 0 end,
+        -- lugar em breve não conta o que é: sem nome, frase nem ícone (só a posição do pino)
+        'nome', case when c.lancado then p.nome end, 'frase', case when c.lancado then p.frase end,
+        'icone', case when c.lancado then p.icone end, 'x', p.x, 'y', p.y,
+        'aberto', st.lugar is not null, 'nivel', st.nivel, 'moeda_qtd', st.moeda, 'fas', st.fas,
+        'dono', (select jsonb_build_object('user_id', w.dono_id, 'avatar', public.idle_avatar_json(w.dono_id))
+                   from public.idle_place_weeks w
+                  where w.lugar = c.id and w.week_start = public.games_week_start() - 7 and w.dono_id is not null))
+        order by c.id)
+      from public.idle_cat_place c
+      left join public.idle_places p on p.id = c.id
+      left join public.idle_place_state st on st.user_id = s.user_id and st.lugar = c.id),
+    'mult', public.idle_place_mult(s))
+$$;
+revoke all on function public.idle_mapa_json(public.idle_state) from public, anon, authenticated;
+
+-- abrir um lugar do mapa, com o desconto da árvore (0082: a árvore grande)
+create or replace function public.idle_place_abrir(p_lugar int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  c       public.idle_cat_place;
+  v_preco double precision;
+  v_n     int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  select * into c from public.idle_cat_place where id = p_lugar;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if not c.lancado or public.idle_era(s.generators) < c.era then
+    raise exception 'idle_locked' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.idle_place_state where user_id = s.user_id and lugar = p_lugar) then
+    raise exception 'idle_lugar_aberto' using errcode = 'P0001';
+  end if;
+  v_preco := c.horas * 3600 * public.idle_rate(s) * public.idle_arv(s.user_id, 'mapa_abrir', 'min', 1);
+  if v_preco <= 0 or s.valuation < v_preco then
+    raise exception 'idle_cant_afford' using errcode = 'P0001';
+  end if;
+  s.valuation := s.valuation - v_preco;
+  perform public.idle_save(s);
+  insert into public.idle_place_state (user_id, lugar, moeda) values (s.user_id, p_lugar, c.moeda_inicial);
+  select count(*) into v_n from public.idle_place_state where user_id = s.user_id;
+  perform public.idle_ganhar(s.user_id, 'mapa_abriu', v_n);
+  return public.idle_json(s) || jsonb_build_object('mapa', public.idle_mapa_json(s));
+end;
+$$;
+revoke all on function public.idle_place_abrir(int) from public, anon;
+grant execute on function public.idle_place_abrir(int) to authenticated;
+
+-- o mult dos lugares: marcos × Monopólio × a árvore (0082: a árvore grande)
+create or replace function public.idle_place_mult(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  with est as (
+    select e.sociais from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
+  )
+  select 1
+       + coalesce((select sum(m.bonus) from public.idle_place_state st
+                     join public.idle_cat_place_marco m on m.id = any (st.marcos)
+                    where st.user_id = s.user_id), 0)
+         * coalesce((select max((x.sociais ->> 'marcosMult')::double precision) from est x
+                      where (x.sociais ->> 'marcosMult') is not null), 1)
+         * public.idle_arv(s.user_id, 'marcos_mult', 'max', 1) * (1 + public.idle_arv(s.user_id, 'marcos_soma', 'soma', 0))
+       + coalesce((select sum((x.sociais ->> 'porLugar')::double precision) from est x
+                    where (x.sociais ->> 'porLugar') is not null), 0)
+         * (select count(*) from public.idle_place_state st where st.user_id = s.user_id)
+$$;
+revoke all on function public.idle_place_mult(public.idle_state) from public, anon, authenticated;
+
+-- subir o nível do lugar, com o desconto da árvore (0082: a árvore grande)
+create or replace function public.idle_place_nivel(p_lugar int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  st      public.idle_place_state;
+  c       public.idle_cat_place;
+  v_custo double precision;
+  v_novos int[];
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  select * into st from public.idle_place_state where user_id = s.user_id and lugar = p_lugar for update;
+  if not found then
+    raise exception 'idle_lugar_fechado' using errcode = 'P0001';
+  end if;
+  if st.nivel >= 25 then
+    raise exception 'idle_lugar_nivel_max' using errcode = 'P0001';
+  end if;
+  select * into c from public.idle_cat_place where id = p_lugar;
+  v_custo := c.custo_base * power(1.55, st.nivel - 1) * public.idle_arv(s.user_id, 'mapa_nivel', 'min', 1);
+  if st.moeda < v_custo then
+    raise exception 'idle_lugar_moeda' using errcode = 'P0001';
+  end if;
+  perform public.idle_save(s);
+  update public.idle_place_state set moeda = moeda - v_custo, nivel = nivel + 1 where user_id = s.user_id and lugar = p_lugar;
+  v_novos := public.idle_place_marcos(s.user_id, p_lugar);
+  return public.idle_json(s) || jsonb_build_object('lugar', public.idle_lugar_json(s, p_lugar), 'marcos_novos', to_jsonb(v_novos));
+end;
+$$;
+revoke all on function public.idle_place_nivel(int) from public, anon;
+grant execute on function public.idle_place_nivel(int) to authenticated;
+
+-- a tela do lugar (substitui a provisória da parte B) (0082: a árvore grande)
+create or replace function public.idle_lugar_json(s public.idle_state, p_lugar int)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'id', c.id, 'moeda_nome', c.moeda, 'numero', c.numero, 'lancado', c.lancado,
+    'nome', case when c.lancado then p.nome end, 'frase', case when c.lancado then p.frase end,
+    'icone', case when c.lancado then p.icone end,
+    'aberto', st.lugar is not null, 'nivel', st.nivel, 'moeda', st.moeda, 'fas', st.fas, 'volume', st.volume,
+    'lendario', st.lendario, 'marcos', to_jsonb(coalesce(st.marcos, '{}')),
+    'preco_nivel', case when st.nivel < 25 then c.custo_base * power(1.55, st.nivel - 1) * public.idle_arv(s.user_id, 'mapa_nivel', 'min', 1) end,
+    'desafio', (select jsonb_build_object('id', d.id, 'texto', d.texto, 'premio', d.premio, 'premio_valor', d.premio_valor,
+                                          'feito', exists (select 1 from public.idle_place_challenges ch
+                                                            where ch.user_id = s.user_id and ch.lugar = c.id
+                                                              and ch.week_start = public.games_week_start()))
+                  from public.idle_place_desafio_da_semana(c.id) d where d.id is not null),
+    'podio', public.idle_place_podio(c.id),
+    'semana', public.idle_place_semana(c.id),
+    'dono', (select jsonb_build_object('user_id', w.dono_id, 'numero', w.numero, 'avatar', public.idle_avatar_json(w.dono_id))
+               from public.idle_place_weeks w
+              where w.lugar = c.id and w.week_start = public.games_week_start() - 7 and w.dono_id is not null),
+    'caderninho', coalesce((select jsonb_agg(jsonb_build_object('tipo', n.tipo, 'a', n.a, 'b', n.b, 'rotulo', n.rotulo)
+                                             order by n.tipo, n.a, n.b)
+                              from public.idle_place_notes n where n.user_id = s.user_id and n.lugar = c.id), '[]'::jsonb),
+    'mecanica', public.idle_place_mecanica_json(s, c.id),
+    'venda_min', 30 * public.idle_arv(s.user_id, 'tee_tempo', 'min', 1),
+    'copao_mult', public.idle_arv(s.user_id, 'copao_mult', 'max', 1),
+    'server_now', now())
+  from public.idle_cat_place c
+  left join public.idle_places p on p.id = c.id
+  left join public.idle_place_state st on st.user_id = s.user_id and st.lugar = c.id
+  where c.id = p_lugar
+$$;
+revoke all on function public.idle_lugar_json(public.idle_state, int) from public, anon, authenticated;
+
+-- Uma por vez (em produção ou à venda). Calcula tudo agora (notas, média, procura, %, rótulo, peça × tema, o tema da semana)
+-- e grava; a tela só mostra o resultado quando fica pronta. "O fornecedor fia": sem cupom pro lote pequeno da peça, o lote
+-- pequeno sai de graça, no máximo uma vez a cada 24 h (podeFiar). (0082: a árvore grande)
+create or replace function public.idle_tee_lancar(p_tema int, p_estilo int, p_peca int, p_cor int, p_arte int, p_tecido int,
+                                                  p_div int, p_lote int, p_nome text)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s           public.idle_state;
+  st          public.idle_place_state;
+  v_nome      text;
+  v_custo     double precision;
+  v_fiado     boolean := false;
+  v_ult_fiado timestamptz;
+  v_sem       int;
+  v_id        bigint;
+  v_tend      int;
+  v_ult_t     int[];
+  v_ult_e     int[];
+  v_notas     int[];
+  v_pronta    timestamptz;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_settle(public.idle_lock(auth.uid()));
+  perform public.idle_save(s);
+  select * into st from public.idle_place_state where user_id = s.user_id and lugar = 3 for update;
+  if not found then
+    raise exception 'idle_lugar_fechado' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.idle_tee_colecoes c
+              where c.user_id = s.user_id and c.encerrada_em is null and now() < c.fim_em) then
+    raise exception 'idle_tee_ocupada' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.idle_tee_cat_tema where id = p_tema)
+     or not exists (select 1 from public.idle_tee_cat_estilo where id = p_estilo)
+     or not exists (select 1 from public.idle_tee_cat_peca where id = p_peca)
+     or not exists (select 1 from public.idle_tee_cat_cor where id = p_cor) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  if not (public.idle_tee_liberado('tema', p_tema, st.nivel) and public.idle_tee_liberado('estilo', p_estilo, st.nivel)
+          and public.idle_tee_liberado('peca', p_peca, st.nivel) and public.idle_tee_liberado('cor', p_cor, st.nivel)) then
+    raise exception 'idle_tee_trancado' using errcode = 'P0001';
+  end if;
+  if p_arte is null or p_tecido is null or p_div is null or least(p_arte, p_tecido, p_div) < 0
+     or greatest(p_arte, p_tecido, p_div) > 10 or p_arte + p_tecido + p_div <> 10 then
+    raise exception 'idle_tee_foco' using errcode = 'P0001';
+  end if;
+  if p_lote is null or p_lote not between 0 and 2 then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  v_nome := public.idle_place_nome(p_nome);
+  v_custo := public.idle_tee_custo_lote(p_peca, st.nivel, p_lote);
+  if st.moeda < v_custo then
+    -- sem coleção ativa (conferido acima) e sem cupom pro lote pequeno desta peça: o pequeno sai fiado, 1 vez a cada 24 h
+    select max(c.criada_em) into v_ult_fiado from public.idle_tee_colecoes c where c.user_id = s.user_id and c.fiado;
+    if p_lote = 0 and (v_ult_fiado is null or now() - v_ult_fiado >= interval '24 hours') then
+      v_fiado := true;
+      v_custo := 0;
+    else
+      raise exception 'idle_lugar_moeda' using errcode = 'P0001';
+    end if;
+  end if;
+
+  -- o id entra na sorte das notas: pega antes de gravar (uma linha só, tudo calculado)
+  v_id := nextval(pg_get_serial_sequence('public.idle_tee_colecoes', 'id'));
+  v_tend := public.idle_tee_tendencia(public.games_week_start());
+  select coalesce(array_agg(u.tema order by u.criada_em desc, u.id desc), '{}'),
+         coalesce(array_agg(u.estilo order by u.criada_em desc, u.id desc), '{}')
+    into v_ult_t, v_ult_e
+    from (select c.tema, c.estilo, c.criada_em, c.id from public.idle_tee_colecoes c
+           where c.user_id = s.user_id order by c.criada_em desc, c.id desc limit 3) u;
+  v_notas := public.idle_tee_notas(v_id, p_tema, p_estilo, p_peca, p_cor, p_arte, p_tecido, p_div, v_tend, v_ult_t, v_ult_e);
+  -- 0069: a produção em minutos (producaoMs) e a venda de 30 min (VENDA_MS)
+  v_pronta := now() + make_interval(mins => (array[2, 5, 10])[p_lote + 1]);
+  insert into public.idle_tee_colecoes (id, user_id, nome, tema, estilo, peca, cor, arte, tecido, div, lote, nivel, pecas, custo,
+                                        tendencia, rotulo, peca_tema, notas, media, procura, pct, criada_em, pronta_em, fim_em, fiado)
+  overriding system value
+  values (v_id, s.user_id, v_nome, p_tema, p_estilo, p_peca, p_cor, p_arte, p_tecido, p_div, p_lote, st.nivel,
+          public.idle_tee_pecas_lote(st.nivel, p_lote), v_custo, v_tend, public.idle_tee_rotulo(p_tema, p_estilo),
+          public.idle_tee_peca_tema(p_peca, p_tema), v_notas,
+          (v_notas[1] + v_notas[2] + v_notas[3] + v_notas[4])::double precision / 4,
+          public.idle_tee_procura(st.nivel, p_peca, st.fas, v_notas) * public.idle_arv(s.user_id, 'tee_publico', 'max', 1), public.idle_tee_pct_procura(st.nivel, p_peca, st.fas, v_notas),
+          now(), v_pronta, v_pronta + make_interval(secs => 1800 * public.idle_arv(s.user_id, 'tee_tempo', 'min', 1)), v_fiado);
+  update public.idle_place_state set moeda = moeda - v_custo where user_id = s.user_id and lugar = 3;
+  -- "Lança 3 coleções na semana" paga no lançamento (a nova já conta); o depois confere de novo e não paga duas vezes
+  select count(*) into v_sem from public.idle_tee_colecoes c
+   where c.user_id = s.user_id and c.criada_em >= (public.games_week_start()::timestamp at time zone 'America/Sao_Paulo');
+  s := public.idle_place_desafio(s, 3, 'tee_colecoes', v_sem);
+  return public.idle_place_responder(s, 3);
+end;
+$$;
+revoke all on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) from public, anon;
+grant execute on function public.idle_tee_lancar(int, int, int, int, int, int, int, int, text) to authenticated;
+
+-- Anda uma noite até agora: cada copão do cardápio dela vendeu o proporcional do total até min(agora, fim, saiu_em)
+-- (vendidoNaNoite do TS); as fichas (vendidos × lucro de cada venda; pode ser negativo) entram na moeda do lugar, pela
+-- diferença do que já tinha entrado. No fim da noite, uma vez (fechada): o PT de quem saiu com menos de 1 h de noite não
+-- conta (ptConta do TS: apaga); a galera (galeraNoite do TS com a galera e o nível gravados no início da noite e as notas
+-- do cardápio; −15% uma vez só, por mais copões em PT) e noites += 1 de cada copão do cardápio. Noite que ninguém abriu:
+-- só fecha. Nada de marcos, conquistas, pódio, caderninho ou desafio aqui (isso é do idle_cup_depois). (0082: a árvore grande)
+create or replace function public.idle_cup_noite_andar(p_user uuid, p_inicio timestamptz)
+returns void language plpgsql volatile set search_path = public as $$
+declare
+  n       public.idle_cup_noites;
+  x       record;
+  v_v     double precision;
+  v_f     double precision;
+  v_dv    double precision := 0;
+  v_df    double precision := 0;
+  v_notas int[];
+  v_pt    boolean := false;
+  v_g     double precision;
+  v_cm    double precision := public.idle_arv(p_user, 'copao_mult', 'max', 1); -- Open bar / After (0082): as fichas
+begin
+  select * into n from public.idle_cup_noites where user_id = p_user and inicio = p_inicio for update;
+  if not found or n.fechada then
+    return;
+  end if;
+  if n.aberta then
+    for x in select k.copao, k.total, k.vendidos, k.fichas, c.saiu_em,
+                    public.idle_cup_lucro_venda(c.base, c.tamanho, c.forca, c.preco) as lucro
+               from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+              where k.user_id = p_user and k.inicio = p_inicio
+              order by c.entrou_em, c.id loop
+      v_v := public.idle_cup_vendido_noite(x.total, p_inicio, least(now(), coalesce(x.saiu_em, now())));
+      v_f := v_v * x.lucro * v_cm;
+      if v_v <> x.vendidos or v_f <> x.fichas then
+        update public.idle_cup_noite_copoes set vendidos = v_v, fichas = v_f
+         where user_id = p_user and inicio = p_inicio and copao = x.copao;
+        update public.idle_cup_copoes set vendido = vendido + (v_v - x.vendidos), fichas = fichas + (v_f - x.fichas)
+         where id = x.copao;
+        v_dv := v_dv + (v_v - x.vendidos);
+        v_df := v_df + (v_f - x.fichas);
+      end if;
+    end loop;
+    if v_dv <> 0 or v_df <> 0 then
+      update public.idle_cup_noites set vendas = vendas + v_dv, fichas = fichas + v_df where user_id = p_user and inicio = p_inicio;
+      update public.idle_place_state set moeda = moeda + v_df where user_id = p_user and lugar = 4;
+    end if;
+  end if;
+  if now() < p_inicio + interval '8 hours' then
+    return;
+  end if;
+  if n.aberta then
+    update public.idle_cup_noite_copoes k set pt = false
+      from public.idle_cup_copoes c
+     where k.user_id = p_user and k.inicio = p_inicio and k.pt and c.id = k.copao
+       and c.saiu_em < p_inicio + interval '1 hour';
+    select coalesce(array_agg(c.nota order by c.entrou_em, c.id), '{}'), coalesce(bool_or(k.pt), false)
+      into v_notas, v_pt
+      from public.idle_cup_noite_copoes k join public.idle_cup_copoes c on c.id = k.copao
+     where k.user_id = p_user and k.inicio = p_inicio;
+    v_g := public.idle_cup_galera_noite(n.galera, n.nivel, v_notas, v_pt);
+    update public.idle_place_state set fas = v_g where user_id = p_user and lugar = 4;
+    update public.idle_cup_copoes c set noites = c.noites + 1
+      from public.idle_cup_noite_copoes k
+     where k.user_id = p_user and k.inicio = p_inicio and c.id = k.copao;
+    update public.idle_cup_noites set fechada = true, pt = v_pt, galera_delta = v_g - n.galera
+     where user_id = p_user and inicio = p_inicio;
+  else
+    update public.idle_cup_noites set fechada = true where user_id = p_user and inicio = p_inicio;
+  end if;
+end;
+$$;
+revoke all on function public.idle_cup_noite_andar(uuid, timestamptz) from public, anon, authenticated;
+
+-- o evento do segundo s pra quem está na era `era` (a da 0074, agora de 1 a 7; acima de 7 conta como 7), ou null. O da
+-- era atual pesa 3, os antigos 1 (igual a eventoEraEm)
+-- 0082: o TARS (Espaço 5) dá uma 2ª chance de 1 em 3600 por 0,5 de frequência a mais no mesmo número (igual a eventoEraEm).
+create or replace function public.idle_evento_era(u uuid, s bigint, era int)
+returns int language plpgsql stable set search_path = public as $$
+declare
+  p   constant numeric := 2147483647;
+  k   constant numeric := 1013904223;
+  h   numeric;
+  v_ate int := greatest(1, least(era, 7));
+  r   int;
+  v_f double precision;
+  v_m numeric;
+  e   int;
+begin
+  h := mod(s::numeric * s * 16807 + s::numeric * 69621 + public.idle_opp_seed(u)::numeric * 48271 + 4242, p);
+  h := mod(h * h + k, p);
+  if mod(h, 1800) <> 0 then
+    v_m := mod(mod((h + 777) * (h + 777) + k, p), 3600);
+    if v_m >= 100 then
+      return null; -- saída barata: a árvore nunca dá mais que 100 em 3600 (freq até 51×), então não precisa ler os nós
+    end if;
+    v_f := public.idle_arv(u, 'era_freq', 'max', 1);
+    if v_f <= 1 or v_m >= round(2 * (v_f - 1)) then
+      return null;
+    end if;
+  end if;
+  r := mod(mod(h * h + k, p), v_ate - 1 + 3)::int;
+  for e in 1 .. v_ate loop
+    r := r - case when e = v_ate then 3 else 1 end;
+    if r < 0 then
+      return e;
+    end if;
+  end loop;
+  return v_ate;
+end;
+$$;
+revoke all on function public.idle_evento_era(uuid, bigint, int) from public, anon, authenticated;
+
+-- 0082 (árvore grande): o Lixo vale lixo_min de produção por destroço, o Silver dura silver_min, e as janelas × era_janela (o segundo pode estar até 120 s longe).
+drop function if exists public.idle_evento_pegar(bigint, int);
+create or replace function public.idle_evento_pegar(p_seg bigint, p_gols int default 0, p_tipo int default null)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s       public.idle_state;
+  v_me    uuid := auth.uid();
+  v_era   int;
+  v_tipo  int;
+  v_ini   timestamptz;
+  v_rate  double precision;
+  v_ganho double precision := 0;
+  v_premio int;
+  v_gols  int := 0;
+  v_chave text;
+  v_n     int;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  -- segundo longe de agora (ou nulo) nem chega no to_timestamp (um valor absurdo daria erro de data)
+  if p_seg is null or abs(p_seg - extract(epoch from now())) > 120 then
+    raise exception 'idle_evento_gone' using errcode = 'P0001';
+  end if;
+  v_era := public.idle_era(s.generators);
+  v_tipo := public.idle_evento_era(v_me, p_seg, v_era);
+  if p_tipo is not null and p_tipo is distinct from v_tipo then
+    if v_era > 1 and p_tipo = public.idle_evento_era(v_me, p_seg, v_era - 1) then
+      v_tipo := p_tipo; -- a página mostrou com a era anterior
+    else
+      raise exception 'idle_evento_gone' using errcode = 'P0001';
+    end if;
+  end if;
+  v_ini := to_timestamp(p_seg);
+  -- na tela: 8 / 12 / 12 / 5 / 30 / 10 / 8 s (igual a JANELA_EVENTO_S); o banco aceita 3 s a mais (rede)
+  if v_tipo is null or now() < v_ini - interval '2 seconds'
+     or now() > v_ini + make_interval(secs => (array[8, 12, 12, 5, 30, 10, 8])[v_tipo] * public.idle_arv(v_me, 'era_janela', 'max', 1) + 3) then
+    raise exception 'idle_evento_gone' using errcode = 'P0001';
+  end if;
+  delete from public.idle_eventos_pegos where user_id = v_me and pegou_em < now() - interval '1 hour';
+  insert into public.idle_eventos_pegos (user_id, seg) values (v_me, p_seg) on conflict do nothing;
+  if not found then
+    raise exception 'idle_evento_pego' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  v_rate := public.idle_rate(s);
+  case v_tipo
+    when 1 then -- Desce pra almoçar!: Marmita da mãe, ×3 por 3 min (outra soma no fim)
+      s.marmita_ate := greatest(coalesce(s.marmita_ate, now()), now()) + interval '3 minutes';
+    when 2 then -- Pacote da Shopee
+      v_premio := public.idle_evento_shopee(v_me, p_seg);
+      if v_premio = 0 then
+        v_ganho := v_rate * 3600 * 0.8; -- Taxa das blusinhas: −20%
+      elsif v_premio = 1 then
+        s.promo_ate := greatest(coalesce(s.promo_ate, now()), now() + interval '1 minute');
+      else
+        s.boost_ate := array(select b from unnest(s.boost_ate) b where b > now()) || (now() + interval '2 minutes');
+      end if;
+    when 3 then -- Reunião que podia ser um e-mail: o tempo que você ia perder
+      v_ganho := v_rate * 1800;
+    when 4 then -- Tela azul: Atualização instalada, melhorias −25% por 2 min
+      s.upg_desc_ate := greatest(coalesce(s.upg_desc_ate, now()), now()) + interval '2 minutes';
+    when 5 then -- Jogo do Brasil: 5 min de produção por gol, até 7
+      v_gols := least(greatest(coalesce(p_gols, 0), 0), 7);
+      v_ganho := v_rate * 300 * v_gols;
+    when 6 then -- Lixo espacial: 10 min de produção por destroço desviado, até 3
+      v_gols := least(greatest(coalesce(p_gols, 0), 0), 3);
+      v_ganho := v_rate * 60 * public.idle_arv(v_me, 'lixo_min', 'max', 10) * v_gols;
+    else -- Houston, temos um problema: Silver tape, produção ×4 por 2 min (outro com um valendo soma 2 min no fim)
+      s.silver_ate := greatest(coalesce(s.silver_ate, now()), now()) + make_interval(secs => 60 * public.idle_arv(v_me, 'silver_min', 'max', 2));
+  end case;
+  s.valuation := s.valuation + v_ganho;
+  v_chave := (array['mae', 'shopee', 'call', 'tela', 'jogos', 'lixo', 'houston'])[v_tipo];
+  v_n := coalesce((s.eventos_era ->> v_chave)::int, 0) + 1;
+  s.eventos_era := coalesce(s.eventos_era, '{}'::jsonb) || jsonb_build_object(v_chave, v_n);
+  perform public.idle_ganhar(v_me, (array['evt_mae', 'evt_shopee', 'evt_call', 'evt_tela', 'evt_gols', 'evt_lixo', 'evt_houston'])[v_tipo],
+                             case when v_tipo in (5, 6) then v_gols else v_n end);
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('evento', jsonb_build_object(
+    'tipo', v_tipo, 'premio', v_premio, 'ganho', v_ganho, 'gols', v_gols));
+end;
+$$;
+revoke all on function public.idle_evento_pegar(bigint, int, int) from public, anon;
+grant execute on function public.idle_evento_pegar(bigint, int, int) to authenticated;
+
+-- fechar a conta (a da 0076) com o Silver tape do Houston (×4, 0078), como a Marmita: multiplica por cima, só o fim importa; o Silver tape × o da árvore (Fita prateada ×5, 0082)
+create or replace function public.idle_settle(s public.idle_state, ts timestamptz default now())
+returns public.idle_state language plpgsql stable set search_path = public as $$
+declare
+  v_fim  timestamptz;
+  v_a    timestamptz;
+  v_b    timestamptz;
+  v_p    timestamptz;
+  v_q    timestamptz;
+  v_meio timestamptz;
+  v_rate double precision;
+  v_mult double precision;
+  v_k    int;
+  v_kb   int;
+  v_dur  interval := make_interval(secs => 60 * public.idle_arv(s.user_id, 'dourado_duracao', 'max', 1)); -- Hype: o dobro
+  v_silver double precision := public.idle_arv(s.user_id, 'silver_mult', 'max', 4);
+begin
+  if not s.started or ts <= s.settled_at then
+    s.settled_at := greatest(s.settled_at, ts);
+    return s;
+  end if;
+  v_fim := ts; -- sem teto desde a 0061: o jogo fechado rende tudo
+  v_a := s.settled_at;
+  for v_b in
+    select x from (select c.ends_at as x from public.idle_contracts c
+                    where (c.employer_id = s.user_id or c.employee_id = s.user_id)
+                      and c.ends_at > s.settled_at and c.ends_at < v_fim
+                   union
+                   select m from public.idle_horta_mudancas(s.user_id, s.settled_at, v_fim) m
+                   union
+                   select m from public.idle_conv_mudancas(s, s.settled_at, v_fim) m
+                   union
+                   select v_fim) y
+     order by x
+  loop
+    v_rate := public.idle_rate_at(s, v_a);
+    v_p := v_a;
+    for v_q in
+      select x from (select b as x from unnest(s.boost_ate) b where b > v_a and b < v_b
+                     union select v - v_dur from unnest(s.viral_ate) v
+                            where v - v_dur > v_a and v - v_dur < v_b
+                     union select v from unnest(s.viral_ate) v where v > v_a and v < v_b
+                     union select s.marmita_ate where s.marmita_ate > v_a and s.marmita_ate < v_b
+                     union select s.linkedin_ate where s.linkedin_ate > v_a and s.linkedin_ate < v_b
+                     union select s.combo_ate where s.combo_ate > v_a and s.combo_ate < v_b
+                     union select s.silver_ate where s.silver_ate > v_a and s.silver_ate < v_b
+                     union select v_b) y
+       order by x
+    loop
+      v_meio := v_p + (v_q - v_p) / 2;
+      v_k := (select count(*) from unnest(s.viral_ate) v where v - v_dur <= v_meio and v > v_meio);
+      -- os ×5 da oportunidade no ar SOMAM (dois = ×10, três = ×15) e o total multiplica com os Viralizou (×10 cada, sem
+      -- teto): dois ×5 com dois Viralizou = ×1.000. Todo ×5 começou antes de settled_at (pegar fecha a conta antes), então
+      -- só o fim importa.
+      v_kb := (select count(*) from unnest(s.boost_ate) b where b > v_meio);
+      -- a Marmita da mãe (×3, 0074) multiplica por cima; começou antes de settled_at (pegar fecha a conta), só o fim importa
+      v_mult := (case when v_kb > 0 then 5 * v_kb else 1 end) * 10 ^ v_k
+                * (case when s.marmita_ate > v_meio then 3 else 1 end)
+                -- LinkedIn e Combo (0076): começaram antes de settled_at (pegar fecha a conta), só o fim importa
+                * (case when s.linkedin_ate > v_meio then coalesce(s.linkedin_mult, 1) else 1 end)
+                * (case when s.combo_ate > v_meio then 7 else 1 end)
+                -- Silver tape do Houston (0078): começou antes de settled_at (pegar fecha a conta), só o fim importa
+                * (case when s.silver_ate > v_meio then v_silver else 1 end);
+      s.valuation := s.valuation + v_rate * v_mult * extract(epoch from v_q - v_p);
+      v_p := v_q;
+    end loop;
+    v_a := v_b;
+  end loop;
+  s.settled_at := ts;
+  return s;
+end;
+$$;
+revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;

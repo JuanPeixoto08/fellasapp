@@ -902,6 +902,20 @@ describe('as noites do bar (avancar)', () => {
     await lugar();
     juntos((await noiteCopoes(ini + DIA)).map((k) => k.total), totaisTs(cs1, { nivel: 1, galera: e1.fas, sexta: false, dj: null }));
   });
+  it('árvore grande (0082): o After até o sol nascer (×1,5) multiplica as fichas da noite, não as vendas', async () => {
+    await bar();
+    await por({ nome: 'Um' });
+    await setFas(50);
+    await q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, [1, 901, 902, 903, 904, 905, 906, 907, 908, 909, 910]]);
+    const cs = await copoes();
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 4 * H);
+    await lugar();
+    const tot = totaisTs(cs, { nivel: 1, galera: 50, sexta: false, dj: null });
+    const ks = await noiteCopoes(ini);
+    juntos(ks.map((k) => k.vendidos), tot.map((x) => vendidoNaNoite(x, ini, agora)));
+    juntos(ks.map((k) => k.fichas), tot.map((x, i) => vendidoNaNoite(x, ini, agora) * lucroVenda(cs[i]) * 1.5));
+  });
 
   it('Review Focus 1: some 3 dias: só a primeira noite abre, as fichas dela entram uma vez, a revelação sai na volta', async () => {
     await bar();

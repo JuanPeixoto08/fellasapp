@@ -284,6 +284,16 @@ describe('lançar', () => {
     c = (await colecoes())[1];
     expect(c.pronta_em.getTime() - c.criada_em.getTime()).toBe(2 * MIN);
   });
+  it('árvore grande (0082): o Influencer de bairro põe +15% na procura gravada; o Drop esgotado vende em 15 min', async () => {
+    await camisetaria(1e6, 4);
+    await q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, [1, 901, 902, 903, 904, 905, 906, 907, 908, 909]]);
+    await lancar({ lote: 2, peca: 3, tema: 9 });
+    const [c] = await colecoes();
+    expect(c.fim_em.getTime() - c.pronta_em.getTime()).toBe(15 * MIN);
+    const [{ f }] = await q<{ f: number }>('select fas as f from public.idle_place_state where user_id = $1 and lugar = 3', [A]);
+    const l: Lancamento = { id: c.id, tema: 9, estilo: 1, peca: 3, cor: 1, foco: [3, 5, 2], lote: 2, nivel: 4, fas: f, tendencia: c.tendencia, ultimas: [] };
+    expect(rel(c.procura, procura(l, notas(l)) * 1.15)).toBeLessThan(1e-9);
+  });
   it('as últimas 3 coleções (a mais recente primeiro) entram na repetição, igual ao TS', async () => {
     await camisetaria();
     const feitas: { tema: number; estilo: number }[] = [];

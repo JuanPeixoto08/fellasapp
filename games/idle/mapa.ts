@@ -50,9 +50,10 @@ export function custoNivel(l: Lugar, nivel: number): number | null {
   return l.custoBase * 1.55 ** (nivel - 1);
 }
 
-/** Multiplicador do mapa: marcos (podem ser dobrados pelo Monopólio) + Marca forte por lugar aberto. */
-export function multMapa(bonusMarcos: number, abertos: number, est: { marcosMult: number; porLugar: number }): number {
-  return 1 + bonusMarcos * est.marcosMult + abertos * est.porLugar;
+/** O multiplicador dos lugares (igual a idle_place_mult na 0082): 1 + Σ marcos × Monopólio × a árvore (Check-in, Rolê que
+ *  virou lenda, Rolê infinito) + Marca forte por lugar aberto. */
+export function multMapa(bonusMarcos: number, abertos: number, est: { marcosMult: number; porLugar: number }, arvore = 1): number {
+  return 1 + bonusMarcos * est.marcosMult * arvore + abertos * est.porLugar;
 }
 
 const MODULO32 = 4294967296n;

@@ -726,7 +726,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     b.precoMais.dataset.foco = 'cup-preco-mais';
     const linhaPreco = el('div', 'cup-linha-preco');
     linhaPreco.append(b.precoMenos, b.precoRange, b.precoMais);
-    dicas.ligar(precoS, 'cup-preco', 'Preço', () => dicaCupPreco(sel));
+    dicas.ligar(precoS, 'cup-preco', 'Preço', () => dicaCupPreco(sel, ultimo?.l.copao_mult ?? 1));
     precoS.append(linhaPreco, b.precoInfo);
 
     const fim = el('div', 'cup-fim');
@@ -841,7 +841,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     b.precoValor.textContent = `${sel.preco} fichas`;
     b.precoMenos.disabled = sel.preco <= lo;
     b.precoMais.disabled = sel.preco >= hi;
-    const lucro = lucroVenda(sel);
+    const lucro = lucroVenda(sel) * (ultimo?.l.copao_mult ?? 1); // o Open bar / o After (0082) nas fichas
     b.precoInfo.replaceChildren(`De ${lo} a ${hi} · ref. ${inteiro(ref)} · `,
       Math.abs(lucro) < 0.05 ? el('span', undefined, 'sem lucro por venda')
         : el('span', lucro < 0 ? 'cup-prejuizo' : 'cup-fichas', `${lucro < 0 ? 'prejuízo' : 'lucro'} de ${fichasVenda(Math.abs(lucro))} por venda`));

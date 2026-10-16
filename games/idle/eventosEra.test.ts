@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DESVIO_S, descontoAtivo, eventoEraEm, ganhoEventoAgora, JANELA_EVENTO_S, marmitaAtiva, MAX_DESVIOS, MAX_GOLS, NOME_EVENTO_ERA,
+  DESVIO_S, descontoAtivo, EVENTO_PADRAO, eventoEraEm, ganhoEventoAgora, JANELA_EVENTO_S, marmitaAtiva, MAX_DESVIOS, MAX_GOLS, NOME_EVENTO_ERA,
   premioShopee, SILVER_MULT, silverAtivo, textoEventoPegou,
 } from './eventosEra';
 
@@ -98,5 +98,32 @@ describe('textos e ganhos', () => {
     expect(ganhoEventoAgora(3, 10)).toBeCloseTo(18_000, 6);
     expect(ganhoEventoAgora(5, 10)).toBeCloseTo(3_000, 6);
     expect(ganhoEventoAgora(1, 10)).toBe(0);
+  });
+});
+
+describe('eventos de era com a árvore grande (Espaço; igual a idle_evento_era/idle_evento_pegar na 0082)', () => {
+  it('TARS (1,5×): os segundos de sempre continuam, com ~50% a mais, os mesmos tipos nos de sempre', () => {
+    let base = 0;
+    let mais = 0;
+    for (let s = 1_760_000_000; s < 1_760_000_000 + 400_000; s++) {
+      const a = eventoEraEm(A, s, 7);
+      const b = eventoEraEm(A, s, 7, 1.5);
+      if (a !== null) {
+        base++;
+        expect(b).toBe(a);
+      }
+      if (b !== null) mais++;
+    }
+    expect(mais / base).toBeGreaterThan(1.3);
+    expect(mais / base).toBeLessThan(1.7);
+  });
+  it('Lixo 15 min por destroço; Silver 3 min ×5: o que dá agora e o texto', () => {
+    const ev = { lixoMin: 15, silverMin: 3, silverMult: 5 };
+    expect(ganhoEventoAgora(6, 10, ev)).toBe(10 * 900);
+    expect(ganhoEventoAgora(7, 10, ev)).toBe(10 * 180 * 4);
+    expect(ganhoEventoAgora(6, 10)).toBe(10 * 600);
+    expect(EVENTO_PADRAO).toEqual({ lixoMin: 10, silverMin: 2, silverMult: 4 });
+    expect(textoEventoPegou({ tipo: 7, premio: null, ganho: 0, gols: 0 }, ev)).toBe('Consertado com silver tape! ×5 por 3 min');
+    expect(textoEventoPegou({ tipo: 7, premio: null, ganho: 0, gols: 0 })).toBe('Consertado com silver tape! ×4 por 2 min');
   });
 });

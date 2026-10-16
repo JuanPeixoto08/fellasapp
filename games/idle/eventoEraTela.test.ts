@@ -200,6 +200,18 @@ describe('eventos de era na tela', () => {
       raiz.remove();
     }
   });
+  it('janela da árvore (Ancoragem manual): o evento fica o dobro e o destroço anda na metade da velocidade', () => {
+    const raiz = document.createElement('div');
+    const t = criarEventoEraTela(raiz, opcoes());
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 100_000, janelaS: 20 });
+    const caixa = raiz.querySelector<HTMLElement>('.evento-era')!;
+    expect(caixa.style.getPropertyValue('--janela')).toBe('20s');
+    expect(raiz.querySelector<HTMLElement>('.evento-destroco')!.style.getPropertyValue('--passo')).toBe(`${Math.round(20_000 / 3)}ms`);
+    t.tick(115_000);
+    expect(raiz.querySelector('.evento-era')).not.toBeNull(); // sem a árvore já teria saído (10 s)
+    t.tick(120_001);
+    expect(raiz.querySelector('.evento-era')).toBeNull();
+  });
 });
 
 describe('eventos das eras 6 e 7 na tela', () => {

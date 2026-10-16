@@ -13,7 +13,7 @@ import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import { FRASES_GERADOR } from './nomes';
 import { CASHBACK_S, cashbackAtivo, CHAMADOS_MAX, CUPONS_POR_OPP, temBolsa, temPlantaCrescendo, type TipoOportunidade } from './oportunidades';
-import { ganhoEventoAgora, marmitaAtiva, MAX_DESVIOS, NOME_EVENTO_ERA, SILVER_MULT, silverAtivo, type TipoEventoEra } from './eventosEra';
+import { EVENTO_PADRAO, ganhoEventoAgora, marmitaAtiva, MAX_DESVIOS, NOME_EVENTO_ERA, silverAtivo, type EventoArvore, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
 } from './camisetaria';
@@ -162,7 +162,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   const virais = s.viral.filter((t) => { const f = Date.parse(t); return f > agoraMs && f - vMs <= agoraMs; }).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   if (marmitaAtiva(s, agoraMs)) linhas.push({ texto: 'Agora: ×3 da Marmita da mãe', tom: 'bom' });
-  if (silverAtivo(s, agoraMs)) linhas.push({ texto: `Agora: ×${SILVER_MULT} do Silver tape`, tom: 'bom' });
+  if (silverAtivo(s, agoraMs)) linhas.push({ texto: `Agora: ×${num(efeitosDe(catalogo, s).silverMult)} do Silver tape`, tom: 'bom' });
   if (s.linkedin_ate && s.linkedin_gen && (s.linkedin_mult ?? 1) > 1 && Date.parse(s.linkedin_ate) > agoraMs) linhas.push({ texto: `Agora: ×${num(s.linkedin_mult ?? 1)} do LinkedIn`, tom: 'bom' });
   if (s.combo_ate && Date.parse(s.combo_ate) > agoraMs) linhas.push({ texto: `Agora: ×${COMBO_MULT} do Combo`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
@@ -338,10 +338,10 @@ export function dicaTeeFoco(estilo: number, cad: Caderno): string {
 }
 
 /** O lote (0 pequeno, 1 médio, 2 grande) da peça escolhida no nível: peças, custo, tempo e o que rende esgotando. */
-export function dicaTeeLote(peca: number, nivel: number, lote: 0 | 1 | 2): string {
+export function dicaTeeLote(peca: number, nivel: number, lote: 0 | 1 | 2, vendaMs = VENDA_MS): string {
   const n = pecasLote(nivel, lote);
   const preco = precoPeca(peca);
-  return `${num(n, 0)} peças por ${num(custoLote(peca, nivel, lote), 0)} cupons. Fica pronto em ${duracao(producaoMs(lote))} e vende em ${duracao(VENDA_MS)} `
+  return `${num(n, 0)} peças por ${num(custoLote(peca, nivel, lote), 0)} cupons. Fica pronto em ${duracao(producaoMs(lote))} e vende em ${duracao(vendaMs)} `
     + `a ${num(preco, 1)} cupons a peça: esgotando, rende ${num(n * preco, 0)}.`;
 }
 
@@ -424,9 +424,9 @@ export function dicaCupForca(base: number, forca: number, cad: CadernoCup): stri
 }
 
 /** O preço: a faixa, a referência e o lucro de cada venda. */
-export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; preco: number }): string {
+export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; preco: number }, mult = 1): string {
   const [lo, hi] = precoFaixaCup(c.base, c.tamanho, c.forca);
-  const lucro = lucroVendaCup(c);
+  const lucro = lucroVendaCup(c) * mult;
   const ganho = lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`;
   return `Vai de ${lo} a ${hi} fichas; referência ${num(precoRefCup(c.base, c.tamanho, c.forca), 1)}. Cada venda dá ${ganho}. `
     + 'Mais caro que a referência vende menos e a nota cai; mais barato vende mais.';
@@ -468,17 +468,17 @@ export function dicaCupTrancados(tipo: 'base' | 'mistura' | 'extra' | 'tamanho' 
   return `Próximo: ${prox.nome}, no nível ${prox.nivel}.${resto ? ` Depois ${resto === 1 ? `mais 1 ${um}` : `mais ${resto} ${varios}`} até o nível ${Math.max(...falta.map((x) => x.nivel))}.` : ''}`;
 }
 
-/** A caixinha do evento de era na tela: o que ele dá agora, nos números da pessoa. */
-export function dicaEventoEra(tipo: TipoEventoEra, rate: number): Dica {
-  const g = ganhoEventoAgora(tipo, rate);
+/** A caixinha do evento de era na tela: o que ele dá agora, nos números da pessoa (com o que a árvore muda no Espaço). */
+export function dicaEventoEra(tipo: TipoEventoEra, rate: number, ev: EventoArvore = EVENTO_PADRAO): Dica {
+  const g = ganhoEventoAgora(tipo, rate, ev);
   const linhas: LinhaDica[] =
     tipo === 1 ? [{ texto: 'Produção ×3 por 3 min' }]
     : tipo === 2 ? [{ texto: `Sorteio: ${formatarValor(g)} (1 h, menos a Taxa das blusinhas), Promoção por 1 min ou ×5 por 2 min` }]
     : tipo === 3 ? [{ texto: `Dá ${formatarValor(g)} agora` }, { texto: '30 min da sua produção', tom: 'fraco' }]
     : tipo === 4 ? [{ texto: 'Melhorias 25% mais baratas por 2 min' }]
     : tipo === 5 ? [{ texto: `Cada gol: ${formatarValor(g)} (até 7)` }, { texto: '5 min da sua produção por gol', tom: 'fraco' }]
-    : tipo === 6 ? [{ texto: `Cada destroço desviado: ${formatarValor(g)} (até ${MAX_DESVIOS})` }, { texto: '10 min da sua produção por destroço', tom: 'fraco' }]
-    : [{ texto: `Produção ×${SILVER_MULT} por 2 min: +${formatarValor(g)} a mais` }, { texto: 'Pegar outro com um valendo soma 2 min', tom: 'fraco' }];
+    : tipo === 6 ? [{ texto: `Cada destroço desviado: ${formatarValor(g)} (até ${MAX_DESVIOS})` }, { texto: `${num(ev.lixoMin)} min da sua produção por destroço`, tom: 'fraco' }]
+    : [{ texto: `Produção ×${num(ev.silverMult)} por ${num(ev.silverMin)} min: +${formatarValor(g)} a mais` }, { texto: `Pegar outro com um valendo soma ${num(ev.silverMin)} min`, tom: 'fraco' }];
   return { titulo: NOME_EVENTO_ERA[tipo], linhas };
 }
 
