@@ -140,7 +140,7 @@ describe('idle_buy', () => {
     await expect(buy('melhoria', 11)).rejects.toThrow(/idle_owned/);
     await expect(buy('melhoria', 12)).rejects.toThrow(/idle_locked/);
   });
-  it('meia-preço vale só na próxima compra unitária e depois some', async () => {
+  it('meia-preço vale na próxima compra e depois some', async () => {
     await dar(A, 100);
     await q('update public.idle_state set meias = 1 where user_id = $1', [A]);
     const s = await buy('gerador', 1);

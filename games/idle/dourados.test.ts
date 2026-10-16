@@ -179,6 +179,11 @@ describe('selos dos dourados novos e da Caixinha (0076)', () => {
   });
   it('1 cupom: "1 restante"; combo 0 ou já feito: sem bolinhas; com o Hype as bolinhas dizem 2 min', () => {
     expect(selosBonus({ promo_ate: null, cupons: 1 }, T).map((x) => x.texto)).toEqual(['Cupom · 1 restante']);
+    // 0080: o cupom conta por gerador (no 10 e no Máx também)
+    expect(selosBonus({ promo_ate: null, cupons: 7 }, T)[0].dica!.linhas.map((x) => x.texto)).toEqual([
+      'Cada gerador comprado sai 25% mais barato: no 10 e no Máx, 1 cupom por gerador', 'Vale pros próximos 7 geradores',
+      'Com Promoção ou meia-preço o cupom fica guardado']);
+    expect(selosBonus({ promo_ate: null, cupons: 1 }, T)[0].dica!.linhas[1].texto).toBe('Vale pro próximo gerador');
     expect(selosBonus({ promo_ate: null }, T, { combo: 0 })).toEqual([]);
     expect(selosBonus({ promo_ate: null }, T, { combo: 3 })).toEqual([]);
     expect(selosBonus({ promo_ate: null }, T, { combo: 1, duracao: 2 })[0].dica!.linhas[0].texto)

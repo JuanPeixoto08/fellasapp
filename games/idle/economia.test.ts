@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
 import {
-  abertura, acumular, acumularTrechos, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  abertura, acumular, acumularTrechos, compraGerador, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
   multLegado, pontosTotais, precoContrato, preco, produzido, rendasGeradores, taxa, taxaPorUnidade, type Estado, unidadesDaEra, VIRAL_MS,
 } from './economia';
 
@@ -139,6 +139,41 @@ describe('preço e compra', () => {
       expect(maxCompra(15, 3, v * 0.999999, 1)).toBe(k - 1);
     }
     expect(maxCompra(15, 0, 0, 1)).toBe(0);
+  });
+  // 0080: o cupom vale 1 por gerador (os primeiros com 25% a menos, o resto cheio); a meia vale a compra inteira pela metade
+  // e guarda os cupons (igual a idle_buy)
+  const C = 100;
+  const N = 20;
+  it('cupom no Máx: com 7 cupons só os 7 primeiros saem 25% mais baratos; gasta 7 e o resto paga cheio', () => {
+    const conta = preco(C, N, 7, 0.75) + preco(C, N + 7, 5, 1);
+    expect(compraGerador(C, N, 0, conta * (1 + 1e-9), { cm: 1, cupons: 7, meia: false })).toEqual({ k: 12, preco: conta, cupons: 7 });
+    // o mesmo dinheiro pagaria 13 com o desconto em todos (o bug da 0076)
+    expect(maxCompra(C, N, conta * (1 + 1e-9), 0.75)).toBeGreaterThan(12);
+    // poucos: só cabem os com desconto
+    const tres = preco(C, N, 3, 0.75);
+    expect(compraGerador(C, N, 0, tres * (1 + 1e-9), { cm: 1, cupons: 7, meia: false })).toEqual({ k: 3, preco: tres, cupons: 3 });
+    // exatamente os 7 com desconto e nem um cheio
+    const sete = preco(C, N, 7, 0.75);
+    expect(compraGerador(C, N, 0, sete * (1 + 1e-9), { cm: 1, cupons: 7, meia: false })).toEqual({ k: 7, preco: sete, cupons: 7 });
+    expect(compraGerador(C, N, 0, sete * 0.999999, { cm: 1, cupons: 7, meia: false }).k).toBe(6);
+  });
+  it('cupom no 10 e no 1: 3 cupons no 10 gastam 3; 12 cupons no 10 gastam 10; o 1 gasta 1', () => {
+    expect(compraGerador(C, N, 10, 0, { cm: 1.25, cupons: 3, meia: false }))
+      .toEqual({ k: 10, preco: preco(C, N, 3, 1.25 * 0.75) + preco(C, N + 3, 7, 1.25), cupons: 3 });
+    expect(compraGerador(C, N, 10, 0, { cm: 1, cupons: 12, meia: false })).toEqual({ k: 10, preco: preco(C, N, 10, 0.75), cupons: 10 });
+    expect(compraGerador(C, N, 1, 0, { cm: 1, cupons: 5, meia: false })).toEqual({ k: 1, preco: preco(C, N, 1, 0.75), cupons: 1 });
+    expect(compraGerador(C, N, 10, 0, { cm: 1, cupons: 0, meia: false })).toEqual({ k: 10, preco: preco(C, N, 10, 1), cupons: 0 });
+  });
+  it('meia: a compra inteira pela metade (1, 10 e Máx), sem gastar cupom; o Máx compra o que cabe pela metade', () => {
+    expect(compraGerador(C, N, 1, 0, { cm: 1, cupons: 3, meia: true })).toEqual({ k: 1, preco: preco(C, N, 1, 1) / 2, cupons: 0 });
+    expect(compraGerador(C, N, 10, 0, { cm: 1, cupons: 3, meia: true })).toEqual({ k: 10, preco: preco(C, N, 10, 1) / 2, cupons: 0 });
+    const seis = preco(C, N, 6, 1) / 2;
+    expect(compraGerador(C, N, 0, seis * (1 + 1e-9), { cm: 1, cupons: 3, meia: true })).toEqual({ k: 6, preco: seis, cupons: 0 });
+    expect(maxCompra(C, N, seis * (1 + 1e-9), 1)).toBeLessThan(6); // sem a meia cabiam menos
+  });
+  it('Máx sem dinheiro pra 1: zero', () => {
+    expect(compraGerador(C, N, 0, preco(C, N, 1, 0.75) * 0.99, { cm: 1, cupons: 7, meia: false }).k).toBe(0);
+    expect(compraGerador(C, N, 0, 0, { cm: 1, cupons: 0, meia: true }).k).toBe(0);
   });
   it('custoMult multiplica as estratégias escolhidas', () => {
     expect(custoMult(cat, vazio())).toBe(1);
