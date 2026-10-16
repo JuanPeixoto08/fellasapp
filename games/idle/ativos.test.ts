@@ -26,8 +26,11 @@ describe('ativos da Fellas Inc.', () => {
       if (k.vagas) expect(naoVazia(k.frente), c).toBe(true);
     }
   });
-  it('resolve os 30 geradores', () => {
-    for (let id = 1; id <= 30; id++) expect(naoVazia(ativos.gerador(id)), `gerador ${id}`).toBe(true);
+  it('resolve os 42 geradores (4 quadros de 32)', () => {
+    for (let id = 1; id <= 42; id++) {
+      expect(naoVazia(ativos.gerador(id)), `gerador ${id}`).toBe(true);
+      if (id > 30) expect(dim(`geradores/gerador-${id}.png`)).toEqual([128, 32]);
+    }
   });
   it('resolve as 8 oportunidades, cada uma com 4 quadros de 24 px', () => {
     for (let k = 0; k <= 7; k++) {
@@ -35,8 +38,11 @@ describe('ativos da Fellas Inc.', () => {
       expect(dim(`oportunidades/oportunidade-${k}.png`)).toEqual([96, 24]);
     }
   });
-  it('resolve os ícones das 20 melhorias gerais', () => {
-    for (let id = 1001; id <= 1020; id++) expect(naoVazia(ativos.geral(id)), `geral ${id}`).toBe(true);
+  it('resolve os ícones das 28 melhorias gerais', () => {
+    for (let id = 1001; id <= 1028; id++) {
+      expect(naoVazia(ativos.geral(id)), `geral ${id}`).toBe(true);
+      if (id > 1020) expect(dim(`gerais/geral-${id}.png`)).toEqual([16, 16]);
+    }
   });
   it('ícone de conquista ou de nó que não existe: null (a célula mostra só a moldura)', () => {
     expect(ativos.conquista(999)).toBeNull();
