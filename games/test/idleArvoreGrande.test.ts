@@ -152,6 +152,19 @@ describe('a maior era (0082 parte A)', () => {
     await t.db.exec(M0082);
     expect((await q<{ e: number }>('select era_max as e from public.idle_state where user_id = $1', [A]))[0].e).toBe(3);
   });
+  it('o backfill enxerga as eras 6 e 7 pelas conquistas de ter 100 (140–145 = era 6, 146–151 = era 7)', async () => {
+    const era = async () => (await q<{ e: number }>('select era_max as e from public.idle_state where user_id = $1', [A]))[0].e;
+    await q('update public.idle_state set era_max = 1, generators = array_fill(0, array[42]) where user_id = $1', [A]);
+    await q('update public.idle_state set generators[13] = 1 where user_id = $1', [A]); // vendeu: hoje na era 3
+    await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 141)', [A]);
+    await t.db.exec(M0082);
+    expect(await era()).toBe(6);
+    await q('insert into public.idle_conquistas (user_id, conquista_id) values ($1, 146)', [A]);
+    await t.db.exec(M0082);
+    expect(await era()).toBe(7);
+    await t.db.exec(M0082);
+    expect(await era()).toBe(7); // idempotente
+  });
 });
 
 // gerador pseudoaleatório fixo: os mesmos casos toda vez
