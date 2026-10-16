@@ -51,7 +51,7 @@ describe('o ×5 da oportunidade empilha', () => {
 });
 
 describe('a meia-preço empilha', () => {
-  it('duas guardadas: as próximas 2 compras unitárias pela metade; a 3ª paga cheio', async () => {
+  it('duas guardadas: as próximas 2 compras pela metade; a 3ª paga cheio', async () => {
     await q('update public.idle_state set valuation = 1e6, meias = 2, settled_at = now() + interval \'1 day\' where user_id = $1', [A]);
     const preco = async () => (await q<{ p: number }>(`select public.idle_price(c.custo, s.generators[1], 1, public.idle_cost_mult(s)) as p from public.idle_cat_gen c, public.idle_state s where c.id = 1 and s.user_id = $1`, [A]))[0].p;
     for (const [meiasDepois, fator] of [[1, 0.5], [0, 0.5], [0, 1]] as const) {

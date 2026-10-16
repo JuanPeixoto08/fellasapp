@@ -4,6 +4,15 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-16-cupom-meia-max',
+    titulo: 'Cupom e meia-preço no 10 e no Máx',
+    data: '2026-10-16',
+    itens: [
+      'O Cupom de primeira compra agora conta por gerador: com 3 cupons, comprar 10 deixa 3 geradores 25% mais baratos e gasta os 3. O Máx já calcula assim quantos cabem.',
+      'A Próxima compra pela metade vale a compra inteira, também no 10 e no Máx: o Máx compra o que cabe pela metade. Enquanto ela vale, os cupons ficam guardados.',
+    ],
+  },
+  {
     id: '2026-10-15-eras-6-7',
     titulo: 'Eras 6 e 7: órbita e Lua',
     data: '2026-10-15',

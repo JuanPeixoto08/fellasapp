@@ -385,7 +385,7 @@ describe('tela da Fellas Inc.', () => {
     tela.renderizar(modelo({ caixaAberta: true, pendentes: [w], estado: estado({ user_id: uid }) }));
     expect(root.querySelector('.modal-caixa .escolha strong')!.textContent).toBe('Adubo de farmácia → sem planta crescendo: 15 min de produção');
   });
-  it('Cupom: os geradores saem 25% mais baratos (1, 10 e Máx); com meia-preço o "1" usa a meia e o cupom fica', () => {
+  it('Cupom: 1 por gerador (o 1 sai 25% mais barato); com meia-preço o "1" usa a meia e o cupom fica', () => {
     const tela = criarTela(root, acoes);
     const agora = Date.parse('2026-10-12T12:00:00.000Z');
     const s = estado({ generators: [5, ...Array(29).fill(0)], valuation: 1e6, cupons: 3 });
@@ -397,6 +397,52 @@ describe('tela da Fellas Inc.', () => {
     expect(um()).toBe(formatarValor(cheio * 0.5));
     tela.renderizar(modelo({ estado: { ...s, cupons: 0 }, agora }));
     expect(um()).toBe(formatarValor(cheio));
+  });
+  // 0080: o que a Loja mostra no 10 e no Máx é o que o banco cobra (o cupom conta por gerador; a meia vale a compra inteira)
+  describe('10 e Máx com cupom e meia-preço (igual a idle_buy da 0080)', () => {
+    const agora = Date.parse('2026-10-12T12:00:00.000Z');
+    const c1 = catalogo.geradores[0].custo;
+    const botao = (q: string) => root.querySelector<HTMLButtonElement>(`.gerador button[data-qtd="${q}"]`)!;
+    const base = (x: Partial<IdleState>) => estado({ generators: [20, ...Array(29).fill(0)], valuation: 1e6, ...x });
+    const maxCompraCheio = (v: number) => { let k = 0; while (preco(c1, 20, k + 1, 1) <= v) k++; return k; };
+    it('Máx com 7 cupons: 7 com desconto e o resto cheio (mostra 12, não 13)', () => {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ estado: base({ cupons: 7 }), agora }));
+      const v = (preco(c1, 20, 7, 0.75) + preco(c1, 27, 5, 1)) * (1 + 1e-9);
+      tela.atualizarValor(v);
+      expect(botao('0').textContent).toBe('Máx (12)');
+      tela.renderizar(modelo({ estado: base({ cupons: 0 }), agora }));
+      tela.atualizarValor(v);
+      expect(botao('0').textContent).toBe(`Máx (${maxCompraCheio(v)})`);
+    });
+    it('o 10 com 3 cupons libera no preço de 3 com desconto + 7 cheios', () => {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ estado: base({ cupons: 3 }), agora }));
+      const dez = preco(c1, 20, 3, 0.75) + preco(c1, 23, 7, 1);
+      tela.atualizarValor(dez * 0.999999);
+      expect(botao('10').disabled).toBe(true);
+      tela.atualizarValor(dez);
+      expect(botao('10').disabled).toBe(false);
+    });
+    it('meia-preço: o 10 e o Máx pela metade, sem cupom (Máx compra o que cabe pela metade)', () => {
+      const tela = criarTela(root, acoes);
+      tela.renderizar(modelo({ estado: base({ cupons: 3, meias: 1, half_price: true }), agora }));
+      const dez = preco(c1, 20, 10, 1) / 2;
+      tela.atualizarValor(dez * 0.999999);
+      expect(botao('10').disabled).toBe(true);
+      tela.atualizarValor(dez);
+      expect(botao('10').disabled).toBe(false);
+      tela.atualizarValor((preco(c1, 20, 6, 1) / 2) * (1 + 1e-9));
+      expect(botao('0').textContent).toBe('Máx (6)');
+    });
+    it('Promoção: tudo pela metade e o cupom e a meia ficam guardados (Máx sem cupom)', () => {
+      const tela = criarTela(root, acoes);
+      const promo_ate = new Date(agora + 20_000).toISOString();
+      tela.renderizar(modelo({ estado: base({ cupons: 3, meias: 1, half_price: true, promo_ate }), agora }));
+      expect(botao('1').textContent).toBe(formatarValor(preco(c1, 20, 1, 0.5)));
+      tela.atualizarValor(preco(c1, 20, 4, 0.5) * (1 + 1e-9));
+      expect(botao('0').textContent).toBe('Máx (4)');
+    });
   });
   it('prazo: horas com minutos, minutos, menos de 1 min', () => {
     expect(prazo(VALIDADE_S * 1000)).toBe('Some em 4h00');

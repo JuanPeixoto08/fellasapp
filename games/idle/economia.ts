@@ -1,7 +1,7 @@
 // Fórmulas da Fellas Inc. Iguais às do banco (0034, 0038, 0041): o banco decide, a tela só anima. Um teste de paridade
 // (games/test/idleParidade.test.ts) compara as duas com estados de exemplo.
 import type { Catalogo, Estrategia, Melhoria, No } from './catalogo';
-import { CAIXA_PADRAO } from './oportunidades';
+import { CAIXA_PADRAO, CUPOM_FATOR } from './oportunidades';
 
 /** O que muda a produção pelos contratos ATIVOS: quantos você contratou e, para cada empresa que te contratou, quanto
  *  ela paga (3 se ela escolheu Cultura de startup). Sem isso (simulação, testes) = jogador sozinho. */
@@ -230,6 +230,36 @@ export function maxCompra(custo: number, n: number, v: number, cm: number): numb
   while (k > 0 && preco(custo, n, k, cm) > v) k--;
   while (preco(custo, n, k + 1, cm) <= v) k++;
   return Math.max(k, 0);
+}
+
+/** Preço de k tendo n com c cupons (igual a idle_price_cupom, 0080): os min(k, c) primeiros com cmc (o custo com o cupom),
+ *  o resto com cm. Sem cupom é o preco. */
+export function precoCupom(custo: number, n: number, k: number, cm: number, cmc: number, c: number): number {
+  const d = Math.min(k, Math.max(c, 0));
+  return preco(custo, n, d, cmc) + preco(custo, n + d, k - d, cm);
+}
+
+/** Máx com c cupons (igual a idle_max_qty_cupom, 0080): os com desconto primeiro, depois os cheios com o que sobra. */
+export function maxCompraCupom(custo: number, n: number, v: number, cm: number, cmc: number, c: number): number {
+  if (c <= 0) return maxCompra(custo, n, v, cm);
+  let k = maxCompra(custo, n, v, cmc);
+  if (k >= c) k = c + maxCompra(custo, n + c, v - preco(custo, n, c, cmc), cm);
+  while (k > 0 && precoCupom(custo, n, k, cm, cmc, c) > v) k--; // arredondamento da soma: nunca cobra mais do que v
+  return k;
+}
+
+/** Como a compra de gerador vale agora: cm = o custo (com Promoção, Horta e convidados; sem cupom nem meia); cupons = os
+ *  que valem (0 com Promoção); meia = a meia-preço vale (não com Promoção). */
+export type RegraCompra = { cm: number; cupons: number; meia: boolean };
+
+/** O que o banco cobra (idle_buy, 0080) por 1, 10 ou Máx (qtd 0, com v): k unidades, o preço e quantos cupons gasta. A
+ *  meia vale a compra inteira pela metade e guarda os cupons; sem ela, cada cupom deixa 1 gerador 25% mais barato. */
+export function compraGerador(custo: number, n: number, qtd: 0 | 1 | 10, v: number, r: RegraCompra): { k: number; preco: number; cupons: number } {
+  const cm = r.meia ? r.cm / 2 : r.cm;
+  const c = r.meia ? 0 : Math.max(r.cupons, 0);
+  const cmc = cm * CUPOM_FATOR;
+  const k = qtd === 0 ? maxCompraCupom(custo, n, v, cm, cmc, c) : qtd;
+  return { k, preco: precoCupom(custo, n, k, cm, cmc, c), cupons: Math.min(k, c) };
 }
 
 export function podeComprarGerador(s: Estado, gid: number): boolean {

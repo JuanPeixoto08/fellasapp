@@ -18,7 +18,7 @@ import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, S
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
 import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
-import { custoMult, efeitosDe, liberada, maxCompra, multContratos, podeComprarGerador, preco, taxaPorUnidade, VIRAL_MS } from './economia';
+import { compraGerador, custoMult, efeitosDe, liberada, multContratos, podeComprarGerador, type RegraCompra, taxaPorUnidade, VIRAL_MS } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
 import type { Desenhar } from './navegador';
@@ -36,7 +36,7 @@ import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
 import { ERAS, FRASES_GERADOR, VISUAL_NOMES } from './nomes';
-import { CASHBACK, cashbackAtivo, CUPOM_FATOR, cupomVale, sai, textoOportunidade, tipo as tipoOportunidade } from './oportunidades';
+import { CASHBACK, cashbackAtivo, cupomVale, sai, textoOportunidade, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { caixa, estrategiaPendente, rotuloEra, segundosOportunidade, type Fase } from './store';
 
@@ -425,7 +425,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   root.append(app);
 
   // botões que dependem do valor (atualizados em atualizarValor)
-  let precos: { botao: HTMLButtonElement; preco: number; maximo?: { custo: number; n: number; cm: number } }[] = [];
+  let precos: { botao: HTMLButtonElement; preco: number; maximo?: (valor: number) => number }[] = [];
   // "some em ..." das oportunidades guardadas (atualizado em atualizarValor)
   let prazos: { texto: HTMLElement; fim: number }[] = [];
   // aba Melhorias: à venda ou as já compradas (só apresentação; refaz com o último modelo)
@@ -474,8 +474,12 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   const custoMelhoria = (s: IdleState) => custoAgora(s) * (1 - (s.horta_bonus?.melhorias ?? 0)) * custosConv(s).melhorias
     * (descontoAtivo(s, agoraTela) ? DESCONTO_MELHORIA : 1); // Atualização instalada (o banco aplica igual)
   const meiaAgora = (s: IdleState) => (s.half_price && !promoAtiva(s, agoraTela) ? 0.5 : 1);
-  // Cupom de primeira compra (0076): geradores 25% mais baratos (1, 10 e Máx), sem Promoção; a meia-preço guarda o cupom
-  const cupomAgora = (s: IdleState) => (cupomVale(s, agoraTela) ? CUPOM_FATOR : 1);
+  // a compra de gerador (o banco faz igual, 0080): cada cupom deixa 1 gerador 25% mais barato (no 10 e no Máx, só os
+  // primeiros); a meia-preço vale a compra inteira pela metade e guarda os cupons (o desconto de compra não passa de 50%);
+  // com a Promoção os dois ficam guardados
+  const regraGerador = (s: IdleState): RegraCompra => ({
+    cm: custoGerador(s), cupons: cupomVale(s, agoraTela) ? s.cupons ?? 0 : 0, meia: meiaAgora(s) < 1,
+  });
   // Cashback (0076): a caixinha do botão de comprar diz quanto volta
   const cashAgora = (s: IdleState) => (cashbackAtivo(s, agoraTela) ? CASHBACK : 0);
 
@@ -512,10 +516,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       etq.title = `Cada ${g.nome} libera +1 ação ${deEmpresa(ligada)} ${ligada.nome} na Bolsa`;
       meio.append(etq);
     }
-    const cm = custoGerador(s);
-    const cmc = cm * cupomAgora(s);
-    // a compra de 1 com meia-preço usa a meia, sem o cupom (o desconto de compra não passa de 50%; o banco faz igual)
-    const precoUm = meiaAgora(s) < 1 ? preco(g.custo, n, 1, cm) * 0.5 : preco(g.custo, n, 1, cmc);
+    const regra = regraGerador(s);
+    const precoUm = compraGerador(g.custo, n, 1, 0, regra).preco;
     const botoes = el('div', 'compra');
     const um = button(formatarValor(precoUm), 'btn', () => a.comprar('gerador', gid, 1));
     um.dataset.qtd = '1';
@@ -525,8 +527,8 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     max.dataset.qtd = '0';
     precos.push(
       { botao: um, preco: precoUm },
-      { botao: dez, preco: preco(g.custo, n, 10, cmc) },
-      { botao: max, preco: preco(g.custo, n, 1, cmc), maximo: { custo: g.custo, n, cm: cmc } },
+      { botao: dez, preco: compraGerador(g.custo, n, 10, 0, regra).preco },
+      { botao: max, preco: precoUm, maximo: (v) => compraGerador(g.custo, n, 0, v, regra).k },
     );
     botoes.append(um, dez, max);
     linha.append(sprite, meio, botoes);
@@ -1108,7 +1110,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     for (const p of precos) {
       p.botao.disabled = p.preco > valor;
       if (p.maximo) {
-        const k = maxCompra(p.maximo.custo, p.maximo.n, valor, p.maximo.cm);
+        const k = p.maximo(valor);
         p.botao.textContent = k > 1 ? `Máx (${k})` : 'Máx';
       }
     }

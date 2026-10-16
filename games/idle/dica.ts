@@ -187,7 +187,7 @@ export function dicaOportunidade(s: IdleState, tipo: TipoOportunidade, agoraMs: 
     return { titulo: 'Chamar um dourado', linhas };
   }
   if (tipo === 4) {
-    const linhas: LinhaDica[] = [{ texto: `+${CUPONS_POR_OPP * c} cupons: cada compra de gerador sai 25% mais barata` }];
+    const linhas: LinhaDica[] = [{ texto: `+${CUPONS_POR_OPP * c} cupons: cada um deixa 1 gerador 25% mais barato (no 10 e no Máx também)` }];
     if (s.cupons) linhas.push({ texto: `Você tem ${s.cupons}`, tom: 'fraco' });
     return { titulo: 'Cupom de primeira compra', linhas };
   }

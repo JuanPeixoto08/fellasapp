@@ -176,8 +176,8 @@ export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; 
   const cupons = s.cupons ?? 0;
   if (cupons > 0) {
     out.push({ texto: `Cupom · ${cupons} ${cupons === 1 ? 'restante' : 'restantes'}`, ouro: false, dica: { titulo: 'Cupom de primeira compra', linhas: [
-      { texto: 'Cada compra de gerador (1, 10 ou Máx) sai 25% mais barata' },
-      { texto: `Faltam ${cupons} ${cupons === 1 ? 'compra' : 'compras'}` },
+      { texto: 'Cada gerador comprado sai 25% mais barato: no 10 e no Máx, 1 cupom por gerador' },
+      { texto: cupons === 1 ? 'Vale pro próximo gerador' : `Vale pros próximos ${cupons} geradores` },
       { texto: 'Com Promoção ou meia-preço o cupom fica guardado', tom: 'fraco' }] } });
   }
   if (s.cashback_ate && Date.parse(s.cashback_ate) > agoraMs) {

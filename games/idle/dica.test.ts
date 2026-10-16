@@ -354,7 +354,7 @@ describe('a caixinha das oportunidades novas (0076)', () => {
     expect(textos(dicaOportunidade(comBolsa({ chamados: 3 }), 3, 0)!)).toContain('Você já tem 3: este se perde');
   });
   it('Cupom: +10 cupons e o que já tem', () => {
-    expect(textos(dicaOportunidade(comBolsa({ cupons: 4 }), 4, 0)!)).toEqual(['+10 cupons: cada compra de gerador sai 25% mais barata', 'Você tem 4']);
+    expect(textos(dicaOportunidade(comBolsa({ cupons: 4 }), 4, 0)!)).toEqual(['+10 cupons: cada um deixa 1 gerador 25% mais barato (no 10 e no Máx também)', 'Você tem 4']);
   });
   it('Adubo: a planta mais perto; sem planta crescendo, os 15 min em F$', () => {
     expect(textos(dicaOportunidade(comBolsa(), 5, 0)!)[0]).toBe('A planta mais perto de amadurecer fica madura na hora');

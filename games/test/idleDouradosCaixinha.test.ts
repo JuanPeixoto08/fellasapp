@@ -8,7 +8,7 @@ import type { IdleState } from '../shared/types';
 import { catalogo } from '../idle/catalogo';
 import { derrubada } from '../idle/convidados';
 import { escolhaLinkedin, segundoPix, sorteioDourado, tigrePaga, tipoDourado, tipoGarantido } from '../idle/dourados';
-import { produzido, rendasGeradores, VIRAL_MS } from '../idle/economia';
+import { compraGerador, preco, produzido, rendasGeradores, VIRAL_MS } from '../idle/economia';
 import { OPP_CORTE, pendentes, tipo } from '../idle/oportunidades';
 import { freshDb, quartaATarde, type TestDb } from './db';
 
@@ -177,29 +177,113 @@ describe('o estado, a conta e a compra (0076, parte B)', () => {
       expect(v1 - v0).toBeCloseTo(esperado, 0);
     }
   });
-  it('cupom: gerador 25% mais barato no 1 e no 10, gasta 1 por compra; melhoria não gasta', async () => {
-    await q('update public.idle_state set cupons = 2 where user_id = $1', [A]);
+  // 0080: o cupom vale 1 por gerador (no 10 e no Máx, só os primeiros saem 25% mais baratos) e a meia-preço vale a compra
+  // inteira (1, 10 e Máx) pela metade, guardando os cupons
+  /** Preço de k do gerador 2 tendo n (sem pegar do estado), com o custo × fator. */
+  const precoGenN = async (n: number, k: number, fator = 1) => (await q<{ p: number }>(
+    `select public.idle_price(c.custo, $2, $3, public.idle_cost_mult(s) * $4) as p
+       from public.idle_cat_gen c, public.idle_state s where c.id = 2 and s.user_id = $1`, [A, n, k, fator]))[0].p;
+  it('cupom: o 1 gasta 1; o 10 com 3 cupons gasta 3 (3 com desconto, 7 cheios); o 10 com 12 gasta 10; melhoria não gasta', async () => {
+    await q('update public.idle_state set cupons = 5 where user_id = $1', [A]);
     let p = await precoGen(1, 0.75);
     let r = await comprar('gerador', 2);
     expect(r.gasto).toBeCloseTo(p, 3);
-    expect(r.s.cupons).toBe(1);
-    p = await precoGen(10, 0.75);
+    expect(r.s.cupons).toBe(4);
+    await q('update public.idle_state set cupons = 3 where user_id = $1', [A]);
+    p = (await precoGenN(21, 3, 0.75)) + (await precoGenN(24, 7));
     r = await comprar('gerador', 2, 10);
     expect(r.gasto).toBeCloseTo(p, 3);
     expect(r.s.cupons).toBe(0);
-    p = await precoGen(1);
-    r = await comprar('gerador', 2);
+    expect(r.s.generators[1]).toBe(31);
+    await q('update public.idle_state set cupons = 12 where user_id = $1', [A]);
+    p = await precoGen(10, 0.75);
+    r = await comprar('gerador', 2, 10);
     expect(r.gasto).toBeCloseTo(p, 3);
+    expect(r.s.cupons).toBe(2);
     await q('update public.idle_state set cupons = 1 where user_id = $1', [A]);
     r = await comprar('melhoria', 11);
     expect(r.s.cupons).toBe(1);
   });
-  it('Máx com cupom: compra o que dá com o preço do cupom', async () => {
-    const tres = await precoGen(3, 0.75);
-    await q('update public.idle_state set cupons = 1, valuation = $2 where user_id = $1', [A, tres * 1.0000001]);
+  it('Máx com 7 cupons: só 7 saem com desconto e gasta 7; o resto paga cheio', async () => {
+    const parte = (await precoGenN(20, 7, 0.75)) + (await precoGenN(27, 5));
+    await q('update public.idle_state set cupons = 7, valuation = $2 where user_id = $1', [A, parte * (1 + 1e-9)]);
     const r = await comprar('gerador', 2, 0);
-    expect(r.s.generators[1]).toBe(23);
+    expect(r.s.generators[1]).toBe(32);
     expect(r.s.cupons).toBe(0);
+    expect(r.gasto / parte).toBeCloseTo(1, 9);
+    // poucos: só cabem os com desconto (3 de 7) e sobram 4
+    const tres = await precoGenN(32, 3, 0.75);
+    await q('update public.idle_state set cupons = 7, valuation = $2 where user_id = $1', [A, tres * (1 + 1e-9)]);
+    const r2 = await comprar('gerador', 2, 0);
+    expect(r2.s.generators[1]).toBe(35);
+    expect(r2.s.cupons).toBe(4);
+  });
+  it('meia-preço: o 10 e o Máx pela metade (o Máx compra o que cabe pela metade), gasta 1 meia e os cupons ficam', async () => {
+    await q('update public.idle_state set cupons = 3, meias = 2 where user_id = $1', [A]);
+    let p = (await precoGen(10)) / 2;
+    let r = await comprar('gerador', 2, 10);
+    expect(r.gasto).toBeCloseTo(p, 3);
+    expect(r.s.meias).toBe(1);
+    expect(r.s.cupons).toBe(3);
+    p = (await precoGenN(30, 6)) / 2;
+    await q('update public.idle_state set valuation = $2 where user_id = $1', [A, p * (1 + 1e-9)]);
+    r = await comprar('gerador', 2, 0);
+    expect(r.s.generators[1]).toBe(36);
+    expect(r.gasto / p).toBeCloseTo(1, 9);
+    expect(r.s.meias).toBe(0);
+    expect(r.s.cupons).toBe(3);
+  });
+  it('melhoria com meia-preço: metade e gasta a meia (os cupons ficam)', async () => {
+    await q('update public.idle_state set cupons = 2, meias = 1 where user_id = $1', [A]);
+    const [{ upg }] = await q<{ upg: number }>('select preco as upg from public.idle_cat_upg where id = 11');
+    const r = await comprar('melhoria', 11);
+    expect(r.gasto).toBeCloseTo(upg / 2, 3);
+    expect(r.s.meias).toBe(0);
+    expect(r.s.cupons).toBe(2);
+  });
+  it('com Promoção o Máx sai pela metade e não gasta cupom nem meia', async () => {
+    const p = await precoGenN(20, 4, 0.5);
+    await q(`update public.idle_state set cupons = 3, meias = 1, valuation = $2, promo_ate = now() + interval '30 seconds' where user_id = $1`,
+      [A, p * (1 + 1e-9)]);
+    const r = await comprar('gerador', 2, 0);
+    expect(r.s.generators[1]).toBe(24);
+    expect(r.gasto / p).toBeCloseTo(1, 9);
+    expect(r.s.cupons).toBe(3);
+    expect(r.s.meias).toBe(1);
+  });
+  it('cashback no Máx com cupom: volta 30% do preço final (o com desconto por gerador)', async () => {
+    const parte = (await precoGenN(20, 7, 0.75)) + (await precoGenN(27, 5));
+    await q(`update public.idle_state set cupons = 7, valuation = $2, cashback_ate = now() + interval '60 seconds' where user_id = $1`,
+      [A, parte * (1 + 1e-9)]);
+    const r = await comprar('gerador', 2, 0);
+    expect(r.s.generators[1]).toBe(32);
+    expect(r.gasto / (parte * 0.7)).toBeCloseTo(1, 9);
+    expect(r.s.dourados_cont.cashback / (parte * 0.3)).toBeCloseTo(1, 9);
+  });
+  it('paridade: o banco cobra o que a página mostra (compraGerador) com cupom, meia e Promoção', async () => {
+    const [{ cm0, custo }] = await q<{ cm0: number; custo: number }>(
+      `select public.idle_cost_mult(s) as cm0, c.custo from public.idle_cat_gen c, public.idle_state s where c.id = 2 and s.user_id = $1`, [A]);
+    expect(custo).toBe(catalogo.geradores[1].custo);
+    let i = 0;
+    for (const cupons of [0, 1, 3, 7, 15]) for (const meias of [0, 1]) for (const promo of [false, true]) for (const qtd of [1, 10, 0] as const) {
+      i++;
+      const n = 10 + (i % 17);
+      const cm = cm0 * (promo ? 0.5 : 1);
+      const regra = { cm, cupons: promo ? 0 : cupons, meia: meias > 0 && !promo };
+      const v = preco(custo, n, 1 + ((i * 7) % 23), cm) * (1.0001 + (i % 5) / 7);
+      await q(`update public.idle_state set generators[2] = $2, valuation = $3, cupons = $4, meias = $5,
+                 promo_ate = ${promo ? `now() + interval '30 seconds'` : 'null'} where user_id = $1`, [A, n, v, cupons, meias]);
+      const pagina = compraGerador(custo, n, qtd, v, regra);
+      if (pagina.k < 1 || pagina.preco > v) {
+        await expect(comprar('gerador', 2, qtd)).rejects.toThrow(/idle_cant_afford/);
+        continue;
+      }
+      const r = await comprar('gerador', 2, qtd);
+      expect(r.s.generators[1]).toBe(n + pagina.k);
+      expect(Math.abs(r.gasto - pagina.preco) / pagina.preco).toBeLessThan(1e-9);
+      expect(r.s.cupons).toBe(cupons - pagina.cupons);
+      expect(r.s.meias).toBe(regra.meia ? meias - 1 : meias);
+    }
   });
   it('com Promoção o cupom fica guardado; com meia-preço a compra de 1 usa a meia e o cupom também fica (até 50%)', async () => {
     await q(`update public.idle_state set cupons = 3, promo_ate = now() + interval '30 seconds' where user_id = $1`, [A]);
