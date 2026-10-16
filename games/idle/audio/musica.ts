@@ -2,7 +2,13 @@
 // compassos em Fá, que cresce por era (0 = antes do Abrir CNPJ, 1 Quarto … 5 Sede). Da referência do Juan ("Welcome
 // to the Green Room", Toby Fox) só vem o balanço: tercina de swing, baixo andando, prato de condução. Melodia e
 // harmonia são daqui.
-export type Instrumento = 'baixo' | 'escovinha' | 'conducao' | 'bumbo' | 'caixa' | 'piano' | 'vibrafone' | 'metais';
+// As eras 6 e 7 tocam outra música (musicaEspaco.ts): órgão, arpejo e tique-taque, no estilo das trilhas do Hans Zimmer.
+import { BATIDAS_ESPACO, BPM_ESPACO, notasEspaco } from './musicaEspaco';
+import { aleatorio } from './sorte';
+
+export type Instrumento =
+  | 'baixo' | 'escovinha' | 'conducao' | 'bumbo' | 'caixa' | 'piano' | 'vibrafone' | 'metais'
+  | 'orgao' | 'arpejo' | 'grave' | 'pad' | 'tique' | 'ar';
 /** Uma nota do giro: `t` e `dur` em batidas (já com o swing), `altura` MIDI (percussão: 0), `forca` de 0 a 1. */
 export type Nota = { inst: Instrumento; t: number; dur: number; altura: number; forca: number };
 /** Um compasso de melodia: [duração em tempos, altura MIDI ou null = pausa]. */
@@ -11,9 +17,14 @@ export type Frase = readonly (readonly [number, number | null])[];
 export const COMPASSOS = 32;
 export const BATIDAS_GIRO = COMPASSOS * 4;
 const BPM = [120, 120, 126, 132, 138, 144] as const; // índice = era (0 = antes do CNPJ, no tempo do Quarto)
-export const eraMusica = (era: number) => Math.max(0, Math.min(5, Math.floor(era)));
-export const bpm = (era: number): number => BPM[eraMusica(era)];
-export const segundosDoGiro = (era: number) => (BATIDAS_GIRO * 60) / bpm(era);
+export const eraMusica = (era: number) => Math.max(0, Math.min(7, Math.floor(era)));
+export const bpm = (era: number): number => {
+  const e = eraMusica(era);
+  return e >= 6 ? BPM_ESPACO[e as 6 | 7] : BPM[e];
+};
+/** Quantas batidas tem o giro: 128 no swing (eras 0–5), 64 nas eras 6 e 7. */
+export const batidasDoGiro = (era: number) => (eraMusica(era) >= 6 ? BATIDAS_ESPACO : BATIDAS_GIRO);
+export const segundosDoGiro = (era: number) => (batidasDoGiro(era) * 60) / bpm(era);
 
 /** Swing de tercina: a colcheia de cima (x,5) cai a 2/3 do tempo. */
 export function swing(t: number): number {
@@ -98,13 +109,6 @@ const ESCALA_FA = [5, 7, 9, 10, 0, 2, 4];
 const MEL_MIN = 65;
 const MEL_MAX = 86;
 
-function aleatorio(semente: number) {
-  let s = semente >>> 0 || 1;
-  return () => {
-    s = (Math.imul(s, 1103515245) + 12345) >>> 0;
-    return s / 4294967296;
-  };
-}
 function maisPerto(de: number, pcs: readonly number[]): number {
   let melhor = de;
   let dist = Infinity;
@@ -199,12 +203,15 @@ const INSTRUMENTOS_DA_ERA: readonly (readonly Instrumento[])[] = [
   ['baixo', 'escovinha', 'piano', 'vibrafone', 'conducao', 'bumbo'],
   ['baixo', 'escovinha', 'piano', 'vibrafone', 'conducao', 'bumbo', 'metais', 'caixa'],
   ['baixo', 'escovinha', 'piano', 'vibrafone', 'conducao', 'bumbo', 'metais', 'caixa'],
+  ['grave', 'orgao', 'pad', 'ar', 'arpejo'],
+  ['grave', 'orgao', 'pad', 'ar', 'arpejo', 'tique'],
 ];
 export const instrumentosDaEra = (era: number): readonly Instrumento[] => INSTRUMENTOS_DA_ERA[eraMusica(era)];
 
 /** Todas as notas de um giro (0 = tema, 1 = solo) da era, ordenadas no tempo. */
 export function notasDoGiro(era: number, giro: number): Nota[] {
   const e = eraMusica(era);
+  if (e >= 6) return notasEspaco(e as 6 | 7, giro);
   const tem = new Set(instrumentosDaEra(e));
   const out: Nota[] = [];
   const nota = (inst: Instrumento, t: number, dur: number, altura: number, forca: number) => out.push({ inst, t, dur, altura, forca });

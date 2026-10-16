@@ -5,9 +5,10 @@ import { IDS_EFEITOS, RECEITAS, type IdEfeito, type OpcoesEfeito } from './efeit
 import { criarAudio } from './index';
 import { INSTRUMENTOS } from './instrumentos';
 import { montarSaida } from './motor';
+import { criarSala, molhadoDaEra } from './sala';
 import { bpm, notasDoGiro, segundosDoGiro } from './musica';
 
-const ERAS = ['Antes do CNPJ', 'Quarto', 'Garagem', 'Escritório', 'Andar inteiro', 'Sede'];
+const ERAS = ['Antes do CNPJ', 'Quarto', 'Garagem', 'Escritório', 'Andar inteiro', 'Sede', 'Em órbita', 'Lua'];
 const EFEITOS: [string, IdEfeito, OpcoesEfeito?][] = [
   ['Comprar 1', 'compra'], ['Comprar 10', 'compraMuitas', { quantas: 10 }], ['Comprar Máx (1000)', 'compraMuitas', { quantas: 1000 }],
   ['Nó da árvore', 'no'], ['Comprar ação', 'acaoCompra'], ['Vender com lucro', 'acaoVende', { lucro: true }],
@@ -16,6 +17,8 @@ const EFEITOS: [string, IdEfeito, OpcoesEfeito?][] = [
   ['Abrir CNPJ', 'cnpj'], ['Erro', 'erro'], ['Clique', 'clique'], ['Abrir folha', 'abrir'], ['Fechar folha', 'fechar'],
   ['Dourado apareceu', 'dourado'], ['Pegou o dourado', 'douradoPego'],
   ['Mãe chamando', 'mae'], ['Pacote da Shopee', 'shopee'], ['Saiu da call', 'call'], ['Tela azul', 'telaAzul'], ['Gol do Brasil', 'gol'],
+  ['Era 6 (Zaratustra)', 'zaratustra'], ['Valsa do Danúbio', 'valsa'], ['Destroço desviado', 'lixo'], ['Houston (alarme)', 'houston'],
+  ['Consertou com silver tape', 'conserto'],
 ];
 
 const raiz = document.getElementById('ouvir')!;
@@ -85,19 +88,26 @@ async function renderizar(segundos: number, tocar: (ctx: OfflineAudioContext, s:
 }
 async function medirTudo(): Promise<Medida[]> {
   const out: Medida[] = [];
-  for (let era = 0; era <= 5; era++) {
+  for (let era = 0; era <= 7; era++) {
     for (const giro of [0, 1]) {
       const spb = 60 / bpm(era);
       const segundos = segundosDoGiro(era);
-      const picoDb = await renderizar(segundos + 2, (ctx, s) => {
-        for (const n of notasDoGiro(era, giro)) INSTRUMENTOS[n.inst](ctx, s.musica, n.t * spb, n.altura, n.dur * spb, n.forca);
+      const picoDb = await renderizar(segundos + 3, (ctx, s) => {
+        const canal = ctx.createGain();
+        canal.connect(s.musica);
+        if (era >= 6) {
+          const sala = criarSala(ctx, s.musica);
+          sala.molhado(molhadoDaEra(era), 0);
+          canal.connect(sala.entrada);
+        }
+        for (const n of notasDoGiro(era, giro)) INSTRUMENTOS[n.inst](ctx, canal, n.t * spb, n.altura, n.dur * spb, n.forca);
       });
       out.push({ nome: `${ERAS[era]} · giro ${giro + 1}`, picoDb, segundos });
     }
   }
   for (const [nome, id, o] of EFEITOS) {
     let dura = 0;
-    const picoDb = await renderizar(3.5, (ctx, s) => {
+    const picoDb = await renderizar(id === 'zaratustra' ? 8 : 3.5, (ctx, s) => {
       dura = RECEITAS[id](ctx, s.efeitos, 0.05, o ?? {});
     });
     out.push({ nome, picoDb, segundos: dura });

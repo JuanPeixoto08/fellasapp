@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { comoContexto, ContextoFalso, destinoFalso } from './falso';
+import { comoContexto, ContextoFalso, ConvolverFalso, destinoFalso } from './falso';
 import type { Toque } from './instrumentos';
 import type { Instrumento, Nota } from './musica';
+import { MOLHADO_ESPACO } from './sala';
 import { criarSequenciador } from './sequenciador';
 
 function montar(comCtx = true) {
@@ -95,5 +96,42 @@ describe('música em segundo plano (PC)', () => {
     expect(canal.ligados).toContain(c.destination); // o canal da rodada ligado na saída da música
     s.parar();
     expect(canal.ligados).toHaveLength(0); // desligado do destino: as notas agendadas não soam
+  });
+});
+
+describe('a sala das eras 6 e 7', () => {
+  const montarSala = (era: number) => {
+    const c = new ContextoFalso();
+    c.state = 'running';
+    const s = criarSequenciador({ ctx: () => comoContexto(c), destino: () => destinoFalso(c) }, { relogio: false });
+    s.tocar(era);
+    return c;
+  };
+  const molhados = (c: ContextoFalso) => c.ganhos().filter((g) => g.gain.eventos.some(([tipo, v]) => tipo === 'alvo' && v === MOLHADO_ESPACO));
+  it('o canal vai seco pro destino e manda pra sala; na era 7 o molhado é o do espaço', () => {
+    const c = montarSala(7);
+    expect(c.criados.some((n) => n instanceof ConvolverFalso)).toBe(true);
+    const canal = c.ganhos()[0];
+    expect(canal.ligados).toContain(c.destination);
+    expect(canal.ligados).toHaveLength(2);
+    expect(molhados(c)).toHaveLength(1);
+  });
+  it('no swing (era 3) o molhado fica em 0: o som de sempre', () => {
+    expect(molhados(montarSala(3))).toHaveLength(0);
+  });
+  it('o giro da Lua acaba em 64 batidas a 60 bpm (troca de giro em 64 s)', () => {
+    const c = new ContextoFalso();
+    c.state = 'running';
+    const giros: [number, number][] = [];
+    const s = criarSequenciador({ ctx: () => comoContexto(c), destino: () => destinoFalso(c) }, {
+      relogio: false, toques: {} as Record<Instrumento, Toque>, notas: (era, giro) => { giros.push([era, giro]); return []; },
+    });
+    s.tocar(7);
+    c.currentTime = 63.9;
+    s.passo();
+    expect(giros).toEqual([[7, 0]]);
+    c.currentTime = 64.05;
+    s.passo();
+    expect(giros).toEqual([[7, 0], [7, 1]]);
   });
 });

@@ -57,6 +57,97 @@ function filtro(ctx: BaseAudioContext, tipo: BiquadFilterType, f: number, q: num
   return b;
 }
 
+/** Envelope lento (órgão, pad, grave, ar): sobe em `ataque`, segura até o fim da nota e solta em `soltura`. */
+function envelopeLento(ctx: BaseAudioContext, destino: AudioNode, t: number, pico: number, ataque: number, dur: number, soltura: number): GainNode {
+  const fimNota = t + Math.max(ataque, dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(Math.max(pico, 0.0002), t + ataque);
+  g.gain.setValueAtTime(Math.max(pico, 0.0002), fimNota);
+  g.gain.exponentialRampToValueAtTime(0.0001, fimNota + soltura);
+  g.connect(destino);
+  return g;
+}
+
+/** As parciais do órgão (índice = harmônico): 8', 4', 2 2/3', 2', 1 3/5', 1 1/3' e 1', como as barras de um órgão. */
+export const PARCIAIS_ORGAO = [0, 1, 0.55, 0.32, 0.22, 0.1, 0.12, 0, 0.06] as const;
+const ondas = new WeakMap<BaseAudioContext, PeriodicWave>();
+function ondaOrgao(ctx: BaseAudioContext): PeriodicWave {
+  let w = ondas.get(ctx);
+  if (!w) {
+    w = ctx.createPeriodicWave(new Float32Array(PARCIAIS_ORGAO.length), Float32Array.from(PARCIAIS_ORGAO));
+    ondas.set(ctx, w);
+  }
+  return w;
+}
+
+/** Órgão aditivo (eras 6+): a onda das parciais somadas em duas camadas desafinadas (±4 cents, o "coro"), a oitava de
+ *  baixo bem leve, ataque de 0,35 s, soltura de 1,2 s e um vibrato leve (5,2 Hz, 4 cents) que entra depois do ataque. */
+const orgao: Toque = (ctx, d, t, m, dur, f) => {
+  const ataque = 0.35;
+  const soltura = 1.2;
+  const fim = t + Math.max(ataque, dur) + soltura;
+  const g = envelopeLento(ctx, d, t, 0.05 * f, ataque, dur, soltura);
+  const vib = ctx.createGain(); // profundidade do vibrato, em cents
+  vib.gain.setValueAtTime(0, t);
+  vib.gain.linearRampToValueAtTime(4, t + ataque + 0.4);
+  osc(ctx, 'sine', 5.2, vib, t, fim);
+  for (const det of [-4, 4]) {
+    const o = osc(ctx, 'sine', hz(m), g, t, fim);
+    o.setPeriodicWave(ondaOrgao(ctx));
+    o.detune.setValueAtTime(det, t);
+    vib.connect(o.detune);
+  }
+  vib.connect(osc(ctx, 'sine', hz(m - 12), envelopeLento(ctx, d, t, 0.02 * f, ataque, dur, soltura), t, fim).detune);
+};
+/** Pad: dois dentes de serra desafinados (±7 cents) num passa-baixa que abre devagar ao longo da nota; ataque de 1,2 s. */
+const pad: Toque = (ctx, d, t, m, dur, f) => {
+  const ataque = 1.2;
+  const soltura = 1.6;
+  const fimNota = t + Math.max(ataque, dur);
+  const g = envelopeLento(ctx, d, t, 0.03 * f, ataque, dur, soltura);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 0.6;
+  lp.frequency.setValueAtTime(260, t);
+  lp.frequency.exponentialRampToValueAtTime(1800, fimNota);
+  lp.connect(g);
+  for (const det of [-7, 7]) osc(ctx, 'sawtooth', hz(m), lp, t, fimNota + soltura).detune.setValueAtTime(det, t);
+};
+/** Arpejo: um "plim" macio (triângulo filtrado e um seno na oitava, só no ataque), cai em 0,7 s. */
+const arpejo: Toque = (ctx, d, t, m, dur, f) => {
+  const fim = t + Math.min(dur, 0.4) + 0.7;
+  osc(ctx, 'triangle', hz(m), filtro(ctx, 'lowpass', 2200, 0.5, envelope(ctx, d, t, 0.07 * f, 0.008, fim - t)), t, fim);
+  osc(ctx, 'sine', hz(m + 12), envelope(ctx, d, t, 0.015 * f, 0.005, 0.3), t, t + 0.3);
+};
+/** Grave longo: seno com o triângulo da oitava bem baixinho; ataque de 0,8 s e soltura de 2 s. */
+const grave: Toque = (ctx, d, t, m, dur, f) => {
+  const ataque = 0.8;
+  const soltura = 2;
+  const fim = t + Math.max(ataque, dur) + soltura;
+  osc(ctx, 'sine', hz(m), envelopeLento(ctx, d, t, 0.28 * f, ataque, dur, soltura), t, fim);
+  osc(ctx, 'triangle', hz(m + 12), filtro(ctx, 'lowpass', 400, 0.5, envelopeLento(ctx, d, t, 0.05 * f, ataque, dur, soltura)), t, fim);
+};
+/** Tique-taque de relógio: estalo seco de ruído passa-alta e um "tic" curto de seno (altura 1 = tique, agudo; 0 = taque). */
+const tique: Toque = (ctx, d, t, m, _dur, f) => {
+  ruidoEm(ctx, filtro(ctx, 'highpass', 5000, 0.7, envelope(ctx, d, t, 0.06 * f, 0.001, 0.025)), t, t + 0.03);
+  osc(ctx, 'sine', m >= 1 ? 2400 : 1700, envelope(ctx, d, t, 0.03 * f, 0.001, 0.04), t, t + 0.04);
+};
+/** Ar: ruído num passa-banda de 3 kHz, bem baixinho, entra e sai devagar (a sala respirando). */
+const ar: Toque = (ctx, d, t, _m, dur, f) => {
+  const ataque = Math.min(2, dur / 2);
+  const soltura = 2;
+  const fim = t + Math.max(ataque, dur) + soltura;
+  ruidoEm(ctx, filtro(ctx, 'bandpass', 3000, 0.4, envelopeLento(ctx, d, t, 0.012 * f, ataque, dur, soltura)), t, fim);
+};
+/** Só dos efeitos: tímpano (seno que assenta na altura, com o baque de ruído grave). */
+const timpano: Toque = (ctx, d, t, m, dur, f) => {
+  const fim = t + Math.max(dur, 0.3) + 0.6;
+  const o = osc(ctx, 'sine', hz(m) * 1.02, envelope(ctx, d, t, 0.35 * f, 0.004, fim - t), t, fim);
+  o.frequency.exponentialRampToValueAtTime(hz(m), t + 0.15);
+  ruidoEm(ctx, filtro(ctx, 'lowpass', 300, 0.7, envelope(ctx, d, t, 0.08 * f, 0.002, 0.12)), t, t + 0.15);
+};
+
 /** Baixo acústico: triângulo filtrado + seno, ataque de dedo. */
 const baixo: Toque = (ctx, d, t, m, dur, f) => {
   const fim = t + Math.min(dur, 1.2) + 0.12;
@@ -127,6 +218,7 @@ const moeda: Toque = (ctx, d, t, m, _dur, f) => {
   o.frequency.setValueAtTime(hz(m + 5), t + 0.06);
 };
 
-export const INSTRUMENTOS: Record<Instrumento | 'sininho' | 'moeda', Toque> = {
+export const INSTRUMENTOS: Record<Instrumento | 'sininho' | 'moeda' | 'timpano', Toque> = {
   baixo, piano, vibrafone, metais, escovinha, conducao, bumbo, caixa, sininho, moeda,
+  orgao, pad, arpejo, grave, tique, ar, timpano,
 };

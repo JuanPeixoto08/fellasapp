@@ -14,14 +14,14 @@ describe('efeitos', () => {
     expect([...IDS_EFEITOS].sort()).toEqual(
       ['abrir', 'acaoCompra', 'acaoVende', 'cnpj', 'clique', 'compra', 'compraMuitas', 'conquista', 'contratado', 'dourado',
         'douradoPego', 'era', 'erro', 'fechar', 'no', 'oportunidade', 'pegar', 'plantar', 'po', 'venda',
-        'mae', 'shopee', 'call', 'telaAzul', 'gol', 'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo', 'lixo', 'houston', 'conserto'].sort(),
+        'mae', 'shopee', 'call', 'telaAzul', 'gol', 'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo', 'lixo', 'houston', 'conserto', 'zaratustra', 'valsa'].sort(),
     );
     for (const id of IDS_EFEITOS) {
       const { c, dura } = tocar(id);
       expect(c.osciladores().length, id).toBeGreaterThan(0);
       expect(dura, id).toBeGreaterThan(0);
-      expect(dura, id).toBeLessThan(3);
-      for (const o of c.osciladores()) expect(o.fim!, id).toBeLessThan(1 + 4);
+      expect(dura, id).toBeLessThan(id === 'zaratustra' ? 7 : 3);
+      for (const o of c.osciladores()) expect(o.fim!, id).toBeLessThan(1 + (id === 'zaratustra' ? 8 : 4));
     }
   });
   it('mais compras, cascata maior (de 3 a 8 moedas)', () => {
@@ -53,6 +53,18 @@ describe('efeitos', () => {
     expect(f[f.length - 1][1]).toBeLessThan(f[0][1]); // cai: "toc", não "pi"
   });
   it('momentos grandes', () => {
-    expect([...GRANDES].sort()).toEqual(['cnpj', 'combo', 'conquista', 'douradoPego', 'era', 'venda']);
+    expect([...GRANDES].sort()).toEqual(['cnpj', 'combo', 'conquista', 'douradoPego', 'era', 'valsa', 'venda', 'zaratustra']);
+  });
+  it('Zaratustra: o pedal grave, as três notas subindo (Dó, Sol, Dó) e o acorde que vira de maior pra menor; uns 6 s', () => {
+    const { c, dura } = tocar('zaratustra');
+    expect(dura).toBeGreaterThan(5);
+    const midi = (f: number) => Math.round(12 * Math.log2(f / 440) + 69);
+    const serras = c.osciladores().filter((o) => o.type === 'sawtooth').map((o) => midi(o.frequency.eventos[0][1]));
+    expect(serras).toEqual(expect.arrayContaining([60, 67, 72, 64, 63]));
+  });
+  it('valsa: três compassos de 3 tempos (o baixo no 1), em menos de 3 s', () => {
+    const { c, dura } = tocar('valsa');
+    expect(dura).toBeLessThan(3);
+    expect(c.osciladores().filter((o) => o.type === 'triangle')).toHaveLength(3); // o baixo, um por compasso
   });
 });

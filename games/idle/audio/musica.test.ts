@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  acorde, acordeEm, BATIDAS_GIRO, bpm, COMPASSOS, FORMA, instrumentosDaEra, notasDoAcorde, notasDoGiro, segundosDoGiro,
+  acorde, acordeEm, BATIDAS_GIRO, batidasDoGiro, bpm, COMPASSOS, FORMA, instrumentosDaEra, notasDoAcorde, notasDoGiro, segundosDoGiro,
   solo, swing, TEMA,
 } from './musica';
 
-const FAIXA: Partial<Record<string, readonly [number, number]>> = { baixo: [28, 55], piano: [50, 79], vibrafone: [62, 91], metais: [55, 84] };
+const FAIXA: Partial<Record<string, readonly [number, number]>> = { baixo: [28, 55], piano: [50, 79], vibrafone: [62, 91], metais: [55, 84],
+  orgao: [40, 84], arpejo: [60, 96], grave: [24, 52], pad: [48, 88], tique: [0, 1] };
 
 /** Nos tempos 1 e 3 (posição 0 e 2 do compasso) a melodia está numa nota do acorde. */
 function confereFrases(frases: readonly (readonly (readonly [number, number | null])[])[], era: number) {
@@ -44,16 +45,17 @@ describe('partitura', () => {
     expect(swing(2)).toBe(2);
     expect(swing(1 + 1 / 3)).toBeCloseTo(1 + 1 / 3);
     expect([0, 1, 2, 3, 4, 5].map(bpm)).toEqual([120, 120, 126, 132, 138, 144]);
+    expect([bpm(6), bpm(7)]).toEqual([66, 60]);
     expect(BATIDAS_GIRO).toBe(128);
     expect(segundosDoGiro(1)).toBe(64);
   });
   it('as notas de cada era: dentro do giro, na faixa de cada instrumento, ordenadas, só instrumentos da era', () => {
-    for (let era = 0; era <= 5; era++) {
+    for (let era = 0; era <= 7; era++) {
       for (const giro of [0, 1]) {
         const ns = notasDoGiro(era, giro);
         ns.forEach((n, i) => {
           expect(n.t).toBeGreaterThanOrEqual(0);
-          expect(n.t).toBeLessThan(BATIDAS_GIRO);
+          expect(n.t).toBeLessThan(batidasDoGiro(era));
           expect(n.dur).toBeGreaterThan(0);
           expect(n.forca).toBeGreaterThan(0);
           expect(n.forca).toBeLessThanOrEqual(1);

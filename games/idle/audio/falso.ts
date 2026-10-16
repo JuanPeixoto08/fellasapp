@@ -28,13 +28,16 @@ export class OscFalso extends NoFalso {
   frequency = new ParamFalso();
   detune = new ParamFalso();
   buffer: unknown = null;
+  onda: unknown = null;
   loop = false;
   inicio: number | null = null;
   fim: number | null = null;
   start(t = 0) { this.inicio = t; }
   stop(t = 0) { this.fim = t; }
+  setPeriodicWave(w: unknown) { this.onda = w; this.type = 'custom'; }
 }
 class FiltroFalso extends NoFalso { type = 'lowpass'; frequency = new ParamFalso(); Q = new ParamFalso(); }
+export class ConvolverFalso extends NoFalso { buffer: unknown = null; normalize = true; }
 class CompressorFalso extends NoFalso {
   threshold = new ParamFalso(); knee = new ParamFalso(); ratio = new ParamFalso(); attack = new ParamFalso(); release = new ParamFalso();
 }
@@ -57,7 +60,12 @@ export class ContextoFalso {
   createBufferSource() { return this.novo(new OscFalso()); }
   createBiquadFilter() { return this.novo(new FiltroFalso()); }
   createDynamicsCompressor() { return this.novo(new CompressorFalso()); }
-  createBuffer(_canais: number, n: number) { const d = new Float32Array(n); return { length: n, getChannelData: () => d }; }
+  createBuffer(canais: number, n: number) {
+    const ds = Array.from({ length: Math.max(1, canais) }, () => new Float32Array(n));
+    return { length: n, numberOfChannels: canais, getChannelData: (c = 0) => ds[c] };
+  }
+  createConvolver() { return this.novo(new ConvolverFalso()); }
+  createPeriodicWave(real: Float32Array, imag: Float32Array) { return { real, imag }; }
   addEventListener(tipo: string, f: () => void) { if (tipo === 'statechange') this.ouvintes.push(f); }
   /** Troca o estado como o navegador faria, avisando no `statechange` (mudar `state` direto não avisa ninguém). */
   mudar(estado: AudioContextState | 'interrupted') {

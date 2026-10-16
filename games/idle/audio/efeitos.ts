@@ -6,16 +6,16 @@ export const IDS_EFEITOS = [
   'compra', 'compraMuitas', 'no', 'acaoCompra', 'acaoVende', 'conquista', 'era', 'venda', 'contratado', 'po', 'oportunidade',
   'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar', 'mae', 'shopee', 'call', 'telaAzul', 'gol',
   'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo',
-  'lixo', 'houston', 'conserto',
+  'lixo', 'houston', 'conserto', 'zaratustra', 'valsa',
 ] as const;
 export type IdEfeito = (typeof IDS_EFEITOS)[number];
 export type OpcoesEfeito = { quantas?: number; lucro?: boolean };
 /** Momentos grandes: a música abaixa enquanto tocam. */
-export const GRANDES: ReadonlySet<IdEfeito> = new Set<IdEfeito>(['conquista', 'era', 'venda', 'cnpj', 'douradoPego', 'combo']);
+export const GRANDES: ReadonlySet<IdEfeito> = new Set<IdEfeito>(['conquista', 'era', 'venda', 'cnpj', 'douradoPego', 'combo', 'zaratustra', 'valsa']);
 export const INTERVALO_MS = 60;
 
 type Receita = (ctx: BaseAudioContext, d: AudioNode, t: number, o: OpcoesEfeito) => number;
-const { sininho, moeda, vibrafone, metais, caixa, bumbo, piano } = INSTRUMENTOS;
+const { sininho, moeda, vibrafone, metais, caixa, bumbo, piano, baixo, grave, orgao, timpano } = INSTRUMENTOS;
 const PENTA = [77, 79, 81, 84, 86, 89, 91, 93]; // Fá maior pentatônica, de cima
 const FA6_PIANO = [57, 60, 62]; // Lá, Dó, Ré
 
@@ -284,6 +284,27 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     ruidoFiltrado(c, d, t, 'highpass', 1500, 5000, 0.25, 0.07);
     sininho(c, d, t + 0.28, 84, 0.3, 0.6);
     return 0.7;
+  },
+  // eras 6–7 (0078): a fanfarra de "Assim Falou Zaratustra" (R. Strauss, 1896, domínio público) ao entrar na era 6 e o
+  // começo do "Danúbio Azul" (J. Strauss II, 1867, domínio público) na melhoria da valsa
+  zaratustra: (c, d, t) => {
+    grave(c, d, t, 36, 5, 0.9); // o Dó grave segurando tudo
+    orgao(c, d, t, 48, 5, 0.6);
+    metais(c, d, t + 0.6, 60, 0.9, 0.7); // Dó
+    metais(c, d, t + 1.5, 67, 0.9, 0.75); // Sol
+    metais(c, d, t + 2.4, 72, 0.6, 0.85); // Dó
+    acorde(c, d, t + 3.0, [64, 67, 72], 0.35, 0.9); // maior…
+    acorde(c, d, t + 3.4, [63, 67, 72], 1.4, 0.95); // …que vira menor
+    [0, 0.3, 0.6, 0.9, 1.2, 1.5].forEach((x, i) => timpano(c, d, t + 3.4 + x, i % 2 ? 31 : 36, 0.25, 0.8));
+    return 6;
+  },
+  valsa: (c, d, t) => {
+    const b = 0.3; // um tempo
+    ([[41, 0], [36, 3], [41, 6]] as const).forEach(([m, k]) => baixo(c, d, t + k * b, m, 0.25, 0.7)); // o "um"
+    for (const k of [1, 2, 4, 5, 7, 8]) acorde(c, d, t + k * b, [57, 60, 65], 0.18, 0.4, piano); // o "pa-pa"
+    ([[0, 65, 0.28], [1, 69, 0.28], [2, 72, 0.28], [3, 72, 0.85], [7, 84, 0.25], [8, 84, 0.3]] as const)
+      .forEach(([k, m, dur]) => vibrafone(c, d, t + k * b, m, dur, 0.75));
+    return 2.9;
   },
 };
 

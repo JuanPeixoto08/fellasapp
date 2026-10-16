@@ -10,7 +10,7 @@ import { GameError, toGameError } from '../shared/errors';
 import type { BolsaEstado, HortaEstado, IdleBoardRow, IdleState, IdleVisual, LugarEstado, MapaEstado } from '../shared/types';
 import { ativos } from './ativos';
 import { criarAudio } from './audio';
-import { quantasCompradas, sonsDaMudanca } from './audio/eventos';
+import { quantasCompradas, somDaCompra, sonsDaMudanca } from './audio/eventos';
 import { descontoAtivo, eventoEraEm, textoEventoPegou, type TipoEventoEra } from './eventosEra';
 import { COMBO_MULT, fraseLinkedin, JANELA_S, posicao, promoAtiva, resultadoTigre, textoDourado, viraisAtivos, type TipoDourado } from './dourados';
 import { VIRAL_MS } from './economia';
@@ -238,7 +238,7 @@ const tela = criarTela(document.getElementById('app')!, {
     const s = await api.idleBuy(tipo, id, qtd);
     aplicar(s);
     const n = quantasCompradas(antes, s, tipo, id);
-    audio.tocar(n > 1 ? 'compraMuitas' : 'compra', { quantas: n });
+    audio.tocar(somDaCompra(tipo, id, n), { quantas: n });
   }),
   escolher: (era, opcao) => void guard(async () => aplicar(await api.idlePickStrategy(era, opcao))),
   pegar: (w) => void guard(async () => {

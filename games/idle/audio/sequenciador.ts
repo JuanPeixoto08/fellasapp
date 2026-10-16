@@ -1,7 +1,8 @@
 // Toca a partitura: agenda as notas um pouco à frente no relógio do áudio (o setInterval só acorda; quem marca o tempo
 // é o contexto) e troca de era no fim do giro, alternando o tema e o solo.
 import { INSTRUMENTOS, type Toque } from './instrumentos';
-import { BATIDAS_GIRO, bpm, eraMusica, notasDoGiro, type Instrumento, type Nota } from './musica';
+import { batidasDoGiro, bpm, eraMusica, notasDoGiro, type Instrumento, type Nota } from './musica';
+import { criarSala, molhadoDaEra, type Sala } from './sala';
 
 export const ADIANTE_S = 0.12;
 export const PASSO_MS = 25;
@@ -30,6 +31,7 @@ export function criarSequenciador(
   let timer: ReturnType<typeof setInterval> | null = null;
   // canal próprio de cada rodada: parar desliga ele e corta o que já estava agendado
   let canal: GainNode | null = null;
+  let sala: Sala | null = null; // o envio de reverb da rodada (o molhado segue a era)
   const spb = () => 60 / bpm(era);
 
   function passo() {
@@ -45,11 +47,12 @@ export function criarSequenciador(
         if (quando < agora - ATRASO_MAX_S) continue;
         toques[n.inst](ctx, dest, Math.max(quando, agora), n.altura, n.dur * spb(), n.forca);
       }
-      const fim = inicio + BATIDAS_GIRO * spb();
+      const fim = inicio + batidasDoGiro(era) * spb();
       if (i < lista.length || fim >= ate) break;
       inicio = fim;
       giro = 1 - giro;
       era = eraNova;
+      sala?.molhado(molhadoDaEra(era), inicio);
       lista = notas(era, giro);
       i = 0;
     }
@@ -65,8 +68,11 @@ export function criarSequenciador(
       const destino = f.destino();
       if (!ctx || !destino) return;
       canal = ctx.createGain();
-      canal.connect(destino);
+      canal.connect(destino); // o seco
+      sala = criarSala(ctx, destino);
+      canal.connect(sala.entrada); // e o envio pra sala
       era = eraNova = eraMusica(e);
+      sala.molhado(molhadoDaEra(era), ctx.currentTime);
       ativo = true;
       giro = 0;
       lista = notas(era, giro);
@@ -82,6 +88,8 @@ export function criarSequenciador(
       ativo = false;
       canal?.disconnect();
       canal = null;
+      sala?.desligar();
+      sala = null;
       if (timer) clearInterval(timer);
       timer = null;
     },
