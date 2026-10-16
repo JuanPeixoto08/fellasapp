@@ -4,6 +4,20 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-16-arvore-grande',
+    titulo: 'A árvore grande',
+    data: '2026-10-16',
+    itens: [
+      'A árvore de habilidades cresceu de 31 pra 120 nós e foi reiniciada pra todo mundo: os pontos que você tinha gastado voltaram inteiros, pra você escolher de novo.',
+      'Cada ramo de antes ganhou os nós 6 a 10 (os 6 e 7 pedem 3 vendas; do 8 em diante, ter chegado na era 7 alguma vez).',
+      'Quatro ramos novos, que abrem junto com o recurso: Bolsa, PPP Podcast, Mapa do rolê e Espaço. Corretagem menor, espiada grátis por dia, mais trocas de convidado, cadeiras mais fortes, lugares mais baratos, Silver tape ×5 e os geradores das eras 6 e 7 rendendo bem mais.',
+      'Os nós novos de produção somam entre si: o Coach quântico, a Planilha com macro, o Faria Limer e as 9 pontes entre os ramos vizinhos.',
+      'Cada ramo tem um nó infinito no fim: compra quantas vezes quiser, cada nível um pouco mais caro (pede 10 vendas).',
+      'A árvore virou uma constelação: os ramos saem do centro como raios e cada era nova vai ganhar um anel por fora. Dá pra aproximar e afastar (pinça, rodinha ou + e −) e pular de ramo pela fileira de cima; o quadro do Legado mostra quanto de cada ramo você já tem.',
+      'No PC, passar o mouse num nó mostra o que ele muda nos seus números agora.',
+    ],
+  },
+  {
     id: '2026-10-16-cupom-meia-max',
     titulo: 'Cupom e meia-preço no 10 e no Máx',
     data: '2026-10-16',
