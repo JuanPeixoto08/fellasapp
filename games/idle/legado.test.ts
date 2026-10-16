@@ -4,7 +4,7 @@ import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import {
   avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaArvore, falta, faltam, ganhouEm, grade, liberadoNo,
-  MUNDO_ARVORE, nivelNo, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
+  MUNDO_ARVORE, GEOMETRIA_ARVORE, ANEIS_ARVORE, nivelNo, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
   textoVenda, TOTAL_CONQUISTAS, type ContextoArvore,
 } from './legado';
 
@@ -197,65 +197,95 @@ describe('nível, preço e portão', () => {
   });
 });
 
-describe('árvore em tela cheia: a copa', () => {
-  it('as 120 posições existem e cabem no mundo com folga de 26', () => {
+describe('árvore em tela cheia: a constelação', () => {
+  const L = MUNDO_ARVORE.largura;
+  const C = L / 2;
+  const ordem = [6, 9, 5, 8, 2, 1, 10, 3, 7, 4];
+  const polar = (id: number) => { const [x, y] = POSICOES_ARVORE[id]; return { r: Math.hypot(x - C, y - C), a: Math.atan2(y - C, x - C) }; };
+  const difAng = (a: number, b: number) => { let d = (a - b) % (2 * Math.PI); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return d; };
+  const anguloRamo = (ramo: number) => polar(catalogo.arvore.find((n) => n.ramo === ramo && n.posicao === 1)!.id).a;
+  const maior = (id: number) => { const n = noDe(id); return n.posicao >= 10 || n.ramo === 11; };
+
+  it('as 120 posições existem (nem uma a mais) e o mundo é quadrado, com folga de 26', () => {
     const ids = Object.keys(POSICOES_ARVORE).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(catalogo.arvore.map((n) => n.id).sort((a, b) => a - b));
-    expect(MUNDO_ARVORE).toEqual({ largura: 1348, altura: 1200 });
+    expect(ids).toHaveLength(120);
+    expect(MUNDO_ARVORE.altura).toBe(L);
     for (const [x, y] of Object.values(POSICOES_ARVORE)) {
       expect(x).toBeGreaterThanOrEqual(26);
-      expect(x).toBeLessThanOrEqual(MUNDO_ARVORE.largura - 26);
+      expect(x).toBeLessThanOrEqual(L - 26);
       expect(y).toBeGreaterThanOrEqual(26);
-      expect(y).toBeLessThanOrEqual(MUNDO_ARVORE.altura - 26);
+      expect(y).toBeLessThanOrEqual(L - 26);
     }
   });
-  it('nenhum nó encosta no outro: centros a 64 ou mais; o nó 10 e o infinito (maiores) a 84 ou mais', () => {
-    const grande = (id: number) => { const n = noDe(id); return n.posicao >= 10 && n.ramo !== 11; };
+  it('a raiz está no centro exato', () => {
+    expect(POSICOES_ARVORE[1]).toEqual([C, C]);
+  });
+  it('nenhum nó encosta no outro: centros a 64 ou mais; o nó 10, o infinito e a ponte (maiores) a 84 ou mais', () => {
     const ids = Object.keys(POSICOES_ARVORE).map(Number);
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const [a, b] = [POSICOES_ARVORE[ids[i]], POSICOES_ARVORE[ids[j]]];
         const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-        expect(d, `${ids[i]} × ${ids[j]}`).toBeGreaterThanOrEqual(grande(ids[i]) || grande(ids[j]) ? 84 : 64);
+        expect(d, `${ids[i]} × ${ids[j]}`).toBeGreaterThanOrEqual(maior(ids[i]) || maior(ids[j]) ? 84 : 64);
       }
     }
   });
-  it('a raiz embaixo de tudo; cada nó acima do que ele pede (a ponte, acima dos dois)', () => {
-    const yRaiz = POSICOES_ARVORE[1][1];
+  it('o raio cresce ao longo do ramo e todos os nós do ramo ficam no mesmo ângulo', () => {
     for (const n of catalogo.arvore) {
-      if (n.id !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(yRaiz);
-      for (const r of [n.requer, n.requer2]) {
-        if (r !== null && r !== 1) expect(POSICOES_ARVORE[n.id][1], `${n.id} × ${r}`).toBeLessThan(POSICOES_ARVORE[r][1]);
-      }
+      if (n.ramo === 0 || n.ramo === 11) continue;
+      if (n.requer !== null && n.requer !== 1) expect(polar(n.id).r, `${n.id} × ${n.requer}`).toBeGreaterThan(polar(n.requer).r);
+      expect(Math.abs(difAng(polar(n.id).a, anguloRamo(n.ramo))), `ângulo ${n.id}`).toBeLessThan(0.02);
     }
   });
-  it('as colunas na ordem da copa (Horta à esquerda, Dourados à direita) e a raiz no meio, entre o Recomeço e a Produção', () => {
-    const x = (ramo: number) => POSICOES_ARVORE[catalogo.arvore.find((n) => n.ramo === ramo && n.posicao === 1)!.id][0];
-    const ordem = [6, 9, 5, 8, 2, 1, 10, 3, 7, 4];
-    for (let k = 1; k < ordem.length; k++) expect(x(ordem[k]) - x(ordem[k - 1])).toBe(132);
-    expect(POSICOES_ARVORE[1][0]).toBe(MUNDO_ARVORE.largura / 2);
-    expect(POSICOES_ARVORE[1][0]).toBeGreaterThan(x(2));
-    expect(POSICOES_ARVORE[1][0]).toBeLessThan(x(1));
-    // as pontes no meio das duas colunas
-    for (const p of catalogo.arvore.filter((n) => n.ramo === 11)) {
-      expect(POSICOES_ARVORE[p.id][0]).toBe((POSICOES_ARVORE[p.requer!][0] + POSICOES_ARVORE[p.requer2!][0]) / 2);
+  it('os ramos seguem a ordem da copa no sentido horário, em passos iguais, Recomeço e Produção simétricos em volta do topo', () => {
+    for (let k = 1; k < ordem.length; k++) {
+      expect(difAng(anguloRamo(ordem[k]), anguloRamo(ordem[k - 1]))).toBeCloseTo((2 * Math.PI) / 10, 1);
+      expect(Math.abs(difAng(anguloRamo(ordem[k]), anguloRamo(ordem[k - 1])) - (2 * Math.PI) / 10)).toBeLessThan(0.02);
+    }
+    const topo = -Math.PI / 2;
+    const a = difAng(anguloRamo(2), topo);
+    const b = difAng(anguloRamo(1), topo);
+    expect(a).toBeLessThan(0);
+    expect(b).toBeGreaterThan(0);
+    expect(Math.abs(a + b)).toBeLessThan(0.02);
+  });
+  it('cada ponte fica no ângulo médio (arco menor) dos dois ramos e meio passo além do nó 5', () => {
+    const pontes = catalogo.arvore.filter((n) => n.ramo === 11);
+    expect(pontes).toHaveLength(9);
+    for (const p of pontes) {
+      const ra = noDe(p.requer!).ramo;
+      const rb = noDe(p.requer2!).ramo;
+      const medio = anguloRamo(ra) + difAng(anguloRamo(rb), anguloRamo(ra)) / 2;
+      expect(Math.abs(difAng(polar(p.id).a, medio)), `ponte ${p.id}`).toBeLessThan(0.02);
+      expect(Math.abs(polar(p.id).r - (polar(p.requer!).r + GEOMETRIA_ARVORE.passoR / 2))).toBeLessThan(1.5);
     }
   });
-  it('o nome de cada ramo fica 64 acima do infinito, na ordem da copa, dentro do mundo; os da mesma altura a 100 ou mais', () => {
+  it('o nome de cada ramo fica depois do infinito, no ângulo do ramo, na ordem da copa, sem se sobrepor', () => {
     expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
+    expect(ROTULOS_ARVORE.map((r) => r.ramo)).toEqual(ordem);
     for (const r of ROTULOS_ARVORE) {
-      expect(r.y).toBe(POSICOES_ARVORE[3000 + r.ramo][1] - 64);
-      expect(r.x).toBe(POSICOES_ARVORE[3000 + r.ramo][0]);
-      expect(r.y).toBeGreaterThanOrEqual(8);
-      for (const o of ROTULOS_ARVORE) {
-        if (o !== r && Math.abs(o.y - r.y) < 20) expect(Math.abs(o.x - r.x), `${r.nome} × ${o.nome}`).toBeGreaterThanOrEqual(100);
-      }
+      const rr = Math.hypot(r.x - C, r.y - C);
+      expect(rr).toBeGreaterThan(polar(3000 + r.ramo).r);
+      expect(Math.abs(difAng(Math.atan2(r.y - C, r.x - C), anguloRamo(r.ramo)))).toBeLessThan(0.02);
+      for (const o of ROTULOS_ARVORE) if (o !== r) expect(Math.hypot(o.x - r.x, o.y - r.y), `${r.nome} × ${o.nome}`).toBeGreaterThanOrEqual(64);
     }
   });
-  it('escala: cabe no lado mais apertado, presa entre 0,8 e 1,4', () => {
-    expect(escalaArvore(1348, 1200)).toBe(1);
-    expect(escalaArvore(4000, 4000)).toBe(1.4);
-    expect(escalaArvore(300, 800)).toBe(0.8);
+  it('o anel da era 7 passa por fora de todos os nós e por dentro dos rótulos', () => {
+    const a7 = ANEIS_ARVORE.find((a) => a.era === 7)!;
+    expect(a7.rotulo).toBe('Era 7');
+    for (const id of Object.keys(POSICOES_ARVORE).map(Number)) expect(a7.raio).toBeGreaterThan(polar(id).r);
+    for (const r of ROTULOS_ARVORE) expect(a7.raio).toBeLessThan(Math.hypot(r.x - C, r.y - C));
+  });
+  it('escala: a copa inteira cabe no palco, entre 0,1 e 1,4', () => {
+    expect(L * escalaArvore(390, 700)).toBeLessThanOrEqual(390);
+    expect(L * escalaArvore(2000, 961)).toBeLessThanOrEqual(961);
+    for (const [w, h] of [[390, 700], [2000, 961], [100, 100], [9000, 9000]]) {
+      expect(escalaArvore(w, h)).toBeGreaterThanOrEqual(0.1);
+      expect(escalaArvore(w, h)).toBeLessThanOrEqual(1.4);
+    }
+    expect(escalaArvore(9000, 9000)).toBe(1.4);
+    expect(escalaArvore(100, 100)).toBe(0.1);
   });
   it('situação na tela: comprado, dá pra comprar, falta ponto, portão, trancado; o infinito comprado segue comprável', () => {
     expect(situacaoTela(noDe(1), ctx({ arvore: [1] }))).toBe('comprado');

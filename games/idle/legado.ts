@@ -159,47 +159,58 @@ export function falta(no: No): string {
   return nomes.length ? `Libera com ${nomes.join(' e ')}` : '';
 }
 
-/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó, gerados (16/10). A raiz embaixo, no meio; os 10
- *  ramos sobem em colunas na ordem da copa (ORDEM_RAMOS, a Horta à esquerda), as do meio mais altas (o arco); o nó 10 e
- *  o infinito com folga a mais (são maiores); cada ponte no meio das duas colunas, meio passo acima dos nós 5 delas.
- *  Mudar aqui = conferir os testes de distância (legado.test.ts). */
-const COLUNA = 132;
-const PASSO = 76;
-const MARGEM_X = 80;
-const ARCO = 120;
-const BASE = 190;
-export const MUNDO_ARVORE = { largura: 2 * MARGEM_X + 9 * COLUNA, altura: 1200 } as const;
+/** Árvore em tela cheia: a constelação (16/10). O mundo (em unidades) e o centro de cada nó, gerados. A raiz no centro;
+ *  os ramos saem como raios em ângulos iguais, na ordem da copa (ORDEM_RAMOS, no sentido horário, Recomeço e Produção
+ *  simétricos em volta do topo); o nó de posição p fica em R1 + (p − 1)·PASSO_R, o infinito um PASSO_INF além do 10; cada
+ *  ponte no ângulo médio dos dois raios, meio passo além do nó 5. Mudar aqui = conferir os testes de distância
+ *  (legado.test.ts). R1 apertado pelo anel de dentro (corda 2·r·sin(π/n)); PASSO_R e PASSO_INF ≥ 86 (84 com folga de arredondamento) porque o nó 10 e o
+ *  infinito são maiores na tela. */
+export const GEOMETRIA_ARVORE = { r1: 110, passoR: 86, passoInf: 90, margem: 60, aneloFolga: 48, rotuloFolga: 64 } as const;
+const NUM_RAMOS = (ORDEM_RAMOS as readonly number[]).length;
+const RAIO_INFINITO = GEOMETRIA_ARVORE.r1 + 9 * GEOMETRIA_ARVORE.passoR + GEOMETRIA_ARVORE.passoInf;
+const RAIO_ROTULO = RAIO_INFINITO + GEOMETRIA_ARVORE.rotuloFolga;
+const LADO = 2 * Math.ceil(RAIO_ROTULO + GEOMETRIA_ARVORE.margem);
+export const MUNDO_ARVORE = { largura: LADO, altura: LADO } as const;
+const CENTRO = LADO / 2;
 const colunaDe = (ramo: number) => (ORDEM_RAMOS as readonly number[]).indexOf(ramo);
-const xColuna = (k: number) => MARGEM_X + k * COLUNA;
-function yNo(k: number, posicao: number): number {
-  const arco = Math.round(ARCO * (1 - ((k - 4.5) / 4.5) ** 2));
-  return MUNDO_ARVORE.altura - BASE - arco - (posicao - 1) * PASSO - (posicao >= 10 ? 12 : 0) - (posicao === 11 ? 24 : 0);
-}
+/** O ângulo do k-ésimo ramo da ordem (radianos, y pra baixo: crescer = sentido horário). O meio entre o 4º e o 5º
+ *  (Recomeço e Produção, com 10 ramos) aponta pra cima. */
+const anguloRamo = (k: number) => -Math.PI / 2 + (k - (NUM_RAMOS / 2 - 0.5)) * ((2 * Math.PI) / NUM_RAMOS);
+const raioPosicao = (posicao: number) =>
+  posicao === 11 ? RAIO_INFINITO : GEOMETRIA_ARVORE.r1 + (posicao - 1) * GEOMETRIA_ARVORE.passoR;
+const ponto = (raio: number, ang: number): readonly [number, number] =>
+  [Math.round(CENTRO + raio * Math.cos(ang)), Math.round(CENTRO + raio * Math.sin(ang))];
 function gerarPosicoes(): Readonly<Record<number, readonly [number, number]>> {
   const pos: Record<number, readonly [number, number]> = {};
   for (const n of catalogo.arvore) {
-    if (n.ramo === 0) pos[n.id] = [MUNDO_ARVORE.largura / 2, MUNDO_ARVORE.altura - 60];
+    if (n.ramo === 0) pos[n.id] = [CENTRO, CENTRO];
     else if (n.ramo === RAMO_PONTE) {
       const a = colunaDe(catalogo.arvore.find((x) => x.id === n.requer)!.ramo);
       const b = colunaDe(catalogo.arvore.find((x) => x.id === n.requer2)!.ramo);
-      pos[n.id] = [(xColuna(a) + xColuna(b)) / 2, Math.round((yNo(a, 5) + yNo(b, 5)) / 2 - PASSO / 2)];
-    } else pos[n.id] = [xColuna(colunaDe(n.ramo)), yNo(colunaDe(n.ramo), n.posicao)];
+      pos[n.id] = ponto(raioPosicao(5) + GEOMETRIA_ARVORE.passoR / 2, anguloRamo(a) + (anguloRamo(b) - anguloRamo(a)) / 2);
+    } else pos[n.id] = ponto(raioPosicao(n.posicao), anguloRamo(colunaDe(n.ramo)));
   }
   return pos;
 }
 export const POSICOES_ARVORE = gerarPosicoes();
 
-/** O nome de cada ramo, 64 unidades acima do infinito dele, na ordem da copa. */
+/** Os anéis de era, decoração que a tela desenha. Hoje um só, o miolo (eras 1–7). As entregas de era acrescentam anéis
+ *  por fora (eras 8–9, 10–12) com os nós novos delas, sem mexer no que já existe. */
+export const ANEIS_ARVORE: readonly { era: number; raio: number; rotulo: string }[] = [
+  { era: 7, raio: RAIO_INFINITO + GEOMETRIA_ARVORE.aneloFolga, rotulo: 'Era 7' },
+];
+
+/** O nome de cada ramo, depois do infinito dele, no ângulo do ramo, na ordem da copa (o texto é centrado no ponto). */
 export const ROTULOS_ARVORE: readonly { ramo: number; nome: string; x: number; y: number }[] = (ORDEM_RAMOS as readonly number[]).map((ramo) => {
-  const [x, y] = POSICOES_ARVORE[3000 + ramo];
-  return { ramo, nome: RAMOS[ramo], x, y: y - 64 };
+  const [x, y] = ponto(RAIO_ROTULO, anguloRamo(colunaDe(ramo)));
+  return { ramo, nome: RAMOS[ramo], x, y };
 });
 
-/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,8 (abaixo disso arrasta) e 1,4. A Task 10 troca
- *  pelo zoom. */
+/** Quanto a copa cresce na tela: a copa inteira cabe no lado mais apertado, entre 0,1 e 1,4 (o mundo é grande; o
+ *  zoom do jogador, Task 10, vai por cima). */
 export function escalaArvore(largura: number, altura: number): number {
   const s = Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura);
-  return Math.min(1.4, Math.max(0.8, s));
+  return Math.min(1.4, Math.max(0.1, s));
 }
 
 /** A situação de um nó na tela. O infinito que você já tem segue comprável (o próximo nível). */

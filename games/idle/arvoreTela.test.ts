@@ -133,8 +133,8 @@ describe('árvore em tela cheia', () => {
   it('com a página ampliada (zoom do PC), o mundo anda junto com o mouse, não mais rápido', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
-    for (const k of ['clientWidth', 'clientHeight', 'offsetWidth']) Object.defineProperty(palco, k, { configurable: true, value: 200 });
-    palco.getBoundingClientRect = () => ({ width: 400, height: 400 }) as DOMRect; // zoom 2: 200 de layout viram 400 na tela
+    for (const k of ['clientWidth', 'clientHeight', 'offsetWidth']) Object.defineProperty(palco, k, { configurable: true, value: 100 });
+    palco.getBoundingClientRect = () => ({ width: 200, height: 200 }) as DOMRect; // zoom 2: 100 de layout viram 200 na tela
     palco.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true }));
     palco.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 120, bubbles: true }));
     expect(document.querySelector<HTMLElement>('.arvore-mundo')!.style.transform).toBe('translate(20px, 10px)');
