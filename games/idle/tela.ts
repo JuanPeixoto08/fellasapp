@@ -17,7 +17,7 @@ import { aplicarTema } from './temasLugar';
 import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO, VSAUCE } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
 import { criarArvoreTela, miniArvore } from './arvoreTela';
-import { dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
+import { contextoArvore, dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
 import { compraGerador, custoMult, efeitosDe, liberada, multContratos, podeComprarGerador, type RegraCompra, taxaPorUnidade, VIRAL_MS } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
@@ -596,7 +596,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     topoL.append(meio, vender);
 
     const comprados = s.bonus.arvore.length;
-    const podem = catalogo.arvore.filter((n) => situacaoTela(n, s.bonus.arvore, s.pontos) === 'pode').length;
+    const podem = catalogo.arvore.filter((n) => situacaoTela(n, contextoArvore(s)) === 'pode').length;
     const quadro = el('div', 'arvore-quadro');
     const textoQ = el('div', 'meio');
     const abrirB = button('Abrir', 'btn main arvore-abrir', () =>

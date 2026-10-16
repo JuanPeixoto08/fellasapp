@@ -32,14 +32,14 @@ const no = (id: number) => document.querySelector<HTMLButtonElement>(`.no-arvore
 const cartao = () => document.querySelector('.arvore-cartao')!;
 
 describe('árvore em tela cheia', () => {
-  it('fechada até abrir; abre com os 31 nós, as situações nas classes e os pontos no topo', () => {
+  it('fechada até abrir; abre com os 120 nós, as situações nas classes e os pontos no topo', () => {
     const t = criarArvoreTela(comprar);
     document.body.append(t.elemento);
     expect(t.aberta()).toBe(false);
     expect(t.elemento.hasAttribute('hidden')).toBe(true);
     t.abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }), false, () => volta);
     expect(t.aberta()).toBe(true);
-    expect(document.querySelectorAll('.no-arvore')).toHaveLength(31);
+    expect(document.querySelectorAll('.no-arvore')).toHaveLength(120);
     expect(no(11).classList.contains('comprado')).toBe(true);
     expect(no(21).classList.contains('pode')).toBe(true);
     expect(no(12).classList.contains('falta')).toBe(true);
@@ -47,16 +47,16 @@ describe('árvore em tela cheia', () => {
     expect(no(12).getAttribute('aria-label')).toBe('Ô loco, bicho!, falta 1 ★');
     expect(no(12).querySelector('.no-custo')!.textContent).toBe('4 ★');
     expect(no(11).querySelector('.no-custo')).toBeNull();
-    expect(document.querySelectorAll('.ligacao')).toHaveLength(30);
+    expect(document.querySelectorAll('.ligacao')).toHaveLength(128); // 119 do nó pro anterior + a 2ª linha das 9 pontes
     expect(document.querySelectorAll('.ligacao.comprado')).toHaveLength(1); // 1 → 11
     expect(document.querySelector('.arvore-pontos')!.textContent).toBe('★ 3');
-    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta']);
+    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
   });
   it('abre com o nó mais barato que dá pra comprar escolhido; Comprar chama comprar(id)', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
     expect(no(21).getAttribute('aria-pressed')).toBe('true');
     expect(cartao().textContent).toContain('Porquinho quebrado');
-    expect(cartao().textContent).toContain('Recomeço · 1 de 5');
+    expect(cartao().textContent).toContain('Recomeço · 1 de 10');
     expect(cartao().textContent).toContain('O Abrir CNPJ começa com F$ 1 mil.');
     const b = cartao().querySelector('button')!;
     expect(b.textContent).toBe('Comprar · 2 ★');
@@ -148,16 +148,23 @@ describe('árvore em tela cheia', () => {
       sem.mockRestore();
     }
   });
-  it('legenda com as 4 situações', () => {
+  it('legenda com as 5 situações', () => {
     abrir(estado());
     expect([...document.querySelectorAll('.arvore-legenda li')].map((x) => x.textContent))
-      .toEqual(['Comprado', 'Dá pra comprar', 'Falta ponto', 'Trancado']);
+      .toEqual(['Comprado', 'Dá pra comprar', 'Falta ponto', 'Tem portão', 'Trancado']);
   });
-  it('miniatura: 31 quadradinhos e 30 linhas, decorativa', () => {
+  it('miniatura: 120 quadradinhos e 128 linhas, decorativa', () => {
     const svg = miniArvore(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
     expect(svg.getAttribute('aria-hidden')).toBe('true');
-    expect(svg.querySelectorAll('rect.mini-no')).toHaveLength(31);
-    expect(svg.querySelectorAll('line.ligacao')).toHaveLength(30);
+    expect(svg.querySelectorAll('rect.mini-no')).toHaveLength(120);
+    expect(svg.querySelectorAll('line.ligacao')).toHaveLength(128);
     expect(svg.querySelectorAll('rect.mini-no.comprado')).toHaveLength(2);
+  });
+  it('nó com portão: o cartão diz o que falta, sem botão', () => {
+    abrir(estado({ pontos: 99, vendas: 1, bonus: { arvore: [1, 11, 12, 13, 14, 15], conquistas: 0 } }));
+    no(106).click();
+    expect(no(106).classList.contains('portao')).toBe(true);
+    expect(cartao().querySelector('button')).toBeNull();
+    expect(cartao().textContent).toContain('Falta: 3 vendas (você tem 1)');
   });
 });

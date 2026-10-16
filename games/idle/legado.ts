@@ -1,9 +1,9 @@
 // Aba Legado da Fellas Inc. (a árvore de habilidades e as conquistas) e o aviso de conquista. Puro: a tela só desenha
 // o que sai daqui. Quem comprou ou ganhou o quê é o banco que decide; aqui só se decide o que cada quadradinho mostra.
 import type { IdleState } from '../shared/types';
-import { catalogo, type Conquista, type No } from './catalogo';
+import { catalogo, ORDEM_RAMOS, RAMO_PONTE, type Conquista, type No } from './catalogo';
 import type { Dica } from './dica';
-import { RAMOS } from './nomes';
+import { NOME_PONTE, RAMOS } from './nomes';
 
 /** Um quadradinho da grade. `texto` = a frase (ganhou), a condição (bloqueada) ou "Alguém do grupo conseguiu".
  *  `feito` = o que precisou pra ganhar (só nas ganhas: continua aparecendo depois de feita). */
@@ -103,78 +103,144 @@ export function criarFilaAvisos<T>(mostrar: (aviso: T | null) => void, ms = 5000
   };
 }
 
-/** Como um nó aparece: comprado (aceso), disponível (o anterior do ramo já é seu) ou trancado (falta o anterior). */
+/** Como um nó aparece no texto: comprado, disponível (tem o que ele pede) ou trancado. */
 export type SituacaoNo = 'comprado' | 'disponivel' | 'trancado';
+/** Tem o que o nó pede: o anterior do ramo e, na ponte, o nó 5 do outro ramo. */
+export const liberadoNo = (no: No, arvore: readonly number[]): boolean =>
+  (no.requer === null || arvore.includes(no.requer)) && (no.requer2 === null || arvore.includes(no.requer2));
 export function situacao(no: No, arvore: readonly number[]): SituacaoNo {
   if (arvore.includes(no.id)) return 'comprado';
-  return no.requer === null || arvore.includes(no.requer) ? 'disponivel' : 'trancado';
+  return liberadoNo(no, arvore) ? 'disponivel' : 'trancado';
 }
 
-/** A raiz e os 6 ramos, na ordem, cada um com os seus nós. */
+/** O que a página sabe da sua árvore pra decidir cada nó: os nós e o nível dos infinitos, os pontos livres, quantas
+ *  vezes vendeu e a maior era alcançada (os portões). */
+export type ContextoArvore = {
+  arvore: readonly number[]; niveis: Readonly<Record<string, number>>; pontos: number; vendas: number; eraMax: number;
+};
+/** Do estado: resposta de antes da 0082 (sem niveis nem era_max) vale nível 1 e a era de agora. */
+export const contextoArvore = (s: Pick<IdleState, 'bonus' | 'pontos' | 'vendas' | 'era' | 'era_max'>): ContextoArvore => ({
+  arvore: s.bonus.arvore, niveis: s.bonus.niveis ?? {}, pontos: s.pontos, vendas: s.vendas, eraMax: Math.max(s.era, s.era_max ?? 1),
+});
+
+/** O nível do nó: 0 sem ele; 1 nos fixos; nos infinitos, o do banco (1 se a resposta não trouxe). */
+export function nivelNo(no: No, c: Pick<ContextoArvore, 'arvore' | 'niveis'>): number {
+  if (!c.arvore.includes(no.id)) return 0;
+  return no.cresce === null ? 1 : Math.max(1, c.niveis[String(no.id)] ?? 1);
+}
+/** Quanto custa comprar o nó (o próximo nível, no infinito): round(custo · cresce^nível de agora), igual a idle_buy_node. */
+export const precoNo = (no: No, c: Pick<ContextoArvore, 'arvore' | 'niveis'>): number =>
+  (no.cresce === null ? no.custo : Math.round(no.custo * no.cresce ** nivelNo(no, c)));
+
+/** Quem abre cada ramo dos recursos (o portão dele é a era em que o recurso abre). */
+const QUEM_ABRE: Readonly<Record<number, string>> = { 7: 'Abre com a Bolsa', 8: 'Abre com os Convidados', 9: 'Abre com o Mapa do rolê' };
+/** O portão que falta além dos pontos (o mesmo motivo do idle_gate do banco), ou null. */
+export function portao(no: No, c: Pick<ContextoArvore, 'vendas' | 'eraMax'>): string | null {
+  if (no.reqVendas !== null && c.vendas < no.reqVendas) return `Falta: ${no.reqVendas} vendas (você tem ${c.vendas})`;
+  if (no.reqEra !== null && c.eraMax < no.reqEra) return QUEM_ABRE[no.ramo] ?? `Falta: chegar na era ${no.reqEra} (você chegou na ${c.eraMax})`;
+  return null;
+}
+
+/** O ramo de um nó na copa (a ponte fica com o do 1º nó que ela pede). */
+export function ramoDoNo(no: No): number {
+  if (no.ramo !== RAMO_PONTE) return no.ramo;
+  return catalogo.arvore.find((n) => n.id === no.requer)!.ramo;
+}
+
+/** A raiz e os 10 ramos, na ordem do catálogo, cada um com os seus nós (1 a 10 e o infinito; as pontes ficam de fora). */
 export const RAMOS_ARVORE: { ramo: number; nome: string; nos: No[] }[] = RAMOS.map((nome, ramo) => ({
-  ramo, nome, nos: catalogo.arvore.filter((n) => n.ramo === ramo),
+  ramo, nome, nos: catalogo.arvore.filter((n) => n.ramo === ramo).sort((a, b) => a.posicao - b.posicao),
 }));
 
-/** O que falta pra um nó trancado: "Libera com Cafezinho de garrafa térmica". */
+const nomeDe = (id: number | null) => catalogo.arvore.find((n) => n.id === id)?.nome;
+/** O que falta pra um nó trancado: "Libera com Cafezinho de garrafa térmica" (a ponte: "… com A e B"). */
 export function falta(no: No): string {
-  const antes = catalogo.arvore.find((n) => n.id === no.requer);
-  return antes ? `Libera com ${antes.nome}` : '';
+  const nomes = [nomeDe(no.requer), nomeDe(no.requer2)].filter((x): x is string => !!x);
+  return nomes.length ? `Libera com ${nomes.join(' e ')}` : '';
 }
 
-/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó. A raiz embaixo; os 6 ramos sobem abrindo, 3 de
- *  cada lado, como a copa de uma árvore (a Horta, de 13/10, é a da ponta direita). Mudar aqui = conferir o teste de distância. */
-export const MUNDO_ARVORE = { largura: 480, altura: 540 } as const;
-export const POSICOES_ARVORE: Readonly<Record<number, readonly [number, number]>> = {
-  1: [240, 510],
-  11: [92, 462], 12: [62, 388], 13: [48, 308], 14: [50, 226], 15: [62, 144],
-  21: [150, 432], 22: [128, 352], 23: [118, 270], 24: [118, 188], 25: [126, 106],
-  31: [206, 396], 32: [196, 316], 33: [190, 234], 34: [190, 152], 35: [190, 70],
-  41: [274, 396], 42: [284, 316], 43: [290, 234], 44: [290, 152], 45: [290, 70],
-  51: [330, 432], 52: [352, 352], 53: [362, 270], 54: [362, 188], 55: [354, 106],
-  61: [388, 462], 62: [418, 388], 63: [432, 308], 64: [430, 226], 65: [418, 144],
-};
+/** Árvore em tela cheia: o mundo (em unidades) e o centro de cada nó, gerados (16/10). A raiz embaixo, no meio; os 10
+ *  ramos sobem em colunas na ordem da copa (ORDEM_RAMOS, a Horta à esquerda), as do meio mais altas (o arco); o nó 10 e
+ *  o infinito com folga a mais (são maiores); cada ponte no meio das duas colunas, meio passo acima dos nós 5 delas.
+ *  Mudar aqui = conferir os testes de distância (legado.test.ts). */
+const COLUNA = 132;
+const PASSO = 76;
+const MARGEM_X = 80;
+const ARCO = 120;
+const BASE = 190;
+export const MUNDO_ARVORE = { largura: 2 * MARGEM_X + 9 * COLUNA, altura: 1200 } as const;
+const colunaDe = (ramo: number) => (ORDEM_RAMOS as readonly number[]).indexOf(ramo);
+const xColuna = (k: number) => MARGEM_X + k * COLUNA;
+function yNo(k: number, posicao: number): number {
+  const arco = Math.round(ARCO * (1 - ((k - 4.5) / 4.5) ** 2));
+  return MUNDO_ARVORE.altura - BASE - arco - (posicao - 1) * PASSO - (posicao >= 10 ? 12 : 0) - (posicao === 11 ? 24 : 0);
+}
+function gerarPosicoes(): Readonly<Record<number, readonly [number, number]>> {
+  const pos: Record<number, readonly [number, number]> = {};
+  for (const n of catalogo.arvore) {
+    if (n.ramo === 0) pos[n.id] = [MUNDO_ARVORE.largura / 2, MUNDO_ARVORE.altura - 60];
+    else if (n.ramo === RAMO_PONTE) {
+      const a = colunaDe(catalogo.arvore.find((x) => x.id === n.requer)!.ramo);
+      const b = colunaDe(catalogo.arvore.find((x) => x.id === n.requer2)!.ramo);
+      pos[n.id] = [(xColuna(a) + xColuna(b)) / 2, Math.round((yNo(a, 5) + yNo(b, 5)) / 2 - PASSO / 2)];
+    } else pos[n.id] = [xColuna(colunaDe(n.ramo)), yNo(colunaDe(n.ramo), n.posicao)];
+  }
+  return pos;
+}
+export const POSICOES_ARVORE = gerarPosicoes();
 
-/** O nome de cada ramo, 44 unidades acima do 5º nó dele. */
-export const ROTULOS_ARVORE: readonly { nome: string; x: number; y: number }[] = RAMOS_ARVORE
-  .filter((r) => r.ramo > 0)
-  .map((r) => {
-    const [x, y] = POSICOES_ARVORE[r.nos[r.nos.length - 1].id];
-    return { nome: r.nome, x, y: y - 44 };
-  });
+/** O nome de cada ramo, 64 unidades acima do infinito dele, na ordem da copa. */
+export const ROTULOS_ARVORE: readonly { ramo: number; nome: string; x: number; y: number }[] = (ORDEM_RAMOS as readonly number[]).map((ramo) => {
+  const [x, y] = POSICOES_ARVORE[3000 + ramo];
+  return { ramo, nome: RAMOS[ramo], x, y: y - 64 };
+});
 
-/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,8 (abaixo disso arrasta; 480 × 0,8 cabe nos 390 do
- *  celular) e 1,4. */
+/** Quanto a copa cresce na tela: cabe no lado mais apertado, entre 0,8 (abaixo disso arrasta) e 1,4. A Task 10 troca
+ *  pelo zoom. */
 export function escalaArvore(largura: number, altura: number): number {
   const s = Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura);
   return Math.min(1.4, Math.max(0.8, s));
 }
 
-/** A situação de um nó na tela cheia: o "disponível" se divide em dá pra comprar agora e falta ponto. */
-export type SituacaoTela = 'comprado' | 'pode' | 'falta' | 'trancado';
-export function situacaoTela(no: No, arvore: readonly number[], pontosLivres: number): SituacaoTela {
-  const s = situacao(no, arvore);
-  if (s !== 'disponivel') return s;
-  return pontosLivres >= no.custo ? 'pode' : 'falta';
+/** A situação de um nó na tela. O infinito que você já tem segue comprável (o próximo nível). */
+export type SituacaoTela = 'comprado' | 'pode' | 'falta' | 'portao' | 'trancado';
+export function situacaoTela(no: No, c: ContextoArvore): SituacaoTela {
+  const tem = c.arvore.includes(no.id);
+  if (tem && no.cresce === null) return 'comprado';
+  if (!tem) {
+    if (!liberadoNo(no, c.arvore)) return 'trancado';
+    if (portao(no, c) !== null) return 'portao';
+  }
+  return c.pontos >= precoNo(no, c) ? 'pode' : 'falta';
 }
 
 /** O nó escolhido ao abrir a árvore: o mais barato que dá pra comprar; senão o mais barato liberado; senão a raiz.
- *  Empate no custo: o menor id. */
-export function noInicial(arvore: readonly number[], pontosLivres: number): number {
-  const porCusto = [...catalogo.arvore].sort((a, b) => a.custo - b.custo || a.id - b.id);
-  const achar = (sit: SituacaoTela) => porCusto.find((n) => situacaoTela(n, arvore, pontosLivres) === sit);
+ *  Empate no preço: o menor id. */
+export function noInicial(c: ContextoArvore): number {
+  const porPreco = [...catalogo.arvore].sort((a, b) => precoNo(a, c) - precoNo(b, c) || a.id - b.id);
+  const achar = (sit: SituacaoTela) => porPreco.find((n) => situacaoTela(n, c) === sit);
   return (achar('pode') ?? achar('falta') ?? catalogo.arvore.find((n) => n.ramo === 0)!).id;
 }
 
-/** "Produção · 2 de 5"; a raiz diz "Raiz". */
-export const ondeNo = (no: No): string => (no.ramo === 0 ? 'Raiz' : `${RAMOS[no.ramo]} · ${no.posicao} de 5`);
+/** "Produção · 2 de 10", "Bolsa · infinito", "Ponte · Gente e PPP Podcast"; a raiz diz "Raiz". */
+export function ondeNo(no: No): string {
+  if (no.ramo === 0) return 'Raiz';
+  if (no.ramo === RAMO_PONTE) {
+    const r = (id: number | null) => RAMOS[catalogo.arvore.find((n) => n.id === id)!.ramo];
+    return `${NOME_PONTE} · ${r(no.requer)} e ${r(no.requer2)}`;
+  }
+  return no.posicao === 11 ? `${RAMOS[no.ramo]} · infinito` : `${RAMOS[no.ramo]} · ${no.posicao} de 10`;
+}
 
 /** "Falta 1 ★" / "Faltam 5 ★". */
 export const faltam = (n: number): string => (n === 1 ? 'Falta 1 ★' : `Faltam ${n} ★`);
 
-/** O rótulo do nó pro leitor de tela: "Turno dobrado, faltam 5 ★". */
-export function descricaoNo(no: No, sit: SituacaoTela, pontosLivres: number): string {
+/** O rótulo do nó pro leitor de tela: "Turno dobrado, faltam 5 ★"; "Hora extra infinita, nível 4, faltam 554 ★". */
+export function descricaoNo(no: No, sit: SituacaoTela, c: ContextoArvore): string {
   if (sit === 'comprado') return `${no.nome}, comprado`;
-  if (sit === 'pode') return `${no.nome}, dá pra comprar por ${no.custo} ★`;
-  if (sit === 'falta') return `${no.nome}, ${faltam(no.custo - pontosLivres).toLowerCase()}`;
-  return `${no.nome}, trancado`;
+  if (sit === 'trancado') return `${no.nome}, trancado`;
+  if (sit === 'portao') return `${no.nome}, ${(portao(no, c) ?? '').toLowerCase()}`;
+  const nivel = no.cresce !== null && c.arvore.includes(no.id) ? `, nível ${nivelNo(no, c)}` : '';
+  const preco = precoNo(no, c);
+  return sit === 'pode' ? `${no.nome}${nivel}, dá pra comprar por ${preco} ★` : `${no.nome}${nivel}, ${faltam(preco - c.pontos).toLowerCase()}`;
 }

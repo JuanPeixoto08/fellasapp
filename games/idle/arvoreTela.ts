@@ -7,15 +7,15 @@ import { ativos } from './ativos';
 import { catalogo, type No } from './catalogo';
 import { iconeFechar } from './icones';
 import {
-  descricaoNo, escalaArvore, falta, faltam, MUNDO_ARVORE, noInicial, ondeNo, pontos, POSICOES_ARVORE, ROTULOS_ARVORE,
-  situacaoTela, type SituacaoTela,
+  contextoArvore, descricaoNo, escalaArvore, falta, faltam, MUNDO_ARVORE, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo,
+  ROTULOS_ARVORE, situacaoTela, type SituacaoTela,
 } from './legado';
 
 const NS = 'http://www.w3.org/2000/svg';
 /** Mexeu mais que isso com o dedo/mouse apertado: é arraste, não toque. */
 const ARRASTE_PX = 6;
 const LEGENDA: readonly [SituacaoTela, string][] = [
-  ['comprado', 'Comprado'], ['pode', 'Dá pra comprar'], ['falta', 'Falta ponto'], ['trancado', 'Trancado'],
+  ['comprado', 'Comprado'], ['pode', 'Dá pra comprar'], ['falta', 'Falta ponto'], ['portao', 'Tem portão'], ['trancado', 'Trancado'],
 ];
 
 export type ArvoreTela = {
@@ -28,21 +28,23 @@ export type ArvoreTela = {
 };
 
 const situacoes = (s: IdleState) =>
-  new Map(catalogo.arvore.map((n) => [n.id, situacaoTela(n, s.bonus.arvore, s.pontos)] as const));
+  new Map(catalogo.arvore.map((n) => [n.id, situacaoTela(n, contextoArvore(s))] as const));
 
 /** As linhas entre cada nó e o anterior do ramo, num svg (k = px por unidade do mundo). */
 function ligacoes(svg: SVGSVGElement, sits: Map<number, SituacaoTela>, k: number) {
   for (const n of catalogo.arvore) {
-    if (n.requer === null) continue;
-    const [x1, y1] = POSICOES_ARVORE[n.requer];
-    const [x2, y2] = POSICOES_ARVORE[n.id];
-    const l = document.createElementNS(NS, 'line');
-    l.setAttribute('x1', String(x1 * k));
-    l.setAttribute('y1', String(y1 * k));
-    l.setAttribute('x2', String(x2 * k));
-    l.setAttribute('y2', String(y2 * k));
-    l.setAttribute('class', `ligacao ${sits.get(n.id)}`);
-    svg.append(l);
+    for (const r of [n.requer, n.requer2]) {
+      if (r === null) continue;
+      const [x1, y1] = POSICOES_ARVORE[r];
+      const [x2, y2] = POSICOES_ARVORE[n.id];
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('x1', String(x1 * k));
+      l.setAttribute('y1', String(y1 * k));
+      l.setAttribute('x2', String(x2 * k));
+      l.setAttribute('y2', String(y2 * k));
+      l.setAttribute('class', `ligacao ${sits.get(n.id)}`);
+      svg.append(l);
+    }
   }
 }
 
@@ -186,10 +188,13 @@ export function criarArvoreTela(comprar: (id: number) => void): ArvoreTela {
     const texto = el('div', 'meio');
     texto.append(el('strong', undefined, n.nome), el('span', 'onde', ondeNo(n)), el('p', undefined, n.efeito));
     const acao = el('div', 'arvore-acao');
+    const c = contextoArvore(s);
     if (sit === 'comprado') acao.append(el('span', 'no-feito', 'Comprado'));
     else if (sit === 'trancado') acao.append(el('span', 'sub', falta(n)));
+    else if (sit === 'portao') acao.append(el('span', 'sub', portao(n, c) ?? ''));
     else {
-      const b = button(sit === 'pode' ? `Comprar · ${n.custo} ★` : faltam(n.custo - s.pontos), 'btn main', () => comprar(n.id));
+      const preco = precoNo(n, c);
+      const b = button(sit === 'pode' ? `Comprar · ${preco} ★` : faltam(preco - s.pontos), 'btn main', () => comprar(n.id));
       b.disabled = sit !== 'pode' || ocupado;
       acao.append(b);
     }
@@ -231,10 +236,10 @@ export function criarArvoreTela(comprar: (id: number) => void): ArvoreTela {
       b.dataset.no = String(n.id);
       b.style.left = `${x * k}px`;
       b.style.top = `${y * k}px`;
-      b.setAttribute('aria-label', descricaoNo(n, sit, s.pontos));
+      b.setAttribute('aria-label', descricaoNo(n, sit, contextoArvore(s)));
       b.setAttribute('aria-pressed', String(escolhido === n.id));
       b.append(icone(n));
-      if (sit === 'pode' || sit === 'falta') b.append(el('span', 'no-custo', `${n.custo} ★`));
+      if (sit === 'pode' || sit === 'falta') b.append(el('span', 'no-custo', `${precoNo(n, contextoArvore(s))} ★`));
       filhos.push(b);
     }
     mundo.replaceChildren(...filhos);
@@ -258,7 +263,7 @@ export function criarArvoreTela(comprar: (id: number) => void): ArvoreTela {
       estado = s;
       ocupado = ocup;
       volta = v;
-      escolhido = noInicial(s.bonus.arvore, s.pontos);
+      escolhido = noInicial(contextoArvore(s));
       desloc = { x: 0, y: 0 };
       tela.removeAttribute('hidden');
       desenhar();

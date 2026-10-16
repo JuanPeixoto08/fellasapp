@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import {
-  avisos, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaArvore, falta, faltam, ganhouEm, grade, MUNDO_ARVORE, noInicial, ondeNo,
-  pontos, POSICOES_ARVORE, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela, textoVenda, TOTAL_CONQUISTAS,
+  avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaArvore, falta, faltam, ganhouEm, grade, liberadoNo,
+  MUNDO_ARVORE, nivelNo, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
+  textoVenda, TOTAL_CONQUISTAS, type ContextoArvore,
 } from './legado';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
@@ -137,30 +138,70 @@ describe('detectarNovas (o que avisar ao recarregar)', () => {
 });
 
 describe('árvore', () => {
-  it('a raiz e os 6 ramos, na ordem, com 5 nós cada', () => {
+  it('a raiz e os 10 ramos, na ordem do catálogo, com 10 nós e o infinito cada', () => {
     expect(RAMOS_ARVORE.map((r) => [r.nome, r.nos.length])).toEqual([
-      ['Raiz', 1], ['Produção', 5], ['Recomeço', 5], ['Oportunidades', 5], ['Dourados', 5], ['Gente', 5], ['Horta', 5],
+      ['Raiz', 1], ['Produção', 11], ['Recomeço', 11], ['Oportunidades', 11], ['Dourados', 11], ['Gente', 11], ['Horta', 11],
+      ['Bolsa', 11], ['PPP Podcast', 11], ['Mapa do rolê', 11], ['Espaço', 11],
     ]);
+    for (const r of RAMOS_ARVORE.slice(1)) expect(r.nos.map((n) => n.posicao)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
-  it('comprado, disponível (o anterior é seu) ou trancado (falta o anterior)', () => {
+  it('comprado, disponível (tem o que o nó pede; a ponte pede os dois nós 5) ou trancado', () => {
     const no = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
     expect(situacao(no(1), [])).toBe('disponivel');
     expect(situacao(no(11), [])).toBe('trancado');
     expect(situacao(no(11), [1])).toBe('disponivel');
     expect(situacao(no(12), [1])).toBe('trancado');
     expect(situacao(no(11), [1, 11])).toBe('comprado');
+    expect(liberadoNo(no(2005), [25])).toBe(false);
+    expect(liberadoNo(no(2005), [25, 15])).toBe(true);
     expect(falta(no(12))).toBe('Libera com Cafezinho de garrafa térmica');
     expect(falta(no(11))).toBe('Libera com Virou MEI');
+    expect(falta(no(2005))).toBe('Libera com Material escolar completo e O hexa vem');
     expect(falta(no(1))).toBe('');
   });
 });
 
 const noDe = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
+const ctx = (x: Partial<ContextoArvore> = {}): ContextoArvore => ({ arvore: [], niveis: {}, pontos: 0, vendas: 0, eraMax: 1, ...x });
+
+describe('nível, preço e portão', () => {
+  it('nível: 0 sem o nó; 1 no fixo; o do banco no infinito (resposta velha, sem niveis: 1)', () => {
+    expect(nivelNo(noDe(11), ctx())).toBe(0);
+    expect(nivelNo(noDe(11), ctx({ arvore: [1, 11] }))).toBe(1);
+    expect(nivelNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 7 } }))).toBe(7);
+    expect(nivelNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1);
+  });
+  it('preço: o custo; no infinito, round(1000 · 1,6^nível de agora)', () => {
+    expect(precoNo(noDe(106), ctx())).toBe(15);
+    expect(precoNo(noDe(3001), ctx())).toBe(1000);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1600);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 9 } }))).toBe(68719);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 19 } }))).toBe(7555786);
+  });
+  it('portão: vendas, era alcançada ou o recurso; null quando passou', () => {
+    expect(portao(noDe(106), ctx({ vendas: 1 }))).toBe('Falta: 3 vendas (você tem 1)');
+    expect(portao(noDe(106), ctx({ vendas: 3 }))).toBeNull();
+    expect(portao(noDe(108), ctx({ eraMax: 6 }))).toBe('Falta: chegar na era 7 (você chegou na 6)');
+    expect(portao(noDe(1001), ctx({ eraMax: 5 }))).toBe('Falta: chegar na era 6 (você chegou na 5)');
+    expect(portao(noDe(701), ctx({ eraMax: 3 }))).toBe('Abre com a Bolsa');
+    expect(portao(noDe(801), ctx({ eraMax: 2 }))).toBe('Abre com os Convidados');
+    expect(portao(noDe(901), ctx({ eraMax: 1 }))).toBe('Abre com o Mapa do rolê');
+    expect(portao(noDe(901), ctx({ eraMax: 2 }))).toBeNull();
+    expect(portao(noDe(2001), ctx({ vendas: 4 }))).toBe('Falta: 5 vendas (você tem 4)');
+    expect(portao(noDe(3003), ctx({ vendas: 9 }))).toBe('Falta: 10 vendas (você tem 9)');
+  });
+  it('o contexto do estado: era_max que falta (resposta velha) é a era de agora; niveis que falta é vazio', () => {
+    const c = contextoArvore(estado({ era: 4, vendas: 2, pontos: 9, bonus: { arvore: [1], conquistas: 0 } }));
+    expect(c).toEqual({ arvore: [1], niveis: {}, pontos: 9, vendas: 2, eraMax: 4 });
+    expect(contextoArvore(estado({ era: 1, era_max: 7 })).eraMax).toBe(7);
+  });
+});
 
 describe('árvore em tela cheia: a copa', () => {
-  it('as 31 posições existem e cabem no mundo com folga de 26', () => {
+  it('as 120 posições existem e cabem no mundo com folga de 26', () => {
     const ids = Object.keys(POSICOES_ARVORE).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(catalogo.arvore.map((n) => n.id).sort((a, b) => a - b));
+    expect(MUNDO_ARVORE).toEqual({ largura: 1348, altura: 1200 });
     for (const [x, y] of Object.values(POSICOES_ARVORE)) {
       expect(x).toBeGreaterThanOrEqual(26);
       expect(x).toBeLessThanOrEqual(MUNDO_ARVORE.largura - 26);
@@ -168,71 +209,90 @@ describe('árvore em tela cheia: a copa', () => {
       expect(y).toBeLessThanOrEqual(MUNDO_ARVORE.altura - 26);
     }
   });
-  it('nenhum nó encosta no outro: centros a 64 ou mais', () => {
-    const pos = Object.values(POSICOES_ARVORE);
-    for (let i = 0; i < pos.length; i++) {
-      for (let j = i + 1; j < pos.length; j++) {
-        expect(Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])).toBeGreaterThanOrEqual(64);
+  it('nenhum nó encosta no outro: centros a 64 ou mais; o nó 10 e o infinito (maiores) a 84 ou mais', () => {
+    const grande = (id: number) => { const n = noDe(id); return n.posicao >= 10 && n.ramo !== 11; };
+    const ids = Object.keys(POSICOES_ARVORE).map(Number);
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const [a, b] = [POSICOES_ARVORE[ids[i]], POSICOES_ARVORE[ids[j]]];
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        expect(d, `${ids[i]} × ${ids[j]}`).toBeGreaterThanOrEqual(grande(ids[i]) || grande(ids[j]) ? 84 : 64);
       }
     }
   });
-  it('a raiz embaixo de tudo e cada ramo subindo', () => {
+  it('a raiz embaixo de tudo; cada nó acima do que ele pede (a ponte, acima dos dois)', () => {
     const yRaiz = POSICOES_ARVORE[1][1];
-    for (const n of catalogo.arvore) if (n.id !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(yRaiz);
     for (const n of catalogo.arvore) {
-      if (n.requer !== null && n.requer !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(POSICOES_ARVORE[n.requer][1]);
+      if (n.id !== 1) expect(POSICOES_ARVORE[n.id][1]).toBeLessThan(yRaiz);
+      for (const r of [n.requer, n.requer2]) {
+        if (r !== null && r !== 1) expect(POSICOES_ARVORE[n.id][1], `${n.id} × ${r}`).toBeLessThan(POSICOES_ARVORE[r][1]);
+      }
     }
   });
-  it('o nome de cada ramo fica 44 acima do 5º nó, dentro do mundo', () => {
-    expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta']);
+  it('as colunas na ordem da copa (Horta à esquerda, Dourados à direita) e a raiz no meio, entre o Recomeço e a Produção', () => {
+    const x = (ramo: number) => POSICOES_ARVORE[catalogo.arvore.find((n) => n.ramo === ramo && n.posicao === 1)!.id][0];
+    const ordem = [6, 9, 5, 8, 2, 1, 10, 3, 7, 4];
+    for (let k = 1; k < ordem.length; k++) expect(x(ordem[k]) - x(ordem[k - 1])).toBe(132);
+    expect(POSICOES_ARVORE[1][0]).toBe(MUNDO_ARVORE.largura / 2);
+    expect(POSICOES_ARVORE[1][0]).toBeGreaterThan(x(2));
+    expect(POSICOES_ARVORE[1][0]).toBeLessThan(x(1));
+    // as pontes no meio das duas colunas
+    for (const p of catalogo.arvore.filter((n) => n.ramo === 11)) {
+      expect(POSICOES_ARVORE[p.id][0]).toBe((POSICOES_ARVORE[p.requer!][0] + POSICOES_ARVORE[p.requer2!][0]) / 2);
+    }
+  });
+  it('o nome de cada ramo fica 64 acima do infinito, na ordem da copa, dentro do mundo; os da mesma altura a 100 ou mais', () => {
+    expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
     for (const r of ROTULOS_ARVORE) {
-      const quinto = catalogo.arvore.find((n) => n.posicao === 5 && POSICOES_ARVORE[n.id][0] === r.x)!;
-      expect(r.y).toBe(POSICOES_ARVORE[quinto.id][1] - 44);
+      expect(r.y).toBe(POSICOES_ARVORE[3000 + r.ramo][1] - 64);
+      expect(r.x).toBe(POSICOES_ARVORE[3000 + r.ramo][0]);
       expect(r.y).toBeGreaterThanOrEqual(8);
-    }
-  });
-  it('escala: cabe no lado mais apertado, presa entre 0,8 e 1,4 (a copa de 480 cabe nos 390 do celular)', () => {
-    expect(escalaArvore(480, 540)).toBe(1);
-    expect(escalaArvore(2000, 2000)).toBe(1.4);
-    expect(escalaArvore(300, 800)).toBe(0.8);
-    expect(escalaArvore(390, 900)).toBeCloseTo(0.8125, 10);
-    expect(MUNDO_ARVORE.largura * escalaArvore(390, 900)).toBeLessThanOrEqual(390);
-  });
-  it('rótulos na mesma altura não encostam no celular: o texto não encolhe, então 100 de mundo (80 px a 0,8) entre eles', () => {
-    for (const r of ROTULOS_ARVORE) {
       for (const o of ROTULOS_ARVORE) {
         if (o !== r && Math.abs(o.y - r.y) < 20) expect(Math.abs(o.x - r.x), `${r.nome} × ${o.nome}`).toBeGreaterThanOrEqual(100);
       }
     }
   });
-  it('a Horta é o ramo mais à direita e a raiz fica no meio', () => {
-    const primeiros = [11, 21, 31, 41, 51].map((id) => POSICOES_ARVORE[id][0]);
-    for (const x of primeiros) expect(POSICOES_ARVORE[61][0]).toBeGreaterThan(x);
-    expect(POSICOES_ARVORE[1][0]).toBe(MUNDO_ARVORE.largura / 2);
+  it('escala: cabe no lado mais apertado, presa entre 0,8 e 1,4', () => {
+    expect(escalaArvore(1348, 1200)).toBe(1);
+    expect(escalaArvore(4000, 4000)).toBe(1.4);
+    expect(escalaArvore(300, 800)).toBe(0.8);
   });
-  it('situação na tela: comprado, dá pra comprar, falta ponto, trancado', () => {
-    expect(situacaoTela(noDe(1), [1], 0)).toBe('comprado');
-    expect(situacaoTela(noDe(11), [1], 2)).toBe('pode');
-    expect(situacaoTela(noDe(11), [1], 1)).toBe('falta');
-    expect(situacaoTela(noDe(12), [1], 99)).toBe('trancado');
-    expect(situacaoTela(noDe(1), [], 0)).toBe('falta');
+  it('situação na tela: comprado, dá pra comprar, falta ponto, portão, trancado; o infinito comprado segue comprável', () => {
+    expect(situacaoTela(noDe(1), ctx({ arvore: [1] }))).toBe('comprado');
+    expect(situacaoTela(noDe(11), ctx({ arvore: [1], pontos: 2 }))).toBe('pode');
+    expect(situacaoTela(noDe(11), ctx({ arvore: [1], pontos: 1 }))).toBe('falta');
+    expect(situacaoTela(noDe(12), ctx({ arvore: [1], pontos: 99 }))).toBe('trancado');
+    expect(situacaoTela(noDe(1), ctx())).toBe('falta');
+    expect(situacaoTela(noDe(106), ctx({ arvore: [1, 11, 12, 13, 14, 15], pontos: 99, vendas: 2 }))).toBe('portao');
+    expect(situacaoTela(noDe(106), ctx({ arvore: [1, 11, 12, 13, 14, 15], pontos: 99, vendas: 3 }))).toBe('pode');
+    const cheio = ctx({ arvore: [3001], niveis: { 3001: 2 }, vendas: 10 });
+    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 2560 })).toBe('pode');
+    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 2559 })).toBe('falta');
   });
   it('nó inicial: o mais barato que dá pra comprar; senão o mais barato liberado; senão a raiz', () => {
-    expect(noInicial([], 5)).toBe(1);
-    expect(noInicial([], 0)).toBe(1);
-    expect(noInicial([1], 3)).toBe(11);
-    expect(noInicial([1, 11], 3)).toBe(21);
-    expect(noInicial([1, 11], 1)).toBe(21);
-    expect(noInicial(catalogo.arvore.map((n) => n.id), 99)).toBe(1);
+    expect(noInicial(ctx({ pontos: 5 }))).toBe(1);
+    expect(noInicial(ctx())).toBe(1);
+    expect(noInicial(ctx({ arvore: [1], pontos: 3 }))).toBe(11);
+    expect(noInicial(ctx({ arvore: [1, 11], pontos: 3 }))).toBe(21);
+    expect(noInicial(ctx({ arvore: [1, 11], pontos: 1 }))).toBe(21);
+    expect(noInicial(ctx({ arvore: [1], pontos: 9, eraMax: 4 }))).toBe(11); // a Bolsa 1 custa 8: o 11 (2) vem antes
+    // tudo comprado: sobram os infinitos (1.600 o próximo nível), o de menor id
+    expect(noInicial(ctx({ arvore: catalogo.arvore.map((n) => n.id), pontos: 99, vendas: 99, eraMax: 7 }))).toBe(3001);
   });
   it('textos: onde fica, quanto falta e a descrição pro leitor de tela', () => {
     expect(ondeNo(noDe(1))).toBe('Raiz');
-    expect(ondeNo(noDe(12))).toBe('Produção · 2 de 5');
+    expect(ondeNo(noDe(12))).toBe('Produção · 2 de 10');
+    expect(ondeNo(noDe(707))).toBe('Bolsa · 7 de 10');
+    expect(ondeNo(noDe(3008))).toBe('PPP Podcast · infinito');
+    expect(ondeNo(noDe(2003))).toBe('Ponte · Gente e PPP Podcast');
     expect(faltam(1)).toBe('Falta 1 ★');
     expect(faltam(5)).toBe('Faltam 5 ★');
-    expect(descricaoNo(noDe(11), 'comprado', 0)).toBe('Cafezinho de garrafa térmica, comprado');
-    expect(descricaoNo(noDe(21), 'pode', 3)).toBe('Porquinho quebrado, dá pra comprar por 2 ★');
-    expect(descricaoNo(noDe(13), 'falta', 3)).toBe('Turno dobrado, faltam 5 ★');
-    expect(descricaoNo(noDe(14), 'trancado', 3)).toBe('Tema da Vitória, trancado');
+    const c = ctx({ pontos: 3, vendas: 1 });
+    expect(descricaoNo(noDe(11), 'comprado', c)).toBe('Cafezinho de garrafa térmica, comprado');
+    expect(descricaoNo(noDe(21), 'pode', c)).toBe('Porquinho quebrado, dá pra comprar por 2 ★');
+    expect(descricaoNo(noDe(13), 'falta', c)).toBe('Turno dobrado, faltam 5 ★');
+    expect(descricaoNo(noDe(14), 'trancado', c)).toBe('Tema da Vitória, trancado');
+    expect(descricaoNo(noDe(106), 'portao', c)).toBe('Coach quântico, falta: 3 vendas (você tem 1)');
+    expect(descricaoNo(noDe(3001), 'falta', ctx({ arvore: [3001], niveis: { 3001: 4 }, pontos: 6000 }))).toBe('Hora extra infinita, nível 4, faltam 554 ★');
   });
 });

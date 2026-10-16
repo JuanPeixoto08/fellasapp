@@ -170,7 +170,10 @@ export type IdleState = {
   /** Entrega 3 (0041): os nós da árvore que você comprou e quantas conquistas você tem (o que entra na conta), pontos de
    *  prestígio livres e ganhos na vida, quantas vezes vendeu, o recorde de F$/s, quantos pontos vender agora daria, suas
    *  conquistas, as ganhas nesta chamada (a tela avisa) e as escondidas que alguém do grupo já tem. */
-  bonus: { arvore: number[]; conquistas: number }; pontos: number; pontos_vida: number; vendas: number; recorde: number;
+  bonus: { arvore: number[]; conquistas: number; /** nível dos infinitos ({"3001": 4}; 0082). Ausente = nível 1. */ niveis?: Record<string, number> };
+  pontos: number; pontos_vida: number; vendas: number; recorde: number;
+  /** A maior era que a empresa já alcançou, vendendo ou não (0082). Ausente = a era de agora. */
+  era_max?: number;
   pontos_venda: number;
   conquistas: IdleConquista[]; novas: number[]; descobertas: number[];
 };
