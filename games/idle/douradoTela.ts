@@ -149,13 +149,36 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
     const el = document.createElement('div');
     el.className = 'chuva'; // trava a tela atrás por 8 s: clique que erra a moedinha não compra nada
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-label', 'Chuva de moedinhas: clique nelas');
+    el.setAttribute('aria-label', 'Chuva de moedinhas: passe o mouse ou o dedo por cima delas');
     const placar = document.createElement('div');
     placar.className = 'chuva-placar';
     placar.setAttribute('role', 'status');
     placar.textContent = '0 moedinhas';
     el.append(placar);
     const c = { seg, el, ate: agora() + CHUVA_S * 1000, moedas: 0 };
+    /** Pega a moedinha (passou o mouse, o dedo ou apertou no teclado); cada uma conta uma vez só (sai da tela). */
+    const pegarMoeda = (m: Element) => {
+      if (chuva !== c || !m.isConnected) return;
+      c.moedas++;
+      placar.textContent = `${c.moedas} ${c.moedas === 1 ? 'moedinha' : 'moedinhas'}`;
+      m.remove();
+      o.som?.('trend');
+    };
+    const moedaEm = (alvo: EventTarget | Element | null) =>
+      alvo instanceof Element ? alvo.closest<HTMLElement>('.moedinha') : null;
+    // mouse: basta passar por cima (o clique em coisa que cai era difícil demais)
+    el.addEventListener('pointerover', (e) => {
+      const m = moedaEm(e.target);
+      if (m) pegarMoeda(m);
+    });
+    // dedo: o toque fica preso no elemento onde começou, então procura a moedinha que está embaixo do dedo agora
+    const debaixoDoDedo = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      const m = moedaEm(document.elementFromPoint(e.clientX, e.clientY));
+      if (m && el.contains(m)) pegarMoeda(m);
+    };
+    el.addEventListener('pointerdown', debaixoDoDedo);
+    el.addEventListener('pointermove', debaixoDoDedo);
     for (let i = 0; i < MOEDINHAS; i++) {
       const m = document.createElement('button');
       m.type = 'button';
@@ -166,13 +189,7 @@ export function criarDouradoTela(raiz: HTMLElement, aoPegar: (seg: number, lado:
       m.style.setProperty('--y', `${12 + ((i * 37) % 76)}%`);
       m.style.animationDelay = `${((i * (CHUVA_S - 2.4)) / MOEDINHAS).toFixed(2)}s`;
       m.append(icone('moeda'));
-      m.addEventListener('click', () => {
-        if (chuva !== c) return;
-        c.moedas++;
-        placar.textContent = `${c.moedas} ${c.moedas === 1 ? 'moedinha' : 'moedinhas'}`;
-        m.remove();
-        o.som?.('trend');
-      });
+      m.addEventListener('click', () => pegarMoeda(m)); // teclado (Enter/espaço) continua valendo
       el.append(m);
     }
     camada.append(el);

@@ -494,7 +494,7 @@ export function dicaDourado(tipo: TipoDourado, s: IdleState, o: { seg: number; d
   if (tipo === 4) {
     return { titulo: 'Trend do TikTok', linhas: [
       { texto: `Até ${TREND_MAX * d} min de produção: ${formatarValor(s.rate * MOEDINHA_S * d)} por moedinha` },
-      { texto: `Chovem moedinhas por ${CHUVA_S} s: clique nelas`, tom: 'fraco' }] };
+      { texto: `Chovem moedinhas por ${CHUVA_S} s: passe o mouse nelas`, tom: 'fraco' }] };
   }
   if (tipo === 5) {
     const e = escolhaLinkedin(s.user_id, o.seg, rendasGeradores(catalogo, s));

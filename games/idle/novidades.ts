@@ -4,6 +4,14 @@ export type Novidade = { id: string; titulo: string; data: string; itens: string
 
 export const NOVIDADES: readonly Novidade[] = [
   {
+    id: '2026-10-16-trend-passar',
+    titulo: 'Trend do TikTok sem clique',
+    data: '2026-10-16',
+    itens: [
+      'Na chuva de moedinhas do Trend do TikTok não precisa mais clicar: é só passar o mouse por cima delas. No celular, passa o dedo.',
+    ],
+  },
+  {
     id: '2026-10-16-arvore-grande',
     titulo: 'A árvore grande',
     data: '2026-10-16',

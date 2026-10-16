@@ -119,6 +119,30 @@ describe('os dourados novos na tela (0076)', () => {
     expect(pegar.mock.calls).toEqual([[T / 1000, 0, 3]]);
     expect(raiz.querySelector('.chuva')).toBeNull();
   });
+  it('Trend: passar o mouse por cima pega a moedinha (uma vez só); no celular, arrastar o dedo por cima também', () => {
+    const som = vi.fn();
+    d = criarDouradoTela(raiz, pegar, { agora: () => 0, som });
+    d.mostrar(ev({ tipo: 4 }));
+    raiz.querySelector<HTMLButtonElement>('.dourado-4')!.click();
+    const chuva = raiz.querySelector<HTMLElement>('.chuva')!;
+    const moedas = [...chuva.querySelectorAll<HTMLButtonElement>('.moedinha')];
+    const passa = (alvo: Element, tipo: string, pointerType = 'mouse') =>
+      alvo.dispatchEvent(new PointerEvent(tipo, { bubbles: true, pointerType, clientX: 10, clientY: 10 }));
+    passa(moedas[0], 'pointerover');
+    passa(moedas[0], 'pointerover'); // a mesma moedinha não conta duas vezes
+    moedas[0].click();
+    passa(moedas[1], 'pointerover');
+    expect(chuva.querySelector('.chuva-placar')!.textContent).toBe('2 moedinhas');
+    // dedo: o toque fica preso no primeiro elemento, então a chuva procura a moedinha embaixo do dedo
+    const debaixo = vi.spyOn(document, 'elementFromPoint').mockReturnValue(moedas[2].querySelector('*') ?? moedas[2]);
+    passa(chuva, 'pointermove', 'touch');
+    debaixo.mockReturnValue(chuva);
+    passa(chuva, 'pointermove', 'touch'); // dedo no vazio: nada
+    debaixo.mockRestore();
+    expect(chuva.querySelector('.chuva-placar')!.textContent).toBe('3 moedinhas');
+    expect(som).toHaveBeenCalledTimes(3);
+    expect(chuva.getAttribute('aria-label')).toBe('Chuva de moedinhas: passe o mouse ou o dedo por cima delas');
+  });
   it('Pix: o clique abre Ficar / Devolver (sem relógio); a escolha vai no lado; some sozinha na janela + 8 s', () => {
     d.mostrar(ev({ tipo: 6 }));
     raiz.querySelector<HTMLButtonElement>('.dourado-6')!.click();

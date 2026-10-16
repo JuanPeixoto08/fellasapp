@@ -8,7 +8,7 @@
   background: var(--gold); box-shadow: 0 0 0 2px var(--i-fundo2); pointer-events: none; }
 
 /* Trend: a chuva cobre a tela (trava os cliques de trás por 8 s) e as moedinhas caem uma atrás da outra */
-.idle .chuva { position: absolute; inset: 0; overflow: hidden; pointer-events: auto; background: color-mix(in srgb, var(--i-fundo2) 28%, transparent); }
+.idle .chuva { position: absolute; inset: 0; overflow: hidden; pointer-events: auto; touch-action: none; background: color-mix(in srgb, var(--i-fundo2) 28%, transparent); }
 .idle .chuva-placar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 2px 12px; white-space: nowrap;
   font: 400 24px var(--i-pixel); color: var(--gold); background: var(--i-fundo2); font-variant-numeric: tabular-nums; --c: var(--gold);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); pointer-events: none; }
