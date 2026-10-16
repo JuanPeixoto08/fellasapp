@@ -319,10 +319,10 @@ const tela = criarTela(document.getElementById('app')!, {
     audio.tocar('pegar');
   }),
   // evento de era: o banco confere o segundo e a era e paga; manda os gols no Jogo do Brasil
-  pegarEventoEra: (seg, gols, p) => void (async () => {
+  pegarEventoEra: (seg, gols, p, tipo) => void (async () => {
     if (!ancora) return;
     try {
-      const s = await api.idleEventoPegar(seg, gols);
+      const s = await api.idleEventoPegar(seg, gols, tipo);
       aplicar(s);
       audio.tocar('douradoPego');
       if (chaves.avisos && s.evento) tela.dourados.subirTexto(textoEventoPegou(s.evento), p.x, p.y);
@@ -759,8 +759,8 @@ setInterval(() => {
       const t = eventoEraEm(ancora.estado.user_id, x, ancora.estado.era);
       if (t !== null && !eventoEm(ancora.estado, x) && !tela.eventosEra.ativo()) {
         tela.eventosEra.mostrar({ seg: x, tipo: t, agoraMs });
-        // a mãe e a tela azul soam ao aparecer; a Shopee, a call e os gols soam na ação (tela.ts)
-        if (tela.eventosEra.ativo() && (t === 1 || t === 4)) audio.tocar(t === 1 ? 'mae' : 'telaAzul');
+        // a mãe, a tela azul e o alarme do Houston soam ao aparecer; a Shopee, a call, os gols e os destroços soam na ação
+        if (tela.eventosEra.ativo() && (t === 1 || t === 4 || t === 7)) audio.tocar(t === 1 ? 'mae' : t === 4 ? 'telaAzul' : 'houston');
       }
     }
     segVistoEra = seg;

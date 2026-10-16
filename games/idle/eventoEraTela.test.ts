@@ -14,7 +14,7 @@ describe('eventos de era na tela', () => {
     expect(b.textContent).toBe('Já vou!');
     b.click(); b.click();
     expect(o.aoPegar).toHaveBeenCalledTimes(1);
-    expect(o.aoPegar).toHaveBeenCalledWith(100, 0, { x: 0.5, y: 0.5 });
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 0, { x: 0.5, y: 0.5 }, 1);
     t.mostrar({ seg: 200, tipo: 1, agoraMs: 200_000 });
     t.tick(208_001);
     expect(raiz.querySelector('.evento-era')).toBeNull();
@@ -39,10 +39,10 @@ describe('eventos de era na tela', () => {
     expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Jogo do Brasil · 3 de 7');
     expect(bola().querySelector('svg.icone-evento')).not.toBeNull(); // a bola de pixel
     t.tick(130_000);
-    expect(o.aoPegar).toHaveBeenCalledWith(100, 3, { x: 0.5, y: 0.5 });
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 3, { x: 0.5, y: 0.5 }, 5);
     t.mostrar({ seg: 200, tipo: 5, agoraMs: 200_000 });
     for (let i = 0; i < 7; i++) bola().click();
-    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 7, { x: 0.5, y: 0.5 });
+    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 7, { x: 0.5, y: 0.5 }, 5);
   });
   it('Jogo do Brasil: do 1º gol até acabar, a tela trava atrás (clique fora da bola não é gol nem cai no jogo)', () => {
     const raiz = document.createElement('div');
@@ -91,16 +91,16 @@ describe('eventos de era na tela', () => {
     const t = criarEventoEraTela(raiz, o);
     t.mostrar({ seg: 100, tipo: 3, agoraMs: 100_000 });
     raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
-    expect(o.aoPegar).toHaveBeenLastCalledWith(100, 0, { x: 0.2, y: 0.3 });
+    expect(o.aoPegar).toHaveBeenLastCalledWith(100, 0, { x: 0.2, y: 0.3 }, 3);
     t.mostrar({ seg: 200, tipo: 4, agoraMs: 200_000 });
     raiz.querySelector<HTMLButtonElement>('.evento-era button')!.click();
-    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 0, { x: 0.5, y: 0.3 });
+    expect(o.aoPegar).toHaveBeenLastCalledWith(200, 0, { x: 0.5, y: 0.3 }, 4);
     t.mostrar({ seg: 300, tipo: 5, agoraMs: 300_000 });
     raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
     raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
     t.tick(301_500); // pulo 1 + 2 gols = 3
     t.tick(330_000);
-    expect(o.aoPegar).toHaveBeenLastCalledWith(300, 2, { x: 0.2 + 3 / 10, y: 0.3 });
+    expect(o.aoPegar).toHaveBeenLastCalledWith(300, 2, { x: 0.2 + 3 / 10, y: 0.3 }, 5);
   });
   it('o placar anda com a bola: em cima dela; embaixo quando ela está perto do topo', () => {
     const raiz = document.createElement('div');
@@ -132,7 +132,7 @@ describe('eventos de era na tela', () => {
     const t = criarEventoEraTela(raiz, o);
     t.mostrar({ seg: 100, tipo: 5, agoraMs: 100_000 });
     for (let i = 0; i < 7; i++) raiz.querySelector<HTMLButtonElement>('.evento-bola')!.click();
-    expect(o.aoPegar).toHaveBeenCalledWith(100, 7, { x: 0.6, y: 0.5 }); // o 7º chute foi na bola do pulo 6
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 7, { x: 0.6, y: 0.5 }, 5); // o 7º chute foi na bola do pulo 6
   });
   it('Jogo do Brasil sem gol não chama o banco', () => {
     const raiz = document.createElement('div');
@@ -199,5 +199,81 @@ describe('eventos de era na tela', () => {
       for (const e of espioes) e.mockRestore();
       raiz.remove();
     }
+  });
+});
+
+describe('eventos das eras 6 e 7 na tela', () => {
+  const destroco = (raiz: HTMLElement) => raiz.querySelector<HTMLButtonElement>('.evento-destroco');
+  it('Lixo espacial: 3 destroços, um de cada vez (um terço da janela cada); cada clique é um desvio; no 3º manda na hora', () => {
+    const raiz = document.createElement('div');
+    const o = { ...opcoes(), aoDesvio: vi.fn() };
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 100_000 });
+    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Lixo espacial · 0 de 3');
+    expect(destroco(raiz)!.querySelector('svg.icone-evento')).not.toBeNull();
+    destroco(raiz)!.click();
+    expect(destroco(raiz)).toBeNull(); // saiu da tela: o mesmo destroço não conta duas vezes
+    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Lixo espacial · 1 de 3');
+    t.tick(103_400); // o 2º entra
+    destroco(raiz)!.click();
+    t.tick(106_700); // o 3º
+    destroco(raiz)!.click();
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 3, { x: 0.5, y: 0.5 }, 6);
+    expect(o.aoDesvio).toHaveBeenCalledTimes(3);
+    expect(raiz.querySelector('.evento-era-6')).toBeNull();
+  });
+  it('Lixo espacial: sem desviar nenhum, não manda nada; com 1, manda 1 no fim da janela', () => {
+    const raiz = document.createElement('div');
+    const o = opcoes();
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 100_000 });
+    t.tick(103_400);
+    t.tick(106_700);
+    t.tick(110_000);
+    expect(o.aoPegar).not.toHaveBeenCalled();
+    t.mostrar({ seg: 200, tipo: 6, agoraMs: 200_000 });
+    destroco(raiz)!.click();
+    t.tick(210_000);
+    expect(o.aoPegar).toHaveBeenCalledWith(200, 1, { x: 0.5, y: 0.5 }, 6);
+  });
+  it('Lixo espacial: do 1º desvio até acabar, a tela atrás trava (clique errado não compra gerador)', () => {
+    const raiz = document.createElement('div');
+    const t = criarEventoEraTela(raiz, opcoes());
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 100_000 });
+    const caixa = () => raiz.querySelector<HTMLElement>('.evento-era-6')!;
+    expect(caixa().classList.contains('travado')).toBe(false);
+    destroco(raiz)!.click();
+    expect(caixa().classList.contains('travado')).toBe(true);
+    caixa().click();
+    expect(raiz.querySelector('.evento-placar')!.textContent).toBe('Lixo espacial · 1 de 3');
+  });
+  it('Lixo espacial: quem volta pra aba no meio pega o destroço da vez, já andando', () => {
+    const raiz = document.createElement('div');
+    const o = opcoes();
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 6, agoraMs: 104_000 }); // o 2º entrou há 0,67 s
+    expect(destroco(raiz)!.style.getPropertyValue('--ja')).toBe('-667ms');
+    destroco(raiz)!.click();
+    t.tick(110_000);
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 1, { x: 0.5, y: 0.5 }, 6);
+  });
+  it('Houston: a cena pisca (alarme) enquanto o aviso está na tela; consertar manda o tipo e apaga o alarme; passou a janela, apaga sem mandar', () => {
+    const raiz = document.createElement('div');
+    const palco = document.createElement('div');
+    const o = { ...opcoes(), alarmeEm: palco, aoBotao: vi.fn() };
+    const t = criarEventoEraTela(raiz, o);
+    t.mostrar({ seg: 100, tipo: 7, agoraMs: 100_000 });
+    expect(palco.classList.contains('alarme')).toBe(true);
+    expect(raiz.querySelector('.evento-balao')!.textContent).toBe('Houston, temos um problema');
+    const b = raiz.querySelector<HTMLButtonElement>('.evento-era button')!;
+    expect(b.textContent).toBe('Consertar com silver tape');
+    b.click();
+    expect(o.aoBotao).toHaveBeenCalledWith(7);
+    expect(o.aoPegar).toHaveBeenCalledWith(100, 0, { x: 0.5, y: 0.5 }, 7);
+    expect(palco.classList.contains('alarme')).toBe(false);
+    t.mostrar({ seg: 200, tipo: 7, agoraMs: 200_000 });
+    t.tick(208_001);
+    expect(palco.classList.contains('alarme')).toBe(false);
+    expect(o.aoPegar).toHaveBeenCalledTimes(1);
   });
 });

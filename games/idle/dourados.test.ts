@@ -221,3 +221,15 @@ describe('o que o rolo do Tigrinho faz com a resposta do banco', () => {
     expect(resultadoTigre(undefined)).toBeNull();
   });
 });
+
+describe('selo do Silver tape (0078)', () => {
+  const T = Date.parse('2026-10-15T12:00:00Z');
+  const em = (s: number) => new Date(T + s * 1000).toISOString();
+  it('"Silver tape ×4 · 1:52", prata (nem dourado nem roxo), com caixinha; passou, some', () => {
+    const [s] = selosBonus({ promo_ate: null, viral: [], silver_ate: em(112) }, T);
+    expect(s).toMatchObject({ texto: 'Silver tape ×4 · 1:52', ouro: false, classe: 'silver' });
+    expect(s.dica!.titulo).toBe('Houston, temos um problema');
+    expect(s.dica!.linhas.map((l) => l.texto)).toEqual(['Produção ×4, por cima de todo o resto', 'Acaba em 1:52']);
+    expect(selosBonus({ promo_ate: null, viral: [], silver_ate: em(-1) }, T)).toEqual([]);
+  });
+});

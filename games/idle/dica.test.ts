@@ -400,3 +400,15 @@ describe('frase dos geradores das eras 6+', () => {
     expect(textos(dicaGerador(s, 1, 20))[0]).toMatch(/^Cada um rende/);
   });
 });
+
+describe('eventos das eras 6 e 7 na caixinha', () => {
+  it('Lixo: quanto vale cada destroço agora; Houston: quanto o ×4 dá a mais nos 2 min', () => {
+    expect(textos(dicaEventoEra(6, 2000))).toEqual(['Cada destroço desviado: F$ 1,2 mi (até 3)', '10 min da sua produção por destroço']);
+    expect(textos(dicaEventoEra(7, 2000))).toEqual(['Produção ×4 por 2 min: +F$ 720 mil a mais', 'Pegar outro com um valendo soma 2 min']);
+    expect(dicaEventoEra(7, 2000).titulo).toBe('Houston, temos um problema');
+  });
+  it('a produção mostra o Silver tape valendo', () => {
+    const s = comTaxa({ silver_ate: '2026-10-12T12:01:00.000Z' });
+    expect(textos(dicaProducao(s, Date.parse(s.server_now)))).toContain('Agora: ×4 do Silver tape');
+  });
+});

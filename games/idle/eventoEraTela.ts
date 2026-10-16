@@ -1,8 +1,9 @@
 // Eventos de era na tela (14/10): o desenho de pixel de cada um com o botão dele, um por vez. Clicar chama `aoPegar`
 // (o banco confere) com o ponto onde a coisa estava (o texto sobe dali). O Jogo do Brasil é diferente: a bola pula de
 // ponto em ponto (a cada 1,5 s e a cada gol) e cada clique é gol; manda os gols no 7º ou quando a janela acaba (sem
-// gol, não manda nada).
-import { JANELA_EVENTO_S, MAX_GOLS, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
+// gol, não manda nada). Eras 6–7: o Lixo espacial é igual com 3 destroços atravessando (um por vez) e o Houston é uma
+// caixa com botão que pisca a cena em vermelho enquanto está na tela.
+import { JANELA_EVENTO_S, MAX_DESVIOS, MAX_GOLS, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 
 const PALETA: Record<string, string> = {
   K: '#1E1B2E', B: '#5A3A1E', S: '#D9A066', H: '#FF5A7A', R: '#E0454B', W: '#F4F1EA', O: '#F07A2A', Q: '#B8501A',
@@ -32,9 +33,12 @@ const ICONES: Record<TipoEventoEra, readonly string[]> = {
   7: ['............', 'O....WW....O', '.O..KKKK..O.', '...KRRWRK...', '..KRRRHRRK..', 'OOKRRRHRRKOO',
       '..KRRRRRRK..', '.KKKKKKKKKK.', '.KNNNNNNNNK.', '.KKKKKKKKKK.', '............', '............'],
 };
-const BOTAO: Record<1 | 2 | 3 | 4, string> = { 1: 'Já vou!', 2: 'Abrir pacote', 3: 'Sair da call', 4: 'Reiniciar' };
-const BALAO: Record<1 | 2 | 3 | 4, string> = {
+const BOTAO: Record<1 | 2 | 3 | 4 | 7, string> = {
+  1: 'Já vou!', 2: 'Abrir pacote', 3: 'Sair da call', 4: 'Reiniciar', 7: 'Consertar com silver tape',
+};
+const BALAO: Record<1 | 2 | 3 | 4 | 7, string> = {
   1: 'Desce pra almoçar!', 2: 'Seu pacote chegou', 3: 'Reunião: alinhamento do alinhamento', 4: 'Seu PC encontrou um problema',
+  7: 'Houston, temos um problema',
 };
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -59,21 +63,29 @@ function icone(tipo: TipoEventoEra): SVGSVGElement {
 
 type Ponto = { x: number; y: number };
 export type OpcoesEventoEra = {
-  /** `pos` = onde a coisa estava (fração da tela): a tela azul é a faixa no meio, a bola é o último pulo dela */
-  aoPegar(seg: number, gols: number, pos: Ponto): void;
+  /** `pos` = onde a coisa estava (fração da tela; o texto sobe dali); `gols` = os gols do Jogo do Brasil ou os desvios do
+   *  Lixo espacial; `tipo` = o que a página mostrou (o banco aceita o da era anterior: a era pode ter mudado no meio) */
+  aoPegar(seg: number, gols: number, pos: Ponto, tipo: TipoEventoEra): void;
   /** liga a caixinha de informação (mouse/teclado) no elemento */
   dica(el: HTMLElement, chave: string, tipo: TipoEventoEra): void;
-  /** onde fica (fração da tela); `i` = o pulo da bola */
+  /** onde fica (fração da tela); `i` = o pulo da bola ou o destroço */
   posicao(seg: number, i: number): Ponto;
   /** cada gol do Jogo do Brasil (o som do gol); `gols` = quantos já */
   aoGol?(gols: number): void;
-  /** clicou no botão da caixa (Abrir pacote, Sair da call…): o som da ação */
-  aoBotao?(tipo: 1 | 2 | 3 | 4): void;
+  /** cada destroço desviado no Lixo espacial (o "tum"); `desvios` = quantos já */
+  aoDesvio?(desvios: number): void;
+  /** clicou no botão da caixa (Abrir pacote, Sair da call, Consertar…): o som da ação */
+  aoBotao?(tipo: 1 | 2 | 3 | 4 | 7): void;
+  /** o que pisca em vermelho enquanto o Houston está na tela (a cena) */
+  alarmeEm?: HTMLElement;
 };
 /** Quantos pulos de 1,5 s a bola já deu, `agoraMs` depois do segundo `seg`. */
 /** Bola acima disto (fração da tela, do topo): o placar vai pra baixo dela, senão sairia da tela/cobriria o topo. */
 const PLACAR_EMBAIXO_Y = 0.25;
 const passoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / 1500));
+/** Lixo espacial: cada destroço atravessa em um terço da janela, um depois do outro. */
+export const PASSO_DESTROCO_MS = (JANELA_EVENTO_S[6] * 1000) / MAX_DESVIOS;
+const destrocoDe = (seg: number, agoraMs: number) => Math.max(0, Math.floor((agoraMs - seg * 1000) / PASSO_DESTROCO_MS));
 /** Folga da caixa até a borda da tela (px). */
 const MARGEM_TELA = 8;
 /** O centro (px) de uma caixa `tam` empurrado pra ela caber inteira na tela, com `margem` de folga; maior que a
@@ -105,7 +117,9 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
     atual = null;
     a.caixa.remove();
     encerrados.add(a.seg);
-    if (enviar && (a.tipo !== 5 || a.gols > 0)) o.aoPegar(a.seg, a.tipo === 5 ? a.gols : 0, a.pos);
+    if (a.tipo === 7) o.alarmeEm?.classList.remove('alarme');
+    const conta = a.tipo === 5 || a.tipo === 6; // Jogo do Brasil e Lixo mandam quantos (sem nenhum, nada)
+    if (enviar && (!conta || a.gols > 0)) o.aoPegar(a.seg, conta ? a.gols : 0, a.pos, a.tipo);
   }
   function posicionar(el: HTMLElement, p: Ponto) {
     el.style.left = `${Math.round(p.x * 100)}%`;
@@ -146,17 +160,48 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
     atual.pos = o.posicao(atual.seg, atual.passo + atual.gols);
     moverBola(atual.caixa, atual.pos);
   }
+  /** "Lixo espacial · 1 de 3" */
+  function contarDesvios(caixa: HTMLElement, n: number) {
+    const placar = caixa.querySelector('.evento-placar');
+    if (placar) placar.textContent = `${NOME_EVENTO_ERA[6]} · ${n} de ${MAX_DESVIOS}`;
+  }
+  /** O destroço `i` (0 a 2): entra pela esquerda numa altura sorteada e atravessa em um terço da janela (o CSS anda; o
+   *  atraso negativo acerta quem voltou pra aba no meio). Cada um conta uma vez: clicou, ele sai. */
+  function lancarDestroco(caixa: HTMLElement, seg: number, i: number, agoraMs: number) {
+    caixa.querySelector('.evento-destroco')?.remove();
+    if (i >= MAX_DESVIOS) return;
+    const p = o.posicao(seg, i);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'evento-destroco';
+    b.setAttribute('aria-label', 'Desviar do destroço');
+    b.style.top = `${Math.round(p.y * 100)}%`;
+    b.style.setProperty('--passo', `${Math.round(PASSO_DESTROCO_MS)}ms`);
+    b.style.setProperty('--ja', `-${Math.max(0, Math.round(agoraMs - seg * 1000 - i * PASSO_DESTROCO_MS))}ms`);
+    b.append(icone(6));
+    b.addEventListener('click', () => {
+      if (!atual || atual.seg !== seg || atual.passo !== i) return;
+      atual.gols++;
+      atual.pos = { x: 0.5, y: p.y };
+      caixa.classList.add('travado'); // do 1º desvio até acabar, a tela atrás segura os cliques
+      contarDesvios(caixa, atual.gols);
+      o.aoDesvio?.(atual.gols);
+      b.remove();
+      if (atual.gols >= MAX_DESVIOS) encerrar(true);
+    });
+    caixa.append(b);
+    o.dica(b, `evento-${seg}-${i}`, 6);
+  }
 
   return {
     mostrar(e: { seg: number; tipo: TipoEventoEra; agoraMs: number }) {
-      if (e.tipo === 6 || e.tipo === 7) return; // Lixo espacial e Houston: a tela deles chega com o desenho (até lá não aparecem)
       const ateMs = (e.seg + JANELA_EVENTO_S[e.tipo]) * 1000;
       if (atual || encerrados.has(e.seg) || e.agoraMs >= ateMs) return;
       const caixa = document.createElement('div');
       caixa.className = `evento-era evento-era-${e.tipo}`;
       caixa.style.setProperty('--janela', `${JANELA_EVENTO_S[e.tipo]}s`);
       caixa.style.setProperty('--ja', `-${Math.max(0, Math.round((e.agoraMs - e.seg * 1000) / 1000))}s`);
-      const passo = e.tipo === 5 ? passoDe(e.seg, e.agoraMs) : 0;
+      const passo = e.tipo === 5 ? passoDe(e.seg, e.agoraMs) : e.tipo === 6 ? destrocoDe(e.seg, e.agoraMs) : 0;
       const pos = o.posicao(e.seg, passo);
       // a tela azul é a faixa inteira no meio da tela (o CSS força o left em 50%)
       atual = { seg: e.seg, tipo: e.tipo, ateMs, caixa, gols: 0, passo, pos: e.tipo === 4 ? { x: 0.5, y: pos.y } : pos };
@@ -183,6 +228,13 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         caixa.append(placar, bola);
         moverBola(caixa, pos);
         o.dica(bola, `evento-${e.seg}`, e.tipo);
+      } else if (e.tipo === 6) {
+        // Lixo espacial: os 3 destroços atravessam a tela um de cada vez; cada clique num é um desvio
+        const placar = document.createElement('div');
+        placar.className = 'evento-placar lixo-placar';
+        caixa.append(placar);
+        contarDesvios(caixa, 0);
+        lancarDestroco(caixa, e.seg, passo, e.agoraMs);
       } else {
         const t = e.tipo;
         const balao = document.createElement('div');
@@ -199,11 +251,12 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
           encerrar(true);
         });
         caixa.append(icone(t), balao, b);
+        if (t === 7) o.alarmeEm?.classList.add('alarme'); // Houston: a cena pisca em vermelho
         posicionar(caixa, atual.pos);
         o.dica(caixa, `evento-${e.seg}`, t);
       }
       camada.append(caixa);
-      if (e.tipo !== 4 && e.tipo !== 5) {
+      if (e.tipo !== 4 && e.tipo !== 5 && e.tipo !== 6) {
         atual.base = pos;
         atual.pos = posicionarCaixa(caixa, pos); // já na tela: dá pra medir
       }
@@ -212,7 +265,7 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
     tick(agoraMs: number) {
       if (!atual) return;
       if (agoraMs >= atual.ateMs) {
-        encerrar(atual.tipo === 5);
+        encerrar(atual.tipo === 5 || atual.tipo === 6);
         return;
       }
       if (atual.tipo === 5) {
@@ -220,6 +273,13 @@ export function criarEventoEraTela(raiz: HTMLElement, o: OpcoesEventoEra) {
         if (passo > atual.passo) {
           atual.passo = passo;
           pularBola();
+        }
+      }
+      if (atual.tipo === 6) {
+        const i = destrocoDe(atual.seg, agoraMs);
+        if (i > atual.passo) {
+          atual.passo = i;
+          lancarDestroco(atual.caixa, atual.seg, i, agoraMs);
         }
       }
     },

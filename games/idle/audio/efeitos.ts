@@ -6,6 +6,7 @@ export const IDS_EFEITOS = [
   'compra', 'compraMuitas', 'no', 'acaoCompra', 'acaoVende', 'conquista', 'era', 'venda', 'contratado', 'po', 'oportunidade',
   'pegar', 'cnpj', 'erro', 'clique', 'abrir', 'fechar', 'dourado', 'douradoPego', 'plantar', 'mae', 'shopee', 'call', 'telaAzul', 'gol',
   'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo',
+  'lixo', 'houston', 'conserto',
 ] as const;
 export type IdEfeito = (typeof IDS_EFEITOS)[number];
 export type OpcoesEfeito = { quantas?: number; lucro?: boolean };
@@ -56,6 +57,26 @@ function ruidoFiltrado(ctx: BaseAudioContext, d: AudioNode, t: number, tipo: Biq
   s.connect(f);
   s.start(t);
   s.stop(t + dura + 0.05);
+}
+
+/** Bipe quadrado de alarme (o Houston): tom fixo, corte seco. */
+function sirene(ctx: BaseAudioContext, d: AudioNode, t: number, f: number, dura: number) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.05, t + 0.01);
+  g.gain.setValueAtTime(0.05, t + dura - 0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dura);
+  g.connect(d);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 2400;
+  lp.connect(g);
+  const o = ctx.createOscillator();
+  o.type = 'square';
+  o.frequency.setValueAtTime(f, t);
+  o.connect(lp);
+  o.start(t);
+  o.stop(t + dura + 0.02);
 }
 
 export const RECEITAS: Record<IdEfeito, Receita> = {
@@ -248,6 +269,21 @@ export const RECEITAS: Record<IdEfeito, Receita> = {
     acorde(c, d, t + 0.38, [77, 81, 84], 0.7, 1);
     sininho(c, d, t + 0.38, 96, 0.5, 0.6);
     return 1.2;
+  },
+  // eventos das eras 6 e 7 (0078)
+  lixo: (c, d, t) => { // "tum" de destroço desviado
+    bumbo(c, d, t, 0, 0.2, 0.8);
+    ruidoFiltrado(c, d, t, 'lowpass', 700, 200, 0.18, 0.06);
+    return 0.3;
+  },
+  houston: (c, d, t) => { // o alarme da estação: dois tons alternando
+    [81, 76, 81, 76].forEach((m, i) => sirene(c, d, t + i * 0.2, hz(m), 0.18));
+    return 0.85;
+  },
+  conserto: (c, d, t) => { // a fita rasgando e o "pronto"
+    ruidoFiltrado(c, d, t, 'highpass', 1500, 5000, 0.25, 0.07);
+    sininho(c, d, t + 0.28, 84, 0.3, 0.6);
+    return 0.7;
   },
 };
 

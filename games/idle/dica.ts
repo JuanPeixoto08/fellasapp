@@ -13,7 +13,7 @@ import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
 import { FRASES_GERADOR } from './nomes';
 import { CASHBACK_S, cashbackAtivo, CHAMADOS_MAX, CUPONS_POR_OPP, temBolsa, temPlantaCrescendo, type TipoOportunidade } from './oportunidades';
-import { ganhoEventoAgora, marmitaAtiva, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
+import { ganhoEventoAgora, marmitaAtiva, MAX_DESVIOS, NOME_EVENTO_ERA, SILVER_MULT, silverAtivo, type TipoEventoEra } from './eventosEra';
 import {
   CORES, custoLote, duracao, ESTILOS, liberado, NOME_ROTULO, PECAS, pecasLote, precoPeca, producaoMs, TEMAS, VENDA_MS, type Caderno,
 } from './camisetaria';
@@ -162,6 +162,7 @@ export function dicaProducao(s: IdleState, agoraMs: number): Dica {
   const virais = s.viral.filter((t) => { const f = Date.parse(t); return f > agoraMs && f - vMs <= agoraMs; }).length;
   if (virais) linhas.push({ texto: `Agora: ×${num(10 ** virais, 0)} do Viralizou`, tom: 'bom' });
   if (marmitaAtiva(s, agoraMs)) linhas.push({ texto: 'Agora: ×3 da Marmita da mãe', tom: 'bom' });
+  if (silverAtivo(s, agoraMs)) linhas.push({ texto: `Agora: ×${SILVER_MULT} do Silver tape`, tom: 'bom' });
   if (s.linkedin_ate && s.linkedin_gen && (s.linkedin_mult ?? 1) > 1 && Date.parse(s.linkedin_ate) > agoraMs) linhas.push({ texto: `Agora: ×${num(s.linkedin_mult ?? 1)} do LinkedIn`, tom: 'bom' });
   if (s.combo_ate && Date.parse(s.combo_ate) > agoraMs) linhas.push({ texto: `Agora: ×${COMBO_MULT} do Combo`, tom: 'bom' });
   linhas.push({ texto: `Total: ${formatarTaxa(s.rate)}` });
@@ -475,7 +476,9 @@ export function dicaEventoEra(tipo: TipoEventoEra, rate: number): Dica {
     : tipo === 2 ? [{ texto: `Sorteio: ${formatarValor(g)} (1 h, menos a Taxa das blusinhas), Promoção por 1 min ou ×5 por 2 min` }]
     : tipo === 3 ? [{ texto: `Dá ${formatarValor(g)} agora` }, { texto: '30 min da sua produção', tom: 'fraco' }]
     : tipo === 4 ? [{ texto: 'Melhorias 25% mais baratas por 2 min' }]
-    : [{ texto: `Cada gol: ${formatarValor(g)} (até 7)` }, { texto: '5 min da sua produção por gol', tom: 'fraco' }];
+    : tipo === 5 ? [{ texto: `Cada gol: ${formatarValor(g)} (até 7)` }, { texto: '5 min da sua produção por gol', tom: 'fraco' }]
+    : tipo === 6 ? [{ texto: `Cada destroço desviado: ${formatarValor(g)} (até ${MAX_DESVIOS})` }, { texto: '10 min da sua produção por destroço', tom: 'fraco' }]
+    : [{ texto: `Produção ×${SILVER_MULT} por 2 min: +${formatarValor(g)} a mais` }, { texto: 'Pegar outro com um valendo soma 2 min', tom: 'fraco' }];
   return { titulo: NOME_EVENTO_ERA[tipo], linhas };
 }
 

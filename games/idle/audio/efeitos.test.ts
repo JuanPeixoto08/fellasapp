@@ -14,7 +14,7 @@ describe('efeitos', () => {
     expect([...IDS_EFEITOS].sort()).toEqual(
       ['abrir', 'acaoCompra', 'acaoVende', 'cnpj', 'clique', 'compra', 'compraMuitas', 'conquista', 'contratado', 'dourado',
         'douradoPego', 'era', 'erro', 'fechar', 'no', 'oportunidade', 'pegar', 'plantar', 'po', 'venda',
-        'mae', 'shopee', 'call', 'telaAzul', 'gol', 'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo'].sort(),
+        'mae', 'shopee', 'call', 'telaAzul', 'gol', 'trend', 'linkedin', 'pix', 'tigreGira', 'tigrePaga', 'tigreCome', 'combo', 'lixo', 'houston', 'conserto'].sort(),
     );
     for (const id of IDS_EFEITOS) {
       const { c, dura } = tocar(id);

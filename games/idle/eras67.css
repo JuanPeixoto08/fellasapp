@@ -10,3 +10,31 @@
   .idle .lista-geradores .gerador:has(.frase) { align-items: start; }
   .idle .lista-geradores .gerador:has(.frase) .meio .frase { margin-right: -246px; margin-top: 2px; }
 }
+
+/* Lixo espacial: a camada cobre a tela (trava os cliques de trás depois do 1º desvio, como o Jogo do Brasil); o destroço
+   atravessa da esquerda pra direita em um terço da janela, rodando em 4 passos */
+.idle .evento-era-6 { inset: 0; transform: none; animation: none; pointer-events: none; }
+.idle .evento-era-6.travado { pointer-events: auto; }
+.idle .evento-placar.lixo-placar { left: 50%; top: 16px; transform: translateX(-50%); }
+.idle .evento-destroco { position: absolute; left: -10%; width: 48px; height: 48px; margin-top: -24px; padding: 0; border: 0;
+  background: none; pointer-events: auto; cursor: pointer;
+  animation: destroco-passa var(--passo, 3333ms) linear var(--ja, 0ms) forwards; }
+.idle .evento-destroco .icone-evento { display: block; width: 48px; height: 48px; image-rendering: pixelated; animation: destroco-gira 1.2s steps(4) infinite;
+  /* contorno duro de papel (4 sombras sem desfoque): sem ele o satélite escuro some no quarto e no chão cinza da Lua */
+  filter: drop-shadow(2px 0 0 var(--paper)) drop-shadow(-2px 0 0 var(--paper)) drop-shadow(0 2px 0 var(--paper)) drop-shadow(0 -2px 0 var(--paper)); }
+.idle .evento-destroco:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 2px; }
+@keyframes destroco-passa { from { left: -10%; } to { left: 110%; } }
+@keyframes destroco-gira { to { transform: rotate(360deg); } }
+
+/* Houston: a cena pisca em vermelho enquanto o alarme toca (o vermelho é o da sirene do ícone) */
+.idle .palco.alarme::after { content: ''; position: absolute; inset: 0; background: #E0454B; opacity: 0; pointer-events: none;
+  animation: alarme-pisca 0.5s steps(2) infinite; }
+@keyframes alarme-pisca { 50% { opacity: 0.32; } }
+
+/* Silver tape (×4): selo prata, nem dourado nem roxo */
+.idle .selo-bonus.silver { color: var(--paper); background: var(--i-painel2); box-shadow: 0 0 0 2px var(--i-mudo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .idle .evento-destroco .icone-evento { animation: none; } /* o destroço ainda atravessa: é o jogo */
+  .idle .palco.alarme::after { animation: none; opacity: 0.22; }
+}

@@ -5,6 +5,7 @@ import type { DouradoPago } from '../shared/types';
 import { catalogo } from './catalogo';
 import type { Dica } from './dica';
 import { VIRAL_MS } from './economia';
+import { SILVER_MULT } from './eventosEra';
 import { formatarValor } from './formatar';
 import { CHAMADOS_MAX, semente } from './oportunidades';
 
@@ -108,7 +109,7 @@ export function posicao(uid: string, s: number, _lado = 0): { x: number; y: numb
 type ComBonus = {
   promo_ate: string | null; viral?: readonly string[]; boosts?: readonly string[]; marmita_ate?: string | null; upg_desc_ate?: string | null;
   linkedin_ate?: string | null; linkedin_gen?: number | null; linkedin_mult?: number | null; combo_ate?: string | null; cupons?: number;
-  cashback_ate?: string | null; chamados?: number;
+  cashback_ate?: string | null; chamados?: number; silver_ate?: string | null;
 };
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -151,6 +152,12 @@ export function selosBonus(s: ComBonus, agoraMs: number, o: { viralMs?: number; 
     const falta = mmss(Date.parse(s.upg_desc_ate) - agoraMs);
     out.push({ texto: `Melhorias −25% · ${falta}`, ouro: false, dica: { titulo: 'Atualização instalada', linhas: [
       { texto: 'Melhorias 25% mais baratas (junta com Promoção e Horta)' }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
+  }
+  // eras 6–7 (0078): o Silver tape do Houston (×4), prata: nem dourado nem roxo
+  if (s.silver_ate && Date.parse(s.silver_ate) > agoraMs) {
+    const falta = mmss(Date.parse(s.silver_ate) - agoraMs);
+    out.push({ texto: `Silver tape ×${SILVER_MULT} · ${falta}`, ouro: false, classe: 'silver', dica: { titulo: 'Houston, temos um problema', linhas: [
+      { texto: `Produção ×${SILVER_MULT}, por cima de todo o resto` }, { texto: `Acaba em ${falta}`, tom: 'fraco' }] } });
   }
   // dourados novos e Caixinha (0076): LinkedIn, Combo (e as bolinhas do que está em andamento), Cupom, Cashback e o Chamar.
   // LinkedIn sem gerador rendendo: o banco grava gen null e mult 1 (e o fim); aí não tem o que mostrar

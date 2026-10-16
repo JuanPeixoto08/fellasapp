@@ -147,7 +147,7 @@ w.__dourado = async (tipo = 2) => {
   await db.query('insert into public.mock_dourado values ($1, $2) on conflict (s) do update set tipo = excluded.tipo', [seg, tipo]);
   (window as unknown as { __mostrarDourado?: (seg: number, tipo: number) => void }).__mostrarDourado?.(seg, tipo);
 };
-// __eventoEra(5) põe um evento de era na tela agora (1 mãe, 2 Shopee, 3 call, 4 tela azul, 5 Jogo do Brasil)
+// __eventoEra(5) põe um evento de era na tela agora (1 mãe, 2 Shopee, 3 call, 4 tela azul, 5 Jogo do Brasil, 6 Lixo espacial, 7 Houston)
 w.__eventoEra = async (tipo = 1) => {
   const { ready } = await import('./mockDb');
   const db = await ready;
@@ -277,8 +277,8 @@ w.__oportunidade = async (k) => {
     b.addEventListener('click', () => void f());
     painel.append(b);
   }
-  // eventos de era (1 a 5): a mãe, a Shopee, a call, a tela azul e o Jogo do Brasil
-  ['Mãe', 'Shopee', 'Call', 'Tela azul', 'Jogo do Brasil'].forEach((nome, i) => {
+  // eventos de era (1 a 7): a mãe, a Shopee, a call, a tela azul, o Jogo do Brasil, o Lixo espacial e o Houston
+  ['Mãe', 'Shopee', 'Call', 'Tela azul', 'Jogo do Brasil', 'Lixo espacial', 'Houston'].forEach((nome, i) => {
     const b = document.createElement('button');
     b.textContent = nome;
     b.style.cssText = 'padding:6px 8px;background:#2A5BD7;color:#fff;border:0;cursor:pointer';

@@ -100,7 +100,7 @@ export type Acoes = {
   lugarRecarregar(): void; // a mecânica pede o lugar de novo (chegou a hora de algo: a coleção ficou pronta)
   config(acao: 'abrir' | TelaConfig): void; chave(qual: ChaveSom, ligada: boolean): void; efeito(id: IdEfeito): void; volumeMusica(v: number): void;
   pegarDourado(seg: number, lado: number, moedas?: number): void; chamarDourado(): void;
-  pegarEventoEra(seg: number, gols: number, pos: { x: number; y: number }): void; // pos: onde estava (o texto sobe dali)
+  pegarEventoEra(seg: number, gols: number, pos: { x: number; y: number }, tipo: number): void; // pos: onde estava (o texto sobe dali)
 };
 export type Tela = {
   canvas: HTMLCanvasElement; renderizar(m: Modelo): void; atualizarValor(valor: number): void; relogioBolsa(ms: number): void; fatal(texto: string): void;
@@ -1133,16 +1133,19 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     saiu: () => dicas.conferir(), // o ícone saiu: a caixinha dele fecha (o Trend e o Pix só pegam depois)
   });
   const eventosEraBase = criarEventoEraTela(app, {
-    aoPegar: (seg, gols, pos) => {
+    aoPegar: (seg, gols, pos, tipo) => {
       dicas.conferir(); // o evento saiu da tela: a caixinha dele fecha
-      a.pegarEventoEra(seg, gols, pos);
+      a.pegarEventoEra(seg, gols, pos, tipo);
     },
     dica: (alvo, chave, tipo) => dicas.ligar(alvo, chave, () => (ultimo?.estado ? dicaEventoEra(tipo, ultimo.estado.rate) : null)),
     posicao: (seg, i) => (ultimo?.estado ? posicaoEvento(ultimo.estado.user_id, seg, i) : { x: 0.5, y: 0.5 }),
     aoGol: () => a.efeito('gol'), // cada gol apita
+    aoDesvio: () => a.efeito('lixo'), // cada destroço desviado faz "tum"
+    alarmeEm: palco, // o Houston pisca a cena
     aoBotao: (tipo) => { // a Shopee soa ao abrir a caixa, a call ao sair dela (a mãe e a tela azul soam ao aparecer)
       if (tipo === 2) a.efeito('shopee');
       else if (tipo === 3) a.efeito('call');
+      else if (tipo === 7) a.efeito('conserto');
     },
   });
   const eventosEra: typeof eventosEraBase = {
