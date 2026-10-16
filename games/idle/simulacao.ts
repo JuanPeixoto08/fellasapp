@@ -259,6 +259,8 @@ function empresaAte(
  */
 export function veterano(fix: FixtureVeterano, cat: Catalogo = padrao, opcoes: OpcoesVeterano): {
   dia: number | null; vendas: number; multCheio: number; extra: number; log: string[];
+  /** fração do custo da parte fixa NOVA (nós fixos acima do 65) já comprada na última conta */ comprado: number;
+  /** quando parou de crescer (dia da última compra de nó fixo; igual a `dia` se fechou) */ diaTrava: number;
 } {
   const o: Required<OpcoesVeterano> = { passo: 30, frac: 0.3, maxDiasEmpresa: 15, dias: 60, ...opcoes };
   const retrato = (arvore: number[]): Estado => ({
@@ -266,6 +268,11 @@ export function veterano(fix: FixtureVeterano, cat: Catalogo = padrao, opcoes: O
   });
   const extra = fix.rate / taxa(cat, retrato(fix.nos));
   const hoje = cat.arvore.filter((n) => n.id <= 65).map((n) => n.id);
+  const novos = cat.arvore.filter((n) => n.id > 65 && n.cresce === null);
+  const custoNovos = novos.reduce((a, n) => a + n.custo, 0);
+  const pct = (arv: number[]) => novos.filter((n) => arv.includes(n.id)).reduce((a, n) => a + n.custo, 0) / custoNovos;
+  let diaTrava = 0;
+  let ultimo = fix.nos.length;
   const fixos = cat.arvore.filter((n) => n.cresce === null).map((n) => n.id);
   const multCheio = taxa(cat, retrato(fixos)) / taxa(cat, retrato(hoje));
   let ganhos = pontosTotais(fix.rate);
@@ -280,9 +287,10 @@ export function veterano(fix: FixtureVeterano, cat: Catalogo = padrao, opcoes: O
     const g = gastar(cat, ganhos - gastos, arvore, { vendas, eraMax }, true);
     gastos += ganhos - gastos - g.sobra;
     arvore = g.arvore;
+    if (arvore.length > ultimo) { ultimo = arvore.length; diaTrava = t / DIA; }
     const faltam = cat.arvore.filter((n) => n.cresce === null && !arvore.includes(n.id));
     log.push(`dia ${(t / DIA).toFixed(1)}: vendas ${vendas}, ganhos ${ganhos}, livres ${ganhos - gastos}, faltam ${faltam.length}`);
-    if (!faltam.length) return { dia: t / DIA, vendas, multCheio, extra, log };
+    if (!faltam.length) return { dia: t / DIA, vendas, multCheio, extra, log, comprado: pct(arvore), diaTrava: t / DIA };
     const liberados = faltam.filter((n) => (n.requer === null || arvore.includes(n.requer)) && (n.requer2 === null || arvore.includes(n.requer2))
       && (n.reqVendas === null || vendas >= n.reqVendas) && (n.reqEra === null || eraMax >= n.reqEra));
     const precisa = liberados.length ? Math.min(...liberados.map((n) => n.custo)) - (ganhos - gastos) : Infinity;
@@ -290,13 +298,14 @@ export function veterano(fix: FixtureVeterano, cat: Catalogo = padrao, opcoes: O
     const r = empresaAte(cat, { arvore, conquistas: fix.conquistas }, gerais, extra, o, (x) => pontosTotais(x) >= meta);
     if (pontosTotais(r.taxa) <= ganhos) {
       log.push('travou: a venda não dá ponto');
-      return { dia: null, vendas, multCheio, extra, log };
+      return { dia: null, vendas, multCheio, extra, log, comprado: pct(arvore), diaTrava };
     }
     t += r.t;
+    log.push('empresa terminou no dia ' + (t / DIA).toFixed(2) + ' com ' + pontosTotais(r.taxa));
     eraMax = Math.max(eraMax, r.era);
     ganhos = pontosTotais(r.taxa);
     vendas++;
     gerais = r.gerais;
   }
-  return { dia: null, vendas, multCheio, extra, log };
+  return { dia: null, vendas, multCheio, extra, log, comprado: pct(arvore), diaTrava };
 }

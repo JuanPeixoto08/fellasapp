@@ -1546,3 +1546,45 @@ begin
 end;
 $$;
 revoke all on function public.idle_settle(public.idle_state, timestamptz) from public, anon, authenticated;
+
+-- ===== parte F: a árvore de todo mundo recomeça e os pontos voltam (uma vez só) =====
+-- Decisão do Juan (16/10): os preços da árvore nova dobraram, então a árvore de hoje é desfeita e o que cada pessoa pagou volta
+-- pra ela gastar de novo. Roda UMA VEZ: a marca em idle_migracao_feita segura as execuções seguintes (os testes rodam este
+-- arquivo várias vezes), e uma cópia da árvore fica em idle_arvore_backup_0082 antes de apagar. Não toca em prestige_earned,
+-- conquistas, vendas, era_max nem no estado da empresa: só prestige_spent e os nós.
+create table if not exists public.idle_migracao_feita (
+  nome     text primary key,
+  feito_em timestamptz not null default now()
+);
+alter table public.idle_migracao_feita enable row level security;
+revoke all on public.idle_migracao_feita from anon, authenticated;
+
+create table if not exists public.idle_arvore_backup_0082 as
+  select a.*, now() as copiado_em from public.idle_arvore a where false;
+alter table public.idle_arvore_backup_0082 enable row level security;
+revoke all on public.idle_arvore_backup_0082 from anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from public.idle_migracao_feita where nome = 'arvore_grande_reinicio') then
+    -- 1) a cópia de segurança
+    insert into public.idle_arvore_backup_0082 select a.*, now() from public.idle_arvore a where true;
+    -- 2) devolve o que cada um pagou: o custo do catálogo no nó fixo; no infinito, os níveis comprados (round(custo · cresce^n),
+    --    n de 0 a nível − 1, a mesma conta do idle_buy_node). Preço de hoje do catálogo (a 0081 já traz os novos; os 31 de hoje
+    --    não mudaram, então o que os antigos pagaram é o que o catálogo diz).
+    update public.idle_state s
+       set prestige_spent = s.prestige_spent - g.total
+      from (select a.user_id,
+                   sum(case when c.cresce is null then c.custo
+                            else (select sum(round(c.custo * power(c.cresce, k::double precision)))
+                                    from generate_series(0, coalesce(a.nivel, 1) - 1) k) end)::int as total
+              from public.idle_arvore a
+              join public.idle_cat_no c on c.id = a.no_id
+             where true
+             group by a.user_id) g
+     where s.user_id = g.user_id;
+    -- 3) a árvore recomeça
+    delete from public.idle_arvore where true;
+    insert into public.idle_migracao_feita (nome) values ('arvore_grande_reinicio');
+  end if;
+end $$;

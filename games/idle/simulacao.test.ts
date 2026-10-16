@@ -155,26 +155,27 @@ describe('os números cabem no double até a era 12', () => {
 // e recomeça até fechar. Medido ao planejar: fecha no dia 12,2 (passo 30 s; 12,8 com 5 s), em ~11 vendas; a árvore
 // cheia deixa a produção dele ~×20 (×26,9 com o legado ×1,5/×2 da spec; o Juan escolheu ×1,25/×1,5); o modelo × 17,2 dá o F$/s real (contratos, convidados, Mapa, Horta). A parte fixa
 // não pode passar de ~67 mil pontos: acima disso a era 7 trava e ele não fecha até as eras 8–9 (Decisão 2 do plano).
-// Medido na implementação (Task 6, custos ×0,9 dos planejados: parte fixa nova 58.917): fecha no dia 12,17 em 11 vendas;
-// a árvore fixa cheia deixa a produção ×21,2 (Espaço ×1,25/×1,5); extra ×17,2. Com a parte fixa em 65.454 a venda travava em
-// ~63,6 mil pontos (a era 7) e ele não fechava; ×0,94 fechava no dia 15,5.
-// Se sair da faixa: ajuste SÓ os custos novos de catalogo.ts (CUSTO_NOVOS_HOJE, CUSTO_RECURSO, CUSTO_ESPACO,
-// CUSTO_PONTE), regere a 0081 (ainda não publicada) e avise o Juan.
+// Preços ×2 (Task 10b, decisão do Juan de 16/10; a parte fixa nova passa de 58.917 pra ~118 mil). O teto de pontos da era 7
+// (~63,6 mil no total) não deixa fechar: medido em 20 dias de jogo, o veterano NÃO fecha, trava no dia 16,7 com 13 vendas
+// (a 14ª, no dia 23,7, já cai fora dos 20 dias) e compra 35,1% do custo da parte fixa nova (~41,6 mil de ~118 mil;
+// o teto da era 7 daria no máximo ~54%); a árvore fixa cheia segue ×21,2 (o efeito dos nós não mudou). Antes (×1): fechava no dia 12,17.
+// Se sair da faixa: ajuste SÓ os custos novos de catalogo.ts, regere a 0081 (ainda não publicada) e avise o Juan.
 describe('o veterano (árvore grande)', () => {
   const fix = JSON.parse(readFileSync(resolve(__dirname, '../test/fixtures/veterano-2026-10-15.json'), 'utf8')) as FixtureVeterano;
   const tem = { horta: true, bolsa: true };
   const minutos = 15 * (mediaOportunidade(RODA_OPP_NOVA, tem) / mediaOportunidade(RODA_OPP_HOJE, tem));
-  const v = veterano(fix, catalogo, { minutosOpp: minutos });
+  const v = veterano(fix, catalogo, { minutosOpp: minutos, dias: 20 });
   it('o retrato: era 7, a venda de agora daria 18.753 pontos no total; o fator de fora do modelo fica perto de 17', () => {
     expect(fix).toMatchObject({ era: 7, prestige_earned: 232, prestige_count: 3 });
     expect(pontosTotais(fix.rate)).toBe(18753);
     expect(v.extra).toBeGreaterThan(14);
     expect(v.extra).toBeLessThan(21);
   });
-  it('fecha a parte fixa da árvore entre os dias 10 e 16 (medido ao planejar: 12,2)', () => {
-    expect(v.dia, v.log.join('\n')).not.toBeNull();
-    expect(v.dia!).toBeGreaterThanOrEqual(10);
-    expect(v.dia!).toBeLessThan(16);
+  it('em 20 dias na era 7 NÃO fecha a parte fixa e compra entre 35% e 70% dela (alvo do Juan: ~metade)', () => {
+    expect(v.dia).toBeNull();
+    expect(v.diaTrava).toBeGreaterThan(10);
+    expect(v.comprado).toBeGreaterThan(0.35);
+    expect(v.comprado).toBeLessThan(0.7);
   });
   it('a árvore fixa cheia deixa a produção dele entre ×15 e ×23 (alvo ~×20, Decisão 3)', () => {
     expect(v.multCheio).toBeGreaterThan(15);

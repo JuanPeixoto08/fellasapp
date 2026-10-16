@@ -171,12 +171,12 @@ describe('nível, preço e portão', () => {
     expect(nivelNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 7 } }))).toBe(7);
     expect(nivelNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1);
   });
-  it('preço: o custo; no infinito, round(1000 · 1,6^nível de agora)', () => {
-    expect(precoNo(noDe(106), ctx())).toBe(14);
-    expect(precoNo(noDe(3001), ctx())).toBe(1000);
-    expect(precoNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1600);
-    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 9 } }))).toBe(68719);
-    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 19 } }))).toBe(7555786);
+  it('preço: o custo; no infinito, round(2000 · 1,6^nível de agora)', () => {
+    expect(precoNo(noDe(106), ctx())).toBe(28);
+    expect(precoNo(noDe(3001), ctx())).toBe(2000);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(3200);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 9 } }))).toBe(137439);
+    expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 19 } }))).toBe(15111573);
   });
   it('portão: vendas, era alcançada ou o recurso; null quando passou', () => {
     expect(portao(noDe(106), ctx({ vendas: 1 }))).toBe('Falta: 3 vendas (você tem 1)');
@@ -344,8 +344,8 @@ describe('árvore em tela cheia: a constelação', () => {
     expect(situacaoTela(noDe(106), ctx({ arvore: [1, 11, 12, 13, 14, 15], pontos: 99, vendas: 2 }))).toBe('portao');
     expect(situacaoTela(noDe(106), ctx({ arvore: [1, 11, 12, 13, 14, 15], pontos: 99, vendas: 3 }))).toBe('pode');
     const cheio = ctx({ arvore: [3001], niveis: { 3001: 2 }, vendas: 10 });
-    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 2560 })).toBe('pode');
-    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 2559 })).toBe('falta');
+    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 5120 })).toBe('pode');
+    expect(situacaoTela(noDe(3001), { ...cheio, pontos: 5119 })).toBe('falta');
   });
   it('nó inicial: o mais barato que dá pra comprar; senão o mais barato liberado; senão a raiz', () => {
     expect(noInicial(ctx({ pontos: 5 }))).toBe(1);
@@ -354,7 +354,7 @@ describe('árvore em tela cheia: a constelação', () => {
     expect(noInicial(ctx({ arvore: [1, 11], pontos: 3 }))).toBe(21);
     expect(noInicial(ctx({ arvore: [1, 11], pontos: 1 }))).toBe(21);
     expect(noInicial(ctx({ arvore: [1], pontos: 9, eraMax: 4 }))).toBe(11); // a Bolsa 1 custa 8: o 11 (2) vem antes
-    // tudo comprado: sobram os infinitos (1.600 o próximo nível), o de menor id
+    // tudo comprado: sobram os infinitos (3.200 o próximo nível), o de menor id
     expect(noInicial(ctx({ arvore: catalogo.arvore.map((n) => n.id), pontos: 99, vendas: 99, eraMax: 7 }))).toBe(3001);
   });
   it('textos: onde fica, quanto falta e a descrição pro leitor de tela', () => {
@@ -371,6 +371,6 @@ describe('árvore em tela cheia: a constelação', () => {
     expect(descricaoNo(noDe(13), 'falta', c)).toBe('Turno dobrado, faltam 5 ★');
     expect(descricaoNo(noDe(14), 'trancado', c)).toBe('Tema da Vitória, trancado');
     expect(descricaoNo(noDe(106), 'portao', c)).toBe('Coach quântico, falta: 3 vendas (você tem 1)');
-    expect(descricaoNo(noDe(3001), 'falta', ctx({ arvore: [3001], niveis: { 3001: 4 }, pontos: 6000 }))).toBe('Hora extra infinita, nível 4, faltam 554 ★');
+    expect(descricaoNo(noDe(3001), 'falta', ctx({ arvore: [3001], niveis: { 3001: 4 }, pontos: 6000 }))).toBe('Hora extra infinita, nível 4, faltam 7107 ★');
   });
 });

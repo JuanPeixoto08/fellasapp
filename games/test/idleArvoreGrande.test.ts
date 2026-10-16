@@ -49,7 +49,7 @@ describe('comprar nós da árvore grande (0082 parte A)', () => {
     await ter([15]);
     const s = await comprar(2005);
     expect(s.bonus.arvore).toContain(2005);
-    expect(await gasto()).toBe(1350);
+    expect(await gasto()).toBe(catalogo.arvore.find((n) => n.id === 2005)!.custo);
   });
   it('portões: cada motivo recusa com idle_gate sem gastar nada; passou, compra', async () => {
     await pontos(1e6, 0, 2);
@@ -74,32 +74,32 @@ describe('comprar nós da árvore grande (0082 parte A)', () => {
     await q('update public.idle_state set era_max = 1, generators[37] = 1 where user_id = $1', [A]);
     expect((await comprar(108)).bonus.arvore).toContain(108);
   });
-  it('infinito: nível 1 por 1.000, o 2 por 1.600, o 3 por 2.560; os níveis no JSON; o fixo comprado de novo é idle_node_owned', async () => {
-    await pontos(10_000, 0, 10);
+  it('infinito: nível 1 por 2.000, o 2 por 3.200, o 3 por 5.120; os níveis no JSON; o fixo comprado de novo é idle_node_owned', async () => {
+    await pontos(20_000, 0, 10);
     await ter([...PRODUCAO_1_5, 106, 107, 108, 109, 110]);
     let s = await comprar(3001);
-    expect(s.pontos).toBe(9000);
+    expect(s.pontos).toBe(18_000);
     expect(s.bonus.niveis).toEqual({ 3001: 1 });
     s = await comprar(3001);
-    expect(s.pontos).toBe(7400);
+    expect(s.pontos).toBe(14_800);
     s = await comprar(3001);
-    expect(s.pontos).toBe(4840);
+    expect(s.pontos).toBe(9680);
     expect(s.bonus.niveis).toEqual({ 3001: 3 });
     expect(s.bonus.arvore.filter((x) => x === 3001)).toHaveLength(1);
     await expect(comprar(110)).rejects.toThrow(/idle_node_owned/);
   });
   it('infinito sem ponto pro próximo nível: idle_points_low e o nível fica', async () => {
-    await pontos(2000, 0, 10);
+    await pontos(4000, 0, 10);
     await ter([...PRODUCAO_1_5, 106, 107, 108, 109, 110]);
     await comprar(3001);
-    await expect(comprar(3001)).rejects.toThrow(/idle_points_low/); // 1.600 com 1.000 livres
+    await expect(comprar(3001)).rejects.toThrow(/idle_points_low/); // 3.200 com 2.000 livres
     expect((await q<{ n: number }>('select nivel as n from public.idle_arvore where user_id = $1 and no_id = 3001', [A]))[0].n).toBe(1);
   });
-  it('nível alto: com 1e9 pontos o nível 30 compra e o 31 recusa; nível 100 recusa sem estourar', async () => {
-    await pontos(1e9, 0, 10);
+  it('nível alto: com 2e9 pontos o nível 30 compra e o 31 recusa; nível 100 recusa sem estourar', async () => {
+    await pontos(2e9, 0, 10);
     await ter([...PRODUCAO_1_5, 106, 107, 108, 109, 110, 3001], { 3001: 29 });
-    const preco30 = Math.round(1000 * 1.6 ** 29);
-    expect((await comprar(3001)).pontos).toBe(1e9 - preco30);
+    const preco30 = Math.round(2000 * 1.6 ** 29);
+    expect((await comprar(3001)).pontos).toBe(2e9 - preco30);
     await expect(comprar(3001)).rejects.toThrow(/idle_points_low/);
     await ter([3001], { 3001: 100 });
     await expect(comprar(3001)).rejects.toThrow(/idle_points_low/);
@@ -493,5 +493,97 @@ describe('Mapa do rolê com a árvore grande (0082 parte E)', () => {
     expect(rel(l.preco_nivel, 450 * 1.55 * 0.6)).toBeLessThan(1e-12);
     expect(l.venda_min).toBeCloseTo(15, 12);
     expect(l.copao_mult).toBe(1.5);
+  });
+});
+
+describe('a árvore de todo mundo recomeça e os pontos voltam (0082 parte F, uma vez só)', () => {
+  const B = '00000000-0000-0000-0000-00000000000b';
+  const C = '00000000-0000-0000-0000-00000000000c';
+  const custoDe = (id: number) => catalogo.arvore.find((n) => n.id === id)!.custo;
+  /** o que se paga pelos 3 primeiros níveis do infinito 3001, pelo preço do catálogo novo */
+  const tresNiveis = () => Math.round(2000) + Math.round(2000 * 1.6) + Math.round(2000 * 1.6 ** 2);
+  const NOS_A = [1, 11, 12, 13, 21];
+  const NOS_B = [1, 11, 12, 13, 14, 15, 106, 107, 108, 109, 110, 3001];
+  const pagoA = () => NOS_A.reduce((x, n) => x + custoDe(n), 0);
+  const pagoB = () => NOS_B.filter((n) => n !== 3001).reduce((x, n) => x + custoDe(n), 0) + tresNiveis();
+  const linha = async (u: string) => (await q<{ earned: number; spent: number }>(
+    'select prestige_earned as earned, prestige_spent as spent from public.idle_state where user_id = $1', [u]))[0];
+  const nosDe = async (u: string) => (await q<{ no_id: number }>('select no_id from public.idle_arvore where user_id = $1 order by no_id', [u])).map((r) => r.no_id);
+  const reiniciar = async () => {
+    await q("delete from public.idle_migracao_feita where nome = 'arvore_grande_reinicio'");
+    await t.db.exec(M0082);
+  };
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    for (const u of [B, C]) {
+      await t.member(u);
+      await t.as(u);
+      await t.rpc('idle_start');
+    }
+    await t.as(A);
+    const dados: [string, number[], Record<number, number>, number][] = [[A, NOS_A, {}, pagoA() + 5], [B, NOS_B, { 3001: 3 }, pagoB() + 7]];
+    for (const [u, nos, niveis, gastos] of dados) {
+      await q('update public.idle_state set prestige_earned = 100000, prestige_spent = $2, prestige_count = 9 where user_id = $1', [u, gastos]);
+      for (const n of nos) await q('insert into public.idle_arvore (user_id, no_id, nivel) values ($1, $2, $3)', [u, n, niveis[n] ?? 1]);
+    }
+    await q('update public.idle_state set prestige_earned = 100000, prestige_spent = 4 where user_id = $1', [C]);
+  });
+  it('o jogo sai da fábrica com a marca gravada (a 0082 já rodou uma vez)', async () => {
+    expect((await q('select 1 from public.idle_migracao_feita where nome = $1', ['arvore_grande_reinicio'])).length).toBe(1);
+    await t.db.exec(M0082);
+    expect(await nosDe(A)).toEqual([...NOS_A].sort((a, b) => a - b));
+  });
+  it('sem a marca: a árvore esvazia e cada um recebe exatamente o que pagou (o infinito soma os 3 níveis)', async () => {
+    const antes = { a: await linha(A), b: await linha(B), c: await linha(C) };
+    await reiniciar();
+    expect(await q('select 1 from public.idle_arvore where true')).toHaveLength(0);
+    const depois = { a: await linha(A), b: await linha(B), c: await linha(C) };
+    expect(antes.a.spent - depois.a.spent).toBe(pagoA());
+    expect(antes.b.spent - depois.b.spent).toBe(pagoB());
+    expect(depois.c).toEqual(antes.c);
+    for (const k of ['a', 'b', 'c'] as const) expect(depois[k].earned).toBe(antes[k].earned);
+    expect(depois.a.spent).toBe(5);
+    expect(depois.b.spent).toBe(7);
+  });
+  it('a cópia de segurança guarda as linhas de antes', async () => {
+    await reiniciar();
+    const copia = await q<{ user_id: string; no_id: number; nivel: number; copiado_em: string }>(
+      'select user_id, no_id, nivel, copiado_em from public.idle_arvore_backup_0082 order by user_id, no_id');
+    expect(copia.filter((r) => r.user_id === A).map((r) => r.no_id)).toEqual([...NOS_A].sort((a, b) => a - b));
+    expect(copia.filter((r) => r.user_id === B).map((r) => r.no_id)).toEqual([...NOS_B].sort((a, b) => a - b));
+    expect(copia.find((r) => r.user_id === B && r.no_id === 3001)!.nivel).toBe(3);
+    expect(copia.filter((r) => r.user_id === C)).toHaveLength(0);
+    expect(copia[0].copiado_em).toBeTruthy();
+  });
+  it('os pontos livres de quem tinha nó aumentam exatamente o que voltou', async () => {
+    const livres = async (u: string) => { await t.as(u); return (await t.rpc<J>('idle_open')).pontos; };
+    const a0 = await livres(A);
+    const b0 = await livres(B);
+    const c0 = await livres(C);
+    await reiniciar();
+    expect(await livres(A)).toBe(a0 + pagoA());
+    expect(await livres(B)).toBe(b0 + pagoB());
+    expect(await livres(C)).toBe(c0);
+  });
+  it('rodar de novo NÃO apaga o que foi comprado depois nem devolve ponto de novo', async () => {
+    await reiniciar();
+    const gastoDepois = (await linha(A)).spent;
+    await t.as(A);
+    await q('update public.idle_state set prestige_spent = prestige_spent + $2 where user_id = $1', [A, 1]);
+    await q('insert into public.idle_arvore (user_id, no_id, nivel) values ($1, 1, 1)', [A]);
+    await t.db.exec(M0082);
+    await t.db.exec(M0082);
+    expect(await nosDe(A)).toEqual([1]);
+    expect((await linha(A)).spent).toBe(gastoDepois + 1);
+    expect((await q('select 1 from public.idle_arvore_backup_0082 where user_id = $1', [A])).length).toBe(NOS_A.length);
+  });
+  it('as tabelas da parte F não são do app (RLS ligada, sem acesso do anon e do authenticated)', async () => {
+    for (const tab of ['idle_migracao_feita', 'idle_arvore_backup_0082']) {
+      await expect(t.asRole('authenticated', `select * from public.${tab}`)).rejects.toThrow();
+      await expect(t.asRole('anon', `select * from public.${tab}`)).rejects.toThrow();
+    }
   });
 });

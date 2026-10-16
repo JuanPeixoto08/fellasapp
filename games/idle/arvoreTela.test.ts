@@ -123,9 +123,9 @@ describe('árvore grande em tela cheia (a constelação)', () => {
     document.body.innerHTML = '';
     abrir(estado({ pontos: 5000, vendas: 10, bonus: { arvore: [3001], conquistas: 0, niveis: { 3001: 7 } } }), false, 3001);
     expect(cartao().textContent).toContain('Nível 7 → 8');
-    expect(cartao().textContent).toContain(`${Math.round(1000 * 1.6 ** 7)} ★`);
+    expect(cartao().textContent).toContain(`${Math.round(2000 * 1.6 ** 7)} ★`);
     expect(no(3001).querySelector('.no-nivel')!.textContent).toBe('nv 7');
-    expect(no(3001).querySelector('.no-custo')!.textContent).toBe(`${Math.round(1000 * 1.6 ** 7)} ★`);
+    expect(no(3001).querySelector('.no-custo')!.textContent).toBe(`${Math.round(2000 * 1.6 ** 7)} ★`);
     expect(no(3001).classList.contains('nivelado')).toBe(true);
     // o nível e o preço do infinito ficam juntos, pro lado de fora do raio
     expect(no(3001).querySelector('.no-info .no-nivel')).not.toBeNull();
