@@ -1,0 +1,205 @@
+{
+  "quadros": 8,
+  "vagas": [
+    {
+      "id": "voce",
+      "papel": "dono",
+      "pose": 2,
+      "x": 52,
+      "y": 64,
+      "espelhada": true,
+      "trilha": [
+        {
+          "y": 64
+        },
+        {
+          "y": 64
+        },
+        {
+          "y": 63
+        },
+        {
+          "y": 62
+        },
+        {
+          "y": 61
+        },
+        {
+          "y": 61
+        },
+        {
+          "y": 62
+        },
+        {
+          "y": 63
+        }
+      ]
+    },
+    {
+      "id": "lua-posto",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 28,
+      "y": 63,
+      "espelhada": true,
+      "freela": {
+        "pele": 2,
+        "cabelo": 3,
+        "cor_cabelo": 3,
+        "roupa": 3,
+        "cor_roupa": 4,
+        "acessorio": 1,
+        "cor_acessorio": 5
+      },
+      "trilha": [
+        {
+          "y": 62
+        },
+        {
+          "y": 61
+        },
+        {
+          "y": 61
+        },
+        {
+          "y": 62
+        },
+        {
+          "y": 62
+        },
+        {
+          "y": 63
+        },
+        {
+          "y": 63
+        },
+        {
+          "y": 62
+        }
+      ]
+    },
+    {
+      "id": "lua-cratera",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 104,
+      "y": 70,
+      "espelhada": false,
+      "freela": {
+        "pele": 4,
+        "cabelo": 0,
+        "cor_cabelo": 1,
+        "roupa": 1,
+        "cor_roupa": 7,
+        "acessorio": 3,
+        "cor_acessorio": 0
+      },
+      "trilha": [
+        {
+          "y": 67
+        },
+        {
+          "y": 68
+        },
+        {
+          "y": 69
+        },
+        {
+          "y": 70
+        },
+        {
+          "y": 70
+        },
+        {
+          "y": 69
+        },
+        {
+          "y": 68
+        },
+        {
+          "y": 67
+        }
+      ]
+    },
+    {
+      "id": "lua-base",
+      "papel": "contratado",
+      "pose": 3,
+      "x": 117,
+      "y": 34,
+      "espelhada": true,
+      "freela": {
+        "pele": 1,
+        "cabelo": 5,
+        "cor_cabelo": 2,
+        "roupa": 2,
+        "cor_roupa": 6,
+        "acessorio": 4,
+        "cor_acessorio": 8
+      },
+      "trilha": [
+        {
+          "y": 33
+        },
+        {
+          "y": 33
+        },
+        {
+          "y": 34
+        },
+        {
+          "y": 34
+        },
+        {
+          "y": 33
+        },
+        {
+          "y": 33
+        },
+        {
+          "y": 32
+        },
+        {
+          "y": 32
+        }
+      ]
+    }
+  ],
+  "pecas": [
+    {
+      "id": "g37",
+      "x": 4,
+      "y": 52
+    },
+    {
+      "id": "g38",
+      "x": 28,
+      "y": 40
+    },
+    {
+      "id": "g39",
+      "x": 116,
+      "y": 60
+    },
+    {
+      "id": "g40",
+      "x": 136,
+      "y": 37
+    },
+    {
+      "id": "g41",
+      "x": 80,
+      "y": 54
+    },
+    {
+      "id": "g42",
+      "x": 126,
+      "y": 20
+    },
+    {
+      "id": "monolito",
+      "x": 74,
+      "y": 30
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import { DJS } from './copao';
 import { CADEIRA, LINHAS_KIT, POSES, QUADROS_POSE, validarVagas, VAGAS_CONTRATADO, type Pose, type Vagas } from './montagem';
 import { CENAS as RITMO, type NomeCena } from './palco';
 
-const CENAS: NomeCena[] = ['cena-0-antes', 'cena-0-abrindo', 'cena-1', 'cena-2', 'cena-3', 'cena-4', 'cena-5', 'cena-6'];
+const CENAS: NomeCena[] = ['cena-0-antes', 'cena-0-abrindo', 'cena-1', 'cena-2', 'cena-3', 'cena-4', 'cena-5', 'cena-6', 'cena-7'];
 const naoVazia = (x: unknown) => typeof x === 'string' && x.length > 0;
 const pasta = resolve(__dirname, 'assets');
 /** Largura e altura de um PNG (o cabeçalho IHDR). */
@@ -78,6 +78,28 @@ describe('arte da entrega 2 (contrato de formato)', () => {
     }
     for (const p of poses) expect(dim(`pessoas/estagiario-pose-${p}.png`), `estagiário pose ${p}`).toEqual([QUADROS_POSE * POSES[p].w, POSES[p].h]);
     expect(dim('pessoas/cadeira.png')).toEqual([CADEIRA.w, CADEIRA.h]);
+  });
+  it('peças das cenas 6 e 7 (eras 6–7): os ids da spec, tira com os quadros da cena, dentro da cena', () => {
+    const esperado: [NomeCena, string[]][] = [
+      ['cena-6', ['g31', 'g32', 'g33', 'g34', 'g35', 'g36']],
+      ['cena-7', ['g37', 'g38', 'g39', 'g40', 'g41', 'g42', 'monolito']],
+    ];
+    for (const [c, ids] of esperado) {
+      const k = ativos.camadas(c);
+      expect(k.pecas.map((p) => p.id).sort(), c).toEqual([...ids].sort());
+      const q = RITMO[c].quadros;
+      for (const p of k.pecas) {
+        const [w, h] = dim(`cenas/${c}-peca-${p.id}.png`);
+        expect(w % q, `${c} ${p.id}: largura múltipla dos quadros`).toBe(0);
+        expect(p.x + w / q, `${c} ${p.id}`).toBeLessThanOrEqual(160);
+        expect(p.y + h, `${c} ${p.id}`).toBeLessThanOrEqual(96);
+      }
+    }
+  });
+  it('a cena da Lua tem você e até 3 contratados (como a da órbita)', () => {
+    const v = ativos.camadas('cena-7').vagas!;
+    expect(v.vagas.filter((g) => g.papel === 'dono')).toHaveLength(1);
+    expect(v.vagas.filter((g) => g.papel === 'contratado')).toHaveLength(3);
   });
   it('o estagiário oficial tem vaga nas cenas 2 e 3', () => {
     for (const c of ['cena-2', 'cena-3'] as const) {
