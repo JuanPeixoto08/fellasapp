@@ -302,7 +302,7 @@ describe('paridade', () => {
          from public.idle_state s where user_id = $1`,
       [A],
     );
-    expect(db.b).toEqual(bonus);
+    expect(db.b).toEqual({ ...bonus, niveis: {} }); // só os infinitos têm nível no JSON (0082)
     expect(rel(db.r, taxa(catalogo, { ...s, bonus }))).toBeLessThan(1e-9);
     await arvore([]);
     await conquistas(0);

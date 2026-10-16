@@ -53,7 +53,7 @@ describe('conquistas de estado', () => {
     const s = await abrirJogo();
     expect(s.novas).toEqual([1, 31]);
     expect(ids(s)).toEqual([1, 31]);
-    expect(s.bonus).toEqual({ arvore: [], conquistas: 2 });
+    expect(s.bonus).toEqual({ arvore: [], conquistas: 2, niveis: {} });
     expect(s.rate).toBeCloseTo(base * 1.02, 9);
     expect((s.valuation - 10) / (base * 20000)).toBeCloseTo(1, 2); // as 20000 s de antes rendem sem o bônus
     const outra = await abrirJogo();

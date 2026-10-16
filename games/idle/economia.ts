@@ -9,7 +9,7 @@ export type Social = { contratei: number; empregos: number[] };
 export const SOLO: Social = { contratei: 0, empregos: [] };
 /** O que é pra sempre (entrega 3): os nós da árvore que você comprou e quantas conquistas você tem (+1% cada). Sem
  *  isso (simulação, testes) = nenhum. */
-export type Bonus = { arvore: number[]; conquistas: number };
+export type Bonus = { arvore: number[]; conquistas: number; /** nível dos infinitos (0082); ausente = 1 */ niveis?: Readonly<Record<string, number>> };
 export const SEM_BONUS: Bonus = { arvore: [], conquistas: 0 };
 export type Estado = { generators: number[]; upgrades: number[]; strategies: number[]; social?: Social; bonus?: Bonus };
 
@@ -50,31 +50,51 @@ export function multLegado(cat: Catalogo, s: Estado, alvo: number): number {
 /** Quanto um evento dourado fica na tela sem a árvore (igual a dourados.ts JANELA_S). */
 const JANELA_DOURADO_S = 12;
 
-/** O que os nós comprados fazem (igual a idle_arvore_efeitos na 0061). Sem nó: o jogo de sempre. Juntando nós do
- *  mesmo tipo: produção, Investidor e bônus das oportunidades multiplicam; +por dia soma; preço do contrato e amadurecer
- *  ficam o menor; o resto fica o maior. */
+/** O que os nós comprados fazem (igual a idle_arvore_efeitos na 0082). Sem nó: o jogo de sempre. Juntando nós do mesmo
+ *  tipo: produção, Investidor, bônus das oportunidades e o ×F$ do Recomeço multiplicam (o infinito conta valor^nível);
+ *  os de soma somam valor × nível (os "1 + Σ" e os que somam direto, ver nomes.ts TipoNo); preço do contrato,
+ *  amadurecer, corretagem, derrubada, abrir/subir lugar e tempo da Camisetaria ficam o menor; o resto fica o maior. */
 export type EfeitosArvore = {
   producao: number; caixinha: number; oppSegundos: number; oppExtra: number; oppBonus: number;
   contratoPreco: number; porContratado: number; contratoDias: number; empregoMult: number;
   inicioValuation: number; inicioNotebooks: number; inicioEra1: boolean; manterGerais: boolean;
   douradoFreq: number; douradoTela: number; douradoInvestidor: number; douradoDuracao: number;
   hortaAmadurece: number; hortaVida: number; hortaCruza: number; hortaMult: number; morangoChance: number;
+  // árvore grande (16/10, 0082)
+  producaoSoma: number; inicioEras: number; inicioMult: number; oppFs: number; contratoDesconto: number; hortaSoma: number;
+  bolsaCorretagem: number; bolsaLimite: number; bolsaLimiteMult: number; bolsaLimiteSoma: number; bolsaEspiadas: number; bolsaEscritorio: number;
+  convRecarga: number; convTrocas: number; convCadeira2: number; convCadeira3: number; convQueda: number; convEfeito: number;
+  mapaAbrir: number; mapaNivel: number; marcosMult: number; marcosSoma: number; teePublico: number; teeTempo: number; copaoMult: number;
+  lixoMin: number; silverMin: number; silverMult: number; legadoMult: number; espaco: number; eraFreq: number; eraJanela: number;
 };
 const porNo = new WeakMap<Catalogo, Map<number, No>>();
-export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArvore {
+export function efeitosArvore(cat: Catalogo, nos: readonly number[], niveis: Readonly<Record<string, number>> = {}): EfeitosArvore {
   let mapa = porNo.get(cat);
   if (!mapa) porNo.set(cat, (mapa = new Map(cat.arvore.map((n) => [n.id, n]))));
-  const unicos = [...new Set(nos)]; // nó repetido não conta duas vezes
-  const valores = (tipo: No['tipo']) => unicos.map((id) => mapa.get(id)).filter((n): n is No => n?.tipo === tipo).map((n) => n.valor);
-  const mult = (tipo: No['tipo']) => valores(tipo).reduce((a, v) => a * v, 1);
+  // uma passada só, agrupando por tipo (a simulação chama isto em toda conta de taxa); nó repetido não conta duas vezes
+  const porTipo = new Map<No['tipo'], No[]>();
+  for (const id of new Set(nos)) {
+    const n = mapa.get(id);
+    if (!n) continue;
+    const l = porTipo.get(n.tipo);
+    if (l) l.push(n);
+    else porTipo.set(n.tipo, [n]);
+  }
+  const comprados = (tipo: No['tipo']): readonly No[] => porTipo.get(tipo) ?? [];
+  // o nível conta só no infinito; o que faltar (resposta velha) ou vier abaixo de 1 vale 1, como no banco
+  const nivel = (n: No) => (n.cresce === null ? 1 : Math.max(1, niveis[String(n.id)] ?? 1));
+  const valores = (tipo: No['tipo']) => comprados(tipo).map((n) => n.valor);
+  const mult = (tipo: No['tipo']) => comprados(tipo).reduce((a, n) => a * n.valor ** nivel(n), 1);
+  const soma = (tipo: No['tipo']) => comprados(tipo).reduce((a, n) => a + n.valor * nivel(n), 0);
   const max = (tipo: No['tipo'], padrao: number) => Math.max(padrao, ...valores(tipo));
+  const min = (tipo: No['tipo'], padrao: number) => Math.min(padrao, ...valores(tipo));
   return {
     producao: mult('producao'),
     caixinha: max('caixinha', CAIXA_PADRAO.tamanho),
     oppSegundos: max('segundos', OPP_SEGUNDOS_PADRAO),
-    oppExtra: valores('opp_extra').reduce((a, v) => a + v, 0),
+    oppExtra: soma('opp_extra'),
     oppBonus: mult('opp_bonus'),
-    contratoPreco: Math.min(1, ...valores('contrato_preco')),
+    contratoPreco: min('contrato_preco', 1),
     porContratado: max('por_contratado', POR_CONTRATADO),
     contratoDias: max('contrato_dias', 7),
     empregoMult: max('emprego_mult', 1),
@@ -86,14 +106,46 @@ export function efeitosArvore(cat: Catalogo, nos: readonly number[]): EfeitosArv
     douradoTela: max('dourado_tela', JANELA_DOURADO_S),
     douradoInvestidor: mult('dourado_investidor'),
     douradoDuracao: max('dourado_duracao', 1),
-    hortaAmadurece: Math.min(1, ...valores('horta_amadurece')),
+    hortaAmadurece: min('horta_amadurece', 1),
     hortaVida: max('horta_vida', 1),
     hortaCruza: max('horta_cruza', 1),
     hortaMult: max('horta_mult', 1),
     morangoChance: max('morango_chance', 1),
+    producaoSoma: 1 + soma('producao_soma'),
+    inicioEras: max('inicio_eras', 0),
+    inicioMult: mult('inicio_mult'),
+    oppFs: 1 + soma('opp_fs'),
+    contratoDesconto: soma('contrato_desconto'),
+    hortaSoma: 1 + soma('horta_soma'),
+    bolsaCorretagem: min('bolsa_corretagem', 1),
+    bolsaLimite: soma('bolsa_limite'),
+    bolsaLimiteMult: max('bolsa_limite_mult', 1),
+    bolsaLimiteSoma: 1 + soma('bolsa_limite_soma'),
+    bolsaEspiadas: soma('bolsa_espiadas'),
+    bolsaEscritorio: max('bolsa_escritorio', 1),
+    convRecarga: max('conv_recarga', 1),
+    convTrocas: soma('conv_trocas'),
+    convCadeira2: max('conv_cadeira2', 0.5),
+    convCadeira3: max('conv_cadeira3', 0.25),
+    convQueda: min('conv_queda', 0.25),
+    convEfeito: soma('conv_efeito'),
+    mapaAbrir: min('mapa_abrir', 1),
+    mapaNivel: min('mapa_nivel', 1),
+    marcosMult: max('marcos_mult', 1),
+    marcosSoma: 1 + soma('marcos_soma'),
+    teePublico: max('tee_publico', 1),
+    teeTempo: min('tee_tempo', 1),
+    copaoMult: max('copao_mult', 1),
+    lixoMin: max('lixo_min', 10),
+    silverMin: max('silver_min', 2),
+    silverMult: max('silver_mult', 4),
+    legadoMult: max('legado_mult', 1),
+    espaco: 1 + soma('espaco_soma'),
+    eraFreq: max('era_freq', 1),
+    eraJanela: max('era_janela', 1),
   };
 }
-export const efeitosDe = (cat: Catalogo, s: Estado) => efeitosArvore(cat, s.bonus?.arvore ?? []);
+export const efeitosDe = (cat: Catalogo, s: Estado) => efeitosArvore(cat, s.bonus?.arvore ?? [], s.bonus?.niveis);
 
 /** Árvore e conquistas (igual a idle_bonus_mult na 0041): nós de produção × (1 + 1% por conquista). */
 export function multBonus(cat: Catalogo, s: Estado): number {

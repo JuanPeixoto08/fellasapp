@@ -41,7 +41,7 @@ export type GameErrorCode =
   | 'idle_cup_vaga' | 'idle_cup_trancado' | 'idle_cup_forca' | 'idle_cup_preco' | 'idle_cup_repetido' | 'idle_cup_sem_copao' | 'idle_cup_provas'
   | 'idle_opp_cap'
   | 'idle_hire_self' | 'idle_hire_twice' | 'idle_hire_not_open' | 'idle_bad_avatar'
-  | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned'
+  | 'idle_prestige_low' | 'idle_points_low' | 'idle_node_owned' | 'idle_gate'
   | 'idle_bolsa_preco_mudou' | 'idle_bolsa_rj' | 'idle_bolsa_limite' | 'idle_bolsa_fechada' | 'idle_bolsa_sem_acoes' | 'idle_bolsa_nivel'
   | 'idle_info_sem_credito' | 'idle_info_ja' | 'idle_info_vira'
   | 'unknown';
@@ -115,6 +115,7 @@ export const ERROR_TEXT: Record<GameErrorCode, string> = {
   idle_prestige_low: 'Ainda não compensa vender',
   idle_points_low: 'Faltam pontos de prestígio pra esse nó',
   idle_node_owned: 'Você já tem esse nó',
+  idle_gate: 'Esse nó ainda tem portão: o cartão diz o que falta',
   idle_bolsa_nivel: 'Essa melhoria já mudou. Confere de novo',
   idle_bolsa_preco_mudou: 'O preço mudou, confere de novo',
   idle_bolsa_rj: 'Essa empresa quebrou. Volta em alguns minutos',
@@ -175,7 +176,7 @@ const FROM_DB: GameErrorCode[] = [
   'idle_cup_vaga', 'idle_cup_trancado', 'idle_cup_forca', 'idle_cup_preco', 'idle_cup_repetido', 'idle_cup_sem_copao', 'idle_cup_provas',
   'idle_opp_cap',
   'idle_hire_self', 'idle_hire_twice', 'idle_hire_not_open', 'idle_bad_avatar',
-  'idle_prestige_low', 'idle_points_low', 'idle_node_owned',
+  'idle_prestige_low', 'idle_points_low', 'idle_node_owned', 'idle_gate',
   'idle_bolsa_preco_mudou', 'idle_bolsa_rj', 'idle_bolsa_limite', 'idle_bolsa_fechada', 'idle_bolsa_sem_acoes', 'idle_bolsa_nivel',
   'idle_info_sem_credito', 'idle_info_ja', 'idle_info_vira',
 ];

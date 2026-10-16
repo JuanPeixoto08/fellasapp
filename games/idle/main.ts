@@ -43,7 +43,7 @@ const api: Api = import.meta.env.DEV && new URLSearchParams(location.search).has
 const RECARREGA = [
   'idle_cant_afford', 'idle_locked', 'idle_owned', 'idle_strategy_set', 'idle_strategy_pending', 'idle_opp_gone', 'idle_opp_cap',
   'idle_not_started', 'idle_started', 'idle_hire_twice', 'idle_hire_not_open', 'idle_prestige_low', 'idle_points_low',
-  'idle_node_owned', 'idle_dourado_pego', 'idle_chamar_vazio',
+  'idle_node_owned', 'idle_gate', 'idle_dourado_pego', 'idle_chamar_vazio',
 ];
 // contratar recusado: o placar (quem já trabalha pra quem) também ficou velho
 const RECARREGA_PLACAR = ['idle_hire_twice', 'idle_hire_not_open'];

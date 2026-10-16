@@ -56,6 +56,7 @@ export const MIGRATIONS: string[] = [
   '0079_fellas_inc_rendas_rapidas.sql',
   '0080_fellas_inc_cupom_meia_max.sql',
   '0081_fellas_inc_catalogo_arvore_grande.sql',
+  '0082_fellas_inc_arvore_grande.sql',
 ];
 
 export type TestDb = Awaited<ReturnType<typeof freshDb>>;

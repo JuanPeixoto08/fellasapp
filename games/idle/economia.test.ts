@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { catalogo as cat } from './catalogo';
 import {
-  abertura, acumular, acumularTrechos, compraGerador, copiasOportunidade, custoMult, efeitosArvore, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
+  abertura, acumular, acumularTrechos, compraGerador, copiasOportunidade, custoMult, efeitosArvore, efeitosDe, era, liberada, maxCompra, multBonus, multContratos, podeComprarGerador,
   multLegado, pontosTotais, precoContrato, preco, produzido, rendasGeradores, taxa, taxaPorUnidade, type Estado, unidadesDaEra, VIRAL_MS,
 } from './economia';
 
@@ -215,7 +215,7 @@ describe('acumular', () => {
 describe('árvore de habilidades e conquistas', () => {
   const comArvore = (s: Estado, arvore: number[], conquistas = 0): Estado => ({ ...s, bonus: { arvore, conquistas } });
   it('sem nó: o jogo de sempre', () => {
-    expect(efeitosArvore(cat, [])).toEqual({
+    expect(efeitosArvore(cat, [])).toMatchObject({
       producao: 1, caixinha: 3, oppSegundos: 10, oppExtra: 0, oppBonus: 1, contratoPreco: 1,
       porContratado: 0.1, contratoDias: 7, empregoMult: 1, inicioValuation: 10, inicioNotebooks: 1, inicioEra1: false,
       manterGerais: false, douradoFreq: 1, douradoTela: 12, douradoInvestidor: 1, douradoDuracao: 1, hortaAmadurece: 1,
@@ -356,5 +356,30 @@ describe('estado curto (resposta de antes da 0078, com 30 geradores)', () => {
   });
   it('a empresa nova (abertura) nasce com os 42 geradores, como o banco', () => {
     expect(abertura(cat, efeitosArvore(cat, [])).generators).toHaveLength(42);
+  });
+});
+
+describe('efeitos da árvore grande (nível e campos novos; igual a idle_arvore_efeitos na 0082)', () => {
+  it('sem nó: o jogo de sempre nos campos novos', () => {
+    expect(efeitosArvore(cat, [])).toMatchObject({
+      producaoSoma: 1, inicioEras: 0, inicioMult: 1, oppFs: 1, contratoDesconto: 0, hortaSoma: 1, bolsaCorretagem: 1, bolsaLimite: 0,
+      bolsaLimiteMult: 1, bolsaLimiteSoma: 1, bolsaEspiadas: 0, bolsaEscritorio: 1, convRecarga: 1, convTrocas: 0, convCadeira2: 0.5,
+      convCadeira3: 0.25, convQueda: 0.25, convEfeito: 0, mapaAbrir: 1, mapaNivel: 1, marcosMult: 1, marcosSoma: 1, teePublico: 1,
+      teeTempo: 1, copaoMult: 1, lixoMin: 10, silverMin: 2, silverMult: 4, legadoMult: 1, espaco: 1, eraFreq: 1, eraJanela: 1,
+    });
+  });
+  it('soma, maior, menor e o nível do infinito (valor × nível; no mult, valor^nível)', () => {
+    const e = efeitosArvore(cat, [106, 107, 2001, 3001, 3002, 3004, 701, 705, 1004, 1008], { 3001: 4, 3002: 2, 3004: 10 });
+    expect(e.producaoSoma).toBeCloseTo(1 + 0.2 + 0.3 + 0.15 + 0.05 * 4, 12);
+    expect(e.inicioMult).toBeCloseTo(100, 9);
+    expect(e.douradoInvestidor).toBeCloseTo(1.02 ** 10, 12);
+    expect(e.bolsaCorretagem).toBe(0.5);
+    expect(e.espaco).toBeCloseTo(1.75, 12);
+  });
+  it('resposta velha (sem niveis): infinito no nível 1; nível 0 ou lixo vira 1', () => {
+    expect(efeitosArvore(cat, [3001]).producaoSoma).toBeCloseTo(1.05, 12);
+    expect(efeitosArvore(cat, [3001], { 3001: 0 }).producaoSoma).toBeCloseTo(1.05, 12);
+    expect(efeitosDe(cat, { generators: [], upgrades: [], strategies: [], bonus: { arvore: [3001], conquistas: 0, niveis: { 3001: 3 } } }).producaoSoma)
+      .toBeCloseTo(1.15, 12);
   });
 });
