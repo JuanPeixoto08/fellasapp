@@ -355,6 +355,13 @@ export function lucroVenda(c: Pick<Copao, 'base' | 'tamanho' | 'forca' | 'preco'
   return c.preco - custoVenda(c.base, c.tamanho, c.forca);
 }
 
+/** O lucro de cada venda com o Open bar / o After da árvore grande (0082, `mult` = copao_mult): o × só vale no lucro;
+ *  venda no prejuízo perde o mesmo de sem a árvore (igual ao idle_cup_noite_andar). */
+export function lucroComArvore(c: Pick<Copao, 'base' | 'tamanho' | 'forca' | 'preco'>, mult = 1): number {
+  const l = lucroVenda(c);
+  return l > 0 ? l * mult : l;
+}
+
 /** A galera no fim de uma noite aberta: + round(público do nível · 0,02 · média/999) com a média das notas do cardápio
  *  ≥ 600, −5% abaixo de 300; depois −15% se alguém deu PT (uma vez por noite, por mais copões em PT); piso 0. */
 export function galeraNoite(galera: number, nivel: number, notas: readonly number[], pt: boolean): number {

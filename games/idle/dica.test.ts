@@ -422,6 +422,9 @@ describe('eventos das eras 6 e 7 na caixinha', () => {
     const lucro = lucroVendaCup(c) * 1.5;
     expect(dicaCupPreco(c, 1.5)).toContain(lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`);
     expect(dicaCupPreco(c, 1.5)).not.toBe(dicaCupPreco(c));
+    const perde = { base: 11, tamanho: 3, forca: 10, preco: 32 }; // −28 por venda: o ×1,5 não aumenta o prejuízo
+    expect(dicaCupPreco(perde, 1.5)).toContain('28 de prejuízo');
+    expect(dicaCupPreco(perde, 1.5)).toBe(dicaCupPreco(perde));
   });
   it('a produção mostra o Silver tape valendo', () => {
     const s = comTaxa({ silver_ate: '2026-10-12T12:01:00.000Z' });

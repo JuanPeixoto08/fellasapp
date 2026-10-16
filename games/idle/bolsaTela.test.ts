@@ -147,6 +147,17 @@ describe('tela da Bolsa', () => {
     tela.renderizar(B({ corretor: 1 }), 100, false);
     expect(document.querySelector<HTMLButtonElement>('.melhoria-bolsa[data-tipo="corretor"] button')!.disabled).toBe(true);
   });
+  it('com a árvore: os cartões e a conta do limite mostram a corretagem e o Escritório com os nós', () => {
+    const empresas = B().empresas.map((e) => (e.id === 1 ? { ...e, limite: 142, limite_gen: 5 } : e));
+    tela.renderizar(B({ corretor: 1, escritorio: 1, corretagem: 0.02, empresas }), 1e9, false, 1, false, { corretagem: 0.5, escritorio: 1.5 });
+    const corr = document.querySelector('.melhoria-bolsa[data-tipo="corretor"]')!;
+    expect(corr.textContent).toContain('Corretagem 2%'); // 4% × 0,5
+    expect(corr.querySelector('button')!.getAttribute('aria-label')).toContain('Corretagem 1,5%'); // o próximo: 3% × 0,5
+    const esc = document.querySelector('.melhoria-bolsa[data-tipo="escritorio"]')!;
+    expect(esc.textContent).toContain('+37,5 ações em cada empresa'); // 25 × 1,5
+    expect(esc.querySelector('button')!.getAttribute('aria-label')).toContain('+75 ações em cada empresa');
+    expect(document.querySelector('.conta-limite')!.textContent).toBe('Limite: 100 + 5 Food truck + 25 ×1,5 do Escritório');
+  });
   it('sem trader: só o aviso pra abrir', () => {
     tela.renderizar(B({ aberta: false }), 1e9, false);
     expect(document.querySelector('.bolsa')!.textContent).toContain('Compra 1 Grupo de trader pra abrir a Bolsa');

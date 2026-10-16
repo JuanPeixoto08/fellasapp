@@ -751,7 +751,7 @@ insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, va
   (408, 4, 8, 'Trevo de quatro folhas', 'Eventos aparecem 2,5× mais vezes (o máximo do ramo).', 126, 'dourado_freq', 2.5, 407, null, null, 7, null),
   (409, 4, 9, 'Trend do TikTok', 'Viralizou e Promoção duram o triplo.', 270, 'dourado_duracao', 3, 408, null, null, 7, null),
   (410, 4, 10, 'Gato da sorte da loja chinesa', 'Investidor apressado rende 90 min de produção.', 540, 'dourado_investidor', 1.5, 409, null, null, 7, null),
-  (3004, 4, 11, 'Sorte de principiante', 'Investidor apressado rende +2% por nível.', 2000, 'dourado_investidor', 1.02, 410, null, 10, null, 1.6),
+  (3004, 4, 11, 'Sorte de principiante', 'Investidor apressado rende ×1,02 por nível (acumula).', 2000, 'dourado_investidor', 1.02, 410, null, 10, null, 1.6),
   (506, 5, 6, 'Vale-refeição de verdade', 'Seus contratados rendem 20% (o máximo).', 28, 'por_contratado', 0.2, 55, null, 3, null, null),
   (507, 5, 7, 'CLT premium', 'Os contratos que você faz duram 14 dias.', 64, 'contrato_dias', 14, 506, null, 3, null, null),
   (508, 5, 8, 'Passe do Neymar', 'Quem te contrata rende o triplo pra você.', 126, 'emprego_mult', 3, 507, null, null, 7, null),

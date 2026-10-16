@@ -916,6 +916,26 @@ describe('as noites do bar (avancar)', () => {
     juntos(ks.map((k) => k.vendidos), tot.map((x) => vendidoNaNoite(x, ini, agora)));
     juntos(ks.map((k) => k.fichas), tot.map((x, i) => vendidoNaNoite(x, ini, agora) * lucroVenda(cs[i]) * 1.5));
   });
+  it('árvore grande (0082): o ×1,5 do After só aumenta o lucro; o copão no prejuízo perde o mesmo de sem a árvore', async () => {
+    await bar();
+    await por({ nome: 'Barato' });
+    await por({ extra: 2, forca: 6, preco: 30, nome: 'Caro' });
+    await ajustar((await copoes())[0].id, { preco: 3 }); // abaixo do custo: cada venda do Barato dá prejuízo
+    await setFas(50);
+    await q('insert into public.idle_arvore (user_id, no_id) select $1, unnest($2::int[])', [A, [1, 901, 902, 903, 904, 905, 906, 907, 908, 909, 910]]);
+    const cs = await copoes();
+    const lucros = cs.map((c) => lucroVenda(c));
+    expect(lucros[0]).toBeLessThan(0);
+    expect(lucros[1]).toBeGreaterThan(0);
+    const ini = inicioNoite(iso(agora).slice(0, 10));
+    ir(ini + 4 * H);
+    await lugar();
+    const tot = totaisTs(cs, { nivel: 1, galera: 50, sexta: false, dj: null });
+    const ks = await noiteCopoes(ini);
+    const esperado = tot.map((x, i) => vendidoNaNoite(x, ini, agora) * lucros[i] * (lucros[i] > 0 ? 1.5 : 1));
+    juntos(ks.map((k) => k.fichas), esperado);
+    expect(rel(await fichas(), esperado[0] + esperado[1])).toBeLessThan(1e-12);
+  });
 
   it('Review Focus 1: some 3 dias: só a primeira noite abre, as fichas dela entram uma vez, a revelação sai na volta', async () => {
     await bar();

@@ -81,4 +81,24 @@ describe('limite com a árvore grande', () => {
     expect(contaLimite(id, 760, 1, 5)).toBe(`Limite: 760 (100 + 5 ${GERADORES[EMPRESAS_BOLSA[0].gerador - 1]} + 25 do Escritório, com a árvore)`);
     expect(contaLimite(id, 130, 1)).toBe(`Limite: 100 + 5 ${GERADORES[EMPRESAS_BOLSA[0].gerador - 1]} + 25 do Escritório`); // resposta velha
   });
+  it('Escritório na Faria Lima (×1,5): a conta mostra o ×1,5 e as partes fecham o total', () => {
+    const id = EMPRESAS_BOLSA[0].id;
+    const g = GERADORES[EMPRESAS_BOLSA[0].gerador - 1];
+    expect(contaLimite(id, 142, 1, 5, 1.5)).toBe(`Limite: 100 + 5 ${g} + 25 ×1,5 do Escritório`); // floor(100 + 5 + 37,5)
+    expect(contaLimite(id, 205, 2, 30, 1.5)).toBe(`Limite: 100 + 30 ${g} + 50 ×1,5 do Escritório`);
+    expect(contaLimite(id, 900, 2, 30, 1.5)).toBe(`Limite: 900 (100 + 30 ${g} + 50 ×1,5 do Escritório, com a árvore)`);
+    expect(contaLimite(id, 105, 0, 5, 1.5)).toBe(`Limite: 100 + 5 ${g}`); // sem Escritório o ×1,5 não aparece
+  });
+  it('cartões do Corretor e do Escritório com a árvore: corretagem × o nó, bônus × o Faria Lima', () => {
+    const arv = { corretagem: 0.5, escritorio: 1.5 };
+    expect(melhoriaAtual('corretor', 0, arv).efeito).toBe('Corretagem 2,5%');
+    expect(melhoriaAtual('corretor', 2, { corretagem: 0.8, escritorio: 1 }).efeito).toBe('Corretagem 2,4%');
+    expect(melhoriaAtual('escritorio', 2, arv).efeito).toBe('+75 ações em cada empresa');
+    expect(proximaMelhoria('corretor', 4, { corretagem: 0.25, escritorio: 1 })!.efeito).toBe('Corretagem 0,125%');
+    expect(proximaMelhoria('escritorio', 0, arv)!.efeito).toBe('+37,5 ações em cada empresa');
+    expect(proximaMelhoria('escritorio', 4, arv)).toMatchObject({ nivel: 5, efeito: '+600 ações em cada empresa', segundos: 57600 });
+    // sem os nós (fatores 1), a frase de sempre
+    expect(melhoriaAtual('corretor', 2, { corretagem: 1, escritorio: 1 }).efeito).toBe('Corretagem 3%');
+    expect(proximaMelhoria('escritorio', 4, { corretagem: 1, escritorio: 1 })!.efeito).toBe('+400 ações em cada empresa');
+  });
 });

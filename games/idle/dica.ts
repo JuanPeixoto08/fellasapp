@@ -23,7 +23,7 @@ import {
 } from './camisetaria';
 import {
   aBase, ALFA as ALFA_CUP, BASES, chavePar, custoVenda as custoVendaCup, DJS, EXTRAS, forcaTestada, liberado as liberadoCup,
-  lucroVenda as lucroVendaCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP, novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup,
+  lucroComArvore as lucroComArvoreCup, MISTURAS, NOME_ROTULO as NOME_ROTULO_CUP, novidade as novidadeCup, pontoDescoberto, precoFaixa as precoFaixaCup,
   precoRef as precoRefCup, TAMANHOS, type CadernoCup, type CopaoCup, type TipoPar,
 } from './copao';
 
@@ -430,7 +430,7 @@ export function dicaCupForca(base: number, forca: number, cad: CadernoCup): stri
 /** O preço: a faixa, a referência e o lucro de cada venda. */
 export function dicaCupPreco(c: { base: number; tamanho: number; forca: number; preco: number }, mult = 1): string {
   const [lo, hi] = precoFaixaCup(c.base, c.tamanho, c.forca);
-  const lucro = lucroVendaCup(c) * mult;
+  const lucro = lucroComArvoreCup(c, mult); // o × da árvore só no lucro
   const ganho = lucro < 0 ? `${num(-lucro, 1)} de prejuízo` : `${num(lucro, 1)} de lucro`;
   return `Vai de ${lo} a ${hi} fichas; referência ${num(precoRefCup(c.base, c.tamanho, c.forca), 1)}. Cada venda dá ${ganho}. `
     + 'Mais caro que a referência vende menos e a nota cai; mais barato vende mais.';

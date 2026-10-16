@@ -3,7 +3,7 @@
 // números, comprar/vender e os lotes do Vorcaro) e embaixo as melhorias da Bolsa. Mockup aprovado em 12/10.
 import { button, el } from '../shared/hud/hud';
 import type { BolsaEmpresa, BolsaEstado, BolsaPosicao, LadoBolsa, MelhoriaBolsa } from '../shared/types';
-import { acoes, avisosPo, contaLimite, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
+import { acoes, type ArvoreBolsa, avisosPo, contaLimite, empresa, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, SEM_ARVORE_BOLSA, textoQuebra, variacao } from './bolsa';
 import { ativos } from './ativos';
 import { type Dica, dicaEspiar } from './dica';
 import { formatarValor } from './formatar';
@@ -66,7 +66,7 @@ export function criarBolsaTela(a: {
 }, dica?: (alvo: HTMLElement, chave: string, conteudo: () => Dica | null) => void) {
   const raiz = el('div', 'bolsa');
   let escolhida: number | null = null;
-  let ultimo: [BolsaEstado | null, number, boolean, number, boolean] | null = null;
+  let ultimo: [BolsaEstado | null, number, boolean, number, boolean, ArvoreBolsa] | null = null;
   // o fim da recuperação de cada empresa quebrada que a tela viu: no minuto em que ela volta o banco vira o humor na hora
   // (o humor dela "acaba" agora), e espiar ali gastaria o crédito sem mostrar nada. No minuto seguinte já dá.
   const fimRj = new Map<number, number>();
@@ -81,15 +81,16 @@ export function criarBolsaTela(a: {
     relogioEl.textContent = `Preço novo em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
   /** `alavanca`: o lote das compras agora (1 + o peso do Vorcaro; 1 sem ele). `vsauce`: o VSauce está sentado (é ele
-   *  quem mostra o humor, mesmo de empresa espiada). */
-  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean, alavanca = 1, vsauce = false): void {
+   *  quem mostra o humor, mesmo de empresa espiada). `arv`: os fatores da árvore na corretagem e no Escritório (os cartões das
+   *  melhorias e a conta do limite mostram os números com eles). */
+  function renderizar(b: BolsaEstado | null, valuation: number, ocupado: boolean, alavanca = 1, vsauce = false, arv: ArvoreBolsa = SEM_ARVORE_BOLSA): void {
     // redesenhar troca a lista e o detalhe por novos: guarda a rolagem e o foco pra devolver no fim
     const rolouLista = raiz.querySelector<HTMLElement>('.bolsa-lista')?.scrollTop ?? 0;
     const detalheAntes = raiz.querySelector<HTMLElement>('.bolsa-detalhe');
     const rolouDetalhe = detalheAntes && detalheAntes.dataset.empresa === String(escolhida) ? detalheAntes.scrollTop : 0;
     const ativo = document.activeElement;
     const focoEmpresa = ativo instanceof HTMLElement && raiz.contains(ativo) ? ativo.closest<HTMLElement>('.acao')?.dataset.empresa : undefined;
-    ultimo = [b, valuation, ocupado, alavanca, vsauce];
+    ultimo = [b, valuation, ocupado, alavanca, vsauce, arv];
     raiz.replaceChildren();
     relogioEl = null;
     atuais = [];
@@ -237,7 +238,7 @@ export function criarBolsaTela(a: {
       const icone = el('span', 'mini-gerador');
       icone.setAttribute('aria-hidden', 'true');
       icone.style.backgroundImage = `url(${ativos.gerador(e.gerador)})`;
-      conta.append(icone, el('span', undefined, contaLimite(m.id, m.limite, b.escritorio, m.limite_gen)));
+      conta.append(icone, el('span', undefined, contaLimite(m.id, m.limite, b.escritorio, m.limite_gen, arv.escritorio)));
       // comprar, vender e os lotes do Vorcaro
       const negocia = el('div', 'bolsa-negocia');
       const unidade = m.valor * b.r * (1 + b.corretagem);
@@ -278,13 +279,13 @@ export function criarBolsaTela(a: {
     const melhorias = el('div', 'bolsa-melhorias');
     for (const tipo of ['corretor', 'escritorio'] as const) {
       const nivel = tipo === 'corretor' ? b.corretor : b.escritorio;
-      const atual = melhoriaAtual(tipo, nivel);
+      const atual = melhoriaAtual(tipo, nivel, arv);
       const card = el('div', 'melhoria-bolsa');
       card.dataset.tipo = tipo;
       const txt = el('div', 'meio');
       txt.append(el('strong', undefined, atual.nome), el('span', 'sub', atual.efeito));
       card.append(txt);
-      const prox = proximaMelhoria(tipo, nivel);
+      const prox = proximaMelhoria(tipo, nivel, arv);
       if (!prox) card.append(el('span', 'no-feito', 'No máximo'));
       else {
         const custo = prox.segundos * b.r;

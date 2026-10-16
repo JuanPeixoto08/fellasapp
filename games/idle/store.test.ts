@@ -90,6 +90,14 @@ describe('fase e cena', () => {
     expect(estrategiaPendente(base({ era: 6, strategies: [0, 0, 0, 0, 1, -1] }))).toBeNull();
     expect(estrategiaPendente(base({ era: 7, strategies: [0, 0, 0, 0, 1, -1] }))).toBe(7);
   });
+  it('estratégia pendente: quem pulou eras com o Recomeço escolhe a mais antiga que falta primeiro', () => {
+    expect(estrategiaPendente(base({ era: 4, strategies: [-1, -1, -1, -1] }))).toBe(2);
+    expect(estrategiaPendente(base({ era: 4, strategies: [] }))).toBe(2); // posição que falta conta como −1
+    expect(estrategiaPendente(base({ era: 4, strategies: [1, -1, -1, -1] }))).toBe(3);
+    expect(estrategiaPendente(base({ era: 4, strategies: [1, 0, -1, -1] }))).toBe(4);
+    expect(estrategiaPendente(base({ era: 4, strategies: [1, 0, 2, -1] }))).toBeNull();
+    expect(estrategiaPendente(base({ era: 3, strategies: [-1, 0, -1, -1] }))).toBe(2);
+  });
   it('Rolê eterno: oportunidade fica 30 s', () => {
     expect(segundosOportunidade(base())).toBe(10);
     expect(segundosOportunidade(base({ strategies: [0, 0, 0, 2] }))).toBe(30);

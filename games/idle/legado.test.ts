@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import {
-  alturaBarra, avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaMinima, falta, faltam, ganhouEm, grade, liberadoNo,
+  alturaBarra, anguloMedio, avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaMinima, falta, faltam, ganhouEm, grade, liberadoNo,
   MUNDO_ARVORE, GEOMETRIA_ARVORE, ANEIS_ARVORE, limitarZoom, nivelNo, posicaoRotulo, progressoRamo, raioAnelTela, ZOOM_ABRIR, ZOOM_MAX, ZOOM_MIN, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
   textoVenda, TOTAL_CONQUISTAS, type ContextoArvore,
 } from './legado';
@@ -261,6 +261,17 @@ describe('árvore em tela cheia: a constelação', () => {
       expect(Math.abs(polar(p.id).r - (polar(p.requer!).r + GEOMETRIA_ARVORE.passoR / 2))).toBeLessThan(1.5);
     }
   });
+  it('anguloMedio: o meio pelo arco menor, mesmo com o par do outro lado da volta (−π/π)', () => {
+    const perto = (x: number, y: number) => expect(Math.abs(difAng(x, y))).toBeLessThan(1e-12);
+    perto(anguloMedio(0.1, 0.5), 0.3);
+    perto(anguloMedio(0.5, 0.1), 0.3);
+    // 170° e −170°: o meio é 180°, não 0°
+    perto(anguloMedio((170 * Math.PI) / 180, (-170 * Math.PI) / 180), Math.PI);
+    perto(anguloMedio((-170 * Math.PI) / 180, (170 * Math.PI) / 180), Math.PI);
+    // −π/2 + 4,5·36° e −π/2 − 4,5·36° (os dois ramos das pontas da copa, lado a lado embaixo): o meio é π/2
+    const passo = (2 * Math.PI) / 10;
+    perto(anguloMedio(-Math.PI / 2 + 4.5 * passo, -Math.PI / 2 - 4.5 * passo), Math.PI / 2);
+  });
   it('o nome de cada ramo fica depois do infinito, no ângulo do ramo, na ordem da copa, sem se sobrepor', () => {
     expect(ROTULOS_ARVORE.map((r) => r.nome)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
     expect(ROTULOS_ARVORE.map((r) => r.ramo)).toEqual(ordem);
@@ -278,11 +289,12 @@ describe('árvore em tela cheia: a constelação', () => {
     for (const r of ROTULOS_ARVORE) expect(a7.raio).toBeLessThan(Math.hypot(r.x - C, r.y - C));
   });
   it('zoom: o mínimo faz a copa inteira caber no palco (nunca abaixo de ZOOM_MIN nem acima de 1); o zoom fica entre o mínimo e 1,4', () => {
-    expect(escalaMinima(L, L + 300)).toBe(1);
+    expect(escalaMinima(L + 32, L + 332)).toBe(1);
+    expect(escalaMinima(L, L + 300)).toBeLessThan(1); // a goteira de 16 px de cada lado conta
     expect(escalaMinima(4000, 4000)).toBe(1);
-    expect(escalaMinima(390, 560)).toBeCloseTo(390 / L, 12); // o celular: a constelação inteira na largura
-    expect(L * escalaMinima(390, 560)).toBeLessThanOrEqual(390);
-    expect(L * escalaMinima(1138, 600)).toBeLessThanOrEqual(600); // o PC (2000×961): a altura manda
+    expect(escalaMinima(390, 560)).toBeCloseTo((390 - 32) / L, 12); // o celular: a constelação inteira na largura, sem encostar
+    expect(L * escalaMinima(390, 560)).toBeLessThanOrEqual(390 - 32); // 16 px de folga de cada lado no zoom mínimo
+    expect(L * escalaMinima(1138, 600)).toBeLessThanOrEqual(600 - 32); // o PC (2000×961): a altura manda
     expect(escalaMinima(100, 100)).toBe(ZOOM_MIN);
     expect(limitarZoom(3, 0.3)).toBe(ZOOM_MAX);
     expect(limitarZoom(0.05, 0.3)).toBe(0.3);

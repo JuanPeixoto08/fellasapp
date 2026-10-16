@@ -780,8 +780,9 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       noCorpo(hortaTela.elemento);
     } else if (gavetaAberta === 'bolsa' && s) {
       const cad = s.convidados ?? SEM_CADEIRAS;
+      const ef = efeitosDe(catalogo, s);
       bolsaTela.renderizar(trader ? m.bolsa : { ...(m.bolsa ?? VAZIA), aberta: false }, s.valuation, m.ocupado, 1 + peso(cad, s.generators[12] ?? 0, VORCARO),
-        peso(cad, s.generators[12] ?? 0, VSAUCE) > 0);
+        peso(cad, s.generators[12] ?? 0, VSAUCE) > 0, { corretagem: ef.bolsaCorretagem, escritorio: ef.bolsaEscritorio });
       noCorpo(bolsaTela.elemento);
     } else corpoBancada.replaceChildren();
     if (abriuAgora) {

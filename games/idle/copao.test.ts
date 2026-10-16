@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   abreNoite, aBase, aguenta, ALFA, custoVenda, MARKUP, ptConta, sementePT, TAXA, distanciaCurta, vagasFuturas, avaliar, BASES, cadernoCup, daBase, chancePT, chavePar, diaBR, distanciasAguenta, distanciaTexto, pontoDescoberto, pontosPossiveis, proximaNoite, CONFLITOS, CRESCE, custoBeneficio, deuPT, DJS, ehSexta, ELASTICIDADE, EXTRAS, fimNoite, galeraNoite,
-  GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
+  GALERA_TETO, inicioNoite, LIBERA, liberado, liberaTextos, lucroComArvore, lucroVenda, MISTURAS, moda, modaDaSemana, movimento, NOITE_MS, noiteIdx,
   noitesEntre, nomeSugerido, nota, novidade, PONTOS, precoFaixa, precoRef, precoValido, publico, PUBLICO_BASE, rotuloPar, rotulos, sabor,
   SABORES, TAMANHOS, vagas, vendasNoite, vendidoNaNoite,
 } from './copao';
@@ -453,6 +453,11 @@ describe('movimento, vendas, lucro e galera', () => {
     expect(lucroVenda({ base: 1, tamanho: 2, forca: 5, preco: 22 })).toBeCloseTo(16, 12);
     // Balde (10 doses) de Absinto (custo 4) força 10, preço 32: 32 - 10·4·1,5 = -28
     expect(lucroVenda({ base: 11, tamanho: 3, forca: 10, preco: 32 })).toBeCloseTo(-28, 12);
+  });
+  it('lucroComArvore: o ×1,5 do After só aumenta lucro; prejuízo fica o mesmo (igual ao idle_cup_noite_andar da 0082)', () => {
+    expect(lucroComArvore({ base: 1, tamanho: 2, forca: 5, preco: 22 }, 1.5)).toBeCloseTo(24, 12);
+    expect(lucroComArvore({ base: 11, tamanho: 3, forca: 10, preco: 32 }, 1.5)).toBeCloseTo(-28, 12);
+    expect(lucroComArvore({ base: 1, tamanho: 2, forca: 5, preco: 22 })).toBeCloseTo(16, 12);
   });
 
   it('galeraNoite: sobe com média ≥ 600, cai 5% abaixo de 300, cai 15% com PT (uma vez), piso 0', () => {

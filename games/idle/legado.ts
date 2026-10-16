@@ -176,6 +176,14 @@ const colunaDe = (ramo: number) => (ORDEM_RAMOS as readonly number[]).indexOf(ra
 /** O ângulo do k-ésimo ramo da ordem (radianos, y pra baixo: crescer = sentido horário). O meio entre o 4º e o 5º
  *  (Recomeço e Produção, com 10 ramos) aponta pra cima. */
 const anguloRamo = (k: number) => -Math.PI / 2 + (k - (NUM_RAMOS / 2 - 0.5)) * ((2 * Math.PI) / NUM_RAMOS);
+/** O ângulo do meio entre a e b pelo arco menor: a diferença vai pra (−π, π] antes de dividir (um par dos dois lados da
+ *  volta, como 170° e −170°, fica em 180°, não em 0°). */
+export function anguloMedio(a: number, b: number): number {
+  let d = (b - a) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  else if (d <= -Math.PI) d += 2 * Math.PI;
+  return a + d / 2;
+}
 const raioPosicao = (posicao: number) =>
   posicao === 11 ? RAIO_INFINITO : GEOMETRIA_ARVORE.r1 + (posicao - 1) * GEOMETRIA_ARVORE.passoR;
 const ponto = (raio: number, ang: number): readonly [number, number] =>
@@ -187,7 +195,7 @@ function gerarPosicoes(): Readonly<Record<number, readonly [number, number]>> {
     else if (n.ramo === RAMO_PONTE) {
       const a = colunaDe(catalogo.arvore.find((x) => x.id === n.requer)!.ramo);
       const b = colunaDe(catalogo.arvore.find((x) => x.id === n.requer2)!.ramo);
-      pos[n.id] = ponto(raioPosicao(5) + GEOMETRIA_ARVORE.passoR / 2, anguloRamo(a) + (anguloRamo(b) - anguloRamo(a)) / 2);
+      pos[n.id] = ponto(raioPosicao(5) + GEOMETRIA_ARVORE.passoR / 2, anguloMedio(anguloRamo(a), anguloRamo(b)));
     } else pos[n.id] = ponto(raioPosicao(n.posicao), anguloRamo(colunaDe(n.ramo)));
   }
   return pos;
@@ -212,8 +220,12 @@ export const ROTULOS_ARVORE: readonly { ramo: number; nome: string; x: number; y
 export const ZOOM_MIN = 0.1;
 export const ZOOM_MAX = 1.4;
 export const ZOOM_ABRIR = 0.8;
+/** A folga (px da tela) de cada lado do palco no zoom mínimo: a constelação não encosta na borda (a goteira de 16 px). */
+const GOTEIRA_PX = 16;
 export function escalaMinima(largura: number, altura: number): number {
-  return Math.min(1, Math.max(ZOOM_MIN, Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura)));
+  const w = Math.max(0, largura - 2 * GOTEIRA_PX);
+  const h = Math.max(0, altura - 2 * GOTEIRA_PX);
+  return Math.min(1, Math.max(ZOOM_MIN, Math.min(w / MUNDO_ARVORE.largura, h / MUNDO_ARVORE.altura)));
 }
 export const limitarZoom = (z: number, minimo: number): number => Math.min(ZOOM_MAX, Math.max(minimo, z));
 

@@ -17,7 +17,7 @@ import { button, el } from '../shared/hud/hud';
 import type { LugarEstado, NotaCaderninho } from '../shared/types';
 import { ativos } from './ativos';
 import {
-  aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroVenda, MISTURAS,
+  aBase, BASES, cadernoCup, chavePar, daBase, diaBR, distanciaCurta, vagasFuturas, distanciaTexto, DJS, EXTRAS, forcaTestada, liberado, liberaTextos, lucroComArvore, MISTURAS,
   NOME_ROTULO, nomeSugerido, novidade, pontoDescoberto, precoFaixa, precoRef, proximaNoite, rotulos, TAMANHOS,
   type CadernoCup, type CopaoCup, type EstadoCup, type ProvaCup, type TipoPar, type UltimaNoite,
 } from './copao';
@@ -841,7 +841,7 @@ function criarTela(a: AcoesMecanica, dicas: Dicas, avisar: (x: Atual) => void): 
     b.precoValor.textContent = `${sel.preco} fichas`;
     b.precoMenos.disabled = sel.preco <= lo;
     b.precoMais.disabled = sel.preco >= hi;
-    const lucro = lucroVenda(sel) * (ultimo?.l.copao_mult ?? 1); // o Open bar / o After (0082) nas fichas
+    const lucro = lucroComArvore(sel, ultimo?.l.copao_mult ?? 1); // o Open bar / o After (0082) nas fichas de lucro
     b.precoInfo.replaceChildren(`De ${lo} a ${hi} · ref. ${inteiro(ref)} · `,
       Math.abs(lucro) < 0.05 ? el('span', undefined, 'sem lucro por venda')
         : el('span', lucro < 0 ? 'cup-prejuizo' : 'cup-fichas', `${lucro < 0 ? 'prejuízo' : 'lucro'} de ${fichasVenda(Math.abs(lucro))} por venda`));

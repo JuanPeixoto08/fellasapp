@@ -370,8 +370,6 @@ begin
 end;
 $$;
 
-revoke all on function public.idle_buy_node(int) from public, anon;
-grant execute on function public.idle_buy_node(int) to authenticated;
 revoke all on function public.idle_start() from public, anon;
 grant execute on function public.idle_start() to authenticated;
 
@@ -469,8 +467,9 @@ $$;
 revoke all on function public.idle_claim_opportunity(bigint) from public, anon;
 grant execute on function public.idle_claim_opportunity(bigint) to authenticated;
 
--- chamam mudar; os descontos seguem até 50% depois de multiplicar. Sem planta: uma linha de zeros (o left join).
--- × (1 + 5% por nível do Adubo orgânico premium, 0082)
+-- bônus das plantas maduras (o da 0061) × o Agrotóxico liberado (horta_mult) × (1 + 5% por nível do Adubo orgânico
+-- premium, horta_soma, 0082), lidos aqui dentro pra nenhum dos que chamam mudar; os descontos seguem até 50% depois de
+-- multiplicar. Sem planta: uma linha de zeros (o left join).
 create or replace function public.idle_horta_bonus(u uuid, lado int, t timestamptz)
 returns table (producao double precision, geradores double precision, melhorias double precision, oportunidades double precision)
 language sql stable set search_path = public as $$
@@ -864,12 +863,14 @@ declare
   d     timestamptz := public.idle_conv_desde(s, 9);
   n     int := 0;
   k     bigint;
+  q     double precision;
 begin
   if p <= 0 or d is null then
     return 0;
   end if;
+  q := public.idle_conv_queda(s.user_id); -- a chance da árvore: lida uma vez, não uma por faixa
   for k in 1 .. least(floor(extract(epoch from t - d) / (7200 / p))::bigint, 2000) loop
-    if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < public.idle_conv_queda(s.user_id) then
+    if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < q then
       n := n + 1;
     end if;
   end loop;
@@ -887,6 +888,7 @@ declare
   passo double precision;
   k     bigint;
   ini   timestamptz;
+  q     double precision;
 begin
   if de >= ate then
     return;
@@ -905,9 +907,10 @@ begin
   d := public.idle_conv_desde(s, 9);
   if p > 0 and d is not null then
     passo := 7200 / p;
+    q := public.idle_conv_queda(s.user_id); -- a chance da árvore: lida uma vez, não uma por faixa
     for k in greatest(1, floor(extract(epoch from de - d) / passo)::bigint)
              .. least(floor(extract(epoch from ate - d) / passo)::bigint, floor(extract(epoch from de - d) / passo)::bigint + 200) loop
-      if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < public.idle_conv_queda(s.user_id) then
+      if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < q then
         ini := d + make_interval(secs => k * passo);
         return query select x from (values (ini), (ini + interval '30 minutes')) v(x) where x > de and x < ate;
       end if;
@@ -1291,7 +1294,7 @@ declare
   v_notas int[];
   v_pt    boolean := false;
   v_g     double precision;
-  v_cm    double precision := public.idle_arv(p_user, 'copao_mult', 'max', 1); -- Open bar / After (0082): as fichas
+  v_cm    double precision := public.idle_arv(p_user, 'copao_mult', 'max', 1); -- Open bar / After (0082): as fichas de lucro
 begin
   select * into n from public.idle_cup_noites where user_id = p_user and inicio = p_inicio for update;
   if not found or n.fechada then
@@ -1304,7 +1307,7 @@ begin
               where k.user_id = p_user and k.inicio = p_inicio
               order by c.entrou_em, c.id loop
       v_v := public.idle_cup_vendido_noite(x.total, p_inicio, least(now(), coalesce(x.saiu_em, now())));
-      v_f := v_v * x.lucro * v_cm;
+      v_f := v_v * x.lucro * case when x.lucro > 0 then v_cm else 1 end; -- o ×1,5 só aumenta lucro, não prejuízo
       if v_v <> x.vendidos or v_f <> x.fichas then
         update public.idle_cup_noite_copoes set vendidos = v_v, fichas = v_f
          where user_id = p_user and inicio = p_inicio and copao = x.copao;
@@ -1569,6 +1572,8 @@ declare
   r public.idle_state;
 begin
   if not exists (select 1 from public.idle_migracao_feita where nome = 'arvore_grande_reinicio') then
+    -- seguro: ninguém compra nó nem mexe no estado enquanto a conta fecha, a cópia sai e a árvore é apagada (as RPCs esperam)
+    lock table public.idle_state, public.idle_arvore in exclusive mode;
     -- 0) nunca apaga um nó sem devolver: se algum nó não está no catálogo (idle_cat_no), a migração para aqui e nada muda
     if exists (select 1 from public.idle_arvore a where not exists (select 1 from public.idle_cat_no c where c.id = a.no_id)) then
       raise exception 'idle_arvore tem nó fora do catálogo: a árvore não pode ser reiniciada sem devolver o que foi pago';

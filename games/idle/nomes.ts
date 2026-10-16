@@ -507,7 +507,7 @@ export const ARVORE: readonly NoTexto[] = [
   { ramo: 4, posicao: 8, tipo: 'dourado_freq', valor: 2.5, nome: 'Trevo de quatro folhas', efeito: 'Eventos aparecem 2,5× mais vezes (o máximo do ramo).' },
   { ramo: 4, posicao: 9, tipo: 'dourado_duracao', valor: 3, nome: 'Trend do TikTok', efeito: 'Viralizou e Promoção duram o triplo.' },
   { ramo: 4, posicao: 10, tipo: 'dourado_investidor', valor: 1.5, nome: 'Gato da sorte da loja chinesa', efeito: 'Investidor apressado rende 90 min de produção.' },
-  { ramo: 4, posicao: 11, tipo: 'dourado_investidor', valor: 1.02, nome: 'Sorte de principiante', efeito: 'Investidor apressado rende +2% por nível.' },
+  { ramo: 4, posicao: 11, tipo: 'dourado_investidor', valor: 1.02, nome: 'Sorte de principiante', efeito: 'Investidor apressado rende ×1,02 por nível (acumula).' },
   { ramo: 5, posicao: 6, tipo: 'por_contratado', valor: 0.2, nome: 'Vale-refeição de verdade', efeito: 'Seus contratados rendem 20% (o máximo).' },
   { ramo: 5, posicao: 7, tipo: 'contrato_dias', valor: 14, nome: 'CLT premium', efeito: 'Os contratos que você faz duram 14 dias.' },
   { ramo: 5, posicao: 8, tipo: 'emprego_mult', valor: 3, nome: 'Passe do Neymar', efeito: 'Quem te contrata rende o triplo pra você.' },

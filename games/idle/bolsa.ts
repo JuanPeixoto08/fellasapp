@@ -33,35 +33,45 @@ export function maxCompra(valuation: number, valor: number, r: number, limite: n
 /** A empresa da Bolsa ligada a um gerador (undefined pros que não têm). */
 export const empresaDoGerador = (gid: number): EmpresaBolsa | undefined => EMPRESAS_BOLSA.find((e) => e.gerador === gid);
 
-/** De onde vem o limite: "Limite: 100 + 5 Curso online + 25 do Escritório"; com a árvore grande (0082) por cima, "Limite: 760
- *  (100 + 5 Curso online + 25 do Escritório, com a árvore)". `gen` = quantos do gerador ligado (o banco manda; sem ele, a
- *  resposta é de antes da árvore e a conta sai do total). */
-export function contaLimite(id: number, limite: number, escritorio: number, gen?: number): string {
+/** Os nós da árvore que mexem nos cartões da Bolsa: o fator da corretagem (bolsaCorretagem) e o do Escritório
+ *  (bolsaEscritorio, o Escritório na Faria Lima). Sem árvore, os dois são 1. */
+export type ArvoreBolsa = { corretagem: number; escritorio: number };
+export const SEM_ARVORE_BOLSA: ArvoreBolsa = { corretagem: 1, escritorio: 1 };
+
+const vezesBolsa = (x: number) => `×${x.toLocaleString('pt-BR')}`;
+
+/** De onde vem o limite: "Limite: 100 + 5 Curso online + 25 do Escritório"; com o Escritório na Faria Lima, "... + 25 ×1,5
+ *  do Escritório" (as partes fecham o total, pra baixo como no banco); com os outros nós da árvore grande (0082) por cima,
+ *  "Limite: 760 (100 + 5 Curso online + 25 do Escritório, com a árvore)". `gen` = quantos do gerador ligado (o banco manda;
+ *  sem ele, a resposta é de antes da árvore, sem o ×, e a conta sai do total). `escMult` = o fator do Escritório da árvore. */
+export function contaLimite(id: number, limite: number, escritorio: number, gen?: number, escMult = 1): string {
   const bonus = MELHORIAS_BOLSA.escritorio.bonus[escritorio];
   const gerador = GERADORES[empresa(id).gerador - 1];
   const n = gen ?? limite - 100 - bonus;
-  const conta = `100 + ${n} ${gerador}${bonus ? ` + ${bonus} do Escritório` : ''}`;
-  return limite === 100 + n + bonus ? `Limite: ${conta}` : `Limite: ${limite} (${conta}, com a árvore)`;
+  const esc = gen === undefined ? 1 : escMult;
+  const conta = `100 + ${n} ${gerador}${bonus ? ` + ${bonus}${esc !== 1 ? ` ${vezesBolsa(esc)}` : ''} do Escritório` : ''}`;
+  return limite === Math.floor(100 + n + bonus * esc) ? `Limite: ${conta}` : `Limite: ${limite} (${conta}, com a árvore)`;
 }
 
 export const acoes = (n: number) => (n === 1 ? '1 ação' : `${n} ações`);
 
 const porcento = (x: number) => `${(x * 100).toLocaleString('pt-BR')}%`;
-const efeito = (tipo: MelhoriaBolsa, nivel: number) =>
+// o efeito com os nós da árvore: corretagem do nível × o fator da árvore; bônus do Escritório × o da Faria Lima
+const efeito = (tipo: MelhoriaBolsa, nivel: number, arv: ArvoreBolsa) =>
   tipo === 'corretor'
-    ? `Corretagem ${porcento(MELHORIAS_BOLSA.corretor.corretagem[nivel])}`
-    : `+${MELHORIAS_BOLSA.escritorio.bonus[nivel]} ações em cada empresa`;
+    ? `Corretagem ${porcento(MELHORIAS_BOLSA.corretor.corretagem[nivel] * arv.corretagem)}`
+    : `+${(MELHORIAS_BOLSA.escritorio.bonus[nivel] * arv.escritorio).toLocaleString('pt-BR')} ações em cada empresa`;
 
-/** O nível que você tem: nome e efeito ("Sem corretor · Corretagem 5%"). */
-export function melhoriaAtual(tipo: MelhoriaBolsa, nivel: number): { nome: string; efeito: string } {
+/** O nível que você tem: nome e efeito ("Sem corretor · Corretagem 5%"), já com a árvore (`arv`). */
+export function melhoriaAtual(tipo: MelhoriaBolsa, nivel: number, arv: ArvoreBolsa = SEM_ARVORE_BOLSA): { nome: string; efeito: string } {
   const nome = nivel === 0 ? (tipo === 'corretor' ? 'Sem corretor' : 'Sem escritório') : MELHORIAS_BOLSA[tipo].nomes[nivel - 1];
-  return { nome, efeito: efeito(tipo, nivel) };
+  return { nome, efeito: efeito(tipo, nivel, arv) };
 }
 
-/** O próximo nível (custo em segundos de produção), ou null no 5. */
-export function proximaMelhoria(tipo: MelhoriaBolsa, nivel: number) {
+/** O próximo nível (custo em segundos de produção), ou null no 5; o efeito já com a árvore (`arv`). */
+export function proximaMelhoria(tipo: MelhoriaBolsa, nivel: number, arv: ArvoreBolsa = SEM_ARVORE_BOLSA) {
   if (nivel >= 5) return null;
-  return { nivel: nivel + 1, nome: MELHORIAS_BOLSA[tipo].nomes[nivel], efeito: efeito(tipo, nivel + 1), segundos: MELHORIAS_BOLSA[tipo].custo[nivel] };
+  return { nivel: nivel + 1, nome: MELHORIAS_BOLSA[tipo].nomes[nivel], efeito: efeito(tipo, nivel + 1, arv), segundos: MELHORIAS_BOLSA[tipo].custo[nivel] };
 }
 
 export const textoQuebra = (rjAte: number, tick: number) => `Quebrou · volta em ${Math.max(1, rjAte - tick)} min`;

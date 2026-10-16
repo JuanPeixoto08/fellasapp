@@ -56,8 +56,11 @@ export function cenaDoEstado(estado: IdleState, fase: Fase): NomeCena {
 }
 
 export function estrategiaPendente(estado: IdleState): number | null {
-  // posição que falta (resposta de antes da 0078, com 4 estratégias) conta como não escolhida
-  return estado.started && estado.era >= 2 && (estado.strategies[estado.era - 2] ?? -1) < 0 ? estado.era : null;
+  // A era mais antiga (2..era) sem escolha: o Recomeço começa na era 2, 3 ou 4 e as que ele pulou também pedem a sua. Posição
+  // que falta (resposta de antes da 0078, com 4 estratégias) conta como não escolhida.
+  if (!estado.started) return null;
+  for (let k = 2; k <= estado.era; k++) if ((estado.strategies[k - 2] ?? -1) < 0) return k;
+  return null;
 }
 
 /** O editor de personagem abre sozinho até o primeiro "Bora": sem avatar salvo, sem fechar no X nesta sessão, sem rascunho
