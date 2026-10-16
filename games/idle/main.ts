@@ -4,6 +4,7 @@ import './idle.css';
 import './dourados.css';
 import './caixinha.css';
 import './eras67.css';
+import './arvore.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';

@@ -3,15 +3,19 @@
 // (ver CLAUDE.md, "Fellas Inc.").
 import type { IdleState, LugarEstado, PinoMapa } from '../shared/types';
 import type { Marco } from './mapa';
-import { catalogo, type Melhoria } from './catalogo';
-import { copiasOportunidade, efeitosDe, estrategiasAtivas, fatores, multBonus, multLegado, partesContratos, rendasGeradores, unidadesDaEra, VIRAL_MS } from './economia';
+import { catalogo, type Melhoria, type No } from './catalogo';
+import {
+  copiasOportunidade, efeitosArvore, efeitosDe, estrategiasAtivas, fatores, multBonus, multLegado, partesContratos, rendasGeradores, unidadesDaEra, VIRAL_MS,
+  type EfeitosArvore,
+} from './economia';
+import { contextoArvore, nivelNo, portao } from './legado';
 import {
   CHUVA_S, COMBO_MULT, escolhaLinkedin, LINKEDIN_MULT, MOEDINHA_S, PIX_FICAR_S, TIGRE_CHANCE, TIGRE_COME_S, TIGRE_GRATIS, TIGRE_PAGA_S, TREND_MAX,
   type TipoDourado,
 } from './dourados';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
-import { FRASES_GERADOR } from './nomes';
+import { FRASES_GERADOR, type TipoNo } from './nomes';
 import { CASHBACK_S, cashbackAtivo, CHAMADOS_MAX, CUPONS_POR_OPP, temBolsa, temPlantaCrescendo, type TipoOportunidade } from './oportunidades';
 import { EVENTO_PADRAO, ganhoEventoAgora, marmitaAtiva, MAX_DESVIOS, NOME_EVENTO_ERA, silverAtivo, type EventoArvore, type TipoEventoEra } from './eventosEra';
 import {
@@ -518,4 +522,100 @@ export function dicaEspiar(nome: string, creditos: number, gratis = 0): Dica {
   const linhas: LinhaDica[] = [{ texto: `Mostra o humor de ${nome} até ele mudar · ${custo}` }, { texto: `Você tem ${creditos}`, tom: 'fraco' }];
   if (gratis > 0) linhas.push({ texto: `${gratis === 1 ? '1 grátis' : `${gratis} grátis`} hoje, da árvore`, tom: 'fraco' });
   return { titulo: 'Espiar', linhas };
+}
+
+// ---------- a árvore (árvore grande, 16/10) ----------
+const mais = (x: number) => `+${num(x * 100, 1)}%`;
+/** O que cada tipo de nó mexe nos efeitos e como mostrar (a caixinha do nó diz o que está agora → com ele). Os que não
+ *  estão aqui (inicio_era1, manter_gerais) mostram só o efeito. */
+const CAMPO_NO: Partial<Record<TipoNo, { campo: keyof EfeitosArvore; nome: string; fmt: (x: number) => string }>> = {
+  producao: { campo: 'producao', nome: 'Produção da árvore', fmt: vezes },
+  producao_soma: { campo: 'producaoSoma', nome: 'Soma de produção', fmt: (x) => mais(x - 1) },
+  inicio_valuation: { campo: 'inicioValuation', nome: 'O Abrir CNPJ começa com', fmt: formatarValor },
+  inicio_notebooks: { campo: 'inicioNotebooks', nome: 'Notebooks no começo', fmt: (x) => num(x, 0) },
+  inicio_eras: { campo: 'inicioEras', nome: 'Começa com 1 de cada gerador das eras', fmt: (x) => (x ? `1 a ${num(x, 0)}` : 'nenhuma') },
+  inicio_mult: { campo: 'inicioMult', nome: 'F$ do começo', fmt: vezes },
+  caixinha: { campo: 'caixinha', nome: 'A caixinha guarda', fmt: (x) => num(x, 0) },
+  segundos: { campo: 'oppSegundos', nome: 'Oportunidade na cena', fmt: (x) => `${num(x, 0)} s` },
+  opp_extra: { campo: 'oppExtra', nome: 'Oportunidades a mais por dia', fmt: (x) => `+${num(x, 0)}` },
+  opp_bonus: { campo: 'oppBonus', nome: 'Oportunidades rendem', fmt: vezes },
+  opp_fs: { campo: 'oppFs', nome: 'Oportunidades em F$', fmt: (x) => mais(x - 1) },
+  contrato_preco: { campo: 'contratoPreco', nome: 'Contratar custa', fmt: pct },
+  contrato_desconto: { campo: 'contratoDesconto', nome: 'Desconto do Happy hour', fmt: (x) => `−${num(x * 100, 1)}%` },
+  por_contratado: { campo: 'porContratado', nome: 'Cada contratado rende', fmt: pct },
+  contrato_dias: { campo: 'contratoDias', nome: 'Os contratos duram', fmt: (x) => `${num(x, 0)} dias` },
+  emprego_mult: { campo: 'empregoMult', nome: 'Quem te contrata rende', fmt: vezes },
+  dourado_freq: { campo: 'douradoFreq', nome: 'Eventos aparecem', fmt: vezes },
+  dourado_tela: { campo: 'douradoTela', nome: 'Eventos ficam na tela', fmt: (x) => `${num(x, 0)} s` },
+  dourado_investidor: { campo: 'douradoInvestidor', nome: 'Investidor apressado', fmt: (x) => `${num(20 * x, 1)} min de produção` },
+  dourado_duracao: { campo: 'douradoDuracao', nome: 'Viralizou e Promoção duram', fmt: vezes },
+  horta_amadurece: { campo: 'hortaAmadurece', nome: 'Plantas amadurecem no tempo de', fmt: pct },
+  horta_vida: { campo: 'hortaVida', nome: 'Vida das plantas maduras', fmt: vezes },
+  horta_cruza: { campo: 'hortaCruza', nome: 'Cruzamento', fmt: vezes },
+  horta_mult: { campo: 'hortaMult', nome: 'Bônus das plantas', fmt: vezes },
+  horta_soma: { campo: 'hortaSoma', nome: 'Bônus das plantas (Adubo)', fmt: (x) => mais(x - 1) },
+  morango_chance: { campo: 'morangoChance', nome: 'Morango com Pescoço', fmt: vezes },
+  bolsa_corretagem: { campo: 'bolsaCorretagem', nome: 'Corretagem', fmt: vezes },
+  bolsa_limite: { campo: 'bolsaLimite', nome: 'Limite de ações a mais', fmt: (x) => `+${num(x, 0)}` },
+  bolsa_limite_mult: { campo: 'bolsaLimiteMult', nome: 'Limite de ações', fmt: vezes },
+  bolsa_limite_soma: { campo: 'bolsaLimiteSoma', nome: 'Limite de ações (Fundo de índice)', fmt: (x) => mais(x - 1) },
+  bolsa_espiadas: { campo: 'bolsaEspiadas', nome: 'Espiadas grátis por dia', fmt: (x) => num(x, 0) },
+  bolsa_escritorio: { campo: 'bolsaEscritorio', nome: 'Bônus do Escritório', fmt: vezes },
+  conv_recarga: { campo: 'convRecarga', nome: 'Cada troca volta em', fmt: (x) => `${num(60 / x, 0)} min` },
+  conv_trocas: { campo: 'convTrocas', nome: 'Trocas guardadas', fmt: (x) => num(3 + x, 0) },
+  conv_cadeira2: { campo: 'convCadeira2', nome: 'A cadeira do meio vale', fmt: pct },
+  conv_cadeira3: { campo: 'convCadeira3', nome: 'A cadeira do canto vale', fmt: pct },
+  conv_queda: { campo: 'convQueda', nome: 'A faixa do MC V.V cai', fmt: pct },
+  conv_efeito: { campo: 'convEfeito', nome: 'Bônus de produção dos convidados', fmt: mais },
+  mapa_abrir: { campo: 'mapaAbrir', nome: 'Abrir lugar custa', fmt: pct },
+  mapa_nivel: { campo: 'mapaNivel', nome: 'Subir nível custa', fmt: pct },
+  marcos_mult: { campo: 'marcosMult', nome: 'Marcos dos lugares', fmt: vezes },
+  marcos_soma: { campo: 'marcosSoma', nome: 'Marcos (Rolê infinito)', fmt: (x) => mais(x - 1) },
+  tee_publico: { campo: 'teePublico', nome: 'Público da Camisetaria', fmt: vezes },
+  tee_tempo: { campo: 'teeTempo', nome: 'A coleção vende em', fmt: (x) => `${num(30 * x, 0)} min` },
+  copao_mult: { campo: 'copaoMult', nome: 'Fichas do Copão', fmt: vezes },
+  lixo_min: { campo: 'lixoMin', nome: 'Cada destroço vale', fmt: (x) => `${num(x, 0)} min de produção` },
+  silver_min: { campo: 'silverMin', nome: 'O Silver tape dura', fmt: (x) => `${num(x, 0)} min` },
+  silver_mult: { campo: 'silverMult', nome: 'O Silver tape vale', fmt: vezes },
+  legado_mult: { campo: 'legadoMult', nome: 'Melhorias de legado', fmt: vezes },
+  espaco_soma: { campo: 'espaco', nome: 'Geradores das eras 6+', fmt: (x) => mais(x - 1) },
+  era_freq: { campo: 'eraFreq', nome: 'Eventos de era aparecem', fmt: vezes },
+  era_janela: { campo: 'eraJanela', nome: 'Eventos de era na tela', fmt: vezes },
+};
+
+/** Quanto o nó soma de F$/s agora (só os de produção; os outros: 0). A conta da página na proporção da taxa do banco. */
+function ganhoNo(s: IdleState, no: No, antes: EfeitosArvore, depois: EfeitosArvore): number {
+  if (no.tipo === 'producao') return s.rate * (depois.producao / antes.producao - 1);
+  if (no.tipo === 'producao_soma') return s.rate * (depois.producaoSoma / antes.producaoSoma - 1);
+  if (no.tipo === 'espaco_soma') {
+    const r = rendasGeradores(catalogo, s);
+    const total = r.reduce((a, x) => a + x, 0);
+    const espaco = r.reduce((a, x, i) => (catalogo.geradores[i].era >= 6 ? a + x : a), 0);
+    return total > 0 ? s.rate * (espaco / total) * (depois.espaco / antes.espaco - 1) : 0;
+  }
+  return 0;
+}
+
+/** A caixinha de um nó da árvore (mouse no PC, foco no teclado): o efeito, o que muda nos seus números (agora → com o
+ *  nó, ou o próximo nível no infinito), quanto de F$/s dá agora e o portão que falta. */
+export function dicaNo(s: IdleState, no: No): Dica {
+  const c = contextoArvore(s);
+  const tem = c.arvore.includes(no.id);
+  const infinito = no.cresce !== null;
+  const nivel = nivelNo(no, c);
+  const antes = efeitosArvore(catalogo, c.arvore, c.niveis);
+  const linhas: LinhaDica[] = [{ texto: no.efeito }];
+  const k = CAMPO_NO[no.tipo];
+  if (tem && !infinito) {
+    linhas.push({ texto: k ? `Já é seu · ${k.nome}: ${k.fmt(antes[k.campo] as number)}` : 'Já é seu', tom: 'bom' });
+    return { titulo: no.nome, linhas };
+  }
+  const depois = efeitosArvore(catalogo, tem ? c.arvore : [...c.arvore, no.id], infinito ? { ...c.niveis, [no.id]: nivel + 1 } : c.niveis);
+  if (k) linhas.push({ texto: `${k.nome}: ${k.fmt(antes[k.campo] as number)} → ${k.fmt(depois[k.campo] as number)}` });
+  const ganho = ganhoNo(s, no, antes, depois);
+  if (ganho > 0) linhas.push({ texto: `${formatarTaxa(ganho)} na sua produção agora`, tom: 'bom' });
+  if (infinito) linhas.push({ texto: `Nível ${nivel} → ${nivel + 1}`, tom: 'fraco' });
+  const p = tem ? null : portao(no, c);
+  if (p) linhas.push({ texto: p, tom: 'ruim' });
+  return { titulo: no.nome, linhas };
 }

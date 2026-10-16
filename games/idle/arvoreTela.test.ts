@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IdleState } from '../shared/types';
 import { ativos } from './ativos';
-import { criarArvoreTela, miniArvore } from './arvoreTela';
+import { copaBarras, criarArvoreTela, type LigarDica } from './arvoreTela';
+import { MUNDO_ARVORE, POSICOES_ARVORE, ZOOM_ABRIR, ZOOM_MIN } from './legado';
 
+const L = MUNDO_ARVORE.largura;
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
-  user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(29).fill(0)],
-  upgrades: [], strategies: [-1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10, promo_ate: null, viral: [],
+  user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0.5, generators: [1, ...Array(41).fill(0)],
+  upgrades: [], strategies: [-1, -1, -1, -1, -1, -1], era: 1, boost_until: null, half_price: false, opp_claimed: [], opp_left: 10, promo_ate: null, viral: [],
   server_now: '2026-10-12T12:00:00.000Z',
   avatar: null, equipe: [], chefes: [], social: { contratei: 0, empregos: [] }, hire_price: 0, muda_em: null,
   bonus: { arvore: [], conquistas: 0 }, pontos: 0, pontos_vida: 0, vendas: 0, recorde: 0, pontos_venda: 0, conquistas: [], novas: [],
@@ -16,27 +18,36 @@ const estado = (x: Partial<IdleState> = {}): IdleState => ({
 });
 
 let comprar: ReturnType<typeof vi.fn<(id: number) => void>>;
+let ligar: ReturnType<typeof vi.fn<LigarDica>>;
 let volta: HTMLButtonElement;
 beforeEach(() => {
   document.body.innerHTML = '<button id="volta">Abrir</button>';
   volta = document.getElementById('volta') as HTMLButtonElement;
   comprar = vi.fn<(id: number) => void>();
+  ligar = vi.fn<LigarDica>();
 });
-const abrir = (s: IdleState, ocupado = false) => {
-  const t = criarArvoreTela(comprar);
+const abrir = (s: IdleState, ocupado = false, no?: number) => {
+  const t = criarArvoreTela(comprar, ligar);
   document.body.append(t.elemento);
-  t.abrir(s, ocupado, () => volta);
+  t.abrir(s, ocupado, () => volta, no);
   return t;
 };
 const no = (id: number) => document.querySelector<HTMLButtonElement>(`.no-arvore[data-no="${id}"]`)!;
 const cartao = () => document.querySelector('.arvore-cartao')!;
+const mundo = () => document.querySelector<HTMLElement>('.arvore-mundo')!;
+const largura = () => parseFloat(mundo().style.width);
+const translate = () => {
+  const m = /translate\((-?[\d.e-]+)px, (-?[\d.e-]+)px\)/.exec(mundo().style.transform)!;
+  return { x: Number(m[1]), y: Number(m[2]) };
+};
+/** O deslocamento que põe o nó no meio do palco, no zoom k. */
+const noMeio = (id: number, k: number) => ({ x: (L / 2 - POSICOES_ARVORE[id][0]) * k, y: (L / 2 - POSICOES_ARVORE[id][1]) * k });
 
-describe('árvore em tela cheia', () => {
-  it('fechada até abrir; abre com os 120 nós, as situações nas classes e os pontos no topo', () => {
-    const t = criarArvoreTela(comprar);
+describe('árvore grande em tela cheia (a constelação)', () => {
+  it('fechada até abrir; abre com os 120 nós, situação e forma nas classes, o anel da era 7 e os pontos no topo', () => {
+    const t = criarArvoreTela(comprar, ligar);
     document.body.append(t.elemento);
     expect(t.aberta()).toBe(false);
-    expect(t.elemento.hasAttribute('hidden')).toBe(true);
     t.abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }), false, () => volta);
     expect(t.aberta()).toBe(true);
     expect(document.querySelectorAll('.no-arvore')).toHaveLength(120);
@@ -44,50 +55,92 @@ describe('árvore em tela cheia', () => {
     expect(no(21).classList.contains('pode')).toBe(true);
     expect(no(12).classList.contains('falta')).toBe(true);
     expect(no(13).classList.contains('trancado')).toBe(true);
-    expect(no(12).getAttribute('aria-label')).toBe('Ô loco, bicho!, falta 1 ★');
+    expect(no(701).classList.contains('portao')).toBe(true);
+    expect(no(701).querySelector('.no-cadeado')).not.toBeNull();
+    expect(no(110).classList.contains('grande')).toBe(true);
+    expect(no(3001).classList.contains('infinito')).toBe(true);
+    expect(no(2005).classList.contains('ponte')).toBe(true);
     expect(no(12).querySelector('.no-custo')!.textContent).toBe('4 ★');
     expect(no(11).querySelector('.no-custo')).toBeNull();
     expect(document.querySelectorAll('.ligacao')).toHaveLength(128); // 119 do nó pro anterior + a 2ª linha das 9 pontes
-    expect(document.querySelectorAll('.ligacao.comprado')).toHaveLength(1); // 1 → 11
+    expect(document.querySelectorAll('.ligacao.acesa')).toHaveLength(1); // 1 → 11: o caminho comprado
+    expect(document.querySelectorAll('.arvore-anel')).toHaveLength(1);
+    expect(document.querySelector('.arvore-anel-rotulo')!.textContent).toBe('Era 7');
+    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent))
+      .toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
     expect(document.querySelector('.arvore-pontos')!.textContent).toBe('★ 3');
-    expect([...document.querySelectorAll('.arvore-ramo')].map((r) => r.textContent)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
+    expect(ligar).toHaveBeenCalledWith(no(106), 'no-106', expect.any(Function)); // a caixinha (mouse/teclado)
   });
-  it('abre com o nó mais barato que dá pra comprar escolhido; Comprar chama comprar(id)', () => {
+  it('abre no nó mais barato que dá pra comprar (ou no pedido), no meio do palco e num zoom que dá pra ler', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
     expect(no(21).getAttribute('aria-pressed')).toBe('true');
+    expect(largura()).toBeCloseTo(L * ZOOM_ABRIR, 6);
+    const t = translate();
+    expect(t.x).toBeCloseTo(noMeio(21, ZOOM_ABRIR).x, 6);
+    expect(t.y).toBeCloseTo(noMeio(21, ZOOM_ABRIR).y, 6);
     expect(cartao().textContent).toContain('Porquinho quebrado');
     expect(cartao().textContent).toContain('Recomeço · 1 de 10');
-    expect(cartao().textContent).toContain('O Abrir CNPJ começa com F$ 1 mil.');
     const b = cartao().querySelector('button')!;
     expect(b.textContent).toBe('Comprar · 2 ★');
     b.click();
     expect(comprar).toHaveBeenCalledWith(21);
-  });
-  it('tocar noutro nó troca o cartão: falta ponto, trancado, comprado', () => {
-    abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
-    no(12).click();
+    document.body.innerHTML = '';
+    abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }), false, 12);
     expect(no(12).getAttribute('aria-pressed')).toBe('true');
-    expect(no(21).getAttribute('aria-pressed')).toBe('false');
-    const b = cartao().querySelector('button')!;
-    expect(b.textContent).toBe('Falta 1 ★');
-    expect(b.disabled).toBe(true);
-    no(13).click();
+  });
+  it('a fileira de ramos: a Raiz no meio e os 10 na ordem da copa; tocar num ramo leva pro raio dele (o próximo nó, no meio)', () => {
+    abrir(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
+    const fileira = [...document.querySelectorAll<HTMLButtonElement>('.arvore-fileira .ramo-botao')];
+    expect(fileira.map((b) => b.textContent)).toEqual(['Horta', 'Mapa do rolê', 'Gente', 'PPP Podcast', 'Recomeço', 'Raiz', 'Produção', 'Espaço', 'Oportunidades', 'Bolsa', 'Dourados']);
+    // afasta tudo e pula pra Produção: o 11 é seu, o próximo é o 12; o zoom volta pro de ler
+    for (let i = 0; i < 20; i++) document.querySelector<HTMLButtonElement>('.arvore-zoom .zoom-menos')!.click();
+    fileira[6].click();
+    expect(no(12).getAttribute('aria-pressed')).toBe('true');
+    expect(largura()).toBeCloseTo(L * ZOOM_ABRIR, 6);
+    expect(translate().x).toBeCloseTo(noMeio(12, ZOOM_ABRIR).x, 6);
+    expect(translate().y).toBeCloseTo(noMeio(12, ZOOM_ABRIR).y, 6);
+    // a fileira é refeita a cada desenho: procura de novo
+    expect(document.querySelectorAll<HTMLButtonElement>('.arvore-fileira .ramo-botao')[6].getAttribute('aria-pressed')).toBe('true');
+    expect(cartao().textContent).toContain('Ô loco, bicho!');
+  });
+  it('cartão: falta ponto, trancado, portão (com cadeado e o motivo), comprado; infinito com o nível e o próximo preço', () => {
+    abrir(estado({ pontos: 3, vendas: 1, bonus: { arvore: [1, 11, 12, 13, 14, 15], conquistas: 0 } }));
+    no(21).click();
+    expect(cartao().querySelector('button')!.textContent).toBe('Comprar · 2 ★');
+    no(106).click();
     expect(cartao().querySelector('button')).toBeNull();
-    expect(cartao().textContent).toContain('Libera com Ô loco, bicho!');
+    expect(cartao().querySelector('.portao-motivo .cadeado')).not.toBeNull();
+    expect(cartao().textContent).toContain('Falta: 3 vendas (você tem 1)');
+    no(107).click();
+    expect(cartao().textContent).toContain('Libera com Coach quântico');
     no(11).click();
-    expect(cartao().querySelector('button')).toBeNull();
     expect(cartao().textContent).toContain('Comprado');
+    document.body.innerHTML = '';
+    abrir(estado({ pontos: 5000, vendas: 10, bonus: { arvore: [3001], conquistas: 0, niveis: { 3001: 7 } } }), false, 3001);
+    expect(cartao().textContent).toContain('Nível 7 → 8');
+    expect(cartao().textContent).toContain(`${Math.round(1000 * 1.6 ** 7)} ★`);
+    expect(no(3001).querySelector('.no-nivel')!.textContent).toBe('nv 7');
+    expect(no(3001).querySelector('.no-custo')!.textContent).toBe(`${Math.round(1000 * 1.6 ** 7)} ★`);
+    expect(no(3001).classList.contains('nivelado')).toBe(true);
+  });
+  it('falta ponto: o botão diz quanto falta, apagado', () => {
+    abrir(estado({ pontos: 1, bonus: { arvore: [1, 11], conquistas: 0 } }), false, 21);
+    expect(no(21).classList.contains('falta')).toBe(true);
+    expect(cartao().querySelector('button')!.textContent).toBe('Falta 1 ★');
+    expect(cartao().querySelector('button')!.disabled).toBe(true);
   });
   it('ocupado: Comprar apagado', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }), true);
     expect(cartao().querySelector<HTMLButtonElement>('button')!.disabled).toBe(true);
   });
-  it('renderizar de novo (comprou) mantém o escolhido e acende o nó', () => {
+  it('renderizar de novo (comprou) mantém o escolhido, o zoom e o lugar, e acende o nó', () => {
     const t = abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     expect(no(11).getAttribute('aria-pressed')).toBe('true');
+    const antes = mundo().style.transform;
     t.renderizar(estado({ pontos: 1, bonus: { arvore: [1, 11], conquistas: 0 } }), false);
     expect(no(11).getAttribute('aria-pressed')).toBe('true');
     expect(no(11).classList.contains('comprado')).toBe(true);
+    expect(mundo().style.transform).toBe(antes);
     expect(cartao().textContent).toContain('Comprado');
     expect(document.querySelector('.arvore-pontos')!.textContent).toBe('★ 1');
   });
@@ -102,42 +155,88 @@ describe('árvore em tela cheia', () => {
     expect(t.aberta()).toBe(false);
     expect(document.activeElement).toBe(volta);
   });
-  it('Esc fecha mesmo com o foco fora da árvore (o botão comprado sumiu, clicou no céu)', () => {
+  it('Esc fecha mesmo com o foco fora da árvore', () => {
     const t = abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     (document.activeElement as HTMLElement).blur();
-    expect(document.activeElement).toBe(document.body);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(t.aberta()).toBe(false);
     expect(document.activeElement).toBe(volta);
-    // fechada, o Esc da página não é da árvore
-    const ouvido = vi.fn();
-    t.elemento.addEventListener('keydown', ouvido);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(t.aberta()).toBe(false);
   });
-  it('arrastar e soltar em cima de um nó não escolhe o nó', () => {
+  it('arrastar e soltar em cima de um nó não escolhe o nó; um toque de verdade escolhe', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
-    const alvo = no(41);
-    palco.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true }));
-    palco.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 120, bubbles: true }));
-    palco.dispatchEvent(new PointerEvent('pointerup', { clientX: 140, clientY: 120, bubbles: true }));
-    alvo.click();
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 140, clientY: 120, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 140, clientY: 120, bubbles: true }));
+    no(41).click();
     expect(no(41).getAttribute('aria-pressed')).toBe('false');
-    // um toque de verdade depois do arraste escolhe
-    palco.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true }));
-    palco.dispatchEvent(new PointerEvent('pointerup', { clientX: 11, clientY: 10, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 10, clientY: 10, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 11, clientY: 10, bubbles: true }));
     no(41).click();
     expect(no(41).getAttribute('aria-pressed')).toBe('true');
+  });
+  it('pinça (dois dedos): aproxima e não escolhe nem compra no fim', () => {
+    abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
+    const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
+    const antes = mundo().style.width;
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, clientX: 200, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientX: 220, clientY: 100, bubbles: true })); // 100 → 120
+    expect(largura()).toBeCloseTo(L * ((ZOOM_ABRIR * 120) / 100), 6);
+    expect(mundo().style.width).not.toBe(antes);
+    palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, clientX: 220, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
+    no(41).click();
+    expect(no(41).getAttribute('aria-pressed')).toBe('false');
+    cartao().querySelector<HTMLButtonElement>('button')?.click();
+    expect(comprar).toHaveBeenCalledTimes(1); // só o clique de verdade no botão (o 11, escolhido ao abrir)
+  });
+  it('botões de zoom: + aproxima até 1,4 (apaga), − afasta até a constelação inteira (apaga; longe, sem rótulos)', () => {
+    abrir(estado());
+    const mais = document.querySelector<HTMLButtonElement>('.arvore-zoom .zoom-mais')!;
+    const menos = document.querySelector<HTMLButtonElement>('.arvore-zoom .zoom-menos')!;
+    expect(mais.getAttribute('aria-label')).toBe('Aproximar');
+    expect(menos.getAttribute('aria-label')).toBe('Afastar');
+    for (let i = 0; i < 6; i++) mais.click();
+    expect(mais.disabled).toBe(true);
+    expect(largura()).toBeCloseTo(L * 1.4, 6);
+    expect(mundo().classList.contains('sem-rotulos')).toBe(false);
+    for (let i = 0; i < 30; i++) menos.click();
+    expect(menos.disabled).toBe(true);
+    expect(largura()).toBeCloseTo(L * ZOOM_MIN, 6); // o palco sem tamanho (teste): o mínimo é o ZOOM_MIN
+    expect(mundo().classList.contains('sem-rotulos')).toBe(true);
+    expect(mundo().classList.contains('longe')).toBe(true); // os ícones viram estrelinhas (abaixo de 16 px borrariam)
   });
   it('com a página ampliada (zoom do PC), o mundo anda junto com o mouse, não mais rápido', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
-    for (const k of ['clientWidth', 'clientHeight', 'offsetWidth']) Object.defineProperty(palco, k, { configurable: true, value: 100 });
-    palco.getBoundingClientRect = () => ({ width: 200, height: 200 }) as DOMRect; // zoom 2: 100 de layout viram 200 na tela
-    palco.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true }));
-    palco.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 120, bubbles: true }));
-    expect(document.querySelector<HTMLElement>('.arvore-mundo')!.style.transform).toBe('translate(20px, 10px)');
+    for (const k of ['clientWidth', 'clientHeight', 'offsetWidth']) Object.defineProperty(palco, k, { configurable: true, value: 200 });
+    palco.getBoundingClientRect = () => ({ width: 400, height: 400 }) as DOMRect; // zoom 2: 200 de layout viram 400 na tela
+    const t0 = translate();
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 140, clientY: 120, bubbles: true }));
+    const t1 = translate();
+    expect(t1.x - t0.x).toBeCloseTo(20, 6);
+    expect(t1.y - t0.y).toBeCloseTo(10, 6);
+  });
+  it('a caixinha: segue o nó quando a vista fica parada (comprou, escolheu); fecha quando a vista anda (zoom, ramo, arraste)', () => {
+    const dicas = { conferir: vi.fn(), esconder: vi.fn() };
+    const t = criarArvoreTela(comprar, ligar, dicas);
+    document.body.append(t.elemento);
+    t.abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }), false, () => volta);
+    dicas.conferir.mockClear();
+    dicas.esconder.mockClear();
+    t.renderizar(estado({ pontos: 1, bonus: { arvore: [1, 11], conquistas: 0 } }), false);
+    no(21).click();
+    expect(dicas.conferir).toHaveBeenCalledTimes(2);
+    expect(dicas.esconder).not.toHaveBeenCalled();
+    document.querySelector<HTMLButtonElement>('.arvore-zoom .zoom-mais')!.click();
+    document.querySelectorAll<HTMLButtonElement>('.arvore-fileira .ramo-botao')[0].click();
+    const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
+    palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 140, clientY: 120, bubbles: true }));
+    expect(dicas.esconder).toHaveBeenCalledTimes(3);
+    expect(dicas.conferir).toHaveBeenCalledTimes(2);
   });
   it('ícone sem a arte: só a moldura', () => {
     const sem = vi.spyOn(ativos, 'no').mockReturnValue(null);
@@ -153,18 +252,14 @@ describe('árvore em tela cheia', () => {
     expect([...document.querySelectorAll('.arvore-legenda li')].map((x) => x.textContent))
       .toEqual(['Comprado', 'Dá pra comprar', 'Falta ponto', 'Tem portão', 'Trancado']);
   });
-  it('miniatura: 120 quadradinhos e 128 linhas, decorativa', () => {
-    const svg = miniArvore(estado({ pontos: 3, bonus: { arvore: [1, 11], conquistas: 0 } }));
-    expect(svg.getAttribute('aria-hidden')).toBe('true');
-    expect(svg.querySelectorAll('rect.mini-no')).toHaveLength(120);
-    expect(svg.querySelectorAll('line.ligacao')).toHaveLength(128);
-    expect(svg.querySelectorAll('rect.mini-no.comprado')).toHaveLength(2);
-  });
-  it('nó com portão: o cartão diz o que falta, sem botão', () => {
-    abrir(estado({ pontos: 99, vendas: 1, bonus: { arvore: [1, 11, 12, 13, 14, 15], conquistas: 0 } }));
-    no(106).click();
-    expect(no(106).classList.contains('portao')).toBe(true);
-    expect(cartao().querySelector('button')).toBeNull();
-    expect(cartao().textContent).toContain('Falta: 3 vendas (você tem 1)');
+  it('as barrinhas do quadro: 10, na ordem da copa, cheias na proporção, decorativas', () => {
+    const b = copaBarras(estado({ bonus: { arvore: [1, 11, 12, 13, 14, 15, 106, 107, 108, 109, 110, 61], conquistas: 0 } }));
+    expect(b.getAttribute('aria-hidden')).toBe('true');
+    const barras = [...b.querySelectorAll<HTMLElement>('.barra')];
+    expect(barras).toHaveLength(10);
+    expect(barras[5].style.getPropertyValue('--cheio')).toBe('100%'); // a Produção é a 6ª da copa
+    expect(barras[5].classList.contains('cheia')).toBe(true);
+    expect(barras[0].style.getPropertyValue('--cheio')).toBe('10%'); // a Horta: 1 de 10
+    expect(barras[1].style.getPropertyValue('--cheio')).toBe('0%');
   });
 });

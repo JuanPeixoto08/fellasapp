@@ -4,14 +4,14 @@ import type { IdleState } from '../shared/types';
 import { catalogo, type Melhoria } from './catalogo';
 import {
   dicaContratos, dicaDesafio, dicaDourado, dicaEspiar, dicaEventoEra, dicaGerador, dicaMarco, dicaMelhoria, dicaNivel, dicaOportunidade, dicaPino, dicaProducao, dicaTeeCor, dicaTeeEstilo, dicaTeeFoco,
-  dicaCupPreco, dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, num, tempoDeProducao,
+  dicaCupPreco, dicaNo, dicaTeeLote, dicaTeePeca, dicaTeeRelatorio, dicaTeeTema, dicaTeeTrancados, num, tempoDeProducao,
 } from './dica';
 import { lucroVenda as lucroVendaCup } from './copao';
 import { caderno } from './camisetaria';
 import { MARCOS } from './mapa';
 import type { LugarEstado } from '../shared/types';
 import { fatores, multContratos, taxa } from './economia';
-import { formatarValor } from './formatar';
+import { formatarTaxa, formatarValor } from './formatar';
 
 const estado = (x: Partial<IdleState> = {}): IdleState => ({
   user_id: 'u', week_start: '2026-10-12', started: true, valuation: 0, rate: 0, generators: Array(30).fill(0),
@@ -426,5 +426,46 @@ describe('eventos das eras 6 e 7 na caixinha', () => {
   it('a produção mostra o Silver tape valendo', () => {
     const s = comTaxa({ silver_ate: '2026-10-12T12:01:00.000Z' });
     expect(textos(dicaProducao(s, Date.parse(s.server_now)))).toContain('Agora: ×4 do Silver tape');
+  });
+});
+
+describe('caixinha dos nós da árvore (o que está agora → com o nó)', () => {
+  const no = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
+  it('nó de soma: a soma antes e depois e quanto de F$/s dá agora', () => {
+    const s = estado({ rate: 1000, vendas: 3, bonus: { arvore: [1, 11, 12, 13, 14, 15], conquistas: 0 } });
+    const t = textos(dicaNo(s, no(106)));
+    expect(t[0]).toBe(no(106).efeito);
+    expect(t).toContain('Soma de produção: +0% → +20%');
+    expect(t).toContain(`${formatarTaxa(1000 * (1.2 / 1 - 1))} na sua produção agora`); // +20% de 1.000/s
+  });
+  it('nó de produção (multiplica): o antes e depois e o ganho', () => {
+    const s = estado({ rate: 1000, bonus: { arvore: [1], conquistas: 0 } });
+    const t = textos(dicaNo(s, no(11)));
+    expect(t.some((x) => x.startsWith('Produção da árvore: ×1,05 → ×1,1'))).toBe(true);
+    expect(t.some((x) => x.endsWith('na sua produção agora'))).toBe(true);
+  });
+  it('infinito: o nível e o efeito do próximo', () => {
+    const s = estado({ rate: 1000, vendas: 10, bonus: { arvore: [3001], conquistas: 0, niveis: { 3001: 4 } } });
+    const t = textos(dicaNo(s, no(3001)));
+    expect(t).toContain('Soma de produção: +20% → +25%');
+    expect(t).toContain('Nível 4 → 5');
+  });
+  it('portão: o que falta; minigame: o número de antes e de depois', () => {
+    expect(textos(dicaNo(estado({ vendas: 1, bonus: { arvore: [15], conquistas: 0 } }), no(106)))).toContain('Falta: 3 vendas (você tem 1)');
+    expect(textos(dicaNo(estado({ era: 4 }), no(701)))).toContain('Corretagem: ×1 → ×0,8');
+    expect(textos(dicaNo(estado({ era: 6 }), no(1001)))).toContain('Cada destroço vale: 10 min de produção → 15 min de produção');
+  });
+  it('fixo que já é seu: diz que é seu e o efeito agora; nada de NaN com resposta velha', () => {
+    const t = textos(dicaNo(estado({ bonus: { arvore: [1, 31, 32, 33, 34, 35, 306], conquistas: 0 } }), no(306)));
+    expect(t).toContain('Já é seu · A caixinha guarda: 6');
+    for (const n of [1, 106, 701, 3001, 2005, 1010]) expect(textos(dicaNo(estado(), no(n))).join(' ')).not.toContain('NaN');
+  });
+  it('todos os 120 nós têm caixinha com título e o efeito', () => {
+    for (const n of catalogo.arvore) {
+      const d = dicaNo(estado({ rate: 10 }), n);
+      expect(d.titulo).toBe(n.nome);
+      expect(d.linhas[0].texto).toBe(n.efeito);
+      expect(d.linhas.map((l) => l.texto).join(' ')).not.toMatch(/NaN|undefined|Infinity/);
+    }
   });
 });

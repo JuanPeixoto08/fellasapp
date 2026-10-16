@@ -206,12 +206,56 @@ export const ROTULOS_ARVORE: readonly { ramo: number; nome: string; x: number; y
   return { ramo, nome: RAMOS[ramo], x, y };
 });
 
-/** Quanto a copa cresce na tela: a copa inteira cabe no lado mais apertado, entre 0,1 e 1,4 (o mundo é grande; o
- *  zoom do jogador, Task 10, vai por cima). */
-export function escalaArvore(largura: number, altura: number): number {
-  const s = Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura);
-  return Math.min(1.4, Math.max(0.1, s));
+/** O zoom da tela (16/10): o mínimo faz a constelação inteira caber no palco (nunca abaixo de ZOOM_MIN nem acima de 1;
+ *  o mundo tem ~2200 de lado, então no celular o mínimo fica perto de 0,18, os nós viram estrelinhas); o máximo é
+ *  ZOOM_MAX. Ao abrir (e ao pular pra um ramo) a tela vai pro ZOOM_ABRIR: o nó com 32 px ou mais no celular. */
+export const ZOOM_MIN = 0.1;
+export const ZOOM_MAX = 1.4;
+export const ZOOM_ABRIR = 0.8;
+export function escalaMinima(largura: number, altura: number): number {
+  return Math.min(1, Math.max(ZOOM_MIN, Math.min(largura / MUNDO_ARVORE.largura, altura / MUNDO_ARVORE.altura)));
 }
+export const limitarZoom = (z: number, minimo: number): number => Math.min(ZOOM_MAX, Math.max(minimo, z));
+
+/** Quanto passa do centro do nó mais de fora o que fica em volta dele na tela (o losango do infinito, 28, e as etiquetas
+ *  de preço e de nível em cima das bordas, 8), com folga: o anel na tela fica por fora disso. O texto não encolhe com o
+ *  zoom, então a folga é em px da tela. */
+const EM_VOLTA_PX = 64;
+/** Os nomes dos ramos e as etiquetas de preço/nível só a partir deste zoom (o texto não encolhe: abaixo, encostariam
+ *  nos nós); a fileira mostra os ramos sempre. */
+export const ZOOM_ROTULOS = 0.8;
+/** Abaixo disto o ícone teria menos de 16 px (borra): os nós viram estrelinhas, sem etiqueta nenhuma. */
+export const ZOOM_LONGE = 1 / 3;
+const RAIOS_NOS = Object.values(POSICOES_ARVORE).map(([x, y]) => Math.hypot(x - CENTRO, y - CENTRO));
+/** O raio do anel na tela (px, k = px por unidade): o do mundo, ou mais pra fora se as etiquetas do nó mais de fora
+ *  dentro dele (que não encolhem) passariam por baixo da linha. Sem etiquetas (longe), o do mundo: a constelação
+ *  inteira cabe no zoom mínimo. Entre os dois, só o cadeado (o losango até 22 + 8 da etiqueta). */
+export function raioAnelTela(anel: { raio: number }, k: number): number {
+  const dentro = Math.max(0, ...RAIOS_NOS.filter((r) => r < anel.raio));
+  const volta = k >= ZOOM_ROTULOS - 1e-9 ? EM_VOLTA_PX : k >= ZOOM_LONGE ? 36 : 0;
+  return Math.max(anel.raio * k, dentro * k + volta);
+}
+/** Folga entre o anel e o nome do ramo, em px da tela. */
+const FOLGA_ROTULO_PX = 10;
+/** O centro (px da tela) do nome de um ramo com a caixa w × h: no ângulo do ramo, com a caixa inteira por fora do anel
+ *  de fora (o ponto da caixa mais perto do centro fica a FOLGA_ROTULO_PX da linha). Antes o anel da era 7 (raio 1022)
+ *  cortava os nomes (raio 1038). */
+export function posicaoRotulo(ramo: number, k: number, w: number, h: number): { x: number; y: number } {
+  const a = anguloRamo(colunaDe(ramo));
+  const anel = Math.max(0, ...ANEIS_ARVORE.map((x) => raioAnelTela(x, k)));
+  // o meio da caixa vai além da linha o "raio de apoio" da caixa naquela direção (|cos|·w/2 + |sin|·h/2)
+  const r = anel + FOLGA_ROTULO_PX + (Math.abs(Math.cos(a)) * w) / 2 + (Math.abs(Math.sin(a)) * h) / 2;
+  return { x: CENTRO * k + r * Math.cos(a), y: CENTRO * k + r * Math.sin(a) };
+}
+
+/** Quantos dos 10 nós fixos de um ramo você tem (as barrinhas do quadro do Legado). */
+export function progressoRamo(ramo: number, c: Pick<ContextoArvore, 'arvore'>): { comprados: number; total: number } {
+  const nos = catalogo.arvore.filter((n) => n.ramo === ramo && n.posicao <= 10);
+  return { comprados: nos.filter((n) => c.arvore.includes(n.id)).length, total: nos.length };
+}
+/** A altura de cada barrinha (fração), pela ordem da copa: as do meio mais altas (o Recomeço e a Produção, no topo da
+ *  constelação), as das pontas a 0,55. */
+export const alturaBarra = (k: number): number => 0.55 + 0.45 * (1 - ((k - 4.5) / 4.5) ** 2);
 
 /** A situação de um nó na tela. O infinito que você já tem segue comprável (o próximo nível). */
 export type SituacaoTela = 'comprado' | 'pode' | 'falta' | 'portao' | 'trancado';

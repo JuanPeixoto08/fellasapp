@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IdleState } from '../shared/types';
 import { catalogo } from './catalogo';
 import {
-  avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaArvore, falta, faltam, ganhouEm, grade, liberadoNo,
-  MUNDO_ARVORE, GEOMETRIA_ARVORE, ANEIS_ARVORE, nivelNo, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
+  alturaBarra, avisos, contextoArvore, criarFilaAvisos, descricaoNo, detectarNovas, dicaConquista, escalaMinima, falta, faltam, ganhouEm, grade, liberadoNo,
+  MUNDO_ARVORE, GEOMETRIA_ARVORE, ANEIS_ARVORE, limitarZoom, nivelNo, posicaoRotulo, progressoRamo, raioAnelTela, ZOOM_ABRIR, ZOOM_MAX, ZOOM_MIN, noInicial, ondeNo, pontos, portao, POSICOES_ARVORE, precoNo, RAMOS_ARVORE, ROTULOS_ARVORE, situacao, situacaoTela,
   textoVenda, TOTAL_CONQUISTAS, type ContextoArvore,
 } from './legado';
 
@@ -277,15 +277,62 @@ describe('árvore em tela cheia: a constelação', () => {
     for (const id of Object.keys(POSICOES_ARVORE).map(Number)) expect(a7.raio).toBeGreaterThan(polar(id).r);
     for (const r of ROTULOS_ARVORE) expect(a7.raio).toBeLessThan(Math.hypot(r.x - C, r.y - C));
   });
-  it('escala: a copa inteira cabe no palco, entre 0,1 e 1,4', () => {
-    expect(L * escalaArvore(390, 700)).toBeLessThanOrEqual(390);
-    expect(L * escalaArvore(2000, 961)).toBeLessThanOrEqual(961);
-    for (const [w, h] of [[390, 700], [2000, 961], [100, 100], [9000, 9000]]) {
-      expect(escalaArvore(w, h)).toBeGreaterThanOrEqual(0.1);
-      expect(escalaArvore(w, h)).toBeLessThanOrEqual(1.4);
+  it('zoom: o mínimo faz a copa inteira caber no palco (nunca abaixo de ZOOM_MIN nem acima de 1); o zoom fica entre o mínimo e 1,4', () => {
+    expect(escalaMinima(L, L + 300)).toBe(1);
+    expect(escalaMinima(4000, 4000)).toBe(1);
+    expect(escalaMinima(390, 560)).toBeCloseTo(390 / L, 12); // o celular: a constelação inteira na largura
+    expect(L * escalaMinima(390, 560)).toBeLessThanOrEqual(390);
+    expect(L * escalaMinima(1138, 600)).toBeLessThanOrEqual(600); // o PC (2000×961): a altura manda
+    expect(escalaMinima(100, 100)).toBe(ZOOM_MIN);
+    expect(limitarZoom(3, 0.3)).toBe(ZOOM_MAX);
+    expect(limitarZoom(0.05, 0.3)).toBe(0.3);
+    expect(limitarZoom(0.8, 0.3)).toBe(0.8);
+    expect(ZOOM_MAX).toBe(1.4);
+    expect(52 * ZOOM_ABRIR).toBeGreaterThanOrEqual(32); // ao abrir, o nó tem 32 px ou mais no celular
+  });
+  it('o anel na tela passa por fora do texto embaixo dos nós de fora (preço, nível), em qualquer zoom com rótulo', () => {
+    const a7 = ANEIS_ARVORE.find((a) => a.era === 7)!;
+    const maisFora = Math.max(...Object.keys(POSICOES_ARVORE).map((id) => polar(Number(id)).r));
+    for (const k of [0.8, 1, 1.4]) {
+      expect(raioAnelTela(a7, k)).toBeGreaterThanOrEqual(a7.raio * k);
+      expect(raioAnelTela(a7, k)).toBeGreaterThanOrEqual(maisFora * k + 60); // o losango (28) + a etiqueta (8), com folga
     }
-    expect(escalaArvore(9000, 9000)).toBe(1.4);
-    expect(escalaArvore(100, 100)).toBe(0.1);
+    // longe (sem etiquetas): o anel do mundo, dentro do quadrado (a constelação inteira cabe no zoom mínimo)
+    for (const k of [0.1, 0.2, 0.3]) {
+      expect(raioAnelTela(a7, k)).toBe(a7.raio * k);
+      expect(raioAnelTela(a7, k)).toBeLessThan((L / 2) * k);
+    }
+    expect(raioAnelTela(a7, 0.5)).toBeGreaterThanOrEqual(maisFora * 0.5 + 36); // o cadeado ainda aparece
+  });
+  it('o nome de cada ramo na tela fica todo por fora do anel (a linha nunca cruza o texto) e um não encosta no outro', () => {
+    const a7 = ANEIS_ARVORE.find((a) => a.era === 7)!;
+    for (const k of [0.8, 1, 1.4]) {
+      for (const [w, h] of [[40, 20], [140, 20]]) {
+        const caixas = ROTULOS_ARVORE.map((r) => posicaoRotulo(r.ramo, k, w, h));
+        caixas.forEach((p, i) => {
+          // o ponto da caixa mais perto do centro do mundo (na tela)
+          const c = (L / 2) * k;
+          const nx = Math.max(p.x - w / 2, Math.min(c, p.x + w / 2));
+          const ny = Math.max(p.y - h / 2, Math.min(c, p.y + h / 2));
+          expect(Math.hypot(nx - c, ny - c), `${ROTULOS_ARVORE[i].nome} k=${k} w=${w}`).toBeGreaterThanOrEqual(raioAnelTela(a7, k) + 8);
+          // no ângulo do ramo
+          expect(Math.abs(difAng(Math.atan2(p.y - c, p.x - c), anguloRamo(ROTULOS_ARVORE[i].ramo)))).toBeLessThan(0.02);
+          for (const o of caixas) {
+            if (o === p) continue;
+            const separa = Math.abs(o.x - p.x) >= w || Math.abs(o.y - p.y) >= h;
+            expect(separa, `${ROTULOS_ARVORE[i].nome} encosta`).toBe(true);
+          }
+        });
+      }
+    }
+  });
+  it('barrinhas do quadro: os 10 nós fixos de cada ramo; as do meio mais altas', () => {
+    expect(progressoRamo(1, ctx({ arvore: [1, 11, 12, 106, 3001] }))).toEqual({ comprados: 3, total: 10 });
+    expect(progressoRamo(7, ctx({ arvore: [701, 702] }))).toEqual({ comprados: 2, total: 10 });
+    expect(alturaBarra(0)).toBeCloseTo(0.55, 12);
+    expect(alturaBarra(9)).toBeCloseTo(0.55, 12);
+    expect(alturaBarra(4)).toBeGreaterThan(alturaBarra(1));
+    expect(alturaBarra(4)).toBeCloseTo(alturaBarra(5), 12);
   });
   it('situação na tela: comprado, dá pra comprar, falta ponto, portão, trancado; o infinito comprado segue comprável', () => {
     expect(situacaoTela(noDe(1), ctx({ arvore: [1] }))).toBe('comprado');

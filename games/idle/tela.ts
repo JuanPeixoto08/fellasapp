@@ -16,8 +16,8 @@ import type { Dicas } from './mecanicas';
 import { aplicarTema } from './temasLugar';
 import { CONVIDADOS, custosConv, destrancada, efeitosTexto, multGerador, peso, SEM_CADEIRAS, TERRY, VINI, VORCARO, VSAUCE } from './convidados';
 import { catalogo, type Melhoria } from './catalogo';
-import { criarArvoreTela, miniArvore } from './arvoreTela';
-import { contextoArvore, dicaConquista, ganhouEm, grade, pontos, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
+import { copaBarras, criarArvoreTela, iconeNo } from './arvoreTela';
+import { contextoArvore, dicaConquista, ganhouEm, grade, noInicial, pontos, precoNo, situacaoTela, textoVenda, TOTAL_CONQUISTAS, type AvisoConquista, type Celula } from './legado';
 import { compraGerador, custoMult, efeitosDe, liberada, multContratos, podeComprarGerador, type RegraCompra, taxaPorUnidade, VIRAL_MS } from './economia';
 import { formatarTaxa, formatarValor } from './formatar';
 import type { Pose } from './montagem';
@@ -168,7 +168,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
   escalar();
   window.addEventListener('resize', escalar);
   // som da interface: navegação clica (comprar, vender e pegar têm o som do que deu certo, no main)
-  const CLIQUE = '.aba, .seg button, .gaveta, .fechar, .config-item, .chave, .acao, .voltar-config, .no-arvore, .conquista, .topo-config';
+  const CLIQUE = '.aba, .seg button, .gaveta, .fechar, .config-item, .chave, .acao, .voltar-config, .no-arvore, .conquista, .topo-config, .ramo-botao, .arvore-zoom .btn';
   app.addEventListener('click', (e) => {
     if (e.target instanceof Element && e.target.closest(CLIQUE)) a.efeito('clique');
   });
@@ -418,7 +418,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     h.id = id;
     return h;
   };  // árvore de habilidades em tela cheia (por cima de tudo, menos dos avisos)
-  const arvore = criarArvoreTela((id) => a.comprarNo(id));
+  const arvore = criarArvoreTela((id) => a.comprarNo(id), dicas.ligar, dicas); // a caixinha dos nós (mouse/teclado)
 
 
   app.append(topo, empresa, painel, notice, overlay, modalE, modalC, modalV, modalP, modalCfg, arvore.elemento, telaCheia, avisoConquista);
@@ -595,18 +595,23 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     vender.disabled = s.pontos_venda < 1 || ocupado;
     topoL.append(meio, vender);
 
+    const c = contextoArvore(s);
     const comprados = s.bonus.arvore.length;
-    const podem = catalogo.arvore.filter((n) => situacaoTela(n, contextoArvore(s)) === 'pode').length;
+    const podem = catalogo.arvore.filter((n) => situacaoTela(n, c) === 'pode').length;
     const quadro = el('div', 'arvore-quadro');
     const textoQ = el('div', 'meio');
-    const abrirB = button('Abrir', 'btn main arvore-abrir', () =>
-      arvore.abrir(s, ocupado, () => listaL.querySelector<HTMLElement>('.arvore-abrir')));
+    // o botão de ação traz o próximo nó (o mais barato que dá pra comprar; senão o mais barato liberado) e abre nele
+    const prox = catalogo.arvore.find((n) => n.id === noInicial(c))!;
+    const abrirB = button('', 'btn main arvore-abrir', () =>
+      arvore.abrir(s, ocupado, () => listaL.querySelector<HTMLElement>('.arvore-abrir'), prox.id));
+    abrirB.append(iconeNo(prox), el('span', undefined, `${prox.nome} · ${precoNo(prox, c)} ★`));
+    abrirB.setAttribute('aria-label', `Abrir a árvore em ${prox.nome}, ${precoNo(prox, c)} ★`);
     textoQ.append(
       el('strong', undefined, 'Árvore de habilidades'),
-      el('span', 'sub', `${comprados} de ${catalogo.arvore.length} comprados${podem ? ` · ${podem} dá pra comprar agora` : ''}`),
+      el('span', 'sub', `★ ${s.pontos} livres · ${comprados} de ${catalogo.arvore.length} comprados${podem ? ` · ${podem} dá pra comprar agora` : ''}`),
       abrirB,
     );
-    quadro.append(miniArvore(s), textoQ);
+    quadro.append(copaBarras(s), textoQ);
 
     const celulas = grade(s);
     const cab = el('div', 'legado-cab');

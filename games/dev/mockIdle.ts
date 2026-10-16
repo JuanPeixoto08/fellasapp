@@ -99,6 +99,7 @@ const w = window as unknown as {
   __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __eventoEra: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
   __oportunidade: (k: number | null) => Promise<void>;
   __era: (era?: number) => Promise<void>;
+  __arvore: (pontos?: number, vendas?: number, era?: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -130,6 +131,12 @@ w.__era = async (era = 6) => {
 w.__pontos = async (n) => {
   await dono('update public.idle_state set prestige_earned = prestige_spent + $2 where user_id = $1', [ME, n]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
+};
+// __arvore(50000, 10, 7) deixa a árvore grande toda à vista: pontos livres, vendas e a maior era (os portões)
+w.__arvore = async (pontos = 50_000, vendas = 10, era = 7) => {
+  await dono('update public.idle_state set prestige_earned = prestige_spent + $2, prestige_count = $3, era_max = $4 where user_id = $1',
+    [ME, pontos, vendas, era]);
+  document.dispatchEvent(new Event('visibilitychange'));
 };
 // __dourado(2) põe um evento na tela agora (0 Investidor, 1 Promoção, 2 Viralizou, 3 dupla, 4 Trend, 5 LinkedIn, 6 Pix,
 // 7 Tigrinho); o banco do mock aceita
@@ -293,6 +300,14 @@ w.__oportunidade = async (k) => {
     b.addEventListener('click', () => void w.__era(e));
     painel.append(b);
   });
+  // árvore grande: pontos, vendas e era 7 de sobra (os portões abertos)
+  {
+    const b = document.createElement('button');
+    b.textContent = 'Árvore cheia de pontos';
+    b.style.cssText = 'padding:6px 8px;background:#3A3940;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void w.__arvore());
+    painel.append(b);
+  }
   const horta: [string, () => Promise<void>][] = [
     ['+25 Food trucks', async () => wh.__foodTrucks(((await dono2()).ft ?? 0) + 25)],
     ['Horta +1 h', () => wh.__hortaAvancar(1)],

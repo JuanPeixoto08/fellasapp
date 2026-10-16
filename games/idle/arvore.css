@@ -1,0 +1,171 @@
+/* Árvore grande (16/10): a constelação de 120 nós (ramos como raios, o anel da era 7), a fileira de ramos, o zoom, o
+   cartão e o quadro do Legado. Fora do idle.css (nenhuma linha lá); usa os tokens dele (--i-*, --paper, --gold,
+   var(--i-pixel)) e os cantos de pixel (o --c + 4 sombras sem desfoque). Hierarquia por tamanho e forma; o estado tem forma
+   além da cor (spec §7): comprado cheio, dá pra comprar com traço lilás, falta ponto com o preço apagado, portão com
+   cadeado, trancado em silhueta. Roxo cheio só no botão de ação; ativo = traço lilás; nenhum rótulo com fundo dourado.
+   O ícone 16x16 só cresce por inteiro (16/32/48/64 px na tela, contando o zoom do PC); abaixo de 16 px os nós viram
+   estrelinhas (.longe). */
+
+/* Cores só da árvore (Ruling C5): as que o idle.css usa solto nas regras da árvore antiga viram variáveis aqui, com
+   nome; a única nova é a do cadeado. */
+.idle {
+  --arv-ceu: #0C0B17;          /* o céu da madrugada (o fundo da tela e das etiquetas) */
+  --arv-no: #15131F;           /* o fundo de um nó */
+  --arv-borda: #3A3654;        /* a moldura neutra (falta ponto, as barrinhas) */
+  --arv-comprado: #2A2414;     /* o fundo do nó comprado (dourado escuro) */
+  --arv-apagado: #8F86B8;      /* o preço que falta ponto e a linha pra ele */
+  --arv-trancado: #26232F;     /* a moldura do trancado */
+  --arv-trancado-fundo: #0F0E16;
+  --arv-linha-fraca: #2C2940;  /* a linha pro trancado */
+  --arv-rotulo: #9D97B8;       /* os nomes dos ramos e do anel */
+  --arv-cadeado: #C9C2E8;      /* o cadeado de pixel do portão (novo) */
+}
+
+.idle .arvore-tela { grid-template-rows: auto auto minmax(0, 1fr); }
+
+/* o zoom: + em cima, − embaixo, flutuando no canto do palco como num mapa; o topo fica numa linha só */
+.idle .arvore-topo h2 { margin-right: auto; }
+.idle .arvore-zoom { position: absolute; top: 10px; right: 14px; z-index: 2; display: flex; flex-direction: column-reverse; gap: 8px; }
+.idle .arvore-zoom .btn { width: 40px; min-width: 40px; min-height: 40px; padding: 0; font-size: 26px; line-height: 1; }
+
+/* a fileira de ramos: uma fita fina parada enquanto a copa arrasta (rola na horizontal no celular); ícone e nome lado a
+   lado; o ativo com o traço lilás embaixo, como a gaveta aberta */
+.idle .arvore-fileira { display: flex; gap: 6px; padding: 2px 14px 10px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+.idle .arvore-fileira::-webkit-scrollbar { display: none; }
+.idle .ramo-botao { flex: none; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px 0 4px; border: 0;
+  background: var(--i-painel); color: var(--i-mudo); font: 400 18px var(--i-pixel); white-space: nowrap; cursor: pointer; scroll-snap-align: center;
+  --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .ramo-botao .icone-legado { width: 32px; height: 32px;
+  width: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); height: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .ramo-botao:hover { color: var(--paper); --c: var(--i-borda2); }
+.idle .ramo-botao.ativo { color: var(--paper); background: var(--i-ativo); --c: var(--i-borda2);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 var(--i-lilas); }
+.idle .ramo-botao:focus-visible { outline: 2px solid var(--i-lilas); outline-offset: 3px; }
+
+/* o mundo: as linhas em pixel (sem alisar), o anel tracejado e fraco, o nome dele no vão de cima */
+.idle .arvore-mundo { --z: 1; }
+.idle .arvore-mundo svg { shape-rendering: crispEdges; }
+.idle .ligacao { stroke: var(--arv-apagado); stroke-width: 2; }
+.idle .ligacao.acesa { stroke: var(--gold); stroke-width: 4; }
+.idle .ligacao.portao { stroke: var(--i-borda2); stroke-dasharray: 4 4; }
+.idle .ligacao.trancado { stroke: var(--arv-linha-fraca); stroke-width: 2; stroke-dasharray: 6 6; }
+.idle .arvore-anel { fill: none; stroke: var(--i-borda2); stroke-width: 2; stroke-dasharray: 2 10; }
+.idle .arvore-anel-rotulo, .idle .arvore-ramo { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  font: 400 17px/1 var(--i-pixel); color: var(--arv-rotulo); text-shadow: 1px 1px 0 var(--arv-ceu); }
+.idle .arvore-anel-rotulo { font-size: 16px; letter-spacing: 0.06em; }
+.idle .arvore-mundo.sem-rotulos .arvore-ramo { display: none; }
+
+/* os nós: o tamanho segue o zoom até 1 (--z vem do arvoreTela.ts); o ícone em 16/32/48/64 px de tela (o zoom do PC
+   entra na conta) */
+.idle .arvore-mundo .no-arvore { --base: 52px; --ic: 48px; --fundo: var(--arv-no); --c: var(--arv-borda);
+  --lado: calc(var(--base) * var(--z)); width: var(--lado); height: var(--lado); margin: calc(var(--lado) / -2) 0 0 calc(var(--lado) / -2);
+  background: var(--fundo); animation: none; filter: none; }
+.idle .arvore-mundo .no-arvore .icone-legado { position: relative; width: calc(var(--ic) * var(--z)); height: calc(var(--ic) * var(--z));
+  width: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1));
+  height: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1)); }
+
+/* forma: o nó 10 é maior, com moldura dupla (3 px, o céu, 2 px) */
+.idle .arvore-mundo .no-arvore.grande { --base: 72px; --ic: 64px;
+  box-shadow: 0 -3px 0 0 var(--c), 0 3px 0 0 var(--c), -3px 0 0 0 var(--c), 3px 0 0 0 var(--c),
+    0 -6px 0 0 var(--arv-ceu), 0 6px 0 0 var(--arv-ceu), -6px 0 0 0 var(--arv-ceu), 6px 0 0 0 var(--arv-ceu),
+    0 -8px 0 0 var(--c), 0 8px 0 0 var(--c), -8px 0 0 0 var(--c), 8px 0 0 0 var(--c); }
+.idle .arvore-mundo .no-arvore.grande.escolhido::after { inset: -13px; }
+/* o infinito: um losango (o quadrado girado, desenhado por baixo do ícone); o ícone e as etiquetas ficam de pé */
+.idle .arvore-mundo .no-arvore.infinito { --base: 56px; --ic: 32px; background: none; box-shadow: none; }
+.idle .arvore-mundo .no-arvore.infinito::before { content: ''; position: absolute; left: 50%; top: 50%; width: 70.7%; height: 70.7%;
+  transform: translate(-50%, -50%) rotate(45deg); background: var(--fundo);
+  box-shadow: 0 -3px 0 0 var(--c), 0 3px 0 0 var(--c), -3px 0 0 0 var(--c), 3px 0 0 0 var(--c); }
+/* a ponte: moldura de trilho (os traços dobrados em cima e embaixo), menor que o comum */
+.idle .arvore-mundo .no-arvore.ponte { --base: 48px; --ic: 32px;
+  box-shadow: 0 -3px 0 0 var(--c), 0 3px 0 0 var(--c), -3px 0 0 0 var(--c), 3px 0 0 0 var(--c),
+    0 -6px 0 0 var(--arv-ceu), 0 6px 0 0 var(--arv-ceu), 0 -8px 0 0 var(--c), 0 8px 0 0 var(--c); }
+
+/* estado com forma: comprado cheio (o fundo dourado escuro e o ícone aceso); dá pra comprar com o traço lilás (pisca de
+   leve, em degrau, sem brilho borrado); falta ponto com a moldura neutra e o preço apagado; portão com o ícone apagado e o
+   cadeado; trancado em silhueta escura */
+.idle .arvore-mundo .no-arvore.comprado { --c: var(--gold); --fundo: var(--arv-comprado); }
+.idle .arvore-mundo .no-arvore.pode { --c: var(--i-lilas); animation: arv-pisca 2.4s infinite; }
+.idle .arvore-mundo .no-arvore.falta .icone-legado { filter: saturate(0.6) brightness(0.8); }
+.idle .arvore-mundo .no-arvore.portao { --c: var(--i-borda2); }
+.idle .arvore-mundo .no-arvore.portao .icone-legado { filter: grayscale(0.8) brightness(0.55); }
+.idle .arvore-mundo .no-arvore.trancado { --c: var(--arv-trancado); --fundo: var(--arv-ceu); }
+.idle .arvore-mundo .no-arvore.trancado .icone-legado { filter: brightness(0) opacity(0.35); }
+@keyframes arv-pisca { 0%, 84%, 100% { --c: var(--i-lilas); } 92% { --c: var(--paper); } }
+
+/* as etiquetas em cima das bordas: o preço (ou o cadeado) embaixo, o nível do infinito em cima; texto em fundo de céu */
+.idle .no-custo, .idle .no-nivel, .idle .no-cadeado { position: absolute; left: 50%; z-index: 1; transform: translate(-50%, -50%); pointer-events: none;
+  padding: 0 4px; background: var(--arv-ceu); font: 400 16px/16px var(--i-pixel); white-space: nowrap; font-variant-numeric: tabular-nums;
+  box-shadow: 0 -1px 0 0 var(--arv-ceu), 0 1px 0 0 var(--arv-ceu); }
+.idle .no-custo, .idle .no-cadeado { top: 100%; }
+.idle .no-custo { color: var(--gold); text-shadow: none; }
+.idle .no-arvore.falta .no-custo { color: var(--arv-apagado); }
+.idle .no-nivel { top: 0; color: var(--paper); }
+.idle .arvore-mundo .no-arvore.grande .no-custo, .idle .arvore-mundo .no-arvore.grande .no-cadeado { top: calc(100% + 6px); }
+.idle .no-cadeado { display: grid; place-items: center; width: 16px; height: 16px; padding: 0; }
+.idle .arvore-mundo.sem-rotulos .no-custo, .idle .arvore-mundo.sem-rotulos .no-nivel { display: none; }
+
+/* o cadeado de pixel (um desenho só: no nó, no cartão e na legenda): arco de 2 px e corpo de 8×7 com o buraco da chave */
+.idle .cadeado { position: relative; display: inline-block; flex: none; width: 12px; height: 12px;
+  background: linear-gradient(var(--arv-ceu) 0 0) 5px 7px / 2px 3px no-repeat, linear-gradient(var(--arv-cadeado) 0 0) 2px 5px / 8px 7px no-repeat; }
+.idle .cadeado::before { content: ''; position: absolute; left: 3px; top: 0; width: 6px; height: 6px; box-shadow: inset 0 0 0 2px var(--arv-cadeado); }
+
+/* longe (zoom < 1/3): sem ícone nem etiqueta, cada nó vira uma estrelinha, ainda com forma por estado — comprado cheio,
+   dá pra comprar e falta ponto ocos (lilás / apagado), portão oco com um ponto no meio, trancado cheio e escuro */
+.idle .arvore-mundo.longe .icone-legado, .idle .arvore-mundo.longe .no-custo, .idle .arvore-mundo.longe .no-nivel,
+.idle .arvore-mundo.longe .no-cadeado { display: none; }
+.idle .arvore-mundo.longe .no-arvore, .idle .arvore-mundo.longe .no-arvore.infinito::before {
+  box-shadow: 0 -1px 0 0 var(--c), 0 1px 0 0 var(--c), -1px 0 0 0 var(--c), 1px 0 0 0 var(--c); }
+.idle .arvore-mundo.longe .no-arvore.infinito { box-shadow: none; }
+.idle .arvore-mundo.longe .no-arvore.grande { box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .arvore-mundo.longe .no-arvore.comprado { --fundo: var(--gold); }
+.idle .arvore-mundo.longe .no-arvore.pode, .idle .arvore-mundo.longe .no-arvore.falta { --fundo: var(--arv-ceu); }
+.idle .arvore-mundo.longe .no-arvore.portao { --fundo: var(--arv-ceu);
+  background: linear-gradient(var(--arv-cadeado) 0 0) center / 2px 2px no-repeat, var(--fundo); }
+.idle .arvore-mundo.longe .ligacao { stroke-width: 1; }
+.idle .arvore-mundo.longe .ligacao.acesa { stroke-width: 2; }
+.idle .arvore-mundo.longe .no-arvore.escolhido::after { inset: -4px; }
+
+/* a legenda com as mesmas formas */
+.idle .arvore-legenda li { display: flex; align-items: center; }
+.idle .arvore-legenda i { --c: var(--arv-borda); background: var(--arv-ceu); }
+.idle .arvore-legenda .comprado i { --c: var(--gold); background: var(--arv-comprado); }
+.idle .arvore-legenda .pode i { --c: var(--i-lilas); }
+.idle .arvore-legenda .falta i { --c: var(--arv-apagado); }
+.idle .arvore-legenda .trancado i { --c: var(--arv-trancado); background: var(--arv-trancado-fundo); }
+.idle .arvore-legenda i.cadeado { box-shadow: none;
+  background: linear-gradient(var(--arv-ceu) 0 0) 5px 7px / 2px 3px no-repeat, linear-gradient(var(--arv-cadeado) 0 0) 2px 5px / 8px 7px no-repeat; }
+
+/* o cartão: a hierarquia é da tipografia (onde em cima, pequeno; o nome grande; o efeito), sem borda colorida num lado
+   só; o ícone com a moldura do estado; embaixo, o nível do infinito ao lado da ação */
+.idle .arvore-cartao > .icone-legado { --c: var(--arv-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .arvore-cartao > .icone-legado.comprado { --c: var(--gold); background-color: var(--arv-comprado); }
+.idle .arvore-cartao > .icone-legado.pode { --c: var(--i-lilas); }
+.idle .arvore-cartao > .icone-legado.portao, .idle .arvore-cartao > .icone-legado.trancado { filter: grayscale(0.8) brightness(0.6); }
+.idle .arvore-cartao .meio { display: grid; gap: 2px; min-width: 0; }
+.idle .arvore-cartao .onde { font: 400 15px/1 var(--i-pixel); color: var(--i-lilas); letter-spacing: 0.03em; }
+.idle .arvore-cartao strong { font: 400 27px/1 var(--i-pixel); color: var(--paper); }
+.idle .arvore-cartao p { margin: 4px 0 0; }
+.idle .arvore-acao { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.idle .arvore-acao .btn { flex: 1 1 180px; }
+.idle .arvore-cartao .nivel { flex: none; font: 400 19px/1 var(--i-pixel); color: var(--paper); font-variant-numeric: tabular-nums; }
+.idle .portao-motivo { display: flex; align-items: center; gap: 8px; font-size: 15px; line-height: 1.3; color: var(--paper); }
+
+/* o quadro do Legado: a silhueta de 10 barrinhas (uma por ramo, as do meio mais altas) e o botão com o próximo nó dentro */
+.idle .copa-barras { display: flex; align-items: flex-end; gap: 5px; height: 84px; padding: 4px 6px 2px; }
+.idle .copa-barras .barra { flex: 1; height: calc(var(--alto) * 100%); background: var(--i-fundo2);
+  background-image: linear-gradient(to top, var(--gold) var(--cheio), transparent var(--cheio)); --c: var(--arv-borda);
+  box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
+.idle .copa-barras .barra.cheia { --c: var(--gold); }
+.idle .arvore-quadro .arvore-abrir { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 4px 12px 4px 6px; text-align: left; line-height: 1.05; }
+.idle .arvore-quadro .arvore-abrir .icone-legado { width: 32px; height: 32px;
+  width: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); height: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+
+@media (min-width: 1100px) {
+  .idle .arvore-fileira { justify-content: safe center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle .arvore-mundo .no-arvore.pode { animation: none; filter: none; }
+  .idle .arvore-fileira { scroll-behavior: auto; }
+}
