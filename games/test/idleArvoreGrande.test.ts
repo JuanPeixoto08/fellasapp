@@ -501,7 +501,10 @@ describe('a árvore de todo mundo recomeça e os pontos voltam (0082 parte F, um
   const C = '00000000-0000-0000-0000-00000000000c';
   const custoDe = (id: number) => catalogo.arvore.find((n) => n.id === id)!.custo;
   /** o que se paga pelos 3 primeiros níveis do infinito 3001, pelo preço do catálogo novo */
-  const tresNiveis = () => Math.round(2000) + Math.round(2000 * 1.6) + Math.round(2000 * 1.6 ** 2);
+  const tresNiveis = () => {
+    const { custo, cresce } = catalogo.arvore.find((n) => n.id === 3001)!;
+    return [0, 1, 2].reduce((x, k) => x + Math.round(custo * cresce! ** k), 0);
+  };
   const NOS_A = [1, 11, 12, 13, 21];
   const NOS_B = [1, 11, 12, 13, 14, 15, 106, 107, 108, 109, 110, 3001];
   const pagoA = () => NOS_A.reduce((x, n) => x + custoDe(n), 0);
@@ -585,5 +588,36 @@ describe('a árvore de todo mundo recomeça e os pontos voltam (0082 parte F, um
       await expect(t.asRole('authenticated', `select * from public.${tab}`)).rejects.toThrow();
       await expect(t.asRole('anon', `select * from public.${tab}`)).rejects.toThrow();
     }
+  });
+  it('fecha a conta antes de apagar: o tempo parado rende com a árvore de antes, e só depois os nós saem', async () => {
+    const nos = [1, 11, 12, 13, 14, 15];
+    const prep = async () => {
+      await q("update public.idle_state set generators[1] = 50, valuation = 0, settled_at = now() - interval '1 day' where user_id = $1", [A]);
+      await q('delete from public.idle_arvore where user_id = $1', [A]);
+      for (const n of nos) await q('insert into public.idle_arvore (user_id, no_id, nivel) values ($1, $2, 1)', [A, n]);
+    };
+    const val = async () => Number((await q<{ v: number }>('select valuation as v from public.idle_state where user_id = $1', [A]))[0].v);
+    // referência: a mesma conta fechada com a árvore cheia, sem reiniciar
+    await prep();
+    await q('select public.idle_save(public.idle_settle(st)) from public.idle_state st where st.user_id = $1', [A]);
+    const comArvore = await val();
+    // sem a árvore a mesma conta rende menos (o teste só vale se a árvore faz diferença)
+    await prep();
+    await q('delete from public.idle_arvore where user_id = $1', [A]);
+    await q('select public.idle_save(public.idle_settle(st)) from public.idle_state st where st.user_id = $1', [A]);
+    const semArvore = await val();
+    expect(comArvore).toBeGreaterThan(semArvore * 1.05);
+    expect(semArvore).toBeGreaterThan(0);
+    // a parte F: fecha com a árvore e só depois apaga
+    await prep();
+    await reiniciar();
+    expect(await val()).toBeCloseTo(comArvore, -Math.floor(Math.log10(comArvore)) + 6);
+    expect(await nosDe(A)).toEqual([]);
+  });
+  it('nó fora do catálogo: a migração para e não apaga nada', async () => {
+    await q('insert into public.idle_arvore (user_id, no_id, nivel) values ($1, 9999, 1)', [A]);
+    await q("delete from public.idle_migracao_feita where nome = 'arvore_grande_reinicio'");
+    await expect(t.db.exec(M0082)).rejects.toThrow(/fora do catálogo/);
+    expect((await q('select 1 from public.idle_arvore where user_id = $1', [A])).length).toBe(NOS_A.length + 1);
   });
 });

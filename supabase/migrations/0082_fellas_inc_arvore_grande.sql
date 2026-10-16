@@ -1565,11 +1565,22 @@ alter table public.idle_arvore_backup_0082 enable row level security;
 revoke all on public.idle_arvore_backup_0082 from anon, authenticated;
 
 do $$
+declare
+  r public.idle_state;
 begin
   if not exists (select 1 from public.idle_migracao_feita where nome = 'arvore_grande_reinicio') then
-    -- 1) a cópia de segurança
+    -- 0) nunca apaga um nó sem devolver: se algum nó não está no catálogo (idle_cat_no), a migração para aqui e nada muda
+    if exists (select 1 from public.idle_arvore a where not exists (select 1 from public.idle_cat_no c where c.id = a.no_id)) then
+      raise exception 'idle_arvore tem nó fora do catálogo: a árvore não pode ser reiniciada sem devolver o que foi pago';
+    end if;
+    -- 1) fecha a conta de todo mundo com a árvore de hoje (o idle_settle não tem teto offline desde a 0061: sem isso, o tempo
+    --    parado seria calculado com a árvore já vazia). Usa o idle_settle e o idle_save desta mesma migração (os mais novos).
+    for r in select st.* from public.idle_state st where st.started order by st.user_id loop
+      perform public.idle_save(public.idle_settle(r));
+    end loop;
+    -- 2) a cópia de segurança
     insert into public.idle_arvore_backup_0082 select a.*, now() from public.idle_arvore a where true;
-    -- 2) devolve o que cada um pagou: o custo do catálogo no nó fixo; no infinito, os níveis comprados (round(custo · cresce^n),
+    -- 3) devolve o que cada um pagou: o custo do catálogo no nó fixo; no infinito, os níveis comprados (round(custo · cresce^n),
     --    n de 0 a nível − 1, a mesma conta do idle_buy_node). Preço de hoje do catálogo (a 0081 já traz os novos; os 31 de hoje
     --    não mudaram, então o que os antigos pagaram é o que o catálogo diz).
     update public.idle_state s
@@ -1583,7 +1594,7 @@ begin
              where true
              group by a.user_id) g
      where s.user_id = g.user_id;
-    -- 3) a árvore recomeça
+    -- 4) a árvore recomeça
     delete from public.idle_arvore where true;
     insert into public.idle_migracao_feita (nome) values ('arvore_grande_reinicio');
   end if;
