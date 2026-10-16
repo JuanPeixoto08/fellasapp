@@ -172,7 +172,7 @@ describe('nível, preço e portão', () => {
     expect(nivelNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1);
   });
   it('preço: o custo; no infinito, round(1000 · 1,6^nível de agora)', () => {
-    expect(precoNo(noDe(106), ctx())).toBe(15);
+    expect(precoNo(noDe(106), ctx())).toBe(14);
     expect(precoNo(noDe(3001), ctx())).toBe(1000);
     expect(precoNo(noDe(3001), ctx({ arvore: [3001] }))).toBe(1600);
     expect(precoNo(noDe(3001), ctx({ arvore: [3001], niveis: { 3001: 9 } }))).toBe(68719);

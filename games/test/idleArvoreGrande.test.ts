@@ -46,7 +46,7 @@ describe('comprar nós da árvore grande (0082 parte A)', () => {
     await ter([15]);
     const s = await comprar(2005);
     expect(s.bonus.arvore).toContain(2005);
-    expect(await gasto()).toBe(1500);
+    expect(await gasto()).toBe(1350);
   });
   it('portões: cada motivo recusa com idle_gate sem gastar nada; passou, compra', async () => {
     await pontos(1e6, 0, 2);

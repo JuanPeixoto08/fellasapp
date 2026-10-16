@@ -191,20 +191,20 @@ describe('catálogo', () => {
   it('nós novos: ids, custos, quem pede quem e os portões', () => {
     const no = (id: number) => catalogo.arvore.find((n) => n.id === id)!;
     expect([idNo(0, 1), idNo(1, 5), idNo(1, 6), idNo(6, 10), idNo(7, 1), idNo(10, 10), idNo(4, 11)]).toEqual([1, 15, 106, 610, 701, 1010, 3004]);
-    expect(CUSTO_NOVOS_HOJE).toEqual([15, 35, 70, 150, 300]);
-    expect(CUSTO_RECURSO).toEqual([8, 15, 35, 70, 150, 200, 350, 550, 850, 1500]);
-    expect(CUSTO_ESPACO).toEqual([150, 200, 350, 550, 1000, 1500, 3000, 4500, 7000, 15000]);
-    expect(CUSTO_PONTE).toEqual([550, 700, 850, 1000, 1500, 5500, 4000, 1500, 2000]);
-    expect(no(106)).toMatchObject({ ramo: 1, posicao: 6, nome: 'Coach quântico', tipo: 'producao_soma', valor: 0.2, custo: 15, requer: 15, reqVendas: 3, reqEra: null });
-    expect(no(107)).toMatchObject({ requer: 106, reqVendas: 3, reqEra: null, custo: 35 });
-    expect(no(108)).toMatchObject({ requer: 107, reqVendas: null, reqEra: 7, custo: 70, nome: 'Reunião cancelada (podia ser um e-mail)' });
-    expect(no(610)).toMatchObject({ tipo: 'morango_chance', valor: 10, custo: 300, reqEra: 7 });
-    expect(no(701)).toMatchObject({ ramo: 7, nome: 'Corretora "sem taxa"', tipo: 'bolsa_corretagem', valor: 0.8, custo: 8, requer: 1, reqEra: 4, reqVendas: null });
+    expect(CUSTO_NOVOS_HOJE).toEqual([14, 32, 63, 135, 270]);
+    expect(CUSTO_RECURSO).toEqual([7, 14, 32, 63, 135, 180, 315, 495, 765, 1350]);
+    expect(CUSTO_ESPACO).toEqual([135, 180, 315, 495, 900, 1350, 2700, 4050, 6300, 13500]);
+    expect(CUSTO_PONTE).toEqual([495, 630, 765, 900, 1350, 4950, 3600, 1350, 1800]);
+    expect(no(106)).toMatchObject({ ramo: 1, posicao: 6, nome: 'Coach quântico', tipo: 'producao_soma', valor: 0.2, custo: 14, requer: 15, reqVendas: 3, reqEra: null });
+    expect(no(107)).toMatchObject({ requer: 106, reqVendas: 3, reqEra: null, custo: 32 });
+    expect(no(108)).toMatchObject({ requer: 107, reqVendas: null, reqEra: 7, custo: 63, nome: 'Reunião cancelada (podia ser um e-mail)' });
+    expect(no(610)).toMatchObject({ tipo: 'morango_chance', valor: 10, custo: 270, reqEra: 7 });
+    expect(no(701)).toMatchObject({ ramo: 7, nome: 'Corretora "sem taxa"', tipo: 'bolsa_corretagem', valor: 0.8, custo: 7, requer: 1, reqEra: 4, reqVendas: null });
     expect(no(801)).toMatchObject({ tipo: 'conv_recarga', valor: 1.25, requer: 1, reqEra: 3 });
     expect(no(901)).toMatchObject({ tipo: 'mapa_abrir', valor: 0.75, requer: 1, reqEra: 2 });
-    expect(no(1001)).toMatchObject({ tipo: 'lixo_min', valor: 15, custo: 150, requer: 1, reqEra: 6 });
+    expect(no(1001)).toMatchObject({ tipo: 'lixo_min', valor: 15, custo: 135, requer: 1, reqEra: 6 });
     expect(no(1006)).toMatchObject({ tipo: 'silver_mult', valor: 5, reqEra: 7, requer: 1005 });
-    expect(no(1010)).toMatchObject({ tipo: 'espaco_soma', valor: 1, custo: 15000, reqEra: 7 });
+    expect(no(1010)).toMatchObject({ tipo: 'espaco_soma', valor: 1, custo: 13500, reqEra: 7 });
     for (let r = 1; r <= 10; r++) {
       expect(no(3000 + r), `infinito ${r}`).toMatchObject({ ramo: r, posicao: 11, custo: 1000, cresce: 1.6, reqVendas: 10, reqEra: null, requer: idNo(r, 10), requer2: null });
     }
@@ -225,8 +225,8 @@ describe('catálogo', () => {
     expect(soma((n) => n.ramo === 1 && n.posicao >= 6 && n.posicao <= 10)).toBeCloseTo(2.75, 12);
     expect(soma((n) => n.ramo === 11)).toBeCloseTo(1.9, 12);
     expect(soma((n) => n.ramo === 10 && n.posicao <= 10 && n.tipo === 'espaco_soma')).toBeCloseTo(1.75, 12);
-    // a parte fixa nova custa 65.454 (Decisão 2)
-    expect(catalogo.arvore.filter((n) => n.id > 65 && n.cresce === null).reduce((t, n) => t + n.custo, 0)).toBe(65454);
+    // a parte fixa nova custa 58.917 (era 65.454 na Decisão 2; ×0,9 na calibração do veterano, Task 6)
+    expect(catalogo.arvore.filter((n) => n.id > 65 && n.cresce === null).reduce((t, n) => t + n.custo, 0)).toBe(58917);
   });
   it('montarCatalogo usa os parâmetros', () => {
     const c = montarCatalogo({ ...PARAMETROS, custoInicial: 20 });
@@ -271,8 +271,8 @@ describe('catálogo no banco (migração mais recente)', () => {
     expect(sql).toContain('insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer, requer2, req_vendas, req_era, cresce) values');
     expect(sql).toContain("(41, 4, 1, 'Pé de coelho', 'Eventos aparecem 50% mais vezes.', 2, 'dourado_freq', 1.5, 1, null, null, null, null)");
     expect(sql).toContain(`(51, 5, 1, 'Placa de "Precisa-se"', 'Contratar custa 25% menos.', 2, 'contrato_preco', 0.75, 1, null, null, null, null)`);
-    expect(sql).toContain("(106, 1, 6, 'Coach quântico', 'Produção +20%, somando com os outros nós de soma.', 15, 'producao_soma', 0.2, 15, null, 3, null, null)");
-    expect(sql).toContain("(2001, 11, 1, 'Feira orgânica no rolê', 'Produção +15%, somando com os outros nós de soma.', 550, 'producao_soma', 0.15, 65, 905, 5, null, null)");
+    expect(sql).toContain("(106, 1, 6, 'Coach quântico', 'Produção +20%, somando com os outros nós de soma.', 14, 'producao_soma', 0.2, 15, null, 3, null, null)");
+    expect(sql).toContain("(2001, 11, 1, 'Feira orgânica no rolê', 'Produção +15%, somando com os outros nós de soma.', 495, 'producao_soma', 0.15, 65, 905, 5, null, null)");
     expect(sql).toContain("(3001, 1, 11, 'Hora extra infinita', 'Produção +5% por nível, somando com os outros nós de soma.', 1000, 'producao_soma', 0.05, 110, null, 10, null, 1.6)");
     expect(sql).toContain('alter table public.idle_cat_no add column if not exists requer2 int, add column if not exists req_vendas int, add column if not exists req_era int, add column if not exists cresce double precision;');
     expect(sql.indexOf('alter table public.idle_cat_no add column')).toBeLessThan(sql.indexOf('insert into public.idle_cat_no'));

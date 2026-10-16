@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { catalogo, PARAMETROS_ESPACO, PRECO_NIVEL } from './catalogo';
 import { K_PRESTIGIO, pontosTotais, SEM_BONUS } from './economia';
-import { FIM_ERA_12, gastar, primeiraVenda, RITMO_ERAS, simular, volta } from './simulacao';
+import { FIM_ERA_12, gastar, primeiraVenda, RITMO_ERAS, simular, veterano, volta, type FixtureVeterano } from './simulacao';
 import { mediaOportunidade, RODA_OPP_HOJE, RODA_OPP_NOVA } from './valorMedio';
 
 const H = 3600;
@@ -65,6 +68,17 @@ describe('ritmo do prestígio', () => {
   });
   it('quem gasta compra o mais barato que acelera: com 11 pontos, a raiz, o 1º de três ramos e o 2º da Produção', () => {
     expect(gastar(catalogo, 11)).toEqual({ arvore: [1, 11, 21, 31, 12], sobra: 0 });
+  });
+  it('quem nunca vendeu não passa dos portões: com 1.000 pontos só compra entre os 31 de hoje', () => {
+    const { arvore } = gastar(catalogo, 1000);
+    expect(arvore.every((id) => id <= 65)).toBe(true);
+  });
+  it('com 3 vendas e a era 7, o 106 entra; nunca um infinito; `todos` compra também os que não aceleram', () => {
+    const p = { vendas: 3, eraMax: 7 };
+    expect(gastar(catalogo, 1000, [], p).arvore).toContain(106);
+    expect(gastar(catalogo, 1e6, [], { vendas: 99, eraMax: 7 }).arvore.some((id) => id > 3000)).toBe(false);
+    expect(gastar(catalogo, 1000, [], p).arvore).not.toContain(41); // Dourados não acelera a simulação
+    expect(gastar(catalogo, 1000, [], p, true).arvore).toContain(41);
   });
   it('depois de vender e gastar ~10 pontos, voltar à era em que estava é mais rápido que da primeira vez', () => {
     const r = volta(catalogo, 10)!;
@@ -134,5 +148,36 @@ describe('os números cabem no double até a era 12', () => {
     const q = PARAMETROS_ESPACO;
     const custo72 = q.custoInicial * q.crescimentoCusto ** (72 - q.aPartirDe);
     expect(custo72 * 1.15 ** 300 * PRECO_NIVEL[7]).toBeLessThan(1e100);
+  });
+});
+
+// Árvore grande (16/10): o veterano do retrato (games/test/fixtures, o maior F$/s de 15/10) vende, gasta na parte fixa
+// e recomeça até fechar. Medido ao planejar: fecha no dia 12,2 (passo 30 s; 12,8 com 5 s), em ~11 vendas; a árvore
+// cheia deixa a produção dele ~×20 (×26,9 com o legado ×1,5/×2 da spec; o Juan escolheu ×1,25/×1,5); o modelo × 17,2 dá o F$/s real (contratos, convidados, Mapa, Horta). A parte fixa
+// não pode passar de ~67 mil pontos: acima disso a era 7 trava e ele não fecha até as eras 8–9 (Decisão 2 do plano).
+// Medido na implementação (Task 6, custos ×0,9 dos planejados: parte fixa nova 58.917): fecha no dia 12,17 em 11 vendas;
+// a árvore fixa cheia deixa a produção ×21,2 (Espaço ×1,25/×1,5); extra ×17,2. Com a parte fixa em 65.454 a venda travava em
+// ~63,6 mil pontos (a era 7) e ele não fechava; ×0,94 fechava no dia 15,5.
+// Se sair da faixa: ajuste SÓ os custos novos de catalogo.ts (CUSTO_NOVOS_HOJE, CUSTO_RECURSO, CUSTO_ESPACO,
+// CUSTO_PONTE), regere a 0081 (ainda não publicada) e avise o Juan.
+describe('o veterano (árvore grande)', () => {
+  const fix = JSON.parse(readFileSync(resolve(__dirname, '../test/fixtures/veterano-2026-10-15.json'), 'utf8')) as FixtureVeterano;
+  const tem = { horta: true, bolsa: true };
+  const minutos = 15 * (mediaOportunidade(RODA_OPP_NOVA, tem) / mediaOportunidade(RODA_OPP_HOJE, tem));
+  const v = veterano(fix, catalogo, { minutosOpp: minutos });
+  it('o retrato: era 7, a venda de agora daria 18.753 pontos no total; o fator de fora do modelo fica perto de 17', () => {
+    expect(fix).toMatchObject({ era: 7, prestige_earned: 232, prestige_count: 3 });
+    expect(pontosTotais(fix.rate)).toBe(18753);
+    expect(v.extra).toBeGreaterThan(14);
+    expect(v.extra).toBeLessThan(21);
+  });
+  it('fecha a parte fixa da árvore entre os dias 10 e 16 (medido ao planejar: 12,2)', () => {
+    expect(v.dia, v.log.join('\n')).not.toBeNull();
+    expect(v.dia!).toBeGreaterThanOrEqual(10);
+    expect(v.dia!).toBeLessThan(16);
+  });
+  it('a árvore fixa cheia deixa a produção dele entre ×15 e ×23 (alvo ~×20, Decisão 3)', () => {
+    expect(v.multCheio).toBeGreaterThan(15);
+    expect(v.multCheio).toBeLessThan(23);
   });
 });

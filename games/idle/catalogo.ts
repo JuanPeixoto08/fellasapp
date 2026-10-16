@@ -39,11 +39,11 @@ export const RAIZ = 1;
 /** Árvore grande (16/10, entrega 6). Custos das posições 6–10 dos ramos de hoje, dos ramos dos recursos (7 Bolsa, 8 PPP,
  *  9 Mapa, posições 1–10), do Espaço (10) e das pontes (2001–2009), e dos infinitos: o próximo nível n custa
  *  round(CUSTO_INFINITO · CRESCE_INFINITO^(n − 1)). Calibrados na simulação do veterano (simulacao.test.ts, "o veterano":
- *  a parte fixa fecha no dia ~12; ×0,28 os da spec, que nunca fechavam abaixo do teto da era 7). */
-export const CUSTO_NOVOS_HOJE = [15, 35, 70, 150, 300] as const;
-export const CUSTO_RECURSO = [8, 15, 35, 70, 150, 200, 350, 550, 850, 1500] as const;
-export const CUSTO_ESPACO = [150, 200, 350, 550, 1000, 1500, 3000, 4500, 7000, 15000] as const;
-export const CUSTO_PONTE = [550, 700, 850, 1000, 1500, 5500, 4000, 1500, 2000] as const;
+ *  a parte fixa fecha no dia ~12; ~×0,25 os da spec, que nunca fechavam abaixo do teto da era 7). */
+export const CUSTO_NOVOS_HOJE = [14, 32, 63, 135, 270] as const;
+export const CUSTO_RECURSO = [7, 14, 32, 63, 135, 180, 315, 495, 765, 1350] as const;
+export const CUSTO_ESPACO = [135, 180, 315, 495, 900, 1350, 2700, 4050, 6300, 13500] as const;
+export const CUSTO_PONTE = [495, 630, 765, 900, 1350, 4950, 3600, 1350, 1800] as const;
 export const CUSTO_INFINITO = 1000;
 export const CRESCE_INFINITO = 1.6;
 /** A ordem dos ramos na copa, da esquerda pra direita (a raiz no meio, embaixo, entre o Recomeço e a Produção). */
