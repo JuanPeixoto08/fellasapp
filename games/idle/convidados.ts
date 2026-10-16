@@ -36,14 +36,22 @@ export const RECARGA_S = 3600;
 const H = 3_600_000;
 
 /** O que o banco manda das cadeiras (idle_json.convidados). */
-export type Cadeiras = { cadeira: (number | null)[]; desde: (string | null)[]; trocas: number; trocas_t: string | null };
+export type Cadeiras = {
+  cadeira: (number | null)[]; desde: (string | null)[]; trocas: number; trocas_t: string | null;
+  /** o que a árvore grande muda (idle_conv_json na 0082); ausente = o de sempre */
+  trocas_max?: number; recarga_s?: number; pesos?: readonly number[]; queda?: number; efeito?: number;
+};
+/** A força das 3 cadeiras, quantas trocas cabem e quanto cada uma leva pra voltar (s): o que o banco mandou, ou o de sempre. */
+export const pesosDe = (c: Partial<Cadeiras>): readonly number[] => c.pesos ?? PESOS;
+export const trocasMax = (c: Partial<Cadeiras>): number => c.trocas_max ?? MAX_TROCAS;
+export const recargaS = (c: Partial<Cadeiras>): number => c.recarga_s ?? RECARGA_S;
 
 export const destrancada = (cadeira: number, ppp: number) => ppp >= ABRE_COM[cadeira];
 
 /** O peso do convidado: o da cadeira em que ele está, se ela está aberta (0 se não está sentado). */
 export function peso(c: Cadeiras, ppp: number, id: number): number {
   const i = c.cadeira.indexOf(id);
-  return i >= 0 && destrancada(i, ppp) ? PESOS[i] : 0;
+  return i >= 0 && destrancada(i, ppp) ? pesosDe(c)[i] : 0;
 }
 /** Desde quando o convidado está sentado (ms), ou null. */
 export function sentadoDesde(c: Cadeiras, id: number): number | null {
@@ -52,25 +60,27 @@ export function sentadoDesde(c: Cadeiras, id: number): number | null {
   return d ? Date.parse(d) : null;
 }
 
-/** Trocas agora e quando volta a próxima (null = cheio). Cada troca gasta volta em 1 h, uma por vez. */
-export function trocasAgora(c: Pick<Cadeiras, 'trocas' | 'trocas_t'>, agoraMs: number): { trocas: number; proximaMs: number | null } {
-  if (c.trocas >= MAX_TROCAS || !c.trocas_t) return { trocas: MAX_TROCAS, proximaMs: null };
+/** Trocas agora e quando volta a próxima (null = cheio). Cada troca gasta volta em `recargaS` (1 h sem a árvore), uma por vez. */
+export function trocasAgora(c: Pick<Cadeiras, 'trocas' | 'trocas_t' | 'trocas_max' | 'recarga_s'>, agoraMs: number): { trocas: number; proximaMs: number | null } {
+  const max = trocasMax(c);
+  const passo = recargaS(c) * 1000;
+  if (c.trocas >= max || !c.trocas_t) return { trocas: max, proximaMs: null };
   const t = Date.parse(c.trocas_t);
-  const k = Math.max(0, Math.floor((agoraMs - t) / (RECARGA_S * 1000)));
-  const n = Math.min(MAX_TROCAS, c.trocas + k);
-  return n >= MAX_TROCAS ? { trocas: MAX_TROCAS, proximaMs: null } : { trocas: n, proximaMs: t + (k + 1) * RECARGA_S * 1000 };
+  const k = Math.max(0, Math.floor((agoraMs - t) / passo));
+  const n = Math.min(max, c.trocas + k);
+  return n >= max ? { trocas: max, proximaMs: null } : { trocas: n, proximaMs: t + (k + 1) * passo };
 }
 
-/** Kojima: −10% ao sentar, +50%/24 a cada hora inteira, até +40% em 24 h (× o peso). */
-export function kojimaMult(p: number, desdeMs: number, tMs: number): number {
+/** Kojima: −10% ao sentar, +50%/24 a cada hora inteira, até +40% em 24 h (× o peso); a subida × (1 + efeito da árvore). */
+export function kojimaMult(p: number, desdeMs: number, tMs: number, efeito = 0): number {
   const h = Math.max(0, Math.floor((tMs - desdeMs) / H));
-  return 1 + p * (-0.1 + (0.5 * Math.min(24, h)) / 24);
+  return 1 + p * (-0.1 + ((0.5 * Math.min(24, h)) / 24) * (1 + efeito));
 }
 
-/** Toby Fox ("já já sai o Chapter 6"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso). */
-export function tobyMult(p: number, desdeMs: number, tMs: number): number {
+/** Toby Fox ("já já sai o Chapter 6"): +2% a cada hora inteira sentado, até +40% em 20 h (× o peso × (1 + efeito)). */
+export function tobyMult(p: number, desdeMs: number, tMs: number, efeito = 0): number {
   const h = Math.max(0, Math.floor((tMs - desdeMs) / H));
-  return 1 + p * 0.02 * Math.min(20, h);
+  return 1 + p * 0.02 * Math.min(20, h) * (1 + efeito);
 }
 
 /** MC V.V: uma faixa a cada 2 h / peso; a derrubada dura 30 min. */
@@ -84,29 +94,30 @@ export function sorte(uid: string, c: number, t: number, k: number): number {
   const h = (b * b * 48271n + b * 16807n + BigInt(semente(uid)) * 69621n + BigInt(c) * 1013n + BigInt(k) * 7919n + 12345n) % P;
   return Number((h * h + 1013904223n) % P) / Number(P);
 }
-/** A faixa k (1, 2, …) de quem sentou em `desdeS` foi derrubada? (25%) */
-export const derrubada = (uid: string, desdeS: number, k: number) => sorte(uid, 50, desdeS + k, 9) < 0.25;
+/** A faixa k (1, 2, …) de quem sentou em `desdeS` foi derrubada? (25%; a árvore baixa pra 15% ou 5%: o banco manda) */
+export const derrubada = (uid: string, desdeS: number, k: number, chance = 0.25) => sorte(uid, 50, desdeS + k, 9) < chance;
 
 /** Se o instante t está numa derrubada do MC V.V: o fim dela (ms); senão null. */
-export function derrubadaAte(uid: string, p: number, desdeMs: number, tMs: number): number | null {
+export function derrubadaAte(uid: string, p: number, desdeMs: number, tMs: number, chance = 0.25): number | null {
   if (p <= 0) return null;
   const passo = faixaS(p) * 1000;
   const k = Math.floor((tMs - desdeMs) / passo);
   if (k < 1) return null;
   const ini = desdeMs + k * passo;
-  return tMs < ini + DERRUBADA_S * 1000 && derrubada(uid, Math.floor(desdeMs / 1000), k) ? ini + DERRUBADA_S * 1000 : null;
+  return tMs < ini + DERRUBADA_S * 1000 && derrubada(uid, Math.floor(desdeMs / 1000), k, chance) ? ini + DERRUBADA_S * 1000 : null;
 }
 
 type Ctx = { c: Cadeiras; ppp: number; uid: string };
 /** Multiplicador da produção toda em t. */
 export function multProducao({ c, ppp, uid }: Ctx, tMs: number): number {
-  let m = (1 + 0.15 * peso(c, ppp, CR)) * (1 - 0.05 * peso(c, ppp, LUVA)) * (1 - 0.05 * peso(c, ppp, VSAUCE));
+  const e = c.efeito ?? 0; // a árvore grande (PPP 5, 9, ∞): só os bônus de produção
+  let m = (1 + 0.15 * peso(c, ppp, CR) * (1 + e)) * (1 - 0.05 * peso(c, ppp, LUVA)) * (1 - 0.05 * peso(c, ppp, VSAUCE));
   const pk = peso(c, ppp, KOJIMA);
-  if (pk) m *= kojimaMult(pk, sentadoDesde(c, KOJIMA)!, tMs);
+  if (pk) m *= kojimaMult(pk, sentadoDesde(c, KOJIMA)!, tMs, e);
   const pt = peso(c, ppp, TOBY);
-  if (pt) m *= tobyMult(pt, sentadoDesde(c, TOBY)!, tMs);
+  if (pt) m *= tobyMult(pt, sentadoDesde(c, TOBY)!, tMs, e);
   const pm = peso(c, ppp, MCVV);
-  if (pm && derrubadaAte(uid, pm, sentadoDesde(c, MCVV)!, tMs) !== null) m *= 1 - 0.1 * pm;
+  if (pm && derrubadaAte(uid, pm, sentadoDesde(c, MCVV)!, tMs, c.queda) !== null) m *= 1 - 0.1 * pm;
   return m;
 }
 export const custoGeradores = (c: Cadeiras, ppp: number) => 1 - 0.1 * peso(c, ppp, GABE);
@@ -122,7 +133,7 @@ export function faixaEm(uid: string, c: Cadeiras, ppp: number, seg: number): Tip
   const dS = Math.floor(d / 1000);
   const passo = faixaS(p);
   const k = (seg - dS) / passo;
-  if (k < 1 || !Number.isInteger(k) || derrubada(uid, dS, k)) return null;
+  if (k < 1 || !Number.isInteger(k) || derrubada(uid, dS, k, c.queda)) return null;
   const t = tipoDourado(uid, seg);
   return t === 7 ? 0 : t; // a faixa nunca é Tigrinho (0076)
 }
@@ -165,24 +176,25 @@ export function eventosEntre(s: ComCadeiras, de: number, ate: number): { seg: nu
 // ---------- textos (o efeito na cadeira, por extenso) ----------
 const pct = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('pt-BR')}%`;
 const vz = (x: number) => `${x.toLocaleString('pt-BR')}×`;
-/** Bônus e defeito do convidado numa cadeira de peso `p`, por extenso ("Geradores 10% mais baratos"), com maiúscula. */
-export function efeitosTexto(id: number, p: number): [string, string] {
-  const [b, d] = efeitosCru(id, p);
+/** Bônus e defeito do convidado numa cadeira de peso `p`, por extenso ("Geradores 10% mais baratos"), com maiúscula.
+ *  `a` = o que a árvore grande mudou (efeito nos bônus de produção, chance de derrubada): o texto diz o número de agora. */
+export function efeitosTexto(id: number, p: number, a: Pick<Cadeiras, 'efeito' | 'queda'> = {}): [string, string] {
+  const [b, d] = efeitosCru(id, p, a.efeito ?? 0, a.queda ?? 0.25);
   const mai = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   return [mai(b), mai(d)];
 }
-function efeitosCru(id: number, p: number): [string, string] {
+function efeitosCru(id: number, p: number, e: number, queda: number): [string, string] {
   switch (id) {
-    case CR: return [`produção +${pct(0.15 * p)}`, `melhorias ${pct(0.1 * p)} mais caras`];
+    case CR: return [`produção +${pct(0.15 * p * (1 + e))}`, `melhorias ${pct(0.1 * p)} mais caras`];
     case VORCARO: return [`ações compradas agora: o ganho conta ${vz(1 + p)} na venda`, `a perda também conta ${vz(1 + p)}`];
     case GEMAPLYS: return [`eventos dourados ${vz(1 + p)} mais frequentes`, `ficam ${pct(p / 2)} menos tempo na tela`];
     case LUVA: return [`+${Math.ceil(5 * p)} oportunidades por dia`, `produção −${pct(0.05 * p)}`];
-    case KOJIMA: return [`produção sobe até +${pct(0.4 * p)} em 24 h sentado`, `começa em −${pct(0.1 * p)}; trocar zera`];
+    case KOJIMA: return [`produção sobe até +${pct(p * (0.4 + 0.5 * e))} em 24 h sentado`, `começa em −${pct(0.1 * p)}; trocar zera`];
     case GABE: return [`geradores ${pct(0.1 * p)} mais baratos`, `−${Math.ceil(3 * p)} oportunidades por dia`];
     case TERRY: return [`plantas novas amadurecem ${pct(0.3 * p)} mais rápido`, `e vivem ${pct(0.2 * p)} menos`];
     case VINI: return [`cruzamento da Horta ${vz(1 + p)}`, `sementes ${pct(0.5 * p)} mais caras`];
-    case MCVV: return [`uma faixa a cada ${faixaS(p) / 3600} h: evento dourado garantido`, `25% de derrubada: produção −${pct(0.1 * p)} por 30 min`];
-    case TOBY: return [`produção sobe +${pct(0.02 * p)} por hora sentado, até +${pct(0.4 * p)}`, `melhorias ${pct(0.1 * p)} mais caras; trocar ou tirar zera`];
+    case MCVV: return [`uma faixa a cada ${faixaS(p) / 3600} h: evento dourado garantido`, `${pct(queda)} de derrubada: produção −${pct(0.1 * p)} por 30 min`];
+    case TOBY: return [`produção sobe +${pct(0.02 * p * (1 + e))} por hora sentado, até +${pct(0.4 * p * (1 + e))}`, `melhorias ${pct(0.1 * p)} mais caras; trocar ou tirar zera`];
     case VSAUCE: return ['a Bolsa mostra pra onde cada ação tende', `produção −${pct(0.05 * p)}`];
     default: return ['', ''];
   }
@@ -193,22 +205,22 @@ const hm = (ms: number) => {
   return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`;
 };
 /** A linha "ao vivo" do convidado sentado (Kojima, MC V.V, Ana), ou null. */
-export function aoVivo(id: number, p: number, desdeMs: number, uid: string, agoraMs: number): string | null {
+export function aoVivo(id: number, p: number, desdeMs: number, uid: string, agoraMs: number, c: Pick<Cadeiras, 'queda' | 'efeito'> = {}): string | null {
   if (p <= 0) return null;
   if (id === KOJIMA) {
-    const m = kojimaMult(p, desdeMs, agoraMs) - 1;
+    const m = kojimaMult(p, desdeMs, agoraMs, c.efeito) - 1;
     const h = Math.floor((agoraMs - desdeMs) / 3_600_000);
     return `Agora: produção ${m >= 0 ? '+' : '−'}${pct(Math.abs(m))}${h < 24 ? ` · sobe em ${hm(desdeMs + (h + 1) * 3_600_000 - agoraMs)}` : ' (no máximo)'}`;
   }
   if (id === MCVV) {
-    const ate = derrubadaAte(uid, p, desdeMs, agoraMs);
+    const ate = derrubadaAte(uid, p, desdeMs, agoraMs, c.queda);
     if (ate !== null) return `Derrubada por copyright · volta em ${hm(ate - agoraMs)}`;
     const passo = faixaS(p) * 1000;
     const k = Math.floor((agoraMs - desdeMs) / passo) + 1;
     return `Próxima faixa em ${hm(desdeMs + k * passo - agoraMs)}`;
   }
   if (id === TOBY) {
-    const m = tobyMult(p, desdeMs, agoraMs) - 1;
+    const m = tobyMult(p, desdeMs, agoraMs, c.efeito) - 1;
     const h = Math.floor((agoraMs - desdeMs) / 3_600_000);
     return `Agora: produção +${pct(m)}${h < 20 ? ` · sobe em ${hm(desdeMs + (h + 1) * 3_600_000 - agoraMs)}` : ' (no máximo)'}`;
   }

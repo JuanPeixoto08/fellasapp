@@ -33,11 +33,15 @@ export function maxCompra(valuation: number, valor: number, r: number, limite: n
 /** A empresa da Bolsa ligada a um gerador (undefined pros que não têm). */
 export const empresaDoGerador = (gid: number): EmpresaBolsa | undefined => EMPRESAS_BOLSA.find((e) => e.gerador === gid);
 
-/** De onde vem o limite: "Limite: 100 + 5 Curso online + 25 do Escritório" (o banco manda só o total). */
-export function contaLimite(id: number, limite: number, escritorio: number): string {
+/** De onde vem o limite: "Limite: 100 + 5 Curso online + 25 do Escritório"; com a árvore grande (0082) por cima, "Limite: 760
+ *  (100 + 5 Curso online + 25 do Escritório, com a árvore)". `gen` = quantos do gerador ligado (o banco manda; sem ele, a
+ *  resposta é de antes da árvore e a conta sai do total). */
+export function contaLimite(id: number, limite: number, escritorio: number, gen?: number): string {
   const bonus = MELHORIAS_BOLSA.escritorio.bonus[escritorio];
   const gerador = GERADORES[empresa(id).gerador - 1];
-  return `Limite: 100 + ${limite - 100 - bonus} ${gerador}${bonus ? ` + ${bonus} do Escritório` : ''}`;
+  const n = gen ?? limite - 100 - bonus;
+  const conta = `100 + ${n} ${gerador}${bonus ? ` + ${bonus} do Escritório` : ''}`;
+  return limite === 100 + n + bonus ? `Limite: ${conta}` : `Limite: ${limite} (${conta}, com a árvore)`;
 }
 
 export const acoes = (n: number) => (n === 1 ? '1 ação' : `${n} ações`);

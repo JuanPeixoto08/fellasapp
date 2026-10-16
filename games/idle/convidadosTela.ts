@@ -5,13 +5,13 @@ import { button, el } from '../shared/hud/hud';
 import type { IdleState } from '../shared/types';
 import { ativos } from './ativos';
 import {
-  ABRE_COM, aoVivo, CONVIDADOS, convidado, DA_CADEIRA, destrancada, efeitosTexto, MAX_TROCAS, NOME_CADEIRA, PESOS,
-  trocasAgora, type Cadeiras,
+  ABRE_COM, aoVivo, CONVIDADOS, convidado, DA_CADEIRA, destrancada, efeitosTexto, NOME_CADEIRA, PESOS, pesosDe,
+  trocasAgora, trocasMax, type Cadeiras,
 } from './convidados';
 import type { Dica } from './dica';
 
 type Ligar = (alvo: HTMLElement, chave: string, conteudo: () => Dica | null) => void;
-const SEM: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: MAX_TROCAS, trocas_t: null };
+const SEM: Cadeiras = { cadeira: [null, null, null], desde: [null, null, null], trocas: 3, trocas_t: null };
 const pct = (p: number) => `${Math.round(p * 100)}%`;
 /** Onde cada cadeira fica no estúdio (px da arte, 160 × 80): a da frente no meio, o meio à esquerda, o canto à direita. */
 const LUGAR = [{ x: 64, placa: 56 }, { x: 16, placa: 8 }, { x: 112, placa: 104 }] as const;
@@ -33,12 +33,12 @@ function peca(cls: string, url: string | null, x: number, y: number): HTMLElemen
 }
 
 /** O que a caixinha de um convidado diz numa cadeira de peso p. */
-export function dicaConvidado(id: number, p: number, cadeira: number | null, viva: string | null): Dica {
-  const [bonus, defeito] = efeitosTexto(id, p || PESOS[0]);
+export function dicaConvidado(id: number, p: number, cadeira: number | null, viva: string | null, a: Pick<Cadeiras, 'efeito' | 'queda'> = {}): Dica {
+  const [bonus, defeito] = efeitosTexto(id, p || PESOS[0], a);
   const linhas: Dica['linhas'] = [{ texto: convidado(id).bordao, tom: 'fraco' }];
   linhas.push({ texto: bonus, tom: 'bom' }, { texto: defeito, tom: 'ruim' });
   if (viva) linhas.push({ texto: viva });
-  linhas.push({ texto: cadeira === null ? 'Valores na cadeira da frente' : `Na cadeira ${DA_CADEIRA[cadeira]} (${pct(PESOS[cadeira])})`, tom: 'fraco' });
+  linhas.push({ texto: cadeira === null ? 'Valores na cadeira da frente' : `Na cadeira ${DA_CADEIRA[cadeira]} (${pct(p)})`, tom: 'fraco' });
   return { titulo: convidado(id).nome, linhas };
 }
 
@@ -80,10 +80,10 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
     // as trocas: o número, quando volta a próxima e uma fichinha por troca
     const topo = el('div', 'conv-topo');
     const txt = el('div', 'conv-trocas-txt');
-    txt.append(el('span', 'conv-trocas', `Trocas: ${tr.trocas}/${MAX_TROCAS}${tr.proximaMs ? ` · próxima em ${tempo(tr.proximaMs - agoraMs)}` : ''}`));
+    txt.append(el('span', 'conv-trocas', `Trocas: ${tr.trocas}/${trocasMax(c)}${tr.proximaMs ? ` · próxima em ${tempo(tr.proximaMs - agoraMs)}` : ''}`));
     const fichas = el('div', 'conv-fichas');
     fichas.setAttribute('aria-hidden', 'true');
-    for (let k = 0; k < MAX_TROCAS; k++) fichas.append(el('i', k < tr.trocas ? 'ficha' : 'ficha gasta'));
+    for (let k = 0; k < trocasMax(c); k++) fichas.append(el('i', k < tr.trocas ? 'ficha' : 'ficha gasta'));
     topo.append(txt, fichas);
 
     // ----- o estúdio -----
@@ -128,7 +128,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
       const aberta = destrancada(i, ppp);
       const id = c.cadeira[i];
       const cad = el('div', `conv-cadeira${i === 0 ? ' frente' : ''}${aberta ? '' : ' trancada'}${escolhendo === i ? ' escolhendo' : ''}`);
-      cad.append(el('span', 'conv-rotulo', `${cap(NOME_CADEIRA[i])} · ${pct(PESOS[i])}`));
+      cad.append(el('span', 'conv-rotulo', `${cap(NOME_CADEIRA[i])} · ${pct(pesosDe(c)[i])}`));
       if (!aberta) {
         cad.append(el('span', 'sub', `Abre com ${ABRE_COM[i]} PPP Podcasts${id ? ` (${convidado(id).nome} esperando)` : ''}`));
         if (id) {
@@ -138,8 +138,8 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
         }
       } else if (id) {
         const desde = c.desde[i] ? Date.parse(c.desde[i]!) : agoraMs;
-        const viva = aoVivo(id, PESOS[i], desde, s.user_id, agoraMs);
-        const [bonus, defeito] = efeitosTexto(id, PESOS[i]);
+        const viva = aoVivo(id, pesosDe(c)[i], desde, s.user_id, agoraMs, c);
+        const [bonus, defeito] = efeitosTexto(id, pesosDe(c)[i], c);
         const meio = el('div', 'meio');
         meio.append(el('strong', undefined, convidado(id).nome), el('span', 'bom', bonus), el('span', 'ruim', defeito));
         if (viva) meio.append(el('span', 'sub vivo-conv', viva));
@@ -151,7 +151,7 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
         bts.append(trocar, tirar);
         cad.append(meio, bts);
         cad.tabIndex = 0;
-        ligar(cad, `cadeira${i}`, () => dicaConvidado(id, PESOS[i], i, viva));
+        ligar(cad, `cadeira${i}`, () => dicaConvidado(id, pesosDe(c)[i], i, viva, c));
       } else {
         const b = button('Chamar convidado', 'btn main compacto', () => escolher(i));
         b.disabled = ocupado || tr.trocas < 1;
@@ -184,14 +184,14 @@ export function criarConvidadosTela(a: { sentar(cadeira: number, id: number): vo
         t.setAttribute('aria-pressed', String(cv.id === foco));
         t.append(peca('conv-tile-retrato', ativos.convidado(cv.id), 0, 0), el('span', 'conv-tile-nome', cv.nome));
         if (onde >= 0) t.append(el('span', 'conv-tile-onde', cap(NOME_CADEIRA[onde])));
-        ligar(t, `conv${cv.id}`, () => dicaConvidado(cv.id, PESOS[ch], ch, null));
+        ligar(t, `conv${cv.id}`, () => dicaConvidado(cv.id, pesosDe(c)[ch], ch, null, c));
         grade.append(t);
       }
       sel.append(grade);
       // o destaque: retrato grande, bordão, efeito nesta cadeira e o Sentar
       const cv = convidado(foco);
       const onde = c.cadeira.indexOf(foco);
-      const [bonus, defeito] = efeitosTexto(foco, PESOS[ch]);
+      const [bonus, defeito] = efeitosTexto(foco, pesosDe(c)[ch], c);
       const det = el('div', 'conv-item conv-detalhe');
       det.dataset.convidado = String(foco);
       const meio = el('div', 'meio');

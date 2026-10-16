@@ -190,7 +190,8 @@ export function criarBolsaTela(a: {
         const muda = m.espiada && m.muda_em ? ` · muda em ${m.muda_em} min` : '';
         linhaPreco.append(el('span', 'humor-vsauce', m.espiada && !vsauce ? `Espiado: ${humor} agora${muda}` : `VSauce: ${humor} agora. Ou não?${muda}`));
       }
-      const creditos = b.info_creditos ?? 0;
+      const gratis = b.info_gratis ?? 0; // a espiada grátis do dia (árvore grande)
+      const creditos = (b.info_creditos ?? 0) + gratis;
       if (a.espiar && creditos > 0 && !m.espiada) {
         const virando = fimRj.get(m.id) === b.tick; // saiu da recuperação neste minuto (ver fimRj)
         // virando: apagado com aria-disabled (não `disabled`), pra o foco do teclado e o mouse chegarem na caixinha que
@@ -199,7 +200,7 @@ export function criarBolsaTela(a: {
         esp.disabled = ocupado;
         if (virando) esp.setAttribute('aria-disabled', 'true');
         dica?.(esp, `espiar-${m.id}`, () => {
-          const d = dicaEspiar(e.nome, creditos);
+          const d = dicaEspiar(e.nome, creditos - gratis, gratis);
           return virando ? { ...d, linhas: [...d.linhas, { texto: 'Acabou de voltar da recuperação: o humor vira neste minuto. Espia no próximo', tom: 'ruim' }] } : d;
         });
         linhaPreco.append(esp);
@@ -236,7 +237,7 @@ export function criarBolsaTela(a: {
       const icone = el('span', 'mini-gerador');
       icone.setAttribute('aria-hidden', 'true');
       icone.style.backgroundImage = `url(${ativos.gerador(e.gerador)})`;
-      conta.append(icone, el('span', undefined, contaLimite(m.id, m.limite, b.escritorio)));
+      conta.append(icone, el('span', undefined, contaLimite(m.id, m.limite, b.escritorio, m.limite_gen)));
       // comprar, vender e os lotes do Vorcaro
       const negocia = el('div', 'bolsa-negocia');
       const unidade = m.valor * b.r * (1 + b.corretagem);

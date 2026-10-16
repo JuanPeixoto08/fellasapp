@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { GameError, toGameError } from '../shared/errors';
+import { EMPRESAS_BOLSA } from './bolsaMotor';
+import { GERADORES } from './nomes';
 import { acoes, avisosPo, contaLimite, empresa, empresaDoGerador, lucro, maxCompra, melhoriaAtual, pct, proximaMelhoria, textoQuebra, variacao } from './bolsa';
 
 describe('contas e textos da Bolsa', () => {
@@ -69,5 +71,14 @@ describe('contas e textos da Bolsa', () => {
       expect(e.code).toBe(code);
       expect(e.message).toBe(texto);
     }
+  });
+});
+
+describe('limite com a árvore grande', () => {
+  it('o banco manda o gerador (limite_gen): sem árvore, a frase de sempre; com árvore, o total e de onde vem', () => {
+    const id = EMPRESAS_BOLSA[0].id;
+    expect(contaLimite(id, 130, 1, 5)).toBe(`Limite: 100 + 5 ${GERADORES[EMPRESAS_BOLSA[0].gerador - 1]} + 25 do Escritório`);
+    expect(contaLimite(id, 760, 1, 5)).toBe(`Limite: 760 (100 + 5 ${GERADORES[EMPRESAS_BOLSA[0].gerador - 1]} + 25 do Escritório, com a árvore)`);
+    expect(contaLimite(id, 130, 1)).toBe(`Limite: 100 + 5 ${GERADORES[EMPRESAS_BOLSA[0].gerador - 1]} + 25 do Escritório`); // resposta velha
   });
 });

@@ -49,6 +49,9 @@ describe('o resumo das portas', () => {
     const c = { cadeira: [1, null, null], desde: ['2026-10-14T17:00:00Z', null, null], trocas: 3, trocas_t: null, ppp: 30, derrubada_ate: null };
     const r = portaConvidados(estado({ generators: gens({ 13: 30 }), convidados: c }), AGORA);
     expect(r).toEqual({ st: '1 sentado · trocas 3/3', badge: 'Cadeira vazia', trancada: false });
+    // com a árvore grande (0082): o máximo vem do banco
+    const arv = { ...c, trocas: 5, trocas_max: 5, recarga_s: 1800 };
+    expect(portaConvidados(estado({ generators: gens({ 13: 30 }), convidados: arv }), AGORA).st).toBe('1 sentado · trocas 5/5');
   });
   it('Mapa: era antes da 2 diz quando abre; sem estado, o convite; depois, quantos lugares abertos', () => {
     expect(portaMapa(estado({ era: 1 }), null)).toEqual({ st: 'Abre na era 2', badge: null, trancada: true });

@@ -371,6 +371,11 @@ describe('a caixinha das oportunidades novas (0076)', () => {
     expect(dicaEspiar('Pastelaria', 2)).toEqual({ titulo: 'Espiar', linhas: [
       { texto: 'Mostra o humor de Pastelaria até ele mudar · 1 crédito' }, { texto: 'Você tem 2', tom: 'fraco' }] });
   });
+  it('Espiar com a grátis do dia da árvore (0082): a grátis vai primeiro', () => {
+    expect(dicaEspiar('Pastelaria', 2, 1)).toEqual({ titulo: 'Espiar', linhas: [
+      { texto: 'Mostra o humor de Pastelaria até ele mudar · grátis hoje' }, { texto: 'Você tem 2', tom: 'fraco' }, { texto: '1 grátis hoje, da árvore', tom: 'fraco' }] });
+    expect(dicaEspiar('Pastelaria', 0, 2).linhas.at(-1)!.texto).toBe('2 grátis hoje, da árvore');
+  });
 });
 
 describe('legado na caixinha (eras 6+)', () => {

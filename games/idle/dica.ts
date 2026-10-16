@@ -512,7 +512,10 @@ export function dicaDourado(tipo: TipoDourado, s: IdleState, o: { seg: number; d
   return null;
 }
 
-/** A caixinha do "Espiar" da Bolsa (0076). */
-export function dicaEspiar(nome: string, creditos: number): Dica {
-  return { titulo: 'Espiar', linhas: [{ texto: `Mostra o humor de ${nome} até ele mudar · 1 crédito` }, { texto: `Você tem ${creditos}`, tom: 'fraco' }] };
+/** A caixinha do "Espiar" da Bolsa (0076); com a árvore grande (0082), a grátis do dia vai primeiro. */
+export function dicaEspiar(nome: string, creditos: number, gratis = 0): Dica {
+  const custo = gratis > 0 ? 'grátis hoje' : '1 crédito';
+  const linhas: LinhaDica[] = [{ texto: `Mostra o humor de ${nome} até ele mudar · ${custo}` }, { texto: `Você tem ${creditos}`, tom: 'fraco' }];
+  if (gratis > 0) linhas.push({ texto: `${gratis === 1 ? '1 grátis' : `${gratis} grátis`} hoje, da árvore`, tom: 'fraco' });
+  return { titulo: 'Espiar', linhas };
 }

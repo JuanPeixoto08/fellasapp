@@ -6,8 +6,10 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
+import { derrubada, kojimaMult, multProducao, trocasAgora } from '../idle/convidados';
 import { abertura, efeitosArvore, precoContrato, taxa, type Estado } from '../idle/economia';
 import { CAIXA_PADRAO, pendentes } from '../idle/oportunidades';
+import type { BolsaEstado } from '../shared/types';
 import { freshDb, quartaAntesDoCorte, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -283,5 +285,87 @@ describe('Recomeço, Oportunidades e Gente com a árvore grande (0082 parte C)',
     expect(w).toBeDefined();
     const depois = await t.rpc<J>('idle_claim_opportunity', { p_window: w });
     expect((depois.valuation - com.valuation) / (com.rate * 900)).toBeCloseTo(3 * 1.1, 6);
+  });
+});
+
+describe('Bolsa e PPP com a árvore grande (0082 parte D)', () => {
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+    await t.as(A);
+    await t.rpc('idle_start');
+    // era 4 com 3 traders e F$ de sobra (a Bolsa aberta); 50 PPP Podcasts (as 3 cadeiras)
+    await q(`update public.idle_state set generators[1:19] = array_fill(1, array[19]), generators[13] = 50, generators[19] = 3,
+               strategies = '{0,0,0,-1,-1,-1}', valuation = 1e30 where user_id = $1`, [A]);
+  });
+  const bolsa = () => t.rpc<BolsaEstado>('idle_bolsa');
+  const BOLSA = [1, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710];
+  it('limite: (100 + gerador + Escritório × 1,5 + 350) × 2 × (1 + 5% por nível); corretagem × 0,25; o banco manda o gerador', async () => {
+    await q('insert into public.idle_bolsa_nivel (user_id, corretor, escritorio) values ($1, 0, 1) on conflict (user_id) do update set escritorio = 1', [A]);
+    await ter([...BOLSA, 3007], { 3007: 4 });
+    const b = await bolsa();
+    expect(b.corretagem).toBeCloseTo(0.05 * 0.25, 12);
+    for (const m of b.empresas) {
+      const gen = m.limite_gen!;
+      expect(m.limite, String(m.id)).toBe(Math.floor((100 + gen + 25 * 1.5 + 350) * 2 * 1.2));
+    }
+  });
+  it('limite sem a árvore e com a Bolsa fechada (sem trader): o de sempre, sem erro', async () => {
+    let b = await bolsa();
+    for (const m of b.empresas) expect(m.limite).toBe(100 + m.limite_gen!);
+    await q('update public.idle_state set generators[19] = 0 where user_id = $1', [A]);
+    await ter(BOLSA);
+    b = await bolsa();
+    expect(b.aberta).toBe(false);
+    expect(b.empresas.every((m) => m.limite > 100)).toBe(true);
+  });
+  it('espiada grátis: 2 por dia (Telegram + YouTube) antes dos créditos; a 3ª gasta o crédito; sem nada, idle_info_sem_credito', async () => {
+    await ter([1, 701, 702, 703, 704, 705, 706, 707]);
+    await q('update public.idle_state set info_creditos = 1 where user_id = $1', [A]);
+    expect((await bolsa()).info_gratis).toBe(2); // a 1ª chamada também cria o mercado
+    // o humor de todas muda daqui a bastante tempo (não "vira" agora): idle_info_vira não atrapalha
+    await q('update public.idle_bolsa_mercado set humor_ate = humor_ate + 100, rj_ate = null where true');
+    const empresas = (await bolsa()).empresas.map((m) => m.id);
+    const espiar = (e: number) => t.rpc<{ info_creditos: number; bolsa: BolsaEstado }>('idle_bolsa_espiar', { p_empresa: e });
+    let r = await espiar(empresas[0]);
+    expect(r.bolsa.info_gratis).toBe(1);
+    expect(r.bolsa.info_creditos).toBe(1);
+    r = await espiar(empresas[1]);
+    expect(r.bolsa.info_gratis).toBe(0);
+    r = await espiar(empresas[2]);
+    expect(r.bolsa.info_creditos).toBe(0);
+    await expect(espiar(empresas[3])).rejects.toThrow(/idle_info_sem_credito/);
+    // outro dia: as grátis voltam
+    await q(`update public.idle_state set info_gratis_dia = public.games_today() - 1 where user_id = $1`, [A]);
+    expect((await bolsa()).info_gratis).toBe(2);
+  });
+  it('PPP: o banco manda trocas 5 com recarga de 30 min, cadeiras 1/0,75/0,5, derrubada 5% e efeito +35%; as contas batem com convidados.ts', async () => {
+    await ter([1, 801, 802, 803, 804, 805, 806, 807, 808, 809, 810]);
+    const desde = Math.floor(Date.now() / 1000) - 30 * 3600;
+    await q(`update public.idle_state set conv_cadeira = '{1,5,10}', conv_desde = array_fill(to_timestamp($2), array[3]),
+               conv_trocas = 1, conv_trocas_t = now() - interval '45 minutes' where user_id = $1`, [A, desde]);
+    const s = await t.rpc<J & { convidados: { trocas: number; trocas_t: string; trocas_max: number; recarga_s: number; pesos: number[]; queda: number; efeito: number; cadeira: (number | null)[]; desde: (string | null)[] } }>('idle_open');
+    const c = s.convidados;
+    expect(c).toMatchObject({ trocas_max: 5, recarga_s: 1800, pesos: [1, 0.75, 0.5], queda: 0.05 });
+    expect(c.efeito).toBeCloseTo(0.35, 12);
+    const agora = Date.parse((s as unknown as { server_now: string }).server_now);
+    const [{ n }] = await q<{ n: number }>('select public.idle_conv_trocas(s, now()) as n from public.idle_state s where user_id = $1', [A]);
+    expect(n).toBe(trocasAgora(c, agora).trocas);
+    const [{ m }] = await q<{ m: number }>('select public.idle_conv_prod(s, $2::timestamptz) as m from public.idle_state s where user_id = $1',
+      [A, new Date(agora).toISOString()]);
+    expect(rel(m, multProducao({ c, ppp: 50, uid: A }, agora))).toBeLessThan(1e-12);
+    expect(kojimaMult(0.75, desde * 1000, agora, 0.35)).toBeGreaterThan(kojimaMult(0.75, desde * 1000, agora));
+    for (let k = 1; k <= 200; k++) {
+      const [{ d }] = await q<{ d: boolean }>(
+        'select public.idle_horta_sorte($1, 50, $2::bigint + $3, 9) < public.idle_conv_queda($1) as d', [A, desde, k]);
+      expect(d, `faixa ${k}`).toBe(derrubada(A, desde, k, 0.05));
+    }
+  });
+  it('sentar com 5 trocas cheias gasta 1 (fica 4) e marca a recarga', async () => {
+    await ter([1, 801, 802, 803, 804, 805, 806, 807, 808]);
+    await q(`update public.idle_state set conv_trocas = 5, conv_trocas_t = null where user_id = $1`, [A]);
+    const s = await t.rpc<{ convidados: { trocas: number; trocas_t: string | null } }>('idle_conv_sentar', { p_cadeira: 1, p_convidado: 1 });
+    expect(s.convidados.trocas).toBe(4);
+    expect(s.convidados.trocas_t).not.toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONVIDADOS, CR, custoGeradores, custoMelhorias, deltaOportunidades, derrubada, derrubadaAte, destrancada, efeitosTexto, eventoDaSorte, eventoEm, faixaEm, GABE, GEMAPLYS, kojimaMult,
-  LUVA, MCVV, multGerador, multProducao, peso, TOBY, tobyMult, trocasAgora, type Cadeiras,
+  LUVA, MCVV, multGerador, multProducao, peso, pesosDe, recargaS, TOBY, tobyMult, trocasAgora, trocasMax, aoVivo, type Cadeiras,
 } from './convidados';
 import { tipoDourado } from './dourados';
 
@@ -153,5 +153,61 @@ describe('eventos com os garantidos (0076)', () => {
     let y = x;
     while (eventoDaSorte(base, y) === null) y++;
     expect(eventoEm(base, y)).toEqual({ ...eventoDaSorte(base, y)!, dobro: false });
+  });
+});
+
+describe('PPP Podcast com a árvore grande (o banco manda os números; 0082)', () => {
+  const T = Date.parse('2026-10-16T12:00:00Z');
+  it('trocas: o máximo e a recarga que o banco mandou (sem eles, 3 e 1 h)', () => {
+    const c = { trocas: 2, trocas_t: new Date(T - 45 * 60_000).toISOString(), trocas_max: 5, recarga_s: 1800 };
+    expect(trocasAgora(c, T)).toEqual({ trocas: 3, proximaMs: T + 15 * 60_000 });
+    expect(trocasMax(c)).toBe(5);
+    expect(recargaS(c)).toBe(1800);
+    expect(trocasAgora({ trocas: 5, trocas_t: null, trocas_max: 5 }, T)).toEqual({ trocas: 5, proximaMs: null });
+    expect(trocasAgora({ trocas: 2, trocas_t: new Date(T - 45 * 60_000).toISOString() }, T)).toEqual({ trocas: 2, proximaMs: T + 15 * 60_000 });
+  });
+  it('a força das cadeiras que o banco mandou (Cadeira gamer, Sofá); sem elas, 1 / 0,5 / 0,25', () => {
+    const c = { cadeira: [null, 1, 3], desde: [null, null, null], trocas: 3, trocas_t: null, pesos: [1, 0.75, 0.5] };
+    expect(peso(c, 50, 1)).toBe(0.75);
+    expect(peso(c, 50, 3)).toBe(0.5);
+    expect(pesosDe({ cadeira: [null, null, null], desde: [null, null, null], trocas: 3, trocas_t: null })).toEqual([1, 0.5, 0.25]);
+  });
+  it('derrubada com a chance da árvore (5%): é um subconjunto das de 25%', () => {
+    let n5 = 0;
+    for (let k = 1; k <= 400; k++) {
+      if (derrubada(UID, 1_700_000_000, k, 0.05)) {
+        n5++;
+        expect(derrubada(UID, 1_700_000_000, k)).toBe(true);
+      }
+    }
+    expect(n5).toBeGreaterThan(5);
+    expect(n5).toBeLessThan(40);
+  });
+  it('o efeito dos convidados multiplica só os bônus de produção (Cristiano, a subida do Kojima, o Toby)', () => {
+    const desde = new Date(T - 30 * 3_600_000).toISOString();
+    const c = { cadeira: [1, 5, 10], desde: [desde, desde, desde], trocas: 3, trocas_t: null, pesos: [1, 0.5, 0.25], efeito: 0.35 };
+    const m = multProducao({ c, ppp: 50, uid: 'u' }, T);
+    expect(m).toBeCloseTo((1 + 0.15 * 1.35) * kojimaMult(0.5, T - 30 * 3_600_000, T, 0.35) * tobyMult(0.25, T - 30 * 3_600_000, T, 0.35), 12);
+    expect(kojimaMult(0.5, T, T, 0.35)).toBeCloseTo(1 - 0.05, 12); // o −10% do começo não muda
+    expect(kojimaMult(0.5, T - 24 * 3_600_000, T, 0.35)).toBeCloseTo(1 + 0.5 * (-0.1 + 0.5 * 1.35), 12);
+    expect(tobyMult(1, T - 20 * 3_600_000, T, 0.35)).toBeCloseTo(1 + 0.4 * 1.35, 12);
+  });
+  it('os textos dizem os números de agora, com o efeito e a derrubada da árvore (C3)', () => {
+    const e = { efeito: 0.4, queda: 0.05 };
+    expect(efeitosTexto(1, 1, e)).toEqual(['Produção +21%', 'Melhorias 10% mais caras']);
+    expect(efeitosTexto(1, 0.5, e)[0]).toBe('Produção +10,5%');
+    expect(efeitosTexto(5, 1, e)).toEqual(['Produção sobe até +60% em 24 h sentado', 'Começa em −10%; trocar zera']);
+    expect(efeitosTexto(10, 1, e)).toEqual(['Produção sobe +2,8% por hora sentado, até +56%', 'Melhorias 10% mais caras; trocar ou tirar zera']);
+    expect(efeitosTexto(9, 0.5, e)[1]).toBe('5% de derrubada: produção −5% por 30 min');
+    expect(efeitosTexto(9, 1, { queda: 0.15 })[1]).toBe('15% de derrubada: produção −10% por 30 min');
+    // sem a árvore: o de sempre; o efeito não toca em quem não é bônus de produção
+    expect(efeitosTexto(1, 1)).toEqual(['Produção +15%', 'Melhorias 10% mais caras']);
+    expect(efeitosTexto(6, 0.5, e)).toEqual(efeitosTexto(6, 0.5));
+  });
+  it('a linha "ao vivo" do Kojima e do Toby usa o efeito (C3)', () => {
+    const d = Date.parse('2026-10-14T00:00:00Z');
+    expect(aoVivo(5, 1, d, 'u', d + 30 * H, { efeito: 0.4 })).toBe('Agora: produção +60% (no máximo)');
+    expect(aoVivo(10, 1, d, 'u', d + 25 * H, { efeito: 0.4 })).toBe('Agora: produção +56% (no máximo)');
+    expect(aoVivo(5, 1, d, 'u', d + 30 * H)).toBe('Agora: produção +40% (no máximo)');
   });
 });

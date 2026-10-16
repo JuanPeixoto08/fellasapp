@@ -485,3 +485,539 @@ language sql stable set search_path = public as $$
    group by m.m
 $$;
 revoke all on function public.idle_horta_bonus(uuid, int, timestamptz) from public, anon, authenticated;
+
+-- ===== parte D: Bolsa e PPP Podcast =====
+-- a corretagem da Bolsa com a árvore: a do Corretor × o menor fator comprado (0,8 → 0,5 → 0,25)
+create or replace function public.idle_bolsa_taxa(u uuid, p_corr int)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_bolsa_corretagem(p_corr) * public.idle_arv(u, 'bolsa_corretagem', 'min', 1)
+$$;
+revoke all on function public.idle_bolsa_taxa(uuid, int) from public, anon, authenticated;
+
+-- o limite de ações de uma empresa (o da 0076 com a árvore): (100 + o gerador dela + o Escritório × o da árvore + os
+-- "+N" dos nós) × o Lobo de Wall Street × (1 + 5% por nível do Fundo de índice), pra baixo
+create or replace function public.idle_bolsa_limite(s public.idle_state, p_gerador int, p_esc int)
+returns int language sql stable set search_path = public as $$
+  select floor((100 + coalesce(s.generators[p_gerador], 0)
+                + public.idle_bolsa_escritorio(p_esc) * public.idle_arv(s.user_id, 'bolsa_escritorio', 'max', 1)
+                + public.idle_arv(s.user_id, 'bolsa_limite', 'soma', 0))
+               * public.idle_arv(s.user_id, 'bolsa_limite_mult', 'max', 1)
+               * (1 + public.idle_arv(s.user_id, 'bolsa_limite_soma', 'soma', 0)))::int
+$$;
+revoke all on function public.idle_bolsa_limite(public.idle_state, int, int) from public, anon, authenticated;
+
+-- quantas espiadas grátis ainda tem hoje (dia de Brasília, o corte da Caixinha): as da árvore − as usadas hoje
+create or replace function public.idle_bolsa_gratis(s public.idle_state)
+returns int language sql stable set search_path = public as $$
+  select greatest(0, public.idle_arv(s.user_id, 'bolsa_espiadas', 'soma', 0)::int
+                     - case when s.info_gratis_dia = public.games_today() then coalesce(s.info_gratis_n, 0) else 0 end)
+$$;
+revoke all on function public.idle_bolsa_gratis(public.idle_state) from public, anon, authenticated;
+
+-- o que a Bolsa mostra (o da 0076) com a árvore grande (0082): corretagem e limite com os nós, o gerador de cada limite e as espiadas grátis de hoje
+create or replace function public.idle_bolsa_estado(p_user uuid, p_agora bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s      public.idle_state;
+  v_po   jsonb;
+  v_tr   int := 0;
+  v_corr int := 0;
+  v_esc  int := 0;
+  v_vs   boolean := false;
+  v_fgc  boolean := false;
+begin
+  select * into s from public.idle_state where user_id = p_user;
+  if found then
+    v_tr := coalesce(s.generators[19], 0);
+    v_vs := public.idle_conv_peso(s, 11) > 0;
+  end if;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
+  with po as (
+    delete from public.idle_bolsa_carteira k
+     using public.idle_bolsa_mercado m
+     where k.user_id = p_user and m.empresa = k.empresa and k.geracao < m.geracao
+    returning k.empresa, k.qtd, k.alavanca
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('empresa', empresa, 'qtd', qtd) order by empresa) filter (where qtd > 0), '[]'::jsonb),
+         coalesce(bool_or(alavanca > 1 and qtd > 0), false)
+    into v_po, v_fgc from po;
+  if v_fgc then -- lote do Vorcaro virou pó: a conquista sai na próxima conta fechada (aqui pode não ter trava)
+    update public.idle_state set conv_fgc = true where user_id = p_user;
+  end if;
+  return jsonb_build_object(
+    'tick', p_agora,
+    'vira_em_ms', greatest(0, (p_agora + 1) * 60000 - floor(extract(epoch from now()) * 1000)::bigint),
+    'r', case when s.user_id is null then 0 else public.idle_rate_bolsa(s) end, -- sem os convidados (ver idle_rate_bolsa)
+    'aberta', v_tr >= 1 and coalesce(s.started, false),
+    'corretor', v_corr,
+    'escritorio', v_esc,
+    'corretagem', public.idle_bolsa_taxa(p_user, v_corr),
+    'info_creditos', coalesce(s.info_creditos, 0),
+    'info_gratis', case when s.user_id is null then 0 else public.idle_bolsa_gratis(s) end,
+    'empresas', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', m.empresa, 'valor', m.valor,
+        'limite', public.idle_bolsa_limite(s, c.gerador, v_esc),
+        'limite_gen', coalesce(s.generators[c.gerador], 0),
+        'risco', m.rj_ate is null and m.valor < 0.15 * c.repouso,
+        'rj_ate', m.rj_ate,
+        'humor', case when v_vs or public.idle_bolsa_espiada(s, m, p_agora) then m.humor end, -- VSauce sentado ou espiada
+        'espiada', public.idle_bolsa_espiada(s, m, p_agora),
+        'muda_em', case when public.idle_bolsa_espiada(s, m, p_agora) then greatest(1, m.humor_ate - p_agora) end,
+        'historico', (select coalesce(jsonb_agg(p.valor order by p.tick), '[]'::jsonb) from public.idle_bolsa_precos p
+                       where p.empresa = m.empresa and p.tick > p_agora - 60 and p.tick <= p_agora)
+      ) order by m.empresa), '[]'::jsonb)
+      from public.idle_bolsa_mercado m join public.idle_cat_bolsa c on c.id = m.empresa),
+    'carteira', (
+      select coalesce(jsonb_agg(jsonb_build_object('empresa', k.empresa, 'qtd', k.qtd, 'custo', k.custo, 'alavanca', k.alavanca)
+                            order by k.empresa, k.alavanca), '[]'::jsonb)
+        from public.idle_bolsa_carteira k where k.user_id = p_user and k.qtd > 0),
+    'viraram_po', v_po);
+end;
+$$;
+revoke all on function public.idle_bolsa_estado(uuid, bigint) from public, anon, authenticated;
+
+-- negociar (o da 0051) + a Insider (shh) na venda (0076); corretagem e limite com a árvore (0082)
+create or replace function public.idle_bolsa_negociar_em(
+  p_user uuid, p_empresa int, p_lado text, p_qtd int, p_tick bigint, p_agora bigint, p_lote double precision default 1)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s        public.idle_state;
+  c        public.idle_cat_bolsa;
+  m        public.idle_bolsa_mercado;
+  k        public.idle_bolsa_carteira;
+  v_tem    int := 0;
+  v_total  int := 0;
+  v_custo  double precision := 0;
+  v_r      double precision;
+  v_preco  double precision;
+  v_cabe   int;
+  v_n      int;
+  v_corr   int := 0;
+  v_esc    int := 0;
+  v_fee    double precision;
+  v_lote   double precision;
+  v_compra double precision;
+  v_por    double precision;
+begin
+  if p_tick is distinct from p_agora then
+    raise exception 'idle_bolsa_preco_mudou' using errcode = 'P0001';
+  end if;
+  if p_lado not in ('comprar', 'vender') or p_qtd not in (0, 1, 10) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  select * into c from public.idle_cat_bolsa where id = p_empresa;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  s := public.idle_lock(p_user);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.generators[19], 0) < 1 then
+    raise exception 'idle_bolsa_fechada' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  select * into m from public.idle_bolsa_mercado where empresa = p_empresa;
+  if m.rj_ate is not null then
+    raise exception 'idle_bolsa_rj' using errcode = 'P0001';
+  end if;
+  -- comprar: o lote é o do Vorcaro agora (1 + peso; 1 sem ele); vender: o lote pedido
+  v_lote := case when p_lado = 'comprar' then 1 + public.idle_conv_peso(s, 2) else coalesce(p_lote, 1) end;
+  select * into k from public.idle_bolsa_carteira
+   where user_id = p_user and empresa = p_empresa and alavanca = v_lote for update;
+  if found and k.geracao = m.geracao then
+    v_tem := k.qtd;
+    v_custo := k.custo;
+  elsif found and k.alavanca > 1 and k.qtd > 0 then
+    perform public.idle_ganhar(p_user, 'conv_fgc'); -- o lote antigo virou pó (a conta já fechou acima)
+  end if;
+  select coalesce(sum(x.qtd), 0) into v_total from public.idle_bolsa_carteira x
+   where x.user_id = p_user and x.empresa = p_empresa and x.geracao = m.geracao;
+  select coalesce(max(n.corretor), 0), coalesce(max(n.escritorio), 0) into v_corr, v_esc
+    from public.idle_bolsa_nivel n where n.user_id = p_user;
+  v_fee := 1 + public.idle_bolsa_taxa(p_user, v_corr);
+  v_r := public.idle_rate_bolsa(s); -- sem os convidados (ver idle_rate_bolsa)
+  v_preco := m.valor * v_r;
+
+  if p_lado = 'comprar' then
+    v_cabe := public.idle_bolsa_limite(s, c.gerador, v_esc) - v_total;
+    if v_cabe <= 0 or (p_qtd > 0 and p_qtd > v_cabe) then
+      raise exception 'idle_bolsa_limite' using errcode = 'P0001';
+    end if;
+    if p_qtd = 0 then
+      v_n := least(v_cabe, floor(s.valuation / (v_preco * v_fee))::int);
+    else
+      v_n := p_qtd;
+    end if;
+    if v_preco <= 0 or v_n < 1 or v_n * v_preco * v_fee > s.valuation then
+      raise exception 'idle_cant_afford' using errcode = 'P0001';
+    end if;
+    s.valuation := greatest(s.valuation - v_n * v_preco * v_fee, 0);
+    insert into public.idle_bolsa_carteira (user_id, empresa, alavanca, qtd, custo, geracao)
+    values (p_user, p_empresa, v_lote, v_tem + v_n, v_custo + v_n * m.valor * v_fee, m.geracao)
+    on conflict (user_id, empresa, alavanca) do update set qtd = excluded.qtd, custo = excluded.custo, geracao = excluded.geracao;
+  else
+    if v_tem < 1 then
+      raise exception 'idle_bolsa_sem_acoes' using errcode = 'P0001';
+    end if;
+    v_n := case when p_qtd = 0 then v_tem else least(p_qtd, v_tem) end;
+    if v_lote = 1 then
+      s.valuation := s.valuation + v_n * v_preco;
+    else
+      -- lote alavancado: a diferença do preço pago (com a corretagem) conta `alavanca` vezes; perdeu tudo = pó
+      v_compra := v_custo / v_tem;
+      v_por := greatest(0, v_compra + v_lote * (m.valor - v_compra));
+      s.valuation := s.valuation + v_n * v_por * v_r;
+      if v_por = 0 then
+        perform public.idle_ganhar(p_user, 'conv_fgc');
+      end if;
+    end if;
+    -- Insider (shh), escondida (0076): vendeu com 100% de lucro (o preço da venda, por ação, no mínimo o dobro do que pagou
+    -- com a corretagem) uma ação de empresa espiada nas últimas 2 h
+    if (case when v_lote = 1 then m.valor else v_por end) >= 2 * (v_custo / v_tem)
+       and (s.espiadas -> p_empresa::text ->> 'em')::timestamptz >= now() - interval '2 hours' then
+      perform public.idle_ganhar(p_user, 'insider', 1);
+    end if;
+    update public.idle_bolsa_carteira
+       set qtd = v_tem - v_n, custo = v_custo * (v_tem - v_n) / v_tem, geracao = m.geracao
+     where user_id = p_user and empresa = p_empresa and alavanca = v_lote;
+  end if;
+
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('bolsa', public.idle_bolsa_estado(p_user, p_agora));
+end;
+$$;
+revoke all on function public.idle_bolsa_negociar_em(uuid, int, text, int, bigint, bigint, double precision) from public, anon, authenticated;
+
+-- Espiar (o da 0076): a grátis do dia (árvore grande, 0082) vai antes do crédito
+create or replace function public.idle_bolsa_espiar_em(p_user uuid, p_empresa int, p_agora bigint)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s public.idle_state;
+  m public.idle_bolsa_mercado;
+  v_gratis int;
+begin
+  s := public.idle_lock(p_user);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if coalesce(s.generators[19], 0) < 1 then
+    raise exception 'idle_bolsa_fechada' using errcode = 'P0001';
+  end if;
+  select * into m from public.idle_bolsa_mercado where empresa = p_empresa;
+  if not found then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  if m.rj_ate is not null then
+    raise exception 'idle_bolsa_rj' using errcode = 'P0001';
+  end if;
+  if public.idle_bolsa_espiada(s, m, p_agora) then
+    raise exception 'idle_info_ja' using errcode = 'P0001';
+  end if;
+  v_gratis := public.idle_bolsa_gratis(s);
+  if v_gratis < 1 and coalesce(s.info_creditos, 0) < 1 then
+    raise exception 'idle_info_sem_credito' using errcode = 'P0001';
+  end if;
+  -- o humor vira neste minuto (humor_ate = agora: a empresa acabou de sair da RJ, ou o mercado acabou de nascer): a
+  -- espiada não valeria nada, então não gasta o crédito
+  if m.humor_ate <= p_agora then
+    raise exception 'idle_info_vira' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  if v_gratis >= 1 then -- a grátis do dia primeiro (Grupo de sinais no Telegram, Analista do YouTube)
+    if s.info_gratis_dia is distinct from public.games_today() then
+      s.info_gratis_dia := public.games_today();
+      s.info_gratis_n := 0;
+    end if;
+    s.info_gratis_n := coalesce(s.info_gratis_n, 0) + 1;
+  else
+    s.info_creditos := s.info_creditos - 1;
+  end if;
+  s.espiadas := coalesce(s.espiadas, '{}'::jsonb)
+                || jsonb_build_object(p_empresa::text, jsonb_build_object('ate_tick', m.humor_ate, 'em', now()));
+  perform public.idle_save(s);
+  return public.idle_json(s) || jsonb_build_object('bolsa', public.idle_bolsa_estado(p_user, p_agora));
+end;
+$$;
+revoke all on function public.idle_bolsa_espiar_em(uuid, int, bigint) from public, anon, authenticated;
+
+-- PPP Podcast com a árvore: quantas trocas cabem (3 + Mesa de som + Pauta roubada), quanto cada uma leva pra voltar (1 h ÷
+-- o Microfone de lapela/o Produtor), a chance de a faixa do MC V.V cair (25% → 15% → 5%) e o +% dos bônus de produção
+create or replace function public.idle_conv_trocas_max(u uuid)
+returns int language sql stable set search_path = public as $$
+  select 3 + public.idle_arv(u, 'conv_trocas', 'soma', 0)::int
+$$;
+create or replace function public.idle_conv_recarga_s(u uuid)
+returns double precision language sql stable set search_path = public as $$
+  select 3600 / public.idle_arv(u, 'conv_recarga', 'max', 1)
+$$;
+create or replace function public.idle_conv_queda(u uuid)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_arv(u, 'conv_queda', 'min', 0.25)
+$$;
+create or replace function public.idle_conv_efeito(u uuid)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_arv(u, 'conv_efeito', 'soma', 0)
+$$;
+revoke all on function public.idle_conv_trocas_max(uuid) from public, anon, authenticated;
+revoke all on function public.idle_conv_recarga_s(uuid) from public, anon, authenticated;
+revoke all on function public.idle_conv_queda(uuid) from public, anon, authenticated;
+revoke all on function public.idle_conv_efeito(uuid) from public, anon, authenticated;
+
+-- peso do convidado c (o da 0051) com a Cadeira gamer (meio 0,75) e o Sofá (canto 0,5); lê a árvore: stable
+create or replace function public.idle_conv_peso(s public.idle_state, c int)
+returns double precision language sql stable set search_path = public as $$
+  select coalesce((select case when i = 1 and coalesce(s.generators[13], 0) >= 1 then 1.0
+                               when i = 2 and coalesce(s.generators[13], 0) >= 25 then public.idle_arv(s.user_id, 'conv_cadeira2', 'max', 0.5)
+                               when i = 3 and coalesce(s.generators[13], 0) >= 50 then public.idle_arv(s.user_id, 'conv_cadeira3', 'max', 0.25)
+                               else 0 end
+                     from generate_subscripts(s.conv_cadeira, 1) i where s.conv_cadeira[i] = c limit 1), 0)
+$$;
+
+-- trocas em t (o da 0051) com a árvore: as gastas voltam uma a cada idle_conv_recarga_s, até idle_conv_trocas_max
+create or replace function public.idle_conv_trocas(s public.idle_state, t timestamptz)
+returns int language sql stable set search_path = public as $$
+  with k as (select public.idle_conv_trocas_max(s.user_id) as mx, public.idle_conv_recarga_s(s.user_id) as rs)
+  select case when s.conv_trocas >= k.mx or s.conv_trocas_t is null then k.mx
+              else least(k.mx, s.conv_trocas + greatest(0, floor(extract(epoch from t - s.conv_trocas_t) / k.rs))::int) end
+    from k
+$$;
+
+-- multiplicador da produção em t (o da 0052) com o efeito da árvore nos bônus de produção (o +15% do Cristiano, a subida
+-- do Kojima, o +2%/h do Toby); os de baixa (Luva, VSauce, o −10% do Kojima, a derrubada) não mudam. Igual a
+-- convidados.ts multProducao
+create or replace function public.idle_conv_prod(s public.idle_state, t timestamptz)
+returns double precision language plpgsql stable set search_path = public as $$
+declare
+  pk double precision := public.idle_conv_peso(s, 5);
+  pt double precision := public.idle_conv_peso(s, 10);
+  pm double precision := public.idle_conv_peso(s, 9);
+  e  double precision := public.idle_conv_efeito(s.user_id);
+  m  double precision;
+begin
+  m := (1 + 0.15 * public.idle_conv_peso(s, 1) * (1 + e)) * (1 - 0.05 * public.idle_conv_peso(s, 4)) * (1 - 0.05 * public.idle_conv_peso(s, 11));
+  if pk > 0 then
+    m := m * (1 + pk * (-0.10 + 0.50 * least(24, greatest(0, floor(extract(epoch from t - public.idle_conv_desde(s, 5)) / 3600))) / 24 * (1 + e)));
+  end if;
+  if pt > 0 then
+    m := m * (1 + pt * 0.02 * least(20, greatest(0, floor(extract(epoch from t - public.idle_conv_desde(s, 10)) / 3600))) * (1 + e));
+  end if;
+  if pm > 0 and public.idle_conv_derrubada_ate(s, t) is not null then
+    m := m * (1 - 0.10 * pm);
+  end if;
+  return m;
+end;
+$$;
+
+-- os efeitos agora (o da 0051) + o que a árvore muda nas cadeiras e nas trocas (a página só mostra)
+create or replace function public.idle_conv_json(s public.idle_state)
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'cadeira', to_jsonb(s.conv_cadeira),
+    'desde', to_jsonb(s.conv_desde),
+    'trocas', s.conv_trocas,
+    'trocas_t', s.conv_trocas_t,
+    'ppp', coalesce(s.generators[13], 0),
+    'derrubada_ate', public.idle_conv_derrubada_ate(s, now()),
+    'trocas_max', public.idle_conv_trocas_max(s.user_id),
+    'recarga_s', public.idle_conv_recarga_s(s.user_id),
+    'pesos', jsonb_build_array(1, public.idle_arv(s.user_id, 'conv_cadeira2', 'max', 0.5), public.idle_arv(s.user_id, 'conv_cadeira3', 'max', 0.25)),
+    'queda', public.idle_conv_queda(s.user_id),
+    'efeito', public.idle_conv_efeito(s.user_id))
+$$;
+
+-- MC V.V: se t está numa derrubada (30 min depois de uma faixa derrubada), o fim dela; senão null. Faixa k a cada
+-- 2 h / peso desde que sentou; 25% derrubada (sorte de idle_horta_sorte com canteiro 50, passo desde + k, sorteio 9) (0082: a chance da árvore)
+create or replace function public.idle_conv_derrubada_ate(s public.idle_state, t timestamptz)
+returns timestamptz language plpgsql stable set search_path = public as $$
+declare
+  p     double precision := public.idle_conv_peso(s, 9);
+  d     timestamptz := public.idle_conv_desde(s, 9);
+  passo double precision;
+  k     bigint;
+  ini   timestamptz;
+begin
+  if p <= 0 or d is null then
+    return null;
+  end if;
+  passo := 7200 / p;
+  k := floor(extract(epoch from t - d) / passo)::bigint;
+  if k < 1 then
+    return null;
+  end if;
+  ini := d + make_interval(secs => k * passo);
+  if t < ini + interval '30 minutes'
+     and public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < public.idle_conv_queda(s.user_id) then
+    return ini + interval '30 minutes';
+  end if;
+  return null;
+end;
+$$;
+
+-- quantas faixas do MC V.V foram derrubadas desde que ele sentou (conquista "Sample não liberado") (0082: a chance da árvore)
+create or replace function public.idle_conv_derrubadas(s public.idle_state, t timestamptz)
+returns int language plpgsql stable set search_path = public as $$
+declare
+  p     double precision := public.idle_conv_peso(s, 9);
+  d     timestamptz := public.idle_conv_desde(s, 9);
+  n     int := 0;
+  k     bigint;
+begin
+  if p <= 0 or d is null then
+    return 0;
+  end if;
+  for k in 1 .. least(floor(extract(epoch from t - d) / (7200 / p))::bigint, 2000) loop
+    if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < public.idle_conv_queda(s.user_id) then
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+
+-- instantes em (de, ate) em que a produção dos convidados muda: degraus do Kojima (24) e do Toby (20), início e fim
+-- das derrubadas do MC V.V (a conta vira neles) (0082: a chance da árvore)
+create or replace function public.idle_conv_mudancas(s public.idle_state, de timestamptz, ate timestamptz)
+returns setof timestamptz language plpgsql stable set search_path = public as $$
+declare
+  d     timestamptz;
+  p     double precision;
+  passo double precision;
+  k     bigint;
+  ini   timestamptz;
+begin
+  if de >= ate then
+    return;
+  end if;
+  d := public.idle_conv_desde(s, 5);
+  if public.idle_conv_peso(s, 5) > 0 and d is not null then
+    return query select d + make_interval(hours => h) from generate_series(1, 24) h
+                  where d + make_interval(hours => h) > de and d + make_interval(hours => h) < ate;
+  end if;
+  d := public.idle_conv_desde(s, 10);
+  if public.idle_conv_peso(s, 10) > 0 and d is not null then
+    return query select d + make_interval(hours => h) from generate_series(1, 20) h
+                  where d + make_interval(hours => h) > de and d + make_interval(hours => h) < ate;
+  end if;
+  p := public.idle_conv_peso(s, 9);
+  d := public.idle_conv_desde(s, 9);
+  if p > 0 and d is not null then
+    passo := 7200 / p;
+    for k in greatest(1, floor(extract(epoch from de - d) / passo)::bigint)
+             .. least(floor(extract(epoch from ate - d) / passo)::bigint, floor(extract(epoch from de - d) / passo)::bigint + 200) loop
+      if public.idle_horta_sorte(s.user_id, 50, floor(extract(epoch from d))::bigint + k, 9) < public.idle_conv_queda(s.user_id) then
+        ini := d + make_interval(secs => k * passo);
+        return query select x from (values (ini), (ini + interval '30 minutes')) v(x) where x > de and x < ate;
+      end if;
+    end loop;
+  end if;
+end;
+$$;
+
+-- a faixa do MC V.V no segundo seg (a da 0051): nunca Tigrinho (o 7 vira Investidor) (0082: a chance da árvore)
+create or replace function public.idle_conv_faixa(s public.idle_state, seg bigint)
+returns int language plpgsql stable set search_path = public as $$
+declare
+  p     double precision := public.idle_conv_peso(s, 9);
+  d     timestamptz := public.idle_conv_desde(s, 9);
+  ds    bigint;
+  passo bigint;
+  t     int;
+begin
+  if p <= 0 or d is null then
+    return null;
+  end if;
+  ds := floor(extract(epoch from d))::bigint;
+  passo := round(7200 / p)::bigint;
+  if seg - ds < passo or mod(seg - ds, passo) <> 0
+     or public.idle_horta_sorte(s.user_id, 50, ds + (seg - ds) / passo, 9) < public.idle_conv_queda(s.user_id) then
+    return null;
+  end if;
+  t := public.idle_dourado_tipo(s.user_id, seg);
+  return case when t = 7 then 0 else t end;
+end;
+$$;
+revoke all on function public.idle_conv_faixa(public.idle_state, bigint) from public, anon, authenticated;
+
+-- sentar (o da 0051) com as trocas e a recarga da árvore (0082)
+create or replace function public.idle_conv_sentar(p_cadeira int, p_convidado int)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare
+  s     public.idle_state;
+  v_me  uuid := auth.uid();
+  v_n   int;
+  v_k   int;
+  v_i   int := p_cadeira + 1;
+  v_ppp int;
+  v_rs   double precision;
+begin
+  if not public.is_member() then
+    raise exception 'not_member' using errcode = '42501';
+  end if;
+  s := public.idle_lock(v_me);
+  if not s.started then
+    raise exception 'idle_not_started' using errcode = 'P0001';
+  end if;
+  if p_cadeira is null or p_cadeira not between 0 and 2 or p_convidado is null
+     or not exists (select 1 from public.idle_cat_conv c where c.id = p_convidado) then
+    raise exception 'idle_bad_choice' using errcode = 'P0001';
+  end if;
+  v_ppp := coalesce(s.generators[13], 0);
+  if v_ppp < 1 then
+    raise exception 'idle_conv_fechado' using errcode = 'P0001';
+  end if;
+  if v_ppp < (array[1, 25, 50])[v_i] then
+    raise exception 'idle_conv_trancada' using errcode = 'P0001';
+  end if;
+  if p_convidado = any (s.conv_cadeira) then
+    raise exception 'idle_conv_ja_sentado' using errcode = 'P0001';
+  end if;
+  -- Gemaplys e MC V.V são a mesma pessoa: não muda nada, mas a conquista escondida sai (sem exceção: o rollback a apagaria)
+  if (p_convidado = 3 and 9 = any (s.conv_cadeira[1:v_i - 1] || s.conv_cadeira[v_i + 1:3]))
+     or (p_convidado = 9 and 3 = any (s.conv_cadeira[1:v_i - 1] || s.conv_cadeira[v_i + 1:3])) then
+    s := public.idle_settle(s); -- fecha a conta antes: a conquista nova só vale dali pra frente
+    perform public.idle_save(s);
+    perform public.idle_ganhar(v_me, 'conv_mesma');
+    return public.idle_json(s) || jsonb_build_object('mesma_pessoa', true);
+  end if;
+  v_n := public.idle_conv_trocas(s, now());
+  v_rs := public.idle_conv_recarga_s(v_me); -- 0082: a recarga da árvore
+  if v_n < 1 then
+    raise exception 'idle_conv_sem_troca' using errcode = 'P0001';
+  end if;
+  s := public.idle_settle(s);
+  if v_n >= public.idle_conv_trocas_max(v_me) then
+    s.conv_trocas := v_n - 1;
+    s.conv_trocas_t := now();
+  else
+    v_k := greatest(0, floor(extract(epoch from now() - s.conv_trocas_t) / v_rs))::int;
+    s.conv_trocas := v_n - 1;
+    s.conv_trocas_t := s.conv_trocas_t + make_interval(secs => v_k * v_rs);
+  end if;
+  s.conv_cadeira[v_i] := p_convidado;
+  s.conv_desde[v_i] := now();
+  if not (p_convidado = any (s.conv_vistos)) then
+    s.conv_vistos := s.conv_vistos || p_convidado;
+  end if;
+  update public.idle_state
+     set conv_cadeira = s.conv_cadeira, conv_desde = s.conv_desde, conv_trocas = s.conv_trocas,
+         conv_trocas_t = s.conv_trocas_t, conv_vistos = s.conv_vistos
+   where user_id = v_me;
+  perform public.idle_ganhar(v_me, 'conv_sentou');
+  if (select count(*) from unnest(s.conv_cadeira) c where c is not null) = 3 then
+    perform public.idle_ganhar(v_me, 'conv_mesa');
+  end if;
+  if p_convidado = 1 and v_i = 1 then
+    perform public.idle_ganhar(v_me, 'conv_cr');
+  end if;
+  if p_convidado = 6 and v_i = 3 then
+    perform public.idle_ganhar(v_me, 'conv_hl3');
+  end if;
+  perform public.idle_save(s);
+  return public.idle_json(s);
+end;
+$$;
+revoke all on function public.idle_conv_sentar(int, int) from public, anon;
+grant execute on function public.idle_conv_sentar(int, int) to authenticated;

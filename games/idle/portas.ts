@@ -2,7 +2,7 @@
 // tem algo pra fazer. Puro: a tela só escreve o que sai daqui.
 import type { BolsaEstado, HortaEstado, IdleState, MapaEstado } from '../shared/types';
 import { empresa, variacao } from './bolsa';
-import { destrancada, MAX_TROCAS, trocasAgora } from './convidados';
+import { destrancada, MAX_TROCAS, trocasAgora, trocasMax } from './convidados';
 import { daPlanta, fase, madura, resumoBonus } from './horta';
 
 export type ResumoPorta = { st: string; badge: string | null; trancada: boolean };
@@ -41,7 +41,7 @@ export function portaConvidados(s: IdleState, agoraMs: number): ResumoPorta {
   const abertas = [0, 1, 2].filter((i) => destrancada(i, ppp)).length;
   const tr = c ? trocasAgora(c, agoraMs).trocas : MAX_TROCAS;
   return {
-    st: `${sentados === 1 ? '1 sentado' : `${sentados} sentados`} · trocas ${tr}/${MAX_TROCAS}`,
+    st: `${sentados === 1 ? '1 sentado' : `${sentados} sentados`} · trocas ${tr}/${c ? trocasMax(c) : MAX_TROCAS}`,
     badge: sentados < abertas && tr > 0 ? (sentados === 0 ? 'Estúdio vazio' : 'Cadeira vazia') : null,
     trancada: false,
   };
