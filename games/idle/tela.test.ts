@@ -460,6 +460,54 @@ describe('tela da Fellas Inc.', () => {
       expect(root.querySelector(`#${modal.getAttribute('aria-labelledby')}`)!.tagName).toBe('H2');
     }
   });
+  it('Loja: com o Foguete aparecem os geradores das eras 6 e 7; a linha dos 31–42 tem a frase; vai até o 42', () => {
+    const tela = criarTela(root, acoes);
+    const g = Array(42).fill(1);
+    g.fill(0, 31); // tem do 1 ao 31
+    tela.renderizar(modelo({ estado: estado({ era: 6, generators: g, strategies: [0, 0, 0, 0, 0, -1] }) }));
+    const linhas = [...root.querySelectorAll('.lista-geradores .gerador')];
+    expect(linhas).toHaveLength(33); // 1 a 32 compráveis + o 33 trancado
+    expect(linhas[30].querySelector('.frase')!.textContent).toBe('Internet no meio do nada, e nenhuma estrela visível no céu.');
+    expect(linhas[29].querySelector('.frase')).toBeNull(); // o Foguete não tem frase
+    expect(linhas[32].classList.contains('trancado')).toBe(true);
+    tela.renderizar(modelo({ estado: estado({ era: 7, generators: Array(42).fill(1), strategies: [0, 0, 0, 0, 0, 0] }) }));
+    expect(root.querySelectorAll('.lista-geradores .gerador')).toHaveLength(42);
+  });
+  it('estratégia da era 6: a folha diz "Era 6: Em órbita" e mostra as duas opções, cada uma com o Escolher', () => {
+    const tela = criarTela(root, acoes);
+    const g = Array(42).fill(1);
+    g.fill(0, 31);
+    tela.renderizar(modelo({ estado: estado({ era: 6, generators: g, strategies: [0, 0, 0, 0, -1, -1] }) }));
+    const folha = root.querySelector('.modal-estrategia')!;
+    expect(folha.textContent).toContain('Era 6: Em órbita');
+    expect([...folha.querySelectorAll('.escolha strong')].map((e) => e.textContent)).toEqual(['Turismo espacial', 'Satélites de internet']);
+    porTexto('Escolher').click();
+    expect(acoes.escolher).toHaveBeenCalledWith(6, 0);
+  });
+  it('a folha da estratégia abre com o mouse em cima de um gerador: a caixinha dele fecha (não cobre o Escolher)', () => {
+    vi.useFakeTimers();
+    try {
+      const tela = criarTela(root, acoes);
+      const g = Array(42).fill(1);
+      g.fill(0, 31);
+      tela.renderizar(modelo({ estado: estado({ era: 6, generators: g, strategies: [0, 0, 0, 0, 0, -1] }) }));
+      const linha = root.querySelectorAll<HTMLElement>('.lista-geradores .gerador')[30];
+      linha.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+      vi.advanceTimersByTime(200);
+      const dica = root.querySelector<HTMLElement>('.dica')!;
+      expect(dica.hasAttribute('hidden')).toBe(false);
+      tela.renderizar(modelo({ estado: estado({ era: 6, generators: g, strategies: [0, 0, 0, 0, -1, -1] }) }));
+      expect(root.querySelector('.modal-estrategia')!.textContent).toContain('Era 6: Em órbita');
+      expect(dica.hasAttribute('hidden')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a faixa da cena diz a era: "Era 7 · Lua"', () => {
+    const tela = criarTela(root, acoes);
+    tela.renderizar(modelo({ estado: estado({ era: 7, generators: Array(42).fill(1), strategies: [0, 0, 0, 0, 0, 0] }) }));
+    expect(root.textContent).toContain('Era 7 · Lua');
+  });
 });
 
 const linha = (x: Partial<IdleBoardRow> = {}): IdleBoardRow => ({

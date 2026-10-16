@@ -11,6 +11,7 @@ import {
 } from './dourados';
 import { formatarTaxa, formatarValor } from './formatar';
 import { multGerador } from './convidados';
+import { FRASES_GERADOR } from './nomes';
 import { CASHBACK_S, cashbackAtivo, CHAMADOS_MAX, CUPONS_POR_OPP, temBolsa, temPlantaCrescendo, type TipoOportunidade } from './oportunidades';
 import { ganhoEventoAgora, marmitaAtiva, NOME_EVENTO_ERA, type TipoEventoEra } from './eventosEra';
 import {
@@ -74,7 +75,8 @@ export function dicaGerador(s: IdleState, gid: number, precoProximo: number, cas
   const cada = porUnidade(s);
   const n = s.generators[gid - 1] ?? 0;
   const soma = cada.reduce((a, x, i) => a + x * (s.generators[i] ?? 0), 0);
-  const linhas: LinhaDica[] = [{ texto: `Cada um rende ${formatarTaxa(cada[gid - 1])}` }];
+  const frase = FRASES_GERADOR[gid];
+  const linhas: LinhaDica[] = [...(frase ? [{ texto: frase, tom: 'fraco' as const }] : []), { texto: `Cada um rende ${formatarTaxa(cada[gid - 1])}` }];
   if (n > 0) {
     const fatia = soma > 0 ? (n * cada[gid - 1]) / soma : 0;
     linhas.push({ texto: `${n === 1 ? 'O seu rende' : `Os ${n} rendem`} ${formatarTaxa(n * cada[gid - 1])} · ${fatia < 0.01 ? 'menos de 1%' : `${Math.round(fatia * 100)}%`} da sua produção`, tom: 'bom' });

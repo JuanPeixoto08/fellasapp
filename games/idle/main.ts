@@ -3,6 +3,7 @@ import '../shared/hud/hud.css';
 import './idle.css';
 import './dourados.css';
 import './caixinha.css';
+import './eras67.css';
 
 import * as realApi from '../shared/api';
 import { GameError, toGameError } from '../shared/errors';

@@ -98,6 +98,7 @@ export async function idleBoard(): Promise<IdleBoardRow[]> {
 const w = window as unknown as {
   __rico: (v: number) => Promise<void>; __dourado: (tipo?: number) => Promise<void>; __eventoEra: (tipo?: number) => Promise<void>; __meContrata: () => Promise<void>; __vendavel: (foguetes?: number) => Promise<void>; __pontos: (n: number) => Promise<void>; __trader: (n?: number) => Promise<void>;
   __oportunidade: (k: number | null) => Promise<void>;
+  __era: (era?: number) => Promise<void>;
 };
 w.__rico = async (v) => {
   const { ready } = await import('./mockDb');
@@ -114,6 +115,16 @@ w.__meContrata = async () => {
 };
 w.__vendavel = async (foguetes = 150) => {
   await dono(`update public.idle_state set generators[30] = $2, strategies = '{0,0,0,0}' where user_id = $1`, [ME, foguetes]);
+  document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
+};
+// __era(7) leva a empresa pra era 6 ou 7 de verdade: 40 de cada gerador até o 30, 1 de cada da era até o último dela, as
+// estratégias das eras de antes escolhidas (a da era fica pendente: a folha aparece) e F$ de sobra
+w.__era = async (era = 6) => {
+  const e = Math.min(7, Math.max(6, era));
+  await dono(`update public.idle_state set
+      generators = array(select case when g <= 30 then 40 when g <= $2 then 1 else 0 end from generate_series(1, 42) g),
+      strategies = array(select (case when x < $3 then 0 else -1 end)::smallint from generate_series(2, 7) x), valuation = 1e22
+    where user_id = $1`, [ME, e * 6, e]);
   document.dispatchEvent(new Event('visibilitychange')); // a página bate o ponto e mostra
 };
 w.__pontos = async (n) => {
@@ -272,6 +283,14 @@ w.__oportunidade = async (k) => {
     b.textContent = nome;
     b.style.cssText = 'padding:6px 8px;background:#2A5BD7;color:#fff;border:0;cursor:pointer';
     b.addEventListener('click', () => void w.__eventoEra(i + 1));
+    painel.append(b);
+  });
+  // eras 6 e 7: pula pra lá (a estratégia da era fica pendente)
+  ([['Era 6', 6], ['Era 7', 7]] as const).forEach(([nome, e]) => {
+    const b = document.createElement('button');
+    b.textContent = nome;
+    b.style.cssText = 'padding:6px 8px;background:#3A3940;color:#fff;border:0;cursor:pointer';
+    b.addEventListener('click', () => void w.__era(e));
     painel.append(b);
   });
   const horta: [string, () => Promise<void>][] = [

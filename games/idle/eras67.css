@@ -1,0 +1,12 @@
+/* Eras 6 e 7 (entrega 1 das eras 6–12, 0077/0078). Fora do idle.css; usa os tokens dele (--i-*, --paper, var(--i-pixel)) e
+   os cantos de pixel (contorno por 4 sombras sem desfoque). Hex só no vermelho do alarme (a cor do ícone dele). */
+
+/* Loja: a frase dos geradores 31–42 embaixo do nome, como texto de apoio (cinza, menor), sem disputar com o preço */
+.idle .gerador .meio .frase { display: block; color: var(--i-mudo); font-size: 13px; line-height: 1.2; }
+/* Loja larga (cada gerador numa linha só, idle.css @container ≥ 440px): a frase não fica espremida entre o ícone e os
+   botões (4 linhas); os botões sobem pro topo e a frase corre por baixo deles, na largura toda da linha. 246px = os 3
+   botões (96 + 44 + 84) + os 2 vãos deles (6 + 6) + o vão da coluna (10); o nome e o ×N já passam da altura dos botões. */
+@container (min-width: 440px) {
+  .idle .lista-geradores .gerador:has(.frase) { align-items: start; }
+  .idle .lista-geradores .gerador:has(.frase) .meio .frase { margin-right: -246px; margin-top: 2px; }
+}

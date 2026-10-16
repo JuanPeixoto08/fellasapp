@@ -392,3 +392,11 @@ describe('legado na caixinha (eras 6+)', () => {
     expect(textos(dicaProducao(s, Date.parse(s.server_now))).join(' ')).not.toContain('NaN');
   });
 });
+
+describe('frase dos geradores das eras 6+', () => {
+  it('a caixinha do HAL começa com a frase; a do notebook não tem frase', () => {
+    const s = comTaxa({ era: 6, generators: gens({ 30: 1, 31: 1, 32: 1, 33: 1, 34: 2 }), strategies: [0, 0, 0, 0, 0, -1] });
+    expect(textos(dicaGerador(s, 34, 1e16))[0]).toBe('Desculpe, Dave. Receio que não posso cancelar sua assinatura.');
+    expect(textos(dicaGerador(s, 1, 20))[0]).toMatch(/^Cada um rende/);
+  });
+});

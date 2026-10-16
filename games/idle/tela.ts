@@ -35,7 +35,7 @@ import { ganhoInvestidor, promoAtiva, selosBonus } from './dourados';
 import { escalaPc } from './escala';
 import type { ChaveSom } from './preferencias';
 import { dataNovidade, NOVIDADES } from './novidades';
-import { ERAS, VISUAL_NOMES } from './nomes';
+import { ERAS, FRASES_GERADOR, VISUAL_NOMES } from './nomes';
 import { CASHBACK, cashbackAtivo, CUPOM_FATOR, cupomVale, sai, textoOportunidade, tipo as tipoOportunidade } from './oportunidades';
 import { CORES, CORES_CABELO, PADRAO, PELES, type Campo, type Tons } from './personagem';
 import { caixa, estrategiaPendente, rotuloEra, segundosOportunidade, type Fase } from './store';
@@ -496,12 +496,15 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
 
   function linhaGerador(s: IdleState, gid: number) {
     const g = catalogo.geradores[gid - 1];
-    const n = s.generators[gid - 1];
+    const n = s.generators[gid - 1] ?? 0;
     const linha = el('div', 'gerador');
     const sprite = el('div', 'sprite');
     sprite.style.backgroundImage = `url(${ativos.gerador(gid)})`;
     const meio = el('div', 'meio');
     meio.append(el('strong', undefined, g.nome), el('span', 'sub', `×${n} · ${formatarTaxa(taxaPorUnidade(catalogo, s, gid) * (1 + (s.horta_bonus?.producao ?? 0)) * multGerador(s, gid, agoraTela) * (s.mapa_mult ?? 1))} cada`));
+    // eras 6+: a frase do gerador (no celular, onde não tem caixinha, é o único lugar dela)
+    const frase = FRASES_GERADOR[gid];
+    if (frase) meio.append(el('span', 'frase', frase));
     // ligado a uma empresa da Bolsa: cada um libera +1 ação dela (só depois de abrir a Bolsa)
     const ligada = (s.generators[18] ?? 0) >= 1 ? empresaDoGerador(gid) : undefined;
     if (ligada) {
@@ -804,7 +807,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
       bonus.textContent = cincos
         ? `Produção ×${(5 * cincos).toLocaleString('pt-BR')} por alguns segundos`
         : meias > 1 ? `Próximas ${meias} compras pela metade` : meias === 1 ? 'Próxima compra pela metade' : '';
-      for (let gid = 1; gid <= 30; gid++) {
+      for (let gid = 1; gid <= catalogo.geradores.length; gid++) {
         if (podeComprarGerador(s, gid)) listaG.append(linhaGerador(s, gid));
         else {
           listaG.append(linhaTrancada(gid));
@@ -926,6 +929,7 @@ export function criarTela(root: HTMLElement, a: Acoes, desenhar: Desenhar = () =
     const era = s ? estrategiaPendente(s) : null;
     modalE.replaceChildren();
     mostrar(modalE, jogando && era !== null);
+    if (jogando && era !== null) dicas.esconder(); // a folha abriu com o mouse num gerador: a caixinha dele não cobre o Escolher
     if (era !== null) {
       const folha = el('div', 'folha');
       const topo = el('div', 'folha-topo');
