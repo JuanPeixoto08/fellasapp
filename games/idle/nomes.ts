@@ -417,25 +417,40 @@ export const CONQUISTAS: readonly ConquistaTexto[] = [
   { id: 159, escondida: true, tipo: 'melhoria', alvo: 348, nome: 'Daisy, Daisy', frase: 'Ele cantou até a voz acabar.', condicao: 'Comprar "Daisy, Daisy"' },
 ];
 
-/** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os ramos (o Tempo virou Dourados e a Horta entrou em 13/10). */
-export const RAMOS: readonly string[] = ['Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta'];
+/** Ramos da árvore de habilidades: 0 é a raiz; 1 a 6 são os de hoje (o Tempo virou Dourados e a Horta entrou em 13/10);
+ *  7 a 10 entraram com a árvore grande (16/10). As pontes ficam no ramo 11 (catalogo.ts RAMO_PONTE). */
+export const RAMOS: readonly string[] = [
+  'Raiz', 'Produção', 'Recomeço', 'Oportunidades', 'Dourados', 'Gente', 'Horta', 'Bolsa', 'PPP Podcast', 'Mapa do rolê', 'Espaço',
+];
+/** O nome de quem fica entre dois ramos (o ramo 11). */
+export const NOME_PONTE = 'Ponte';
 
 /** O que cada nó faz. Valor: multiplicador (producao, opp_bonus, contrato_preco, emprego_mult, dourado_freq,
- *  dourado_investidor, dourado_duracao, horta_amadurece, horta_vida, horta_cruza, horta_mult, morango_chance),
- *  segundos (segundos: quanto a oportunidade fica na cena; dourado_tela: quanto o evento fica na tela), quantidade
- *  (caixinha, opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado) ou 1
- *  (inicio_era1, manter_gerais: só ter o nó). */
+ *  dourado_investidor, dourado_duracao, horta_amadurece, horta_vida, horta_cruza, horta_mult, morango_chance), segundos
+ *  (segundos: quanto a oportunidade fica na cena; dourado_tela: quanto o evento fica na tela), quantidade (caixinha,
+ *  opp_extra, inicio_notebooks, contrato_dias), reais (inicio_valuation), fração (por_contratado) ou 1 (inicio_era1,
+ *  manter_gerais: só ter o nó). Árvore grande (16/10, 0081/0082): os de "soma" entram como 1 + Σ valor × nível
+ *  (producao_soma, opp_fs, horta_soma, bolsa_limite_soma, marcos_soma, espaco_soma) ou somam direto (contrato_desconto,
+ *  bolsa_limite, bolsa_espiadas, conv_trocas, conv_efeito); inicio_mult multiplica (valor^nível); inicio_eras, lixo_min,
+ *  silver_min, silver_mult, legado_mult, era_freq, era_janela, bolsa_limite_mult, bolsa_escritorio, conv_recarga,
+ *  conv_cadeira2/3, marcos_mult, tee_publico, copao_mult ficam o maior; bolsa_corretagem, conv_queda, mapa_abrir,
+ *  mapa_nivel, tee_tempo ficam o menor (economia.ts efeitosArvore e idle_arvore_efeitos na 0082). */
 export type TipoNo =
   | 'producao' | 'inicio_valuation' | 'inicio_notebooks' | 'manter_gerais' | 'inicio_era1'
   | 'caixinha' | 'segundos' | 'opp_extra' | 'opp_bonus'
   | 'contrato_preco' | 'por_contratado' | 'contrato_dias' | 'emprego_mult'
   | 'dourado_freq' | 'dourado_tela' | 'dourado_investidor' | 'dourado_duracao'
-  | 'horta_amadurece' | 'horta_vida' | 'horta_cruza' | 'horta_mult' | 'morango_chance';
+  | 'horta_amadurece' | 'horta_vida' | 'horta_cruza' | 'horta_mult' | 'morango_chance'
+  // árvore grande (16/10)
+  | 'producao_soma' | 'inicio_eras' | 'inicio_mult' | 'opp_fs' | 'contrato_desconto' | 'horta_soma'
+  | 'bolsa_corretagem' | 'bolsa_limite' | 'bolsa_limite_mult' | 'bolsa_limite_soma' | 'bolsa_espiadas' | 'bolsa_escritorio'
+  | 'conv_recarga' | 'conv_trocas' | 'conv_cadeira2' | 'conv_cadeira3' | 'conv_queda' | 'conv_efeito'
+  | 'mapa_abrir' | 'mapa_nivel' | 'marcos_mult' | 'marcos_soma' | 'tee_publico' | 'tee_tempo' | 'copao_mult'
+  | 'lixo_min' | 'silver_min' | 'silver_mult' | 'legado_mult' | 'espaco_soma' | 'era_freq' | 'era_janela';
 
 export type NoTexto = { ramo: number; posicao: number; nome: string; efeito: string; tipo: TipoNo; valor: number };
 
-/** A árvore de habilidades, na ordem: a raiz e os 6 ramos de 5 nós. id = ramo·10 + posição (a raiz é 1). Nó novo ou
- *  efeito mudado = migração nova do catálogo; id nunca muda (o banco guarda quem comprou pelo id). */
+/** A árvore de habilidades, na ordem: a raiz, os 6 ramos de hoje (posições 1–5), e o que entrou com a árvore grande: as posições 6–10 e o infinito (posição 11) de cada ramo de hoje, e os ramos 7–10 com 10 nós e um infinito. O id sai de catalogo.ts idNo. Nó novo ou efeito mudado = migração nova do catálogo; id nunca muda (o banco guarda quem comprou pelo id). */
 export const ARVORE: readonly NoTexto[] = [
   { ramo: 0, posicao: 1, tipo: 'producao', valor: 1.05, nome: 'Virou MEI', efeito: 'Abre a árvore. Produção +5%.' },
   { ramo: 1, posicao: 1, tipo: 'producao', valor: 1.1, nome: 'Cafezinho de garrafa térmica', efeito: 'Produção +10%.' },
@@ -468,4 +483,100 @@ export const ARVORE: readonly NoTexto[] = [
   { ramo: 6, posicao: 3, tipo: 'horta_cruza', valor: 2, nome: 'Abelha influencer', efeito: 'Cruzamento da Horta 2× mais fácil.' },
   { ramo: 6, posicao: 4, tipo: 'horta_mult', valor: 1.5, nome: 'Agrotóxico liberado', efeito: 'Bônus das plantas ×1,5 (descontos seguem até 50%).' },
   { ramo: 6, posicao: 5, tipo: 'morango_chance', valor: 5, nome: 'Morango do amor', efeito: 'Morango com Pescoço brota 5× mais.' },
+  // ===== árvore grande (16/10, 0081): os nós 6–10 e o infinito (posição 11) dos ramos de hoje =====
+  { ramo: 1, posicao: 6, tipo: 'producao_soma', valor: 0.2, nome: 'Coach quântico', efeito: 'Produção +20%, somando com os outros nós de soma.' },
+  { ramo: 1, posicao: 7, tipo: 'producao_soma', valor: 0.3, nome: 'Planilha com macro', efeito: 'Produção +30%, somando com os outros nós de soma.' },
+  { ramo: 1, posicao: 8, tipo: 'producao_soma', valor: 0.5, nome: 'Reunião cancelada (podia ser um e-mail)', efeito: 'Produção +50%, somando com os outros nós de soma.' },
+  { ramo: 1, posicao: 9, tipo: 'producao_soma', valor: 0.75, nome: 'Home office na praia', efeito: 'Produção +75%, somando com os outros nós de soma.' },
+  { ramo: 1, posicao: 10, tipo: 'producao_soma', valor: 1, nome: 'Faria Limer', efeito: 'Produção +100%, somando com os outros nós de soma.' },
+  { ramo: 1, posicao: 11, tipo: 'producao_soma', valor: 0.05, nome: 'Hora extra infinita', efeito: 'Produção +5% por nível, somando com os outros nós de soma.' },
+  { ramo: 2, posicao: 6, tipo: 'inicio_valuation', valor: 1e9, nome: 'Poupança da vó', efeito: 'O Abrir CNPJ começa com F$ 1 bi.' },
+  { ramo: 2, posicao: 7, tipo: 'inicio_eras', valor: 2, nome: 'Kit primeiro emprego', efeito: 'O Abrir CNPJ começa com 1 de cada gerador das eras 1 e 2.' },
+  { ramo: 2, posicao: 8, tipo: 'inicio_valuation', valor: 1e12, nome: 'Clube de investimento do grupo', efeito: 'O Abrir CNPJ começa com F$ 1 tri.' },
+  { ramo: 2, posicao: 9, tipo: 'inicio_eras', valor: 3, nome: 'Mochilão na Europa', efeito: 'O Abrir CNPJ começa com 1 de cada gerador das eras 1 a 3.' },
+  { ramo: 2, posicao: 10, tipo: 'inicio_eras', valor: 4, nome: 'Nepo baby', efeito: 'O Abrir CNPJ começa com 1 de cada gerador das eras 1 a 4.' },
+  { ramo: 2, posicao: 11, tipo: 'inicio_mult', valor: 10, nome: 'Abrir outra startup', efeito: 'O F$ com que o Abrir CNPJ começa ×10 por nível.' },
+  { ramo: 3, posicao: 6, tipo: 'caixinha', valor: 6, nome: 'Cofrinho de porquinho', efeito: 'A caixinha guarda 6 oportunidades.' },
+  { ramo: 3, posicao: 7, tipo: 'segundos', valor: 45, nome: 'Notificação fixada', efeito: 'Oportunidades passam 45 s na cena.' },
+  { ramo: 3, posicao: 8, tipo: 'opp_extra', valor: 3, nome: 'Black Friday de verdade', efeito: '+3 oportunidades por dia (com o Relâmpago da Shopee, +6).' },
+  { ramo: 3, posicao: 9, tipo: 'opp_bonus', valor: 1.5, nome: 'Cupom empilhado', efeito: 'Oportunidades rendem ×1,5 (com a Xepa da feira, ×3).' },
+  { ramo: 3, posicao: 10, tipo: 'caixinha', valor: 8, nome: 'Gaveta das sacolinhas', efeito: 'A caixinha guarda 8 oportunidades.' },
+  { ramo: 3, posicao: 11, tipo: 'opp_fs', valor: 0.02, nome: 'Cliente fiel', efeito: 'Oportunidades em F$ rendem +2% por nível.' },
+  { ramo: 4, posicao: 6, tipo: 'dourado_tela', valor: 36, nome: 'Óculos novo', efeito: 'Eventos ficam 36 s na tela.' },
+  { ramo: 4, posicao: 7, tipo: 'dourado_investidor', valor: 1.5, nome: 'Tubarão do Shark Tank', efeito: 'Investidor apressado rende 60 min de produção (no lugar de 40).' },
+  { ramo: 4, posicao: 8, tipo: 'dourado_freq', valor: 2.5, nome: 'Trevo de quatro folhas', efeito: 'Eventos aparecem 2,5× mais vezes (o máximo do ramo).' },
+  { ramo: 4, posicao: 9, tipo: 'dourado_duracao', valor: 3, nome: 'Trend do TikTok', efeito: 'Viralizou e Promoção duram o triplo.' },
+  { ramo: 4, posicao: 10, tipo: 'dourado_investidor', valor: 1.5, nome: 'Gato da sorte da loja chinesa', efeito: 'Investidor apressado rende 90 min de produção.' },
+  { ramo: 4, posicao: 11, tipo: 'dourado_investidor', valor: 1.02, nome: 'Sorte de principiante', efeito: 'Investidor apressado rende +2% por nível.' },
+  { ramo: 5, posicao: 6, tipo: 'por_contratado', valor: 0.2, nome: 'Vale-refeição de verdade', efeito: 'Seus contratados rendem 20% (o máximo).' },
+  { ramo: 5, posicao: 7, tipo: 'contrato_dias', valor: 14, nome: 'CLT premium', efeito: 'Os contratos que você faz duram 14 dias.' },
+  { ramo: 5, posicao: 8, tipo: 'emprego_mult', valor: 3, nome: 'Passe do Neymar', efeito: 'Quem te contrata rende o triplo pra você.' },
+  { ramo: 5, posicao: 9, tipo: 'contrato_preco', valor: 0.3, nome: 'Estágio "pela experiência"', efeito: 'Contratar custa 70% menos.' },
+  { ramo: 5, posicao: 10, tipo: 'contrato_dias', valor: 21, nome: 'Day off no aniversário', efeito: 'Os contratos que você faz duram 21 dias.' },
+  { ramo: 5, posicao: 11, tipo: 'contrato_desconto', valor: 0.02, nome: 'Happy hour da firma', efeito: 'Contratar custa 2% menos por nível (nunca menos de 10% do preço cheio).' },
+  { ramo: 6, posicao: 6, tipo: 'horta_amadurece', valor: 0.6, nome: 'Fertilizante do vizinho', efeito: 'Plantas novas amadurecem 40% mais rápido.' },
+  { ramo: 6, posicao: 7, tipo: 'horta_vida', valor: 2, nome: 'Estufa', efeito: 'Plantas novas vivem o dobro depois de maduras.' },
+  { ramo: 6, posicao: 8, tipo: 'horta_cruza', valor: 3, nome: 'Abelha rainha', efeito: 'Cruzamento da Horta 3× mais fácil.' },
+  { ramo: 6, posicao: 9, tipo: 'horta_mult', valor: 2, nome: 'Transgênico gourmet', efeito: 'Bônus das plantas ×2 (descontos seguem até 50%).' },
+  { ramo: 6, posicao: 10, tipo: 'morango_chance', valor: 10, nome: 'Festival do Morango do Amor', efeito: 'Morango com Pescoço brota 10× mais.' },
+  { ramo: 6, posicao: 11, tipo: 'horta_soma', valor: 0.05, nome: 'Adubo orgânico premium', efeito: 'Bônus das plantas +5% por nível (descontos seguem até 50%).' },
+  // ===== os ramos novos (abrem junto com o recurso) =====
+  { ramo: 7, posicao: 1, tipo: 'bolsa_corretagem', valor: 0.8, nome: 'Corretora "sem taxa"', efeito: 'A corretagem da Bolsa cai 20%.' },
+  { ramo: 7, posicao: 2, tipo: 'bolsa_limite', valor: 50, nome: 'Conta no exterior', efeito: '+50 no limite de ações de cada empresa.' },
+  { ramo: 7, posicao: 3, tipo: 'bolsa_espiadas', valor: 1, nome: 'Grupo de sinais no Telegram', efeito: '1 espiada grátis por dia na Bolsa.' },
+  { ramo: 7, posicao: 4, tipo: 'bolsa_limite', valor: 100, nome: 'Home broker no celular', efeito: '+100 no limite de ações de cada empresa.' },
+  { ramo: 7, posicao: 5, tipo: 'bolsa_corretagem', valor: 0.5, nome: 'Tio do Bitcoin', efeito: 'Corretagem pela metade.' },
+  { ramo: 7, posicao: 6, tipo: 'bolsa_escritorio', valor: 1.5, nome: 'Escritório na Faria Lima', efeito: 'O bônus do Escritório vale ×1,5.' },
+  { ramo: 7, posicao: 7, tipo: 'bolsa_espiadas', valor: 1, nome: 'Analista do YouTube', efeito: '+1 espiada grátis por dia (2 no total).' },
+  { ramo: 7, posicao: 8, tipo: 'bolsa_limite', valor: 200, nome: 'Fundo exclusivo', efeito: '+200 no limite de ações de cada empresa.' },
+  { ramo: 7, posicao: 9, tipo: 'bolsa_corretagem', valor: 0.25, nome: 'Corretagem zero (dessa vez é verdade)', efeito: 'Corretagem ×0,25.' },
+  { ramo: 7, posicao: 10, tipo: 'bolsa_limite_mult', valor: 2, nome: 'Lobo de Wall Street', efeito: 'Limite de ações ×2.' },
+  { ramo: 7, posicao: 11, tipo: 'bolsa_limite_soma', valor: 0.05, nome: 'Fundo de índice', efeito: 'Limite de ações +5% por nível.' },
+  { ramo: 8, posicao: 1, tipo: 'conv_recarga', valor: 1.25, nome: 'Microfone de lapela', efeito: 'As trocas de convidado voltam 25% mais rápido.' },
+  { ramo: 8, posicao: 2, tipo: 'conv_trocas', valor: 1, nome: 'Mesa de som', efeito: '+1 troca guardada (4).' },
+  { ramo: 8, posicao: 3, tipo: 'conv_cadeira2', valor: 0.75, nome: 'Cadeira gamer', efeito: 'A cadeira do meio vale 75% (no lugar de 50%).' },
+  { ramo: 8, posicao: 4, tipo: 'conv_queda', valor: 0.15, nome: 'Corte pro TikTok', efeito: 'A faixa do MC V.V é derrubada 15% das vezes (no lugar de 25%).' },
+  { ramo: 8, posicao: 5, tipo: 'conv_efeito', valor: 0.1, nome: 'Patrocínio de casa de aposta', efeito: 'O bônus de produção dos convidados +10%.' },
+  { ramo: 8, posicao: 6, tipo: 'conv_recarga', valor: 2, nome: 'Produtor que não dorme', efeito: 'As trocas de convidado voltam 2× mais rápido.' },
+  { ramo: 8, posicao: 7, tipo: 'conv_cadeira3', valor: 0.5, nome: 'Sofá do estúdio', efeito: 'A cadeira do canto vale 50% (no lugar de 25%).' },
+  { ramo: 8, posicao: 8, tipo: 'conv_trocas', valor: 1, nome: 'Pauta roubada do concorrente', efeito: '+1 troca guardada (5).' },
+  { ramo: 8, posicao: 9, tipo: 'conv_efeito', valor: 0.25, nome: '10 milhões de views', efeito: 'O bônus de produção dos convidados +25% (com o Patrocínio, +35%).' },
+  { ramo: 8, posicao: 10, tipo: 'conv_queda', valor: 0.05, nome: 'Virou programa de TV', efeito: 'A faixa do MC V.V é derrubada só 5% das vezes.' },
+  { ramo: 8, posicao: 11, tipo: 'conv_efeito', valor: 0.02, nome: 'Corte viral', efeito: 'O bônus de produção dos convidados +2% por nível.' },
+  { ramo: 9, posicao: 1, tipo: 'mapa_abrir', valor: 0.75, nome: 'Rolê de quinta', efeito: 'Abrir lugar no Mapa custa 25% menos.' },
+  { ramo: 9, posicao: 2, tipo: 'mapa_nivel', valor: 0.8, nome: 'Vaquinha dos parças', efeito: 'Subir nível de lugar custa 20% menos.' },
+  { ramo: 9, posicao: 3, tipo: 'marcos_mult', valor: 1.25, nome: 'Check-in no Instagram', efeito: 'Os marcos dos lugares valem ×1,25.' },
+  { ramo: 9, posicao: 4, tipo: 'tee_publico', valor: 1.15, nome: 'Influencer de bairro', efeito: 'Camisetaria: público +15% (a procura das coleções novas).' },
+  { ramo: 9, posicao: 5, tipo: 'copao_mult', valor: 1.25, nome: 'Open bar até meia-noite', efeito: 'O Copão rende ×1,25 de fichas.' },
+  { ramo: 9, posicao: 6, tipo: 'mapa_abrir', valor: 0.5, nome: 'Promoter que conhece o dono', efeito: 'Abrir lugar no Mapa custa 50% menos.' },
+  { ramo: 9, posicao: 7, tipo: 'mapa_nivel', valor: 0.6, nome: 'Nome na lista', efeito: 'Subir nível de lugar custa 40% menos.' },
+  { ramo: 9, posicao: 8, tipo: 'marcos_mult', valor: 1.5, nome: 'Rolê que virou lenda', efeito: 'Os marcos dos lugares valem ×1,5.' },
+  { ramo: 9, posicao: 9, tipo: 'tee_tempo', valor: 0.5, nome: 'Drop esgotado', efeito: 'A Camisetaria vende a coleção na metade do tempo.' },
+  { ramo: 9, posicao: 10, tipo: 'copao_mult', valor: 1.5, nome: 'After até o sol nascer', efeito: 'O Copão rende ×1,5 de fichas.' },
+  { ramo: 9, posicao: 11, tipo: 'marcos_soma', valor: 0.03, nome: 'Rolê infinito', efeito: 'Os marcos dos lugares valem +3% por nível.' },
+  { ramo: 10, posicao: 1, tipo: 'lixo_min', valor: 15, nome: 'Treino na NASA', efeito: 'Cada destroço desviado do Lixo espacial vale 15 min de produção (no lugar de 10).' },
+  { ramo: 10, posicao: 2, tipo: 'silver_min', valor: 3, nome: 'Rolo extra de silver tape', efeito: 'O Silver tape do Houston dura 3 min.' },
+  { ramo: 10, posicao: 3, tipo: 'legado_mult', valor: 1.25, nome: 'Antena voltada pra Terra', efeito: 'As melhorias de legado valem ×1,25.' },
+  { ramo: 10, posicao: 4, tipo: 'espaco_soma', valor: 0.25, nome: 'Combustível de foguete', efeito: 'Geradores das eras 6 em diante +25% (somando com os outros do Espaço).' },
+  { ramo: 10, posicao: 5, tipo: 'era_freq', valor: 1.5, nome: 'TARS, honestidade 90%', efeito: 'Eventos de era aparecem 1,5× mais.' },
+  { ramo: 10, posicao: 6, tipo: 'silver_mult', valor: 5, nome: 'Fita prateada industrial', efeito: 'O Silver tape vira ×5.' },
+  { ramo: 10, posicao: 7, tipo: 'legado_mult', valor: 1.5, nome: 'Mensagem de casa', efeito: 'As melhorias de legado valem ×1,5.' },
+  { ramo: 10, posicao: 8, tipo: 'espaco_soma', valor: 0.5, nome: 'Motor de dobra', efeito: 'Geradores das eras 6 em diante +50% (somando com os outros do Espaço).' },
+  { ramo: 10, posicao: 9, tipo: 'era_janela', valor: 2, nome: 'Ancoragem manual', efeito: 'Eventos de era ficam o dobro do tempo na tela.' },
+  { ramo: 10, posicao: 10, tipo: 'espaco_soma', valor: 1, nome: 'Endurance', efeito: 'Geradores das eras 6 em diante +100% (somando com os outros do Espaço).' },
+  { ramo: 10, posicao: 11, tipo: 'espaco_soma', valor: 0.05, nome: 'Buraco de minhoca', efeito: 'Geradores das eras 6 em diante +5% por nível.' },
+];
+
+/** As 9 pontes (ramo 11): uma entre cada par de ramos vizinhos na copa (catalogo.ts ORDEM_RAMOS), pedindo o nó 5 dos
+ *  dois. Todas somam na produção (tipo producao_soma). Ids 2001 em diante, na ordem. */
+export const PONTES: readonly { entre: readonly [number, number]; nome: string; efeito: string; valor: number }[] = [
+  { entre: [6, 9], valor: 0.15, nome: 'Feira orgânica no rolê', efeito: 'Produção +15%, somando com os outros nós de soma.' },
+  { entre: [9, 5], valor: 0.15, nome: 'A firma fechou o bar', efeito: 'Produção +15%, somando com os outros nós de soma.' },
+  { entre: [5, 8], valor: 0.2, nome: 'Estagiário virou convidado', efeito: 'Produção +20%, somando com os outros nós de soma.' },
+  { entre: [8, 2], valor: 0.2, nome: 'Podcast da startup que faliu', efeito: 'Produção +20%, somando com os outros nós de soma.' },
+  { entre: [2, 1], valor: 0.25, nome: 'Pivotou', efeito: 'Produção +25%, somando com os outros nós de soma.' },
+  { entre: [1, 10], valor: 0.25, nome: 'Fábrica em órbita', efeito: 'Produção +25%, somando com os outros nós de soma.' },
+  { entre: [10, 3], valor: 0.25, nome: 'Frete grátis pra Lua', efeito: 'Produção +25%, somando com os outros nós de soma.' },
+  { entre: [3, 7], valor: 0.2, nome: 'Promoção relâmpago no home broker', efeito: 'Produção +20%, somando com os outros nós de soma.' },
+  { entre: [7, 4], valor: 0.25, nome: 'Dica quente do investidor anjo', efeito: 'Produção +25%, somando com os outros nós de soma.' },
 ];

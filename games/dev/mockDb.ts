@@ -50,6 +50,7 @@ import m77 from '../../supabase/migrations/0077_fellas_inc_catalogo_eras_6_7.sql
 import m78 from '../../supabase/migrations/0078_fellas_inc_eras_6_7.sql?raw';
 import m79 from '../../supabase/migrations/0079_fellas_inc_rendas_rapidas.sql?raw';
 import m80 from '../../supabase/migrations/0080_fellas_inc_cupom_meia_max.sql?raw';
+import m81 from '../../supabase/migrations/0081_fellas_inc_catalogo_arvore_grande.sql?raw';
 import { toGameError } from '../shared/errors';
 import { SKELETON } from '../test/skeleton';
 
@@ -63,7 +64,7 @@ export const FRIENDS: [string, string, number][] = [
 export const ready = (async () => {
   const db = new PGlite();
   await db.exec(SKELETON);
-  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m60, m61, m62, m63, m64, m65, m66, m67, m68, m69, m70, m71, m72, m73, m74, m75, m76, m77, m78, m79, m80]) await db.exec(m);
+  for (const m of [m27, m28, m29, m30, m31, m33, m34, m35, m36, m37, m38, m40, m41, m43, m44, m45, m46, m47, m48, m49, m50, m51, m52, m53, m54, m55, m60, m61, m62, m63, m64, m65, m66, m67, m68, m69, m70, m71, m72, m73, m74, m75, m76, m77, m78, m79, m80, m81]) await db.exec(m);
   // lugares de mentira pro ?mock não ficar vazio (os de verdade só no banco, carregados fora do repositório)
   await db.exec(`insert into public.idle_places (id, nome, frase, x, y)
     select g, 'Lugar ' || g, 'Um lugar de mentira pro ?mock.', 30 + ((g - 1) % 3) * 50, 18 + ((g - 1) / 3) * 30

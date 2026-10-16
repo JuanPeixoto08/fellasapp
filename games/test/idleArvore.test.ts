@@ -187,11 +187,13 @@ describe('o que cada ramo faz', () => {
     await ter(B, [1, 51, 52, 53, 54]);
     expect((await t.rpc<Estado>('idle_open')).rate).toBeCloseTo(0.5 * 1.05 * 1.04, 10);
   });
-  it('o catálogo no banco é o da página', async () => {
-    const nos = await q<{ id: number; custo: number; requer: number | null; tipo: string; valor: number }>(
-      'select id, custo, requer, tipo, valor from public.idle_cat_no order by id',
+  it('o catálogo no banco é o da página (com quem pede quem, os portões e o crescimento dos infinitos)', async () => {
+    const nos = await q<{ id: number; custo: number; requer: number | null; requer2: number | null; req_vendas: number | null; req_era: number | null; cresce: number | null; tipo: string; valor: number }>(
+      'select id, custo, requer, requer2, req_vendas, req_era, cresce, tipo, valor from public.idle_cat_no order by id',
     );
-    expect(nos).toEqual(catalogo.arvore.map((n) => ({ id: n.id, custo: n.custo, requer: n.requer, tipo: n.tipo, valor: n.valor })));
+    expect(nos).toEqual([...catalogo.arvore].sort((a, b) => a.id - b.id).map((n) => ({
+      id: n.id, custo: n.custo, requer: n.requer, requer2: n.requer2, req_vendas: n.reqVendas, req_era: n.reqEra, cresce: n.cresce, tipo: n.tipo, valor: n.valor,
+    })));
   });
 });
 

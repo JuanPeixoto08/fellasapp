@@ -1,7 +1,7 @@
 // Catálogo da Fellas Inc. montado a partir dos textos (nomes.ts) e dos parâmetros de balanceamento.
 // É a fonte única: o banco recebe uma cópia gerada (0033, ver catalogoSql) e um teste trava os dois iguais.
 import {
-  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, LEGADO, MELHORIAS_GERADOR, SINERGIAS, type TipoConquista,
+  ARVORE, CARGOS, CONQUISTAS, CONQUISTAS_GERADOR, ESTRATEGIAS, GERADORES, GERAIS, LEGADO, MELHORIAS_GERADOR, PONTES, SINERGIAS, type TipoConquista,
   type TipoNo,
 } from './nomes';
 
@@ -31,10 +31,40 @@ export const PRECO_LEGADO = [20, 40, 80, 160, 320, 640] as const;
 /** Sinergia: preço (× custo do alvo) e quantas unidades de cada lado pedem. */
 export const PRECO_SINERGIA = 100;
 export const REQUER_SINERGIA = 15;
-/** Árvore de habilidades: custo em pontos de prestígio por posição no ramo (1 a 5); a raiz custa 1. */
+/** Árvore de habilidades: custo em pontos de prestígio por posição no ramo (1 a 5); a raiz custa 1. Preço em produção:
+ *  não muda nunca. */
 export const CUSTO_NO = [2, 4, 8, 15, 30] as const;
 export const CUSTO_RAIZ = 1;
 export const RAIZ = 1;
+/** Árvore grande (16/10, entrega 6). Custos das posições 6–10 dos ramos de hoje, dos ramos dos recursos (7 Bolsa, 8 PPP,
+ *  9 Mapa, posições 1–10), do Espaço (10) e das pontes (2001–2009), e dos infinitos: o próximo nível n custa
+ *  round(CUSTO_INFINITO · CRESCE_INFINITO^(n − 1)). Calibrados na simulação do veterano (simulacao.test.ts, "o veterano":
+ *  a parte fixa fecha no dia ~12; ×0,28 os da spec, que nunca fechavam abaixo do teto da era 7). */
+export const CUSTO_NOVOS_HOJE = [15, 35, 70, 150, 300] as const;
+export const CUSTO_RECURSO = [8, 15, 35, 70, 150, 200, 350, 550, 850, 1500] as const;
+export const CUSTO_ESPACO = [150, 200, 350, 550, 1000, 1500, 3000, 4500, 7000, 15000] as const;
+export const CUSTO_PONTE = [550, 700, 850, 1000, 1500, 5500, 4000, 1500, 2000] as const;
+export const CUSTO_INFINITO = 1000;
+export const CRESCE_INFINITO = 1.6;
+/** A ordem dos ramos na copa, da esquerda pra direita (a raiz no meio, embaixo, entre o Recomeço e a Produção). */
+export const ORDEM_RAMOS = [6, 9, 5, 8, 2, 1, 10, 3, 7, 4] as const;
+/** Os ramos dos recursos abrem com o recurso: a era em que ele abre hoje (Mapa na era 2; Convidados com o gerador 13, o
+ *  1º da era 3; Bolsa com o gerador 19, o 1º da era 4). */
+export const ERA_RECURSO: Readonly<Record<number, number>> = { 7: 4, 8: 3, 9: 2 };
+/** Portões: 3 vendas (posições 6–7 dos ramos de hoje), era 7 alcançada (8–10), 5 vendas (pontes), 10 vendas (infinitos). */
+export const VENDAS_67 = 3;
+export const ERA_8A10 = 7;
+export const VENDAS_PONTE = 5;
+export const VENDAS_INFINITO = 10;
+/** As pontes ficam no ramo 11. */
+export const RAMO_PONTE = 11;
+/** O id de um nó: a raiz é 1; os 31 de hoje, ramo·10 + posição; os novos, ramo·100 + posição; o infinito (posição 11),
+ *  3000 + ramo. As pontes são 2001–2009 (montarCatalogo). */
+export function idNo(ramo: number, posicao: number): number {
+  if (ramo === 0) return RAIZ;
+  if (posicao === 11) return 3000 + ramo;
+  return ramo <= 6 && posicao <= 5 ? ramo * 10 + posicao : ramo * 100 + posicao;
+}
 
 export type Gerador = { id: number; era: number; nome: string; custo: number; renda: number };
 export type Melhoria =
@@ -58,10 +88,12 @@ export type Conquista = {
   id: number; nome: string; frase: string; condicao: string; tipo: TipoConquista;
   alvo: number | null; valor: number | null; escondida: boolean;
 };
-/** Nó da árvore. requer = o nó anterior do ramo (a raiz, para o 1º; null na raiz). */
+/** Nó da árvore. requer = o nó anterior do ramo (a raiz, para o 1º; o nó 10, para o infinito; null na raiz); requer2 =
+ *  o 2º que a ponte pede (null nos outros). Portões além dos pontos (null = sem): reqVendas (vendas da startup) e reqEra
+ *  (maior era alcançada). cresce: só nos infinitos (o preço do próximo nível = round(custo · cresce^nível)). */
 export type No = {
   id: number; ramo: number; posicao: number; nome: string; efeito: string; custo: number; tipo: TipoNo; valor: number;
-  requer: number | null;
+  requer: number | null; requer2: number | null; reqVendas: number | null; reqEra: number | null; cresce: number | null;
 };
 export type Catalogo = {
   geradores: Gerador[]; melhorias: Melhoria[]; estrategias: Estrategia[]; cargos: string[]; conquistas: Conquista[]; arvore: No[];
@@ -134,10 +166,27 @@ export function montarCatalogo(p: Parametros = PARAMETROS, q: ParametrosEspaco =
       valor: c.valor ?? null, escondida: c.escondida ?? false,
     })),
   ];
-  const arvore: No[] = ARVORE.map((n) => ({
-    id: n.ramo * 10 + n.posicao, ramo: n.ramo, posicao: n.posicao, nome: n.nome, efeito: n.efeito,
-    custo: n.ramo === 0 ? CUSTO_RAIZ : CUSTO_NO[n.posicao - 1], tipo: n.tipo, valor: n.valor,
-    requer: n.ramo === 0 ? null : n.posicao === 1 ? RAIZ : n.ramo * 10 + n.posicao - 1,
+  const arvore: No[] = ARVORE.map((n) => {
+    const infinito = n.posicao === 11;
+    const custo = n.ramo === 0 ? CUSTO_RAIZ
+      : infinito ? CUSTO_INFINITO
+      : n.ramo <= 6 ? (n.posicao <= 5 ? CUSTO_NO[n.posicao - 1] : CUSTO_NOVOS_HOJE[n.posicao - 6])
+      : n.ramo === 10 ? CUSTO_ESPACO[n.posicao - 1]
+      : CUSTO_RECURSO[n.posicao - 1];
+    const requer = n.ramo === 0 ? null : infinito ? idNo(n.ramo, 10) : n.posicao === 1 ? RAIZ : idNo(n.ramo, n.posicao - 1);
+    const reqVendas = infinito ? VENDAS_INFINITO : n.ramo >= 1 && n.ramo <= 6 && (n.posicao === 6 || n.posicao === 7) ? VENDAS_67 : null;
+    const reqEra = infinito || n.ramo === 0 ? null
+      : n.ramo <= 6 ? (n.posicao >= 8 ? ERA_8A10 : null)
+      : n.ramo === 10 ? (n.posicao <= 5 ? 6 : 7)
+      : ERA_RECURSO[n.ramo];
+    return {
+      id: idNo(n.ramo, n.posicao), ramo: n.ramo, posicao: n.posicao, nome: n.nome, efeito: n.efeito, custo, tipo: n.tipo, valor: n.valor,
+      requer, requer2: null, reqVendas, reqEra, cresce: infinito ? CRESCE_INFINITO : null,
+    };
+  });
+  PONTES.forEach((p, i) => arvore.push({
+    id: 2001 + i, ramo: RAMO_PONTE, posicao: i + 1, nome: p.nome, efeito: p.efeito, custo: CUSTO_PONTE[i], tipo: 'producao_soma',
+    valor: p.valor, requer: idNo(p.entre[0], 5), requer2: idNo(p.entre[1], 5), reqVendas: VENDAS_PONTE, reqEra: null, cresce: null,
   }));
   return { geradores, melhorias, estrategias, cargos: [...CARGOS], conquistas, arvore };
 }
@@ -165,7 +214,7 @@ export function catalogoSql(cat: Catalogo = catalogo): string {
   );
   const nos = cat.arvore.map(
     (n) =>
-      `  (${n.id}, ${n.ramo}, ${n.posicao}, ${txt(n.nome)}, ${txt(n.efeito)}, ${n.custo}, ${txt(n.tipo)}, ${num(n.valor)}, ${num(n.requer)})`,
+      `  (${n.id}, ${n.ramo}, ${n.posicao}, ${txt(n.nome)}, ${txt(n.efeito)}, ${n.custo}, ${txt(n.tipo)}, ${num(n.valor)}, ${num(n.requer)}, ${num(n.requer2)}, ${num(n.reqVendas)}, ${num(n.reqEra)}, ${num(n.cresce)})`,
   );
   const lista = (linhas: string[]) => (linhas.length ? `${linhas.join(',\n')};\n` : '');
   return `-- fellasapp: Fellas Inc. (idle), catálogo: geradores, melhorias, estratégias, cargos, conquistas e a árvore. Idempotente.
@@ -193,12 +242,14 @@ create table if not exists public.idle_cat_conquista (
 );
 create table if not exists public.idle_cat_no (
   id int primary key, ramo int not null, posicao int not null, nome text not null, efeito text not null, custo int not null,
-  tipo text not null, valor double precision not null, requer int
+  tipo text not null, valor double precision not null, requer int, requer2 int, req_vendas int, req_era int, cresce double precision
 );
 -- legado (0077): banco que já tinha a tabela ganha as colunas e o tipo novo (o create acima não roda de novo)
 alter table public.idle_cat_upg add column if not exists fonte_era int, add column if not exists alvo_era int;
 alter table public.idle_cat_upg drop constraint if exists idle_cat_upg_tipo_check;
 alter table public.idle_cat_upg add constraint idle_cat_upg_tipo_check check (tipo in ('gerador', 'geral', 'sinergia', 'legado'));
+-- árvore grande (0081): a ponte pede 2 nós; portões de vendas e de era; o crescimento do preço dos infinitos
+alter table public.idle_cat_no add column if not exists requer2 int, add column if not exists req_vendas int, add column if not exists req_era int, add column if not exists cresce double precision;
 
 alter table public.idle_cat_gen enable row level security;
 alter table public.idle_cat_upg enable row level security;
@@ -238,6 +289,6 @@ insert into public.idle_cat_cargo (id, nome) values
 ${lista(car)}
 insert into public.idle_cat_conquista (id, nome, frase, condicao, tipo, alvo, valor, escondida) values
 ${lista(con)}
-insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer) values
+insert into public.idle_cat_no (id, ramo, posicao, nome, efeito, custo, tipo, valor, requer, requer2, req_vendas, req_era, cresce) values
 ${lista(nos)}`;
 }
