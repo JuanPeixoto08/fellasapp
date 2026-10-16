@@ -282,3 +282,58 @@ begin
     'era_max', greatest(s.era_max, public.idle_era(s.generators)));
 end;
 $$;
+
+-- ===== parte B: a soma de produção, o Espaço (eras 6+) e o legado na conta =====
+-- nós de produção de hoje × a soma da árvore grande (1 + Σ valor × nível) × (1 + 1% por conquista) (a da 0041 + 0082;
+-- igual a economia.ts multBonus)
+create or replace function public.idle_bonus_mult(s public.idle_state)
+returns double precision language sql stable set search_path = public as $$
+  select public.idle_arv(s.user_id, 'producao', 'mult', 1)
+       * (1 + public.idle_arv(s.user_id, 'producao_soma', 'soma', 0))
+       * (1 + 0.01::double precision * (select count(*) from public.idle_conquistas c where c.user_id = s.user_id))
+$$;
+revoke all on function public.idle_bonus_mult(public.idle_state) from public, anon, authenticated;
+
+-- quanto cada gerador rende em t (a da 0079, CTEs materializados) com a árvore grande (0082): o Espaço multiplica os
+-- geradores das eras 6+ (1 + Σ valor × nível) e o ×legado (o maior comprado) multiplica o p de todos os legados. Igual a
+-- economia.ts fatores/multLegado.
+create or replace function public.idle_gen_rendas(s public.idle_state, t timestamptz)
+returns table (gen int, renda double precision) language sql stable set search_path = public as $$
+  with est as materialized (
+    select e.* from public.idle_cat_est e where e.opcao = s.strategies[e.era - 1]
+  ), glob as materialized (
+    select coalesce((select exp(sum(ln(u.mult))) from public.idle_cat_upg u where u.tipo = 'geral' and u.id = any (s.upgrades)), 1)
+         * coalesce((select exp(sum(ln(e.prod_mult))) from est e), 1)
+         * (1 + coalesce((select sum(e.por_gerador_distinto) from est e), 0)
+              * (select count(*) from public.idle_cat_gen c where s.generators[c.id] > 0))
+         * public.idle_social_mult(s, t)
+         * public.idle_bonus_mult(s)
+         * (1 + (select b.producao from public.idle_horta_bonus(s.user_id, public.idle_horta_lado(coalesce(s.generators[11], 0)), t) b))
+         * public.idle_conv_prod(s, t)
+         * public.idle_place_mult(s) as g
+  ), arv as materialized (
+    -- árvore grande (0082): o Espaço (só nos geradores das eras 6+) e o ×legado
+    select 1 + public.idle_arv(s.user_id, 'espaco_soma', 'soma', 0) as espaco,
+           public.idle_arv(s.user_id, 'legado_mult', 'max', 1) as leg
+  ), leg as materialized (
+    select u.alvo_era as era,
+           1 + (select a.leg from arv a) * sum(u.por_unidade * (select coalesce(sum(coalesce(s.generators[g.id], 0)), 0)
+                                      from public.idle_cat_gen g where g.era = u.fonte_era)) as m
+      from public.idle_cat_upg u
+     where u.tipo = 'legado' and u.id = any (s.upgrades)
+     group by u.alvo_era
+  )
+  select c.id,
+         c.renda * coalesce(s.generators[c.id], 0)
+         * power(2::double precision, (select count(*) from public.idle_cat_upg u
+                                        where u.tipo = 'gerador' and u.gerador = c.id and u.id = any (s.upgrades)))
+         * (1 + coalesce((select sum(u.por_unidade * s.generators[u.fonte]) from public.idle_cat_upg u
+                           where u.tipo = 'sinergia' and u.alvo = c.id and u.id = any (s.upgrades)), 0))
+         * coalesce((select leg.m from leg where leg.era = c.era), 1)
+         * case when c.era >= 6 then (select a.espaco from arv a) else 1 end
+         * coalesce((select exp(sum(ln(e.gen_mult))) from est e where c.id between e.gen_de and e.gen_ate), 1)
+         * case when c.id = 11 then public.idle_conv_food(s, t) else 1 end
+         * glob.g
+    from public.idle_cat_gen c cross join glob
+$$;
+revoke all on function public.idle_gen_rendas(public.idle_state, timestamptz) from public, anon, authenticated;

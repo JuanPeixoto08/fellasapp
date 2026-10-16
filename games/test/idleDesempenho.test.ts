@@ -11,9 +11,9 @@ describe('idle_gen_rendas (0079)', () => {
   beforeAll(async () => {
     t = await freshDb({ conquistas: false });
   });
-  it('os CTEs de fora da linha do gerador rodam uma vez só (materialized)', async () => {
+  it('os CTEs de fora da linha do gerador rodam uma vez só (materialized; o arv é da 0082)', async () => {
     const [{ def }] = (await t.db.query<{ def: string }>(
       "select pg_get_functiondef('public.idle_gen_rendas(public.idle_state, timestamptz)'::regprocedure) as def")).rows;
-    for (const cte of ['est', 'glob', 'leg']) expect(def, cte).toMatch(new RegExp(`\\b${cte} as materialized \\(`));
+    for (const cte of ['est', 'glob', 'arv', 'leg']) expect(def, cte).toMatch(new RegExp(`\\b${cte} as materialized \\(`));
   });
 });

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { catalogo } from '../idle/catalogo';
-import { efeitosArvore } from '../idle/economia';
+import { efeitosArvore, taxa, type Estado } from '../idle/economia';
 import { freshDb, type TestDb } from './db';
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -200,6 +200,35 @@ describe('paridade dos efeitos com níveis (0082 parte A)', () => {
         if (typeof v === 'boolean') expect(e[k], `${nos} ${k}`).toBe(v);
         else expect(rel(e[k] as number, v), `${nos} ${JSON.stringify(niveis)} ${k}`).toBeLessThan(1e-12);
       }
+    }
+  });
+});
+
+describe('paridade da produção com a árvore grande (0082 parte B)', () => {
+  beforeEach(async () => {
+    t = await freshDb({ conquistas: false });
+    await t.member(A);
+  });
+  it('taxa com a soma, o Espaço, o legado e os infinitos (níveis ao acaso) é a de economia.ts', async () => {
+    const r = rng(82);
+    const producao = catalogo.arvore.filter((n) => ['producao', 'producao_soma', 'espaco_soma', 'legado_mult'].includes(n.tipo)).map((n) => n.id);
+    for (let i = 0; i < 30; i++) {
+      const generators = Array.from({ length: 42 }, (_, g) => (r() < 0.75 - g * 0.012 ? Math.floor(r() * 150) : 0));
+      const upgrades = catalogo.melhorias.filter((m) => r() < (m.tipo === 'legado' ? 0.6 : 0.25)).map((m) => m.id);
+      const strategies = [0, 1, 2, 3, 4, 5].map((k) => {
+        const ops = catalogo.estrategias.filter((e) => e.era === k + 2 && e.ativa).map((e) => e.opcao);
+        return r() < 0.8 ? ops[Math.floor(r() * ops.length)] : -1;
+      });
+      const nos = producao.filter(() => r() < 0.5);
+      const niveis = Object.fromEntries(nos.filter((id) => id > 3000).map((id) => [id, 1 + Math.floor(r() * 25)]));
+      await q('delete from public.idle_state where true');
+      await q('delete from public.idle_arvore where true');
+      await q(`insert into public.idle_state (user_id, week_start, started, generators, upgrades, strategies)
+               values ($1, public.games_week_start(), true, $2, $3, $4)`, [A, generators, upgrades, strategies]);
+      await ter(nos, niveis);
+      const s: Estado = { generators, upgrades, strategies, bonus: { arvore: nos, conquistas: 0, niveis } };
+      const [{ v }] = await q<{ v: number }>('select public.idle_rate(s) as v from public.idle_state s where user_id = $1', [A]);
+      expect(rel(v, taxa(catalogo, s)), `${nos} ${JSON.stringify(niveis)}`).toBeLessThan(1e-9);
     }
   });
 });

@@ -383,3 +383,29 @@ describe('efeitos da árvore grande (nível e campos novos; igual a idle_arvore_
       .toBeCloseTo(1.15, 12);
   });
 });
+
+describe('a árvore grande na produção (igual a idle_gen_rendas e idle_bonus_mult na 0082)', () => {
+  const base = () => com([[1, 50], [7, 20], [30, 3], [31, 2], [37, 1]], { strategies: [0, 0, 0, 0, 0, 0] });
+  const comNos = (arvore: number[], niveis: Record<number, number> = {}) => ({ ...base(), bonus: { arvore, conquistas: 0, niveis } });
+  it('os nós de soma somam entre si e multiplicam por cima dos de hoje (×1,1 do Cafezinho × (1 + 0,2 + 0,15))', () => {
+    const r = taxa(cat, comNos([1, 11, 106, 2001])) / taxa(cat, comNos([1, 11]));
+    expect(r).toBeCloseTo(1.35, 12);
+    expect(multBonus(cat, comNos([1, 106]))).toBeCloseTo(1.05 * 1.2, 12);
+  });
+  it('o infinito da Produção soma 5% por nível', () => {
+    expect(taxa(cat, comNos([3001], { 3001: 6 })) / taxa(cat, comNos([]))).toBeCloseTo(1.3, 12);
+  });
+  it('o Espaço vale só nos geradores 31 em diante (eras 6+), somando os nós dele', () => {
+    const sem = comNos([]);
+    const com_ = comNos([1004, 1008]); // +25% +50%
+    expect(taxaPorUnidade(cat, com_, 31) / taxaPorUnidade(cat, sem, 31)).toBeCloseTo(1.75, 12);
+    expect(taxaPorUnidade(cat, com_, 37) / taxaPorUnidade(cat, sem, 37)).toBeCloseTo(1.75, 12);
+    expect(taxaPorUnidade(cat, com_, 30)).toBeCloseTo(taxaPorUnidade(cat, sem, 30), 12);
+  });
+  it('o legado ×1,5 multiplica o p de todos os legados (o maior comprado vale)', () => {
+    const s = { ...base(), upgrades: [3001, 3006] };
+    const leg = (arvore: number[]) => multLegado(cat, { ...s, bonus: { arvore, conquistas: 0 } }, 6) - 1;
+    expect(leg([1003, 1007])).toBeCloseTo(1.5 * leg([]), 12);
+    expect(leg([1003])).toBeCloseTo(1.25 * leg([]), 12);
+  });
+});

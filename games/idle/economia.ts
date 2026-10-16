@@ -37,12 +37,17 @@ export function unidadesDaEra(cat: Catalogo, gens: readonly number[], e: number)
   return cat.geradores.reduce((a, g) => (g.era === e ? a + (gens[g.id - 1] ?? 0) : a), 0);
 }
 
-/** O legado na era `alvo` (igual a idle_gen_rendas na 0078): 1 + Σ p × unidades da era fonte de cada legado comprado. */
+/** O legado na era `alvo` (igual a idle_gen_rendas na 0082): 1 + Σ p × (×legado da árvore) × unidades da era fonte de
+ *  cada legado comprado. */
 export function multLegado(cat: Catalogo, s: Estado, alvo: number): number {
+  return legadoCom(cat, s, alvo, efeitosDe(cat, s).legadoMult);
+}
+/** multLegado com o ×legado já calculado (fatores calcula os efeitos uma vez só por conta). */
+function legadoCom(cat: Catalogo, s: Estado, alvo: number, leg: number): number {
   let m = 1;
   for (const id of s.upgrades) {
     const u = melhoria(cat, id);
-    if (u?.tipo === 'legado' && u.alvoEra === alvo) m += u.porUnidade * unidadesDaEra(cat, s.generators, u.fonteEra);
+    if (u?.tipo === 'legado' && u.alvoEra === alvo) m += u.porUnidade * leg * unidadesDaEra(cat, s.generators, u.fonteEra);
   }
   return m;
 }
@@ -147,9 +152,11 @@ export function efeitosArvore(cat: Catalogo, nos: readonly number[], niveis: Rea
 }
 export const efeitosDe = (cat: Catalogo, s: Estado) => efeitosArvore(cat, s.bonus?.arvore ?? [], s.bonus?.niveis);
 
-/** Árvore e conquistas (igual a idle_bonus_mult na 0041): nós de produção × (1 + 1% por conquista). */
+/** Árvore e conquistas (igual a idle_bonus_mult na 0082): nós de produção de hoje × a soma da árvore grande (1 + Σ) ×
+ *  (1 + 1% por conquista). */
 export function multBonus(cat: Catalogo, s: Estado): number {
-  return efeitosDe(cat, s).producao * (1 + POR_CONQUISTA * (s.bonus?.conquistas ?? 0));
+  const ef = efeitosDe(cat, s);
+  return ef.producao * ef.producaoSoma * (1 + POR_CONQUISTA * (s.bonus?.conquistas ?? 0));
 }
 
 /** Quantos pontos de prestígio um F$/s vale: floor(cbrt(r ÷ K)), exato nos cubos (igual a idle_prestige_total). */
@@ -221,6 +228,7 @@ function melhoria(cat: Catalogo, id: number): Melhoria | undefined {
 /** Quanto cada unidade de cada gerador rende (sem o multiplicador global) e o multiplicador global. */
 export function fatores(cat: Catalogo, s: Estado): { porGerador: number[]; global: number } {
   const est = estrategiasAtivas(cat, s);
+  const ef = efeitosDe(cat, s);
   const n = cat.geradores.length;
   const dobras = Array(n).fill(0);
   const sinergia = Array(n).fill(1);
@@ -236,13 +244,14 @@ export function fatores(cat: Catalogo, s: Estado): { porGerador: number[]; globa
   const distintos = s.generators.filter((x) => x > 0).length;
   global *= 1 + est.reduce((a, e) => a + e.porGeradorDistinto, 0) * distintos;
   global *= multContratos(cat, s);
-  global *= multBonus(cat, s);
+  global *= ef.producao * ef.producaoSoma * (1 + POR_CONQUISTA * (s.bonus?.conquistas ?? 0)); // = multBonus
   const legado = new Map<number, number>(); // por era alvo
+  const espaco = ef.espaco; // árvore grande: só nos geradores das eras 6+
   const porGerador = cat.geradores.map((g) => {
-    if (!legado.has(g.era)) legado.set(g.era, multLegado(cat, s, g.era));
+    if (!legado.has(g.era)) legado.set(g.era, legadoCom(cat, s, g.era, ef.legadoMult));
     let mult = 1;
     for (const e of est) if (e.genDe !== null && e.genAte !== null && g.id >= e.genDe && g.id <= e.genAte) mult *= e.genMult;
-    return g.renda * 2 ** dobras[g.id - 1] * sinergia[g.id - 1] * legado.get(g.era)! * mult;
+    return g.renda * 2 ** dobras[g.id - 1] * sinergia[g.id - 1] * legado.get(g.era)! * mult * (g.era >= 6 ? espaco : 1);
   });
   return { porGerador, global };
 }
