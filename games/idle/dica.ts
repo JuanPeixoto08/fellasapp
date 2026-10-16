@@ -614,7 +614,8 @@ export function dicaNo(s: IdleState, no: No): Dica {
   if (k) linhas.push({ texto: `${k.nome}: ${k.fmt(antes[k.campo] as number)} → ${k.fmt(depois[k.campo] as number)}` });
   const ganho = ganhoNo(s, no, antes, depois);
   if (ganho > 0) linhas.push({ texto: `${formatarTaxa(ganho)} na sua produção agora`, tom: 'bom' });
-  if (infinito) linhas.push({ texto: `Nível ${nivel} → ${nivel + 1}`, tom: 'fraco' });
+  // o nível só no infinito que você tem (igual ao cartão: no que não é seu, "Nível 0 → 1" não diz nada)
+  if (infinito && tem) linhas.push({ texto: `Nível ${nivel} → ${nivel + 1}`, tom: 'fraco' });
   const p = tem ? null : portao(no, c);
   if (p) linhas.push({ texto: p, tom: 'ruim' });
   return { titulo: no.nome, linhas };

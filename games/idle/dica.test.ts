@@ -449,6 +449,10 @@ describe('caixinha dos nós da árvore (o que está agora → com o nó)', () =>
     const t = textos(dicaNo(s, no(3001)));
     expect(t).toContain('Soma de produção: +20% → +25%');
     expect(t).toContain('Nível 4 → 5');
+    // o infinito que você não tem: sem "Nível 0 → 1" (o cartão também não diz)
+    const novo = textos(dicaNo(estado({ rate: 1000, vendas: 10, bonus: { arvore: [110], conquistas: 0 } }), no(3001)));
+    expect(novo.join(' ')).not.toContain('Nível');
+    expect(novo.some((x) => x.startsWith('Soma de produção: '))).toBe(true);
   });
   it('portão: o que falta; minigame: o número de antes e de depois', () => {
     expect(textos(dicaNo(estado({ vendas: 1, bonus: { arvore: [15], conquistas: 0 } }), no(106)))).toContain('Falta: 3 vendas (você tem 1)');

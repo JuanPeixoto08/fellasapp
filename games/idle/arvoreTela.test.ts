@@ -42,6 +42,11 @@ const translate = () => {
 };
 /** O deslocamento que põe o nó no meio do palco, no zoom k. */
 const noMeio = (id: number, k: number) => ({ x: (L / 2 - POSICOES_ARVORE[id][0]) * k, y: (L / 2 - POSICOES_ARVORE[id][1]) * k });
+/** Espera o próximo quadro (a pinça e a rodinha redesenham uma vez por quadro). */
+const quadro = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+const palcoEl = () => document.querySelector<HTMLElement>('.arvore-palco')!;
+const rodinha = (deltaY: number, deltaX = 0) =>
+  palcoEl().dispatchEvent(new WheelEvent('wheel', { deltaY, deltaX, clientX: 0, clientY: 0, bubbles: true, cancelable: true }));
 
 describe('árvore grande em tela cheia (a constelação)', () => {
   it('fechada até abrir; abre com os 120 nós, situação e forma nas classes, o anel da era 7 e os pontos no topo', () => {
@@ -122,12 +127,68 @@ describe('árvore grande em tela cheia (a constelação)', () => {
     expect(no(3001).querySelector('.no-nivel')!.textContent).toBe('nv 7');
     expect(no(3001).querySelector('.no-custo')!.textContent).toBe(`${Math.round(1000 * 1.6 ** 7)} ★`);
     expect(no(3001).classList.contains('nivelado')).toBe(true);
+    // o nível e o preço do infinito ficam juntos, pro lado de fora do raio
+    expect(no(3001).querySelector('.no-info .no-nivel')).not.toBeNull();
+    expect(no(3001).style.getPropertyValue('--ux')).not.toBe('');
   });
   it('falta ponto: o botão diz quanto falta, apagado', () => {
     abrir(estado({ pontos: 1, bonus: { arvore: [1, 11], conquistas: 0 } }), false, 21);
     expect(no(21).classList.contains('falta')).toBe(true);
     expect(cartao().querySelector('button')!.textContent).toBe('Falta 1 ★');
     expect(cartao().querySelector('button')!.disabled).toBe(true);
+  });
+  it('infinito: depois de comprar, o Comprar fica apagado ~400 ms (o 2º toque não compra outro nível) e o foco volta pra ele', () => {
+    vi.useFakeTimers();
+    try {
+      const s = (nv: number) => estado({ pontos: 99999, vendas: 10, bonus: { arvore: [3001], conquistas: 0, niveis: { 3001: nv } } });
+      const t = abrir(s(2), false, 3001);
+      const b = cartao().querySelector<HTMLButtonElement>('.arvore-acao .btn')!;
+      b.focus();
+      b.click();
+      expect(comprar).toHaveBeenCalledWith(3001);
+      t.renderizar(s(2), true); // o banco pensando
+      t.renderizar(s(3), false); // respondeu: nível 3
+      const b2 = cartao().querySelector<HTMLButtonElement>('.arvore-acao .btn')!;
+      expect(b2.disabled).toBe(true);
+      b2.click();
+      expect(comprar).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(399);
+      expect(cartao().querySelector<HTMLButtonElement>('.arvore-acao .btn')!.disabled).toBe(true);
+      vi.advanceTimersByTime(1);
+      const b3 = cartao().querySelector<HTMLButtonElement>('.arvore-acao .btn')!;
+      expect(b3.disabled).toBe(false);
+      expect(document.activeElement).toBe(b3); // o teclado segue no Comprar
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('comprar com o teclado: o foco volta pro Comprar depois de redesenhar; escolher outro nó com o mouse não puxa o foco', () => {
+    const s = () => estado({ pontos: 9, bonus: { arvore: [1], conquistas: 0 } });
+    const t = abrir(s(), false, 21);
+    cartao().querySelector<HTMLButtonElement>('.arvore-acao .btn')!.focus();
+    t.renderizar(s(), true);
+    t.renderizar(s(), false);
+    expect(document.activeElement).toBe(cartao().querySelector('.arvore-acao .btn'));
+    no(31).focus();
+    no(31).click();
+    t.renderizar(s(), false);
+    expect(document.activeElement).toBe(no(31));
+  });
+  it('a fileira rola até o ramo ativo só quando ele muda', () => {
+    const rolar = vi.fn();
+    const antes = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = rolar;
+    try {
+      abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } })); // o 11, Produção
+      expect(rolar).toHaveBeenCalledTimes(1);
+      no(12).click(); // Produção de novo
+      document.querySelector<HTMLButtonElement>('.arvore-zoom .zoom-mais')!.click();
+      expect(rolar).toHaveBeenCalledTimes(1);
+      no(21).click(); // Recomeço
+      expect(rolar).toHaveBeenCalledTimes(2);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = antes;
+    }
   });
   it('ocupado: Comprar apagado', () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }), true);
@@ -175,21 +236,50 @@ describe('árvore grande em tela cheia (a constelação)', () => {
     no(41).click();
     expect(no(41).getAttribute('aria-pressed')).toBe('true');
   });
-  it('pinça (dois dedos): aproxima e não escolhe nem compra no fim', () => {
+  it('pinça (dois dedos): aproxima em volta do meio dos dedos, redesenha uma vez por quadro e não escolhe nem compra no fim', async () => {
     abrir(estado({ pontos: 3, bonus: { arvore: [1], conquistas: 0 } }));
     const palco = document.querySelector<HTMLElement>('.arvore-palco')!;
     const antes = mundo().style.width;
+    const t0 = translate();
+    const desenhos = vi.spyOn(mundo(), 'replaceChildren');
     palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
     palco.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, clientX: 200, clientY: 100, bubbles: true }));
+    palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientX: 210, clientY: 100, bubbles: true }));
     palco.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientX: 220, clientY: 100, bubbles: true })); // 100 → 120
+    expect(desenhos).not.toHaveBeenCalled(); // espera o quadro
+    await quadro();
+    expect(desenhos).toHaveBeenCalledTimes(1);
     expect(largura()).toBeCloseTo(L * ((ZOOM_ABRIR * 120) / 100), 6);
     expect(mundo().style.width).not.toBe(antes);
+    // o ponto do mundo que estava no meio dos dedos (150, 100) segue no meio deles (160, 100)
+    expect(translate().x).toBeCloseTo(160 + (t0.x - 150) * 1.2, 6);
+    expect(translate().y).toBeCloseTo(100 + (t0.y - 100) * 1.2, 6);
     palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, clientX: 220, clientY: 100, bubbles: true }));
     palco.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 100, clientY: 100, bubbles: true }));
     no(41).click();
     expect(no(41).getAttribute('aria-pressed')).toBe('false');
     cartao().querySelector<HTMLButtonElement>('button')?.click();
     expect(comprar).toHaveBeenCalledTimes(1); // só o clique de verdade no botão (o 11, escolhido ao abrir)
+  });
+  it('rodinha/trackpad: passo pequeno aproxima pouco, em volta do mouse, um desenho por quadro; de lado arrasta; deltaY 0 não faz nada', async () => {
+    abrir(estado());
+    const w0 = largura();
+    const desenhos = vi.spyOn(mundo(), 'replaceChildren');
+    rodinha(4);
+    rodinha(4);
+    rodinha(-2);
+    await quadro();
+    expect(desenhos).toHaveBeenCalledTimes(1);
+    expect(largura()).toBeCloseTo(w0 * Math.exp(-6 * 0.0015), 6); // nada de pular pro mínimo ou pro máximo
+    const t0 = translate();
+    rodinha(3, 60); // deslizar de lado no trackpad: arrasta
+    await quadro();
+    expect(largura()).toBeCloseTo(w0 * Math.exp(-6 * 0.0015), 6);
+    expect(translate().x).toBeCloseTo(t0.x - 60, 6);
+    expect(translate().y).toBeCloseTo(t0.y - 3, 6);
+    rodinha(0);
+    await quadro();
+    expect(largura()).toBeCloseTo(w0 * Math.exp(-6 * 0.0015), 6);
   });
   it('botões de zoom: + aproxima até 1,4 (apaga), − afasta até a constelação inteira (apaga; longe, sem rótulos)', () => {
     abrir(estado());

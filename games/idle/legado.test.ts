@@ -295,7 +295,7 @@ describe('árvore em tela cheia: a constelação', () => {
     const maisFora = Math.max(...Object.keys(POSICOES_ARVORE).map((id) => polar(Number(id)).r));
     for (const k of [0.8, 1, 1.4]) {
       expect(raioAnelTela(a7, k)).toBeGreaterThanOrEqual(a7.raio * k);
-      expect(raioAnelTela(a7, k)).toBeGreaterThanOrEqual(maisFora * k + 60); // o losango (28) + a etiqueta (8), com folga
+      expect(raioAnelTela(a7, k)).toBeGreaterThanOrEqual(maisFora * k + 106); // o losango (38) + 2 + o nível e o preço pra fora (até 66)
     }
     // longe (sem etiquetas): o anel do mundo, dentro do quadrado (a constelação inteira cabe no zoom mínimo)
     for (const k of [0.1, 0.2, 0.3]) {
@@ -303,6 +303,7 @@ describe('árvore em tela cheia: a constelação', () => {
       expect(raioAnelTela(a7, k)).toBeLessThan((L / 2) * k);
     }
     expect(raioAnelTela(a7, 0.5)).toBeGreaterThanOrEqual(maisFora * 0.5 + 36); // o cadeado ainda aparece
+    expect(raioAnelTela(a7, 0.4)).toBeLessThan((L / 2) * 0.4); // e o anel ainda cabe no quadrado
   });
   it('o nome de cada ramo na tela fica todo por fora do anel (a linha nunca cruza o texto) e um não encosta no outro', () => {
     const a7 = ANEIS_ARVORE.find((a) => a.era === 7)!;

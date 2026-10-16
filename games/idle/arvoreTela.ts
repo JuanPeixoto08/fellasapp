@@ -22,7 +22,11 @@ const NS = 'http://www.w3.org/2000/svg';
 const ARRASTE_PX = 6;
 const PASSO_ZOOM = 1.25;
 /** Com os nomes à vista, o arraste passa um pouco da borda do mundo (os nomes dos raios de lado saem do quadrado). */
-const FOLGA_PX = 140;
+const FOLGA_PX = 180;
+/** Rodinha/trackpad: quanto cada px de deltaY aproxima (suave: o trackpad manda vários deltas pequenos por gesto). */
+const RODINHA_POR_PX = 0.0015;
+/** Depois de comprar um nível do infinito, o Comprar fica apagado esse tempo: um toque duplo não compra o nível seguinte. */
+const TRAVA_INFINITO_MS = 400;
 /** Meia abertura do anel em volta do "Era 7" (px da tela): a linha nunca passa por baixo do texto. */
 const VAO_ANEL_PX = 34;
 const LEGENDA: readonly [SituacaoTela, string][] = [
@@ -163,9 +167,20 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
   let desloc = { x: 0, y: 0 };
   let zoom = ZOOM_ABRIR;
   let arraste: { x: number; y: number; dx: number; dy: number; moveu: boolean } | null = null;
-  let pinca: { d0: number; z0: number; dx: number; dy: number } | null = null;
+  /** A pinça: a distância e o zoom do começo, o deslocamento e o ponto do palco entre os dedos (a âncora). */
+  let pinca: { d0: number; z0: number; dx: number; dy: number; mx: number; my: number } | null = null;
   const toques = new Map<number, { x: number; y: number }>();
   let engolirClique = false;
+  /** O pedido de desenho no próximo quadro (pinça e rodinha: no máximo um desenho por quadro). */
+  let pedido = 0;
+  /** O ramo que a fileira já trouxe pra vista (só rola quando muda). */
+  let ramoVisto: number | null | undefined;
+  /** O teclado estava no Comprar: depois de redesenhar o cartão, o foco volta pra ele. */
+  let focoComprar = false;
+  /** O infinito que você mandou comprar e o nível de antes; quando o nível sobe, o Comprar trava até `travaAte`. */
+  let esperando: { id: number; nivel: number } | null = null;
+  let travaAte = 0;
+  let timerTrava: ReturnType<typeof setTimeout> | null = null;
 
   const aberta = () => !tela.hasAttribute('hidden');
   // sem tamanho (escondida ou nos testes): o mínimo é o ZOOM_MIN
@@ -173,6 +188,22 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
   const k = () => limitarZoom(zoom, minimo());
   /** O mouse anda em px da tela; o mundo, em px da página (que no PC pode estar ampliada pelo zoom). */
   const zoomPagina = () => (palco.offsetWidth ? palco.getBoundingClientRect().width / palco.offsetWidth || 1 : 1);
+  /** Um ponto da tela em px do palco, a partir do meio dele (o mesmo referencial do deslocamento). */
+  function pontoNoPalco(x: number, y: number) {
+    // sem coordenada (evento sintético): o meio do palco
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: 0, y: 0 };
+    const r = palco.getBoundingClientRect();
+    const z = zoomPagina();
+    return { x: (x - r.left) / z - palco.clientWidth / 2, y: (y - r.top) / z - palco.clientHeight / 2 };
+  }
+  /** Redesenha no próximo quadro (vários eventos no mesmo quadro viram um desenho só). */
+  function pedirDesenho() {
+    if (pedido) return;
+    pedido = requestAnimationFrame(() => {
+      pedido = 0;
+      desenhar(true);
+    });
+  }
 
   /** Prende o arraste às bordas: só dá pra arrastar o que passa do palco (com os nomes à vista, uma folga a mais). */
   function posicionar() {
@@ -189,21 +220,27 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
     const kk = k();
     desloc = { x: (MUNDO_ARVORE.largura / 2 - x) * kk, y: (MUNDO_ARVORE.altura / 2 - y) * kk };
   }
-  /** Aproxima/afasta em volta de um ponto do palco (px a partir do meio dele; os botões: o meio). */
-  function mudarZoom(f: number, px = 0, py = 0) {
+  /** Aproxima/afasta em volta de um ponto do palco (px a partir do meio dele; os botões: o meio). `noQuadro`: desenha no
+   *  próximo quadro (a rodinha). */
+  function mudarZoom(f: number, px = 0, py = 0, noQuadro = false) {
     const antes = k();
     zoom = limitarZoom(antes * f, minimo());
     const r = k() / antes;
     desloc = { x: px + (desloc.x - px) * r, y: py + (desloc.y - py) * r };
-    desenhar(true);
+    if (noQuadro) pedirDesenho();
+    else desenhar(true);
   }
+  const meioDosDedos = () => {
+    const [a, b] = [...toques.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y), m: pontoNoPalco((a.x + b.x) / 2, (a.y + b.y) / 2) };
+  };
 
   palco.addEventListener('pointerdown', (e) => {
     engolirClique = false;
     toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (toques.size === 2) {
-      const [a, b] = [...toques.values()];
-      pinca = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: k(), dx: desloc.x, dy: desloc.y };
+      const { d, m } = meioDosDedos();
+      pinca = { d0: d || 1, z0: k(), dx: desloc.x, dy: desloc.y, mx: m.x, my: m.y };
       arraste = null;
       return;
     }
@@ -212,12 +249,13 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
   palco.addEventListener('pointermove', (e) => {
     if (toques.has(e.pointerId)) toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinca && toques.size >= 2) {
-      const [a, b] = [...toques.values()];
-      zoom = limitarZoom((pinca.z0 * Math.hypot(a.x - b.x, a.y - b.y)) / pinca.d0, minimo());
+      // o ponto do mundo que estava entre os dedos fica entre os dedos (aproxima ali e anda junto com eles)
+      const { d, m } = meioDosDedos();
+      zoom = limitarZoom((pinca.z0 * d) / pinca.d0, minimo());
       const r = k() / pinca.z0;
-      desloc = { x: pinca.dx * r, y: pinca.dy * r };
+      desloc = { x: m.x + (pinca.dx - pinca.mx) * r, y: m.y + (pinca.dy - pinca.my) * r };
       engolirClique = true; // o fim da pinça não escolhe nem compra
-      desenhar(true);
+      pedirDesenho();
       return;
     }
     if (!arraste) return;
@@ -250,14 +288,33 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
     e.stopPropagation();
     e.preventDefault();
   }, true);
-  // a rodinha do mouse aproxima e afasta em volta do mouse (no PC)
+  // a rodinha do mouse e o trackpad (PC): pra cima/baixo aproxima e afasta, suave, em volta do mouse; deslizar de lado
+  // no trackpad arrasta (não afasta); um desenho por quadro
   palco.addEventListener('wheel', (e) => {
     if (!aberta()) return;
     e.preventDefault();
-    const r = palco.getBoundingClientRect();
-    const z = zoomPagina();
-    mudarZoom(e.deltaY < 0 ? PASSO_ZOOM : 1 / PASSO_ZOOM, (e.clientX - r.left) / z - palco.clientWidth / 2, (e.clientY - r.top) / z - palco.clientHeight / 2);
+    const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? palco.clientHeight || 400 : 1; // linhas/páginas em px
+    const dx = e.deltaX * px;
+    const dy = e.deltaY * px;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      const z = zoomPagina();
+      desloc = { x: desloc.x - dx / z, y: desloc.y - dy / z };
+      dicas.esconder();
+      posicionar();
+      return;
+    }
+    if (dy === 0) return;
+    const p = pontoNoPalco(e.clientX, e.clientY);
+    mudarZoom(Math.exp(-dy * RODINHA_POR_PX), p.x, p.y, true);
   }, { passive: false });
+  // o teclado no Comprar: depois de comprar (o cartão é refeito) o foco volta pra ele; qualquer outro foco ou toque
+  // fora dele desliga
+  tela.addEventListener('focusin', (e) => {
+    focoComprar = (e.target as Element).matches?.('.arvore-acao .btn') ?? false;
+  });
+  tela.addEventListener('pointerdown', (e) => {
+    if (!(e.target as Element).closest?.('.arvore-acao .btn')) focoComprar = false;
+  });
   // Tab num nó fora da vista: o navegador rolaria o palco (overflow escondido) por baixo do arraste; em vez disso, a copa
   // traz o nó pro meio
   palco.addEventListener('focusin', (e) => {
@@ -311,8 +368,9 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
       return b;
     }));
     if (focado) fileira.querySelector<HTMLElement>(`[data-ramo="${focado}"]`)?.focus();
-    // o ramo ativo à vista na fileira (no celular ela rola)
-    fileira.querySelector('.ativo')?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    // o ramo ativo à vista na fileira (no celular ela rola), só quando ele muda
+    if (atual !== ramoVisto) fileira.querySelector('.ativo')?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    ramoVisto = atual;
   }
 
   function desenharCartao(s: IdleState, c: ContextoArvore, sits: Map<number, SituacaoTela>) {
@@ -338,18 +396,48 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
       acao.append(motivo);
     } else {
       const preco = precoNo(n, c);
-      const b = button(sit === 'pode' ? `Comprar · ${preco} ★` : faltam(preco - s.pontos), 'btn main', () => comprar(n.id));
-      b.disabled = sit !== 'pode' || ocupado;
+      const b = button(sit === 'pode' ? `Comprar · ${preco} ★` : faltam(preco - s.pontos), 'btn main', () => {
+        if (n.cresce !== null) esperando = { id: n.id, nivel: nivelNo(n, c) };
+        comprar(n.id);
+      });
+      b.disabled = sit !== 'pode' || ocupado || Date.now() < travaAte;
       acao.append(b);
     }
     cartao.replaceChildren(ic, texto, acao);
+    const b = cartao.querySelector<HTMLButtonElement>('.arvore-acao .btn');
+    if (focoComprar && b && !b.disabled) b.focus({ preventScroll: true });
+  }
+  function redesenharCartao() {
+    if (!estado) return;
+    const c = contextoArvore(estado);
+    desenharCartao(estado, c, situacoes(c));
+  }
+  /** O nível do infinito que você mandou comprar subiu: o Comprar trava um pouco (o 2º toque de um toque duplo não
+   *  compra o nível seguinte). Sem subir e sem o banco pensando (deu erro, ou o pedido nem saiu), esquece. */
+  function conferirCompra(c: ContextoArvore) {
+    if (!esperando) return;
+    const n = catalogo.arvore.find((x) => x.id === esperando!.id)!;
+    if (nivelNo(n, c) > esperando.nivel) {
+      esperando = null;
+      travaAte = Date.now() + TRAVA_INFINITO_MS;
+      if (timerTrava) clearTimeout(timerTrava);
+      timerTrava = setTimeout(() => {
+        timerTrava = null;
+        if (aberta()) redesenharCartao();
+      }, TRAVA_INFINITO_MS);
+    } else if (!ocupado) esperando = null;
   }
 
   /** `vistaAndou`: o zoom ou o lugar mudou (a caixinha aberta fecha); sem ele, ela segue o nó com os números novos. */
   function desenhar(vistaAndou = false) {
+    if (pedido) {
+      cancelAnimationFrame(pedido);
+      pedido = 0;
+    }
     if (!estado) return;
     const s = estado;
     const c = contextoArvore(s);
+    conferirCompra(c);
     const sits = situacoes(c);
     const kk = k();
     const W = MUNDO_ARVORE.largura * kk;
@@ -390,24 +478,40 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
       b.setAttribute('aria-label', descricaoNo(n, sit, c));
       b.setAttribute('aria-pressed', String(escolhido === n.id));
       b.append(iconeNo(n));
-      if (sit === 'pode' || sit === 'falta') b.append(el('span', 'no-custo', `${precoNo(n, c)} ★`));
+      // as etiquetas: o preço (ou o cadeado, se tem portão) na borda de baixo; no infinito, o nível e o preço juntos, pro
+      // lado de fora do raio (pra dentro fica o nó 10, maior)
+      const etiquetas: HTMLElement[] = [];
+      if (nivelado) etiquetas.push(el('span', 'no-nivel', `nv ${nivelNo(n, c)}`));
+      if (sit === 'pode' || sit === 'falta') etiquetas.push(el('span', 'no-custo', `${precoNo(n, c)} ★`));
       if (sit === 'portao') {
-        const placa = el('span', 'no-cadeado'); // a etiqueta de baixo: o preço, ou o cadeado se tem portão
+        const placa = el('span', 'no-cadeado');
         placa.append(el('i', 'cadeado'));
-        b.append(placa);
+        etiquetas.push(placa);
       }
-      if (nivelado) b.append(el('span', 'no-nivel', `nv ${nivelNo(n, c)}`));
+      if (n.posicao === 11 && n.ramo !== RAMO_PONTE) {
+        const [cx, cy] = [x - MUNDO_ARVORE.largura / 2, y - MUNDO_ARVORE.altura / 2];
+        const d = Math.hypot(cx, cy) || 1;
+        b.style.setProperty('--ux', (cx / d).toFixed(4));
+        b.style.setProperty('--uy', (cy / d).toFixed(4));
+        if (etiquetas.length) {
+          const info = el('span', 'no-info');
+          info.append(...etiquetas);
+          b.append(info);
+        }
+      } else b.append(...etiquetas);
       ligarDica(b, `no-${n.id}`, () => (estado ? dicaNo(estado, n) : null));
       filhos.push(b);
     }
     mundo.replaceChildren(...filhos);
     // os nomes dos ramos: a caixa inteira por fora do anel (mede o texto; sem medida, nos testes, uma estimativa)
     if (comRotulos) {
-      for (const { r, t } of rotulos) {
-        const p = posicaoRotulo(r.ramo, kk, t.offsetWidth || r.nome.length * 8, t.offsetHeight || 18);
+      // lê todas as medidas antes de escrever (uma conta de layout só, não uma por nome)
+      const medidas = rotulos.map(({ r, t }) => [t.offsetWidth || r.nome.length * 8, t.offsetHeight || 18] as const);
+      rotulos.forEach(({ r, t }, i) => {
+        const p = posicaoRotulo(r.ramo, kk, medidas[i][0], medidas[i][1]);
         t.style.left = `${p.x}px`;
         t.style.top = `${p.y}px`;
-      }
+      });
     }
     if (focado) mundo.querySelector<HTMLElement>(`[data-no="${focado}"]`)?.focus({ preventScroll: true });
     posicionar();
@@ -435,6 +539,7 @@ export function criarArvoreTela(comprar: (id: number) => void, ligarDica: LigarD
       ocupado = ocup;
       volta = v;
       escolhido = no ?? noInicial(contextoArvore(s));
+      ramoVisto = undefined;
       tela.removeAttribute('hidden');
       zoom = ZOOM_ABRIR;
       centrar(escolhido);

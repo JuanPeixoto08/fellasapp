@@ -217,10 +217,12 @@ export function escalaMinima(largura: number, altura: number): number {
 }
 export const limitarZoom = (z: number, minimo: number): number => Math.min(ZOOM_MAX, Math.max(minimo, z));
 
-/** Quanto passa do centro do nó mais de fora o que fica em volta dele na tela (o losango do infinito, 28, e as etiquetas
- *  de preço e de nível em cima das bordas, 8), com folga: o anel na tela fica por fora disso. O texto não encolhe com o
- *  zoom, então a folga é em px da tela. */
-const EM_VOLTA_PX = 64;
+/** Quanto passa do centro do nó mais de fora o que fica em volta dele na tela: o losango do infinito (38 de meia caixa) e,
+ *  pro lado de fora do raio, o nível e o preço empilhados (até ~60 × 34; na diagonal, ~66), com folga: o anel na tela
+ *  fica por fora disso. O texto não encolhe com o zoom, então a folga é em px da tela. */
+const EM_VOLTA_PX = 112;
+/** Só com o cadeado à vista (entre o longe e os rótulos): a meia caixa do losango no zoom (40·k) + o cadeado (26). */
+const emVoltaCadeado = (k: number) => 40 * k + 26;
 /** Os nomes dos ramos e as etiquetas de preço/nível só a partir deste zoom (o texto não encolhe: abaixo, encostariam
  *  nos nós); a fileira mostra os ramos sempre. */
 export const ZOOM_ROTULOS = 0.8;
@@ -229,10 +231,10 @@ export const ZOOM_LONGE = 1 / 3;
 const RAIOS_NOS = Object.values(POSICOES_ARVORE).map(([x, y]) => Math.hypot(x - CENTRO, y - CENTRO));
 /** O raio do anel na tela (px, k = px por unidade): o do mundo, ou mais pra fora se as etiquetas do nó mais de fora
  *  dentro dele (que não encolhem) passariam por baixo da linha. Sem etiquetas (longe), o do mundo: a constelação
- *  inteira cabe no zoom mínimo. Entre os dois, só o cadeado (o losango até 22 + 8 da etiqueta). */
+ *  inteira cabe no zoom mínimo. Entre os dois, só o cadeado. */
 export function raioAnelTela(anel: { raio: number }, k: number): number {
   const dentro = Math.max(0, ...RAIOS_NOS.filter((r) => r < anel.raio));
-  const volta = k >= ZOOM_ROTULOS - 1e-9 ? EM_VOLTA_PX : k >= ZOOM_LONGE ? 36 : 0;
+  const volta = k >= ZOOM_ROTULOS - 1e-9 ? EM_VOLTA_PX : k >= ZOOM_LONGE ? emVoltaCadeado(k) : 0;
   return Math.max(anel.raio * k, dentro * k + volta);
 }
 /** Folga entre o anel e o nome do ramo, em px da tela. */

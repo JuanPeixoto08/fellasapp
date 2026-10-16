@@ -35,8 +35,7 @@
 .idle .ramo-botao { flex: none; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px 0 4px; border: 0;
   background: var(--i-painel); color: var(--i-mudo); font: 400 18px var(--i-pixel); white-space: nowrap; cursor: pointer; scroll-snap-align: center;
   --c: var(--i-borda); box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
-.idle .ramo-botao .icone-legado { width: 32px; height: 32px;
-  width: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); height: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .ramo-botao .icone-legado { width: 32px; height: 32px; }
 .idle .ramo-botao:hover { color: var(--paper); --c: var(--i-borda2); }
 .idle .ramo-botao.ativo { color: var(--paper); background: var(--i-ativo); --c: var(--i-borda2);
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c), inset 0 -3px 0 var(--i-lilas); }
@@ -56,13 +55,11 @@
 .idle .arvore-mundo.sem-rotulos .arvore-ramo { display: none; }
 
 /* os nós: o tamanho segue o zoom até 1 (--z vem do arvoreTela.ts); o ícone em 16/32/48/64 px de tela (o zoom do PC
-   entra na conta) */
+   entra na conta; ver o @supports do round() no fim) */
 .idle .arvore-mundo .no-arvore { --base: 52px; --ic: 48px; --fundo: var(--arv-no); --c: var(--arv-borda);
   --lado: calc(var(--base) * var(--z)); width: var(--lado); height: var(--lado); margin: calc(var(--lado) / -2) 0 0 calc(var(--lado) / -2);
   background: var(--fundo); animation: none; filter: none; }
-.idle .arvore-mundo .no-arvore .icone-legado { position: relative; width: calc(var(--ic) * var(--z)); height: calc(var(--ic) * var(--z));
-  width: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1));
-  height: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1)); }
+.idle .arvore-mundo .no-arvore .icone-legado { position: relative; width: calc(var(--ic) * var(--z)); height: calc(var(--ic) * var(--z)); }
 
 /* forma: o nó 10 é maior, com moldura dupla (3 px, o céu, 2 px) */
 .idle .arvore-mundo .no-arvore.grande { --base: 72px; --ic: 64px;
@@ -70,8 +67,14 @@
     0 -6px 0 0 var(--arv-ceu), 0 6px 0 0 var(--arv-ceu), -6px 0 0 0 var(--arv-ceu), 6px 0 0 0 var(--arv-ceu),
     0 -8px 0 0 var(--c), 0 8px 0 0 var(--c), -8px 0 0 0 var(--c), 8px 0 0 0 var(--c); }
 .idle .arvore-mundo .no-arvore.grande.escolhido::after { inset: -13px; }
-/* o infinito: um losango (o quadrado girado, desenhado por baixo do ícone); o ícone e as etiquetas ficam de pé */
-.idle .arvore-mundo .no-arvore.infinito { --base: 56px; --ic: 32px; background: none; box-shadow: none; }
+/* o infinito: um losango maior que o nó comum (a caixa de 76, o lado de 54 contra os 52 do quadrado), desenhado por
+   baixo do ícone; o ícone fica de pé; o nível e o preço empilhados pro lado de fora do raio (--ux/--uy, do arvoreTela.ts:
+   pra dentro fica o nó 10) */
+.idle .arvore-mundo .no-arvore.infinito { --base: 76px; --ic: 48px; background: none; box-shadow: none; }
+.idle .no-arvore.infinito .no-info { position: absolute; z-index: 1; display: grid; justify-items: center; gap: 2px; pointer-events: none;
+  left: calc(50% + var(--ux, 0) * (var(--lado) / 2 + 2px)); top: calc(50% + var(--uy, 1) * (var(--lado) / 2 + 2px));
+  transform: translate(calc(-50% + var(--ux, 0) * 50%), calc(-50% + var(--uy, 1) * 50%)); }
+.idle .no-info > .no-custo, .idle .no-info > .no-nivel, .idle .no-info > .no-cadeado { position: static; transform: none; }
 .idle .arvore-mundo .no-arvore.infinito::before { content: ''; position: absolute; left: 50%; top: 50%; width: 70.7%; height: 70.7%;
   transform: translate(-50%, -50%) rotate(45deg); background: var(--fundo);
   box-shadow: 0 -3px 0 0 var(--c), 0 3px 0 0 var(--c), -3px 0 0 0 var(--c), 3px 0 0 0 var(--c); }
@@ -92,7 +95,7 @@
 .idle .arvore-mundo .no-arvore.trancado .icone-legado { filter: brightness(0) opacity(0.35); }
 @keyframes arv-pisca { 0%, 84%, 100% { --c: var(--i-lilas); } 92% { --c: var(--paper); } }
 
-/* as etiquetas em cima das bordas: o preço (ou o cadeado) embaixo, o nível do infinito em cima; texto em fundo de céu */
+/* as etiquetas em cima das bordas: o preço (ou o cadeado) embaixo (no infinito, pro lado de fora); texto em fundo de céu */
 .idle .no-custo, .idle .no-nivel, .idle .no-cadeado { position: absolute; left: 50%; z-index: 1; transform: translate(-50%, -50%); pointer-events: none;
   padding: 0 4px; background: var(--arv-ceu); font: 400 16px/16px var(--i-pixel); white-space: nowrap; font-variant-numeric: tabular-nums;
   box-shadow: 0 -1px 0 0 var(--arv-ceu), 0 1px 0 0 var(--arv-ceu); }
@@ -104,10 +107,12 @@
 .idle .no-cadeado { display: grid; place-items: center; width: 16px; height: 16px; padding: 0; }
 .idle .arvore-mundo.sem-rotulos .no-custo, .idle .arvore-mundo.sem-rotulos .no-nivel { display: none; }
 
-/* o cadeado de pixel (um desenho só: no nó, no cartão e na legenda): arco de 2 px e corpo de 8×7 com o buraco da chave */
-.idle .cadeado { position: relative; display: inline-block; flex: none; width: 12px; height: 12px;
-  background: linear-gradient(var(--arv-ceu) 0 0) 5px 7px / 2px 3px no-repeat, linear-gradient(var(--arv-cadeado) 0 0) 2px 5px / 8px 7px no-repeat; }
-.idle .cadeado::before { content: ''; position: absolute; left: 3px; top: 0; width: 6px; height: 6px; box-shadow: inset 0 0 0 2px var(--arv-cadeado); }
+/* o cadeado de pixel (um desenho só: no nó, no cartão e na legenda), 12×12: a alça em U de cabeça pra baixo, estreita
+   (6 de largura, 2 px de traço, aberta embaixo) em cima do corpo largo (12×6) com o buraco da chave — não lê como um 8 */
+.idle .cadeado, .idle .arvore-legenda i.cadeado { position: relative; display: inline-block; flex: none; width: 12px; height: 12px; box-shadow: none;
+  background: linear-gradient(var(--arv-ceu) 0 0) 5px 8px / 2px 2px no-repeat, linear-gradient(var(--arv-cadeado) 0 0) 0 6px / 12px 6px no-repeat; }
+.idle .cadeado::before { content: ''; position: absolute; left: 3px; top: 0; box-sizing: border-box; width: 6px; height: 6px;
+  border: 2px solid var(--arv-cadeado); border-bottom: 0; }
 
 /* longe (zoom < 1/3): sem ícone nem etiqueta, cada nó vira uma estrelinha, ainda com forma por estado — comprado cheio,
    dá pra comprar e falta ponto ocos (lilás / apagado), portão oco com um ponto no meio, trancado cheio e escuro */
@@ -132,8 +137,6 @@
 .idle .arvore-legenda .pode i { --c: var(--i-lilas); }
 .idle .arvore-legenda .falta i { --c: var(--arv-apagado); }
 .idle .arvore-legenda .trancado i { --c: var(--arv-trancado); background: var(--arv-trancado-fundo); }
-.idle .arvore-legenda i.cadeado { box-shadow: none;
-  background: linear-gradient(var(--arv-ceu) 0 0) 5px 7px / 2px 3px no-repeat, linear-gradient(var(--arv-cadeado) 0 0) 2px 5px / 8px 7px no-repeat; }
 
 /* o cartão: a hierarquia é da tipografia (onde em cima, pequeno; o nome grande; o efeito), sem borda colorida num lado
    só; o ícone com a moldura do estado; embaixo, o nível do infinito ao lado da ação */
@@ -158,8 +161,17 @@
   box-shadow: 0 -2px 0 0 var(--c), 0 2px 0 0 var(--c), -2px 0 0 0 var(--c), 2px 0 0 0 var(--c); }
 .idle .copa-barras .barra.cheia { --c: var(--gold); }
 .idle .arvore-quadro .arvore-abrir { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 4px 12px 4px 6px; text-align: left; line-height: 1.05; }
-.idle .arvore-quadro .arvore-abrir .icone-legado { width: 32px; height: 32px;
-  width: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); height: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+.idle .arvore-quadro .arvore-abrir .icone-legado { width: 32px; height: 32px; }
+
+/* o ícone 16×16 só cresce por inteiro (16/32/48/64 px de tela, contando o zoom do PC). Navegador sem round() fica com o
+   tamanho contínuo de cima (pode borrar um pouco), em vez de o cálculo inválido zerar o ícone. */
+@supports (width: round(down, 1px, 1px)) {
+  .idle .ramo-botao .icone-legado, .idle .arvore-quadro .arvore-abrir .icone-legado {
+    width: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); height: calc(max(16px, round(down, 32px * var(--zoom, 1), 16px)) / var(--zoom, 1)); }
+  .idle .arvore-mundo .no-arvore .icone-legado {
+    width: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1));
+    height: calc(max(16px, round(down, var(--ic) * var(--zoom, 1) * var(--z), 16px)) / var(--zoom, 1)); }
+}
 
 @media (min-width: 1100px) {
   .idle .arvore-fileira { justify-content: safe center; }
